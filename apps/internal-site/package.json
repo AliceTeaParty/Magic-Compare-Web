@@ -1,0 +1,39 @@
+{
+  "name": "@magic-compare/internal-site",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "typecheck": "next build",
+    "test": "vitest run --passWithNoTests",
+    "db:generate": "prisma generate --schema prisma/schema.prisma",
+    "db:push": "prisma db push --schema prisma/schema.prisma",
+    "db:seed": "tsx prisma/seed.ts"
+  },
+  "dependencies": {
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/sortable": "^10.0.0",
+    "@dnd-kit/utilities": "^3.2.2",
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.1",
+    "@magic-compare/compare-core": "workspace:*",
+    "@magic-compare/content-schema": "workspace:*",
+    "@magic-compare/shared-utils": "workspace:*",
+    "@magic-compare/ui": "workspace:*",
+    "@mui/icons-material": "^7.0.2",
+    "@mui/material": "^7.0.2",
+    "@prisma/client": "^6.8.2",
+    "embla-carousel-react": "^8.6.0",
+    "motion": "^12.23.24",
+    "next": "^15.3.1",
+    "react": "^19.1.0",
+    "react-compare-slider": "^3.1.0",
+    "react-dom": "^19.1.0",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "prisma": "^6.8.2"
+  }
+}

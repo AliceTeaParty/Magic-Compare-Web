@@ -34,3 +34,15 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# MCP Vector Search index directory
+.mcp-vector-search/
+
+# Project References
+project-guide.md
+design-example-old.pdf
+
+# Generated workspace artifacts
+apps/public-site/public/published/
+apps/internal-site/prisma/dev.db*
+apps/internal-site/public/internal-assets/

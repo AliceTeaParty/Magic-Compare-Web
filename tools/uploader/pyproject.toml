@@ -1,0 +1,18 @@
+[project]
+name = "magic-compare-uploader"
+version = "0.1.0"
+description = "Local CLI importer for Magic Compare Web"
+requires-python = ">=3.11"
+dependencies = [
+  "httpx>=0.28.1",
+  "pillow>=11.2.1",
+  "pyyaml>=6.0.2",
+  "typer>=0.15.4"
+]
+
+[project.scripts]
+magic-compare-uploader = "src.cli:app"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
