@@ -50,7 +50,9 @@ export function useViewerController(group: ViewerGroup): ViewerController {
   const currentFrameIndex = currentFrame
     ? frames.findIndex((frame) => frame.id === currentFrame.id)
     : -1;
-  const availableModes = currentFrame ? getAvailableModes(currentFrame) : ["before-after"];
+  const availableModes: ViewerMode[] = currentFrame
+    ? getAvailableModes(currentFrame)
+    : ["before-after"];
 
   useEffect(() => {
     setModeState((previousMode) =>

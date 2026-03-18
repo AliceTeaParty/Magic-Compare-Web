@@ -28,6 +28,11 @@ const SlugSchema = z
   .min(1)
   .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/);
 
+const PublicSlugSchema = z
+  .string()
+  .min(1)
+  .regex(/^[a-z0-9]+(?:-+[a-z0-9]+)*$/);
+
 const StringListSchema = z.array(z.string().min(1)).default([]);
 
 export const CaseSchema = z.object({
@@ -47,7 +52,7 @@ export const GroupSchema = z.object({
   id: z.string().min(1),
   caseId: z.string().min(1),
   slug: SlugSchema,
-  publicSlug: SlugSchema.nullable().default(null),
+  publicSlug: PublicSlugSchema.nullable().default(null),
   title: z.string().min(1),
   description: z.string().default(""),
   order: z.number().int().nonnegative(),
@@ -189,7 +194,7 @@ export const PublishManifestFrameSchema = z.object({
 
 export const PublishManifestSchema = z.object({
   schemaVersion: z.number().int().positive(),
-  publicSlug: SlugSchema,
+  publicSlug: PublicSlugSchema,
   generatedAt: z.string().datetime(),
   assetBasePath: z.string().min(1),
   case: z.object({
@@ -203,7 +208,7 @@ export const PublishManifestSchema = z.object({
   group: z.object({
     id: z.string().min(1),
     slug: SlugSchema,
-    publicSlug: SlugSchema,
+    publicSlug: PublicSlugSchema,
     title: z.string().min(1),
     description: z.string().default(""),
     defaultMode: ViewerModeSchema,

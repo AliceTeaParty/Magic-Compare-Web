@@ -5,13 +5,9 @@ import { listCases } from "@/lib/server/repositories/content-repository";
 export const dynamic = "force-dynamic";
 
 export default async function InternalHomePage() {
-  let cases = [];
-
-  try {
-    cases = await listCases();
-  } catch {
-    cases = [];
-  }
+  const cases: Awaited<ReturnType<typeof listCases>> = await listCases().catch(
+    () => [],
+  );
 
   return (
     <Container maxWidth="xl" sx={{ py: 5 }}>
