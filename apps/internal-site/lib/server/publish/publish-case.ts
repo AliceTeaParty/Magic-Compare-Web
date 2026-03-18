@@ -1,7 +1,7 @@
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { PUBLISH_SCHEMA_VERSION, type PublishManifest } from "@magic-compare/content-schema";
-import { kebabCase } from "@magic-compare/shared-utils";
+import { buildPublicGroupSlug } from "@magic-compare/shared-utils";
 import { prisma } from "@/lib/server/db/client";
 import {
   copyInternalAssetToPublished,
@@ -15,7 +15,7 @@ function withFileExtension(url: string, fallback: string): string {
 }
 
 async function ensurePublicSlug(caseSlug: string, groupSlug: string, groupId: string): Promise<string> {
-  const baseSlug = kebabCase(`${caseSlug}--${groupSlug}`);
+  const baseSlug = buildPublicGroupSlug(caseSlug, groupSlug);
   let candidate = baseSlug;
 
   while (true) {

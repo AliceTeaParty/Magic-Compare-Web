@@ -7,6 +7,10 @@ export function kebabCase(input: string): string {
     .replace(/-{2,}/g, "-");
 }
 
+export function buildPublicGroupSlug(caseSlug: string, groupSlug: string): string {
+  return `${caseSlug}--${groupSlug}`;
+}
+
 export function orderByNumericOrder<T extends { order: number }>(items: T[]): T[] {
   return [...items].sort((left, right) => left.order - right.order);
 }
