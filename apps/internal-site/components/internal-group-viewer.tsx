@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { GroupViewerWorkbench } from "@magic-compare/ui";
-import type { ViewerDataset } from "@magic-compare/compare-core";
+import type { ViewerDataset } from "@magic-compare/compare-core/viewer-data";
 
 export function InternalGroupViewer({ dataset }: { dataset: ViewerDataset }) {
   const router = useRouter();

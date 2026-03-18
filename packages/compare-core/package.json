@@ -4,7 +4,9 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./viewer-data": "./src/utils/viewer-data.ts",
+    "./use-viewer-controller": "./src/state/use-viewer-controller.ts"
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json --noEmit",

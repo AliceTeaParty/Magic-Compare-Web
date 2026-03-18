@@ -1,0 +1,96 @@
+{
+  "schemaVersion": 1,
+  "publicSlug": "demo-grain-study--banding-check",
+  "generatedAt": "2026-03-18T04:00:00.000Z",
+  "assetBasePath": "/published/groups/demo-grain-study--banding-check/assets",
+  "case": {
+    "slug": "demo-grain-study",
+    "title": "Demo Grain Study",
+    "subtitle": "Banding and texture recovery",
+    "summary": "A lightweight published bundle used to verify static consumption in the public site.",
+    "tags": ["grain", "banding", "deband"],
+    "publishedAt": "2026-03-18T04:00:00.000Z"
+  },
+  "group": {
+    "id": "group-demo-banding",
+    "slug": "banding-check",
+    "publicSlug": "demo-grain-study--banding-check",
+    "title": "Banding Check",
+    "description": "Two frames comparing gradient cleanup and edge retention.",
+    "defaultMode": "before-after",
+    "tags": ["gradient", "grain"]
+  },
+  "frames": [
+    {
+      "id": "frame-demo-001",
+      "title": "Gradient Sweep",
+      "caption": "Frame with visible sky banding and a generated heatmap.",
+      "order": 0,
+      "assets": [
+        {
+          "id": "asset-demo-001-before",
+          "kind": "before",
+          "label": "Before",
+          "imageUrl": "/published/groups/demo-grain-study--banding-check/assets/001-before.svg",
+          "thumbUrl": "/published/groups/demo-grain-study--banding-check/assets/001-before.svg",
+          "width": 1280,
+          "height": 720,
+          "note": "Original gradient",
+          "isPrimaryDisplay": true
+        },
+        {
+          "id": "asset-demo-001-after",
+          "kind": "after",
+          "label": "After",
+          "imageUrl": "/published/groups/demo-grain-study--banding-check/assets/001-after.svg",
+          "thumbUrl": "/published/groups/demo-grain-study--banding-check/assets/001-after.svg",
+          "width": 1280,
+          "height": 720,
+          "note": "Debanded with controlled grain rebuild",
+          "isPrimaryDisplay": true
+        },
+        {
+          "id": "asset-demo-001-heatmap",
+          "kind": "heatmap",
+          "label": "Heatmap",
+          "imageUrl": "/published/groups/demo-grain-study--banding-check/assets/001-heatmap.svg",
+          "thumbUrl": "/published/groups/demo-grain-study--banding-check/assets/001-heatmap.svg",
+          "width": 1280,
+          "height": 720,
+          "note": "Difference emphasis overlay",
+          "isPrimaryDisplay": false
+        }
+      ]
+    },
+    {
+      "id": "frame-demo-002",
+      "title": "Edge Hold",
+      "caption": "Frame without heatmap to exercise mode fallback.",
+      "order": 1,
+      "assets": [
+        {
+          "id": "asset-demo-002-before",
+          "kind": "before",
+          "label": "Before",
+          "imageUrl": "/published/groups/demo-grain-study--banding-check/assets/002-before.svg",
+          "thumbUrl": "/published/groups/demo-grain-study--banding-check/assets/002-before.svg",
+          "width": 1280,
+          "height": 720,
+          "note": "Original edge detail",
+          "isPrimaryDisplay": true
+        },
+        {
+          "id": "asset-demo-002-after",
+          "kind": "after",
+          "label": "After",
+          "imageUrl": "/published/groups/demo-grain-study--banding-check/assets/002-after.svg",
+          "thumbUrl": "/published/groups/demo-grain-study--banding-check/assets/002-after.svg",
+          "width": 1280,
+          "height": 720,
+          "note": "Refined edge preservation",
+          "isPrimaryDisplay": true
+        }
+      ]
+    }
+  ]
+}

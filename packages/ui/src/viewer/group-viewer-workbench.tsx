@@ -41,13 +41,13 @@ import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { ReactCompareSlider, ReactCompareSliderImage } from "react-compare-slider";
 import type { ViewerMode } from "@magic-compare/content-schema";
 import { clampNumber, formatUtcDate } from "@magic-compare/shared-utils";
-import { useViewerController } from "@magic-compare/compare-core";
+import { useViewerController } from "@magic-compare/compare-core/use-viewer-controller";
 import type {
   ViewerAsset,
   ViewerDataset,
   ViewerFrame,
   ViewerGroup,
-} from "@magic-compare/compare-core";
+} from "@magic-compare/compare-core/viewer-data";
 
 interface GroupViewerWorkbenchProps {
   dataset: ViewerDataset;

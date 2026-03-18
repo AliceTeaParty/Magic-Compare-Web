@@ -1,5 +1,5 @@
 import type { Asset } from "@prisma/client";
-import type { ViewerDataset } from "@magic-compare/compare-core";
+import type { ViewerDataset } from "@magic-compare/compare-core/viewer-data";
 import type {
   CaseStatus,
   ImportManifest,
