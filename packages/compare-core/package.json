@@ -11,7 +11,8 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
-    "@magic-compare/content-schema": "workspace:*"
+    "@magic-compare/content-schema": "workspace:*",
+    "@magic-compare/shared-utils": "workspace:*"
   },
   "peerDependencies": {
     "react": "^19.1.0"

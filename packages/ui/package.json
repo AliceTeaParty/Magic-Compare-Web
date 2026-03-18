@@ -16,6 +16,7 @@
     "@dnd-kit/utilities": "^3.2.2",
     "@magic-compare/compare-core": "workspace:*",
     "@magic-compare/content-schema": "workspace:*",
+    "@magic-compare/shared-utils": "workspace:*",
     "@mui/icons-material": "^7.0.2",
     "@mui/material": "^7.0.2",
     "embla-carousel-react": "^8.6.0",
