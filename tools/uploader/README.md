@@ -1,0 +1,405 @@
+# Magic Compare Uploader
+
+This document covers the Python uploader in `tools/uploader`.
+
+The uploader is intentionally local-first. It is designed for the current v1 workflow where images already live on disk and the web app should not implement a complex browser upload experience.
+
+## What the uploader does
+
+The uploader has three jobs:
+
+- validate the local case directory structure
+- stage original images and thumbnails into the repository's internal asset path
+- build and optionally sync an import manifest to the internal site
+
+Current staged asset destination:
+
+```text
+apps/internal-site/public/internal-assets/
+```
+
+Current default sync endpoint:
+
+```text
+http://localhost:3000/api/ops/import-sync
+```
+
+## Installation
+
+From the repository root:
+
+```bash
+cd tools/uploader
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -e .
+```
+
+After installation, the CLI entry point is:
+
+```bash
+magic-compare-uploader
+```
+
+## Commands
+
+### `scan`
+
+Validate the directory structure and print a summary.
+
+```bash
+magic-compare-uploader scan /path/to/sample-case
+```
+
+What it does:
+
+- checks that `groups/` exists
+- checks ordered folder naming
+- checks that every frame has `before` and `after`
+- prints the detected case/group/frame summary
+
+### `manifest`
+
+Stage assets and emit the import manifest JSON.
+
+```bash
+magic-compare-uploader manifest /path/to/sample-case
+```
+
+Write manifest to a file:
+
+```bash
+magic-compare-uploader manifest /path/to/sample-case -o /tmp/demo-manifest.json
+```
+
+Important:
+
+- this command is not read-only
+- it copies files into `apps/internal-site/public/internal-assets`
+- it generates thumbnails
+
+### `sync`
+
+Stage assets and push the manifest to the internal site.
+
+```bash
+magic-compare-uploader sync /path/to/sample-case
+```
+
+Use a custom internal API URL:
+
+```bash
+magic-compare-uploader sync /path/to/sample-case --api-url http://localhost:3100/api/ops/import-sync
+```
+
+## Required directory convention
+
+The uploader expects ordered directories.
+
+```text
+sample-case/
+  case.yaml
+  groups/
+    001-banding-check/
+      group.yaml
+      frames/
+        001-gradient-sweep/
+          frame.yaml
+          before.png
+          after.png
+          heatmap.png
+          crop-1.png
+          note.md
+        002-edge-hold/
+          before.png
+          after.png
+```
+
+### Ordered directory names
+
+Both group and frame directories must use:
+
+```text
+<order>-<slug>
+```
+
+Examples:
+
+- `001-banding-check`
+- `002-edge-hold`
+
+The numeric prefix is converted to zero-based `order` in the manifest.
+
+## Metadata files
+
+### `case.yaml`
+
+Supported fields:
+
+- `slug`
+- `title`
+- `subtitle`
+- `summary`
+- `tags`
+- `status`
+- `coverAssetLabel`
+
+Example:
+
+```yaml
+slug: grain-retention-study
+title: Grain Retention Study
+subtitle: Deband and edge hold
+summary: Internal compare set for debanding passes.
+tags:
+  - grain
+  - deband
+status: internal
+coverAssetLabel: After
+```
+
+### `group.yaml`
+
+Supported fields:
+
+- `title`
+- `description`
+- `defaultMode`
+- `isPublic`
+- `tags`
+
+Example:
+
+```yaml
+title: Banding Check
+description: Gradient cleanup and texture recovery.
+defaultMode: before-after
+isPublic: true
+tags:
+  - gradient
+  - grain
+```
+
+### `frame.yaml`
+
+Supported fields:
+
+- `title`
+- `caption`
+
+Example:
+
+```yaml
+title: Gradient Sweep
+caption: Sky gradient with visible banding.
+```
+
+### `note.md`
+
+`note.md` is optional.
+
+If present, its contents become the `note` field of every asset in that frame.
+
+## Supported asset discovery
+
+The uploader scans a frame directory with the following rules.
+
+### Required files
+
+- `before.*`
+- `after.*`
+
+Supported extensions:
+
+- `.png`
+- `.jpg`
+- `.jpeg`
+- `.webp`
+- `.avif`
+- `.svg`
+
+### Optional files
+
+- `heatmap.*`
+- `crop-*.*`
+- any other supported file, which is treated as `misc`
+
+## How staging works
+
+The uploader does not upload binaries over HTTP today.
+
+Instead it performs a local staging step:
+
+1. copy original assets into `apps/internal-site/public/internal-assets/[caseSlug]/[groupSlug]/[frameOrder]/`
+2. generate thumbnails alongside them with `thumb-` prefix
+3. compute `imageUrl` and `thumbUrl` as internal public paths
+4. construct the import manifest
+5. optionally send the manifest JSON to the internal site
+
+Example staged output:
+
+```text
+apps/internal-site/public/internal-assets/
+  grain-retention-study/
+    banding-check/
+      001/
+        before.png
+        thumb-before.png
+        after.png
+        thumb-after.png
+        heatmap.png
+        thumb-heatmap.png
+```
+
+## Manifest semantics
+
+The uploader emits the current repository import shape:
+
+- case metadata at the top
+- groups array
+- nested frames array
+- nested assets array
+
+Current asset semantics:
+
+- `before` and `after` are marked `isPrimaryDisplay: true`
+- `heatmap`, `crop`, and `misc` are marked `isPrimaryDisplay: false`
+- `before`, `after`, and `heatmap` default to `isPublic: true`
+- `crop` and `misc` default to `isPublic: false`
+
+This matches the current v1 intention:
+
+- public compare pages should expose the main pair and optional heatmap
+- extra crops and miscellaneous material stay internal by default
+
+## Thumbnail generation
+
+Raster inputs:
+
+- thumbnails are generated through Pillow
+- current max thumbnail size is `480x270`
+
+SVG inputs:
+
+- thumbnails are currently copied as-is
+- width and height are read from `viewBox` or SVG width/height attributes
+
+## How sync works
+
+The uploader sends the manifest to:
+
+```text
+POST /api/ops/import-sync
+```
+
+The internal site then:
+
+- validates the manifest with shared Zod schemas
+- upserts the case by slug
+- upserts groups by `(caseId, slug)`
+- deletes existing frames/assets under replaced groups
+- recreates frames/assets from the manifest
+- sets a cover asset when possible
+
+## Current assumptions
+
+The uploader currently assumes:
+
+- it runs inside this repository
+- it can write into `apps/internal-site/public/internal-assets`
+- the internal site is reachable over HTTP if `sync` is used
+
+If you install the uploader outside this repository without adapting the staging logic, `manifest` and `sync` will stage into the wrong place.
+
+## Typical workflows
+
+### Validate a new case folder
+
+```bash
+magic-compare-uploader scan ~/work/cases/grain-retention-study
+```
+
+### Stage assets and inspect generated manifest
+
+```bash
+magic-compare-uploader manifest ~/work/cases/grain-retention-study -o /tmp/manifest.json
+```
+
+### Import into a running internal site
+
+```bash
+pnpm dev:internal
+magic-compare-uploader sync ~/work/cases/grain-retention-study
+```
+
+### Publish after import
+
+1. open the internal site
+2. open the case workspace
+3. reorder groups if needed
+4. open a group and reorder frames if needed
+5. click publish in the case workspace
+6. run `pnpm sync:published` before building or deploying `public-site`
+
+## Troubleshooting
+
+### `before` or `after` missing
+
+Symptom:
+
+- `scan`, `manifest`, or `sync` fails with a missing asset error
+
+Fix:
+
+- ensure each frame directory contains both `before.*` and `after.*`
+
+### Invalid ordered directory name
+
+Symptom:
+
+- uploader rejects a folder name
+
+Fix:
+
+- rename it to `<order>-<slug>`
+- example: `001-banding-check`
+
+### Wrong `imageUrl` output path
+
+Symptom:
+
+- assets do not load in the internal site
+
+Fix:
+
+- ensure you are running the uploader from this repository layout
+- confirm the staged files exist under `apps/internal-site/public/internal-assets`
+
+### `sync` cannot reach the internal site
+
+Symptom:
+
+- HTTP request fails
+
+Fix:
+
+- start `pnpm dev:internal`
+- confirm the site is listening on the URL passed to `--api-url`
+
+### Public site still shows old content after publish
+
+Symptom:
+
+- `content/published` is updated but `public-site` still serves stale assets
+
+Fix:
+
+- run `pnpm sync:published`
+- rebuild or restart the public site
+
+## Future improvements
+
+- remote binary upload instead of repo-local staging
+- manifest dry-run mode that validates without mutating staged assets
+- richer metadata support in `frame.yaml`
+- uploader-side validation for duplicate labels and more explicit publish defaults
