@@ -1,0 +1,1 @@
+"""Magic Compare uploader package."""

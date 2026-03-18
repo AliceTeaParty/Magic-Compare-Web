@@ -1,0 +1,133 @@
+from __future__ import annotations
+
+import re
+from dataclasses import dataclass
+from pathlib import Path
+
+import yaml
+
+
+ORDERED_DIRECTORY_RE = re.compile(r"^(?P<order>\d+)-(?P<slug>[a-z0-9-]+)$")
+SUPPORTED_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".avif", ".svg"}
+
+
+@dataclass(frozen=True)
+class AssetSource:
+    kind: str
+    label: str
+    path: Path
+    note: str
+
+
+@dataclass(frozen=True)
+class FrameSource:
+    title: str
+    order: int
+    caption: str
+    directory: Path
+    assets: list[AssetSource]
+
+
+@dataclass(frozen=True)
+class GroupSource:
+    slug: str
+    order: int
+    metadata: dict
+    frames: list[FrameSource]
+
+
+@dataclass(frozen=True)
+class CaseSource:
+    root: Path
+    metadata: dict
+    groups: list[GroupSource]
+
+
+def _load_yaml(path: Path) -> dict:
+    if not path.exists():
+        return {}
+    return yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+
+
+def _parse_ordered_directory(directory: Path) -> tuple[int, str]:
+    match = ORDERED_DIRECTORY_RE.match(directory.name)
+    if not match:
+        raise ValueError(
+            f"{directory} must use '<order>-<slug>' naming, for example '001-banding-check'."
+        )
+    return int(match.group("order")), match.group("slug")
+
+
+def _find_asset_file(frame_directory: Path, stem: str) -> Path | None:
+    for extension in SUPPORTED_EXTENSIONS:
+        candidate = frame_directory / f"{stem}{extension}"
+        if candidate.exists():
+            return candidate
+    return None
+
+
+def _discover_assets(frame_directory: Path) -> list[AssetSource]:
+    note_path = frame_directory / "note.md"
+    note = note_path.read_text(encoding="utf-8").strip() if note_path.exists() else ""
+    assets: list[AssetSource] = []
+
+    for kind, label in (("before", "Before"), ("after", "After")):
+        candidate = _find_asset_file(frame_directory, kind)
+        if not candidate:
+            raise ValueError(f"{frame_directory} is missing required asset '{kind}'.")
+        assets.append(AssetSource(kind=kind, label=label, path=candidate, note=note))
+
+    heatmap = _find_asset_file(frame_directory, "heatmap")
+    if heatmap:
+        assets.append(AssetSource(kind="heatmap", label="Heatmap", path=heatmap, note=note))
+
+    for candidate in sorted(frame_directory.iterdir()):
+        if candidate.suffix.lower() not in SUPPORTED_EXTENSIONS:
+            continue
+        if candidate.stem.startswith("crop-"):
+            assets.append(AssetSource(kind="crop", label=candidate.stem, path=candidate, note=note))
+        elif candidate.stem not in {"before", "after", "heatmap"}:
+            assets.append(AssetSource(kind="misc", label=candidate.stem, path=candidate, note=note))
+
+    return assets
+
+
+def scan_case_directory(case_root: Path) -> CaseSource:
+    case_root = case_root.resolve()
+    case_metadata = _load_yaml(case_root / "case.yaml")
+    groups_directory = case_root / "groups"
+    if not groups_directory.exists():
+        raise ValueError(f"{case_root} does not contain a groups/ directory.")
+
+    groups: list[GroupSource] = []
+    for group_directory in sorted(path for path in groups_directory.iterdir() if path.is_dir()):
+        group_order, group_slug = _parse_ordered_directory(group_directory)
+        group_metadata = _load_yaml(group_directory / "group.yaml")
+        frames_directory = group_directory / "frames"
+        if not frames_directory.exists():
+            raise ValueError(f"{group_directory} does not contain a frames/ directory.")
+
+        frames: list[FrameSource] = []
+        for frame_directory in sorted(path for path in frames_directory.iterdir() if path.is_dir()):
+            frame_order, frame_slug = _parse_ordered_directory(frame_directory)
+            frame_metadata = _load_yaml(frame_directory / "frame.yaml")
+            frames.append(
+                FrameSource(
+                    title=frame_metadata.get("title", frame_slug.replace("-", " ").title()),
+                    order=frame_order - 1,
+                    caption=frame_metadata.get("caption", ""),
+                    directory=frame_directory,
+                    assets=_discover_assets(frame_directory),
+                )
+            )
+
+        groups.append(
+            GroupSource(
+                slug=group_slug,
+                order=group_order - 1,
+                metadata=group_metadata,
+                frames=frames,
+            )
+        )
+
+    return CaseSource(root=case_root, metadata=case_metadata, groups=groups)
