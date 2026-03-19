@@ -1,0 +1,63 @@
+services:
+  rustfs:
+    image: rustfs/rustfs:latest
+    container_name: magic-compare-rustfs
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      RUSTFS_ACCESS_KEY: ${MAGIC_COMPARE_S3_ACCESS_KEY_ID:-rustfsadmin}
+      RUSTFS_SECRET_KEY: ${MAGIC_COMPARE_S3_SECRET_ACCESS_KEY:-rustfsadmin}
+      RUSTFS_CONSOLE_ENABLE: "true"
+    command: ["/data"]
+    volumes:
+      - ./docker-data/rustfs:/data
+
+  rustfs-init:
+    image: amazon/aws-cli:2.31.18
+    depends_on:
+      - rustfs
+    restart: "no"
+    environment:
+      AWS_ACCESS_KEY_ID: ${MAGIC_COMPARE_S3_ACCESS_KEY_ID:-rustfsadmin}
+      AWS_SECRET_ACCESS_KEY: ${MAGIC_COMPARE_S3_SECRET_ACCESS_KEY:-rustfsadmin}
+      AWS_DEFAULT_REGION: ${MAGIC_COMPARE_S3_REGION:-us-east-1}
+      MAGIC_COMPARE_S3_BUCKET: ${MAGIC_COMPARE_S3_BUCKET:-magic-compare-assets}
+    command:
+      - /bin/sh
+      - -lc
+      - >
+        until aws --endpoint-url http://rustfs:9000 s3api list-buckets >/dev/null 2>&1; do
+          sleep 2;
+        done;
+        aws --endpoint-url http://rustfs:9000 s3api head-bucket --bucket "$MAGIC_COMPARE_S3_BUCKET" >/dev/null 2>&1 ||
+        aws --endpoint-url http://rustfs:9000 s3api create-bucket --bucket "$MAGIC_COMPARE_S3_BUCKET";
+
+  internal-site:
+    build:
+      context: .
+      dockerfile: docker/internal-site.Dockerfile
+    container_name: magic-compare-internal-site
+    depends_on:
+      - rustfs
+      - rustfs-init
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-file:/app/data/sqlite/internal-site.db}
+      MAGIC_COMPARE_HIDE_DEMO: ${MAGIC_COMPARE_HIDE_DEMO:-true}
+      MAGIC_COMPARE_PUBLISHED_ROOT: ${MAGIC_COMPARE_PUBLISHED_ROOT:-/app/data/published}
+      MAGIC_COMPARE_PUBLIC_EXPORT_DIR: ${MAGIC_COMPARE_PUBLIC_EXPORT_DIR:-/app/data/public-export}
+      MAGIC_COMPARE_S3_BUCKET: ${MAGIC_COMPARE_S3_BUCKET:-magic-compare-assets}
+      MAGIC_COMPARE_S3_REGION: ${MAGIC_COMPARE_S3_REGION:-us-east-1}
+      MAGIC_COMPARE_S3_ENDPOINT: ${MAGIC_COMPARE_S3_ENDPOINT:-http://rustfs:9000}
+      MAGIC_COMPARE_S3_ACCESS_KEY_ID: ${MAGIC_COMPARE_S3_ACCESS_KEY_ID:-rustfsadmin}
+      MAGIC_COMPARE_S3_SECRET_ACCESS_KEY: ${MAGIC_COMPARE_S3_SECRET_ACCESS_KEY:-rustfsadmin}
+      MAGIC_COMPARE_S3_FORCE_PATH_STYLE: ${MAGIC_COMPARE_S3_FORCE_PATH_STYLE:-true}
+      MAGIC_COMPARE_S3_INTERNAL_PREFIX: ${MAGIC_COMPARE_S3_INTERNAL_PREFIX:-internal-assets}
+      MAGIC_COMPARE_CF_PAGES_PROJECT_NAME: ${MAGIC_COMPARE_CF_PAGES_PROJECT_NAME:-}
+      MAGIC_COMPARE_CF_PAGES_BRANCH: ${MAGIC_COMPARE_CF_PAGES_BRANCH:-}
+      CLOUDFLARE_ACCOUNT_ID: ${CLOUDFLARE_ACCOUNT_ID:-}
+      CLOUDFLARE_API_TOKEN: ${CLOUDFLARE_API_TOKEN:-}
+    volumes:
+      - ./docker-data/internal-data:/app/data

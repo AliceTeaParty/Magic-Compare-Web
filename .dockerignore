@@ -1,0 +1,11 @@
+.git
+.github
+.next
+.turbo
+.venv
+node_modules
+**/node_modules
+**/.next
+**/coverage
+docker-data
+tmp

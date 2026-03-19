@@ -46,8 +46,8 @@ Magic Compare Web is a monorepo for an image compare platform aimed at encoding 
 
 The project has two deployment targets:
 
-- `internal-site`: internal catalog, case workspace, compare viewer, reorder operations, and publish operations.
-- `public-site`: static, read-only group pages that consume published artifacts from `content/published`.
+- `internal-site`: a server-backed Next.js app for the internal catalog, case workspace, compare viewer, reorder operations, publish operations, public export, and Pages deploy.
+- `public-site`: a static export target that consumes published artifacts from `content/published`.
 
 This repository is deliberately not a video previewer, not an online VapourSynth runner, and not an in-site review/comment system. The current scope is "look" and "publish".
 
@@ -58,16 +58,20 @@ This repository is deliberately not a video previewer, not an online VapourSynth
 - `Heatmap` for difference emphasis when visual deltas need extra contrast.
 - An internal import-to-publish workflow that turns local image sets into reviewable cases.
 - A static public delivery target that reads published bundles from `content/published`.
+- S3-compatible internal asset storage with uploader direct upload.
+- Explicit public export and Cloudflare Pages deploy actions from the internal workspace.
 
 <a id="quick-start"></a>
 
 ## 🚀 Quick Start
 
 ```bash
+cp .env.example .env
+docker compose up -d rustfs rustfs-init
 pnpm install
 pnpm db:push
 pnpm db:seed
-pnpm sync:published
+pnpm public:export
 
 # terminal 1
 pnpm dev:internal
@@ -92,6 +96,17 @@ Demo content:
 
 - `pnpm db:push` currently runs `apps/internal-site/prisma/init-db.ts` because `prisma db push` fails in the current local environment.
 
+## 🐳 Docker and Storage
+
+- `docker/internal-site.Dockerfile` builds a full-workspace internal-site image that can also trigger public export and Pages deploy.
+- `docker-compose.yml` wires together:
+  - `internal-site`
+  - `rustfs` as the S3-compatible object store
+  - `rustfs-init` to create the bucket on startup
+- internal assets now live in S3-compatible storage configured by `MAGIC_COMPARE_S3_*`
+- published bundles still live under `MAGIC_COMPARE_PUBLISHED_ROOT`
+- static public exports are mirrored into `MAGIC_COMPARE_PUBLIC_EXPORT_DIR`
+
 <a id="workflow-overview"></a>
 
 ## 🔄 Workflow Overview
@@ -100,15 +115,14 @@ Demo content:
 
 1. Prepare a local case directory that matches the uploader convention.
 2. Run the uploader to validate required files and scan the source set.
-3. Stage source images into `apps/internal-site/public/internal-assets/...`.
-4. Generate thumbnails next to the staged files.
+3. Upload source images, generated thumbnails, and generated heatmaps into S3-compatible storage.
 5. Build an `ImportManifest` and post it to `POST /api/ops/import-sync`.
 6. Let the internal site upsert case and group metadata, then recreate replaced frame and asset rows from the manifest.
 
 Result:
 
 - imported review data is available in the internal site workspace
-- staged assets stay repo-local for the current v1 flow
+- internal assets live in S3-compatible storage behind `/internal-assets/...`
 - detailed uploader usage lives in `tools/uploader/README.md`
 
 ### 📦 Publish Workflow
@@ -118,7 +132,8 @@ Result:
 3. Derive or reuse a stable `publicSlug` for each public group.
 4. Copy public assets into `content/published/groups/[publicSlug]/assets`.
 5. Write a `manifest.json` with `schemaVersion` for each published group.
-6. Run `pnpm sync:published` so the public app can serve the published bundle.
+6. Trigger `pnpm public:export` or `POST /api/ops/public-export` when you want a fresh static public bundle.
+7. Trigger `pnpm public:deploy` or `POST /api/ops/public-deploy` when you want a direct Cloudflare Pages upload.
 
 Result:
 
@@ -132,8 +147,8 @@ The repository is fully bootstrapped and verified:
 
 - `pnpm install` works.
 - `pnpm db:push` initializes the SQLite schema.
-- `pnpm db:seed` seeds a demo case into the internal database and stages demo internal assets.
-- `pnpm sync:published` copies published bundles into `apps/public-site/public/published`.
+- `pnpm db:seed` seeds a demo case into the internal database and uploads demo internal assets to S3-compatible storage.
+- `pnpm public:export` builds the static public bundle into `dist/public-site` by default.
 - `pnpm build` succeeds for both Next.js apps.
 - `pnpm test` succeeds for shared schema and viewer logic tests.
 
@@ -179,6 +194,7 @@ Internal site responsibilities:
 - reorder groups within a case
 - reorder frames within a group
 - publish public artifacts into `content/published`
+- export and deploy the public static site on demand
 
 Key implementation areas:
 
@@ -186,7 +202,8 @@ Key implementation areas:
 - `components/`: internal-only UI such as the case directory and workspace list
 - `lib/server/repositories/`: read/write data access backed by Prisma client
 - `lib/server/publish/`: publish pipeline that filters public content and writes manifests
-- `lib/server/storage/`: filesystem helpers for published artifacts
+- `lib/server/storage/`: S3-backed internal asset helpers and published artifact writers
+- `lib/server/public-site/`: runtime public export and Pages deploy helpers
 - `prisma/schema.prisma`: Prisma data model
 - `prisma/init-db.ts`: SQLite schema bootstrap script used by `pnpm db:push`
 
@@ -194,13 +211,13 @@ Key implementation areas:
 
 Public site responsibilities:
 
-- statically generate published group pages
+- statically export published group pages
 - read only from `content/published/groups/*/manifest.json`
 - expose no catalog, no upload UI, and no write APIs
 
 Key implementation areas:
 
-- `app/g/[publicSlug]/page.tsx`: SSG group viewer entry
+- `app/g/[publicSlug]/page.tsx`: SSG/static-export group viewer entry
 - `lib/content.ts`: published manifest reader
 
 ### packages/content-schema
@@ -246,7 +263,7 @@ Shared viewer workbench and theme:
 Python CLI that:
 
 - validates a local case directory
-- stages source images into `apps/internal-site/public/internal-assets`
+- uploads source images and thumbnails into S3-compatible internal asset storage
 - generates thumbnails
 - builds an import manifest
 - posts the manifest to `POST /api/ops/import-sync`
@@ -391,19 +408,14 @@ Keyboard support currently includes:
 <details>
 <summary><strong>📥 Detailed Import Flow</strong></summary>
 
-The current import flow is filesystem-first.
+The current import flow is local-processing + S3 upload.
 
 1. A local case directory is prepared according to the uploader convention.
 2. The uploader scans the directory and validates required files.
-3. The uploader copies source images into `apps/internal-site/public/internal-assets/...`.
-4. The uploader generates thumbnails next to the staged files.
+3. The uploader uploads source images, thumbnails, and generated heatmaps into S3-compatible storage.
 5. The uploader builds an `ImportManifest`.
 6. The uploader posts the manifest to `POST /api/ops/import-sync`.
 7. The internal site upserts case/group metadata, deletes existing frame/asset rows for replaced groups, and recreates them from the manifest.
-
-Important current limitation:
-
-- the uploader assumes it is running inside this repository, because staging currently writes directly into `apps/internal-site/public/internal-assets`
 
 </details>
 
@@ -415,9 +427,10 @@ The current publish flow is explicit and case-scoped.
 1. Internal site calls `POST /api/ops/case-publish`.
 2. The publish pipeline loads the full case and filters `group.isPublic`, `frame.isPublic`, and `asset.isPublic`.
 3. Each public group gets a stable `publicSlug`. If it does not exist yet, it is derived from `caseSlug--groupSlug`. Collisions add a short suffix.
-4. Public assets are copied from internal staged assets into `content/published/groups/[publicSlug]/assets`.
+4. Public assets are copied from internal S3-backed assets into `content/published/groups/[publicSlug]/assets`.
 5. A `manifest.json` with `schemaVersion` is written for each published group.
-6. `pnpm sync:published` copies `content/published` into `apps/public-site/public/published` for the public deployment target.
+6. `pnpm public:export` builds a fresh static public bundle and mirrors it into `MAGIC_COMPARE_PUBLIC_EXPORT_DIR`.
+7. `pnpm public:deploy` optionally uploads that bundle to Cloudflare Pages through Wrangler.
 
 Important current rule:
 
@@ -449,8 +462,9 @@ Note:
 ### 3. Seed demo content
 
 ```bash
+docker compose up -d rustfs rustfs-init
 pnpm db:seed
-pnpm sync:published
+pnpm public:export
 ```
 
 ### 4. Start internal and public sites
@@ -481,7 +495,8 @@ Suggested local URLs:
 | Start public site | `pnpm dev:public` |
 | Initialize SQLite | `pnpm db:push` |
 | Seed demo content | `pnpm db:seed` |
-| Sync published assets | `pnpm sync:published` |
+| Export public static site | `pnpm public:export` |
+| Deploy public static site | `pnpm public:deploy` |
 
 Build everything:
 
@@ -519,9 +534,8 @@ This is used for:
 ## ⚠️ Current Limitations
 
 - Prisma migrations are not yet wired; SQLite bootstrap is currently implemented through a manual init script.
-- Internal asset staging is repo-local, not remote-storage-backed.
-- The public site consumes published artifacts from the same repository; external deployment sync is still a pre-build step, not a dedicated pipeline.
-- The uploader does not yet support remote binary upload. It stages files locally and syncs metadata over HTTP.
+- The public site still consumes published artifacts from the same repository checkout before export.
+- Cloudflare Pages deploy assumes an existing Pages project and Wrangler-compatible credentials.
 - There is no browser-side upload UI in v1.
 - There is no in-site discussion, scoring, annotation, or review workflow.
 

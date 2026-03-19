@@ -19,13 +19,13 @@ It can start from a flat VSEditor export folder, generate a structured work dire
 The uploader has three jobs:
 
 - validate the local case directory structure
-- stage original images and thumbnails into the repository's runtime internal asset path
+- upload original images, thumbnails, and generated heatmaps into S3-compatible internal asset storage
 - build and optionally sync an import manifest to the internal site
 
-Current staged asset destination:
+Current internal asset destination:
 
 ```text
-apps/internal-site/.runtime/internal-assets/
+MAGIC_COMPARE_S3_BUCKET + MAGIC_COMPARE_S3_INTERNAL_PREFIX
 ```
 
 Default internal site homepage:
@@ -45,6 +45,13 @@ The uploader now reads configuration from a work-directory `.env` file and ships
 ```text
 MAGIC_COMPARE_SITE_URL=http://localhost:3000
 MAGIC_COMPARE_API_URL=
+MAGIC_COMPARE_S3_BUCKET=magic-compare-assets
+MAGIC_COMPARE_S3_REGION=us-east-1
+MAGIC_COMPARE_S3_ENDPOINT=http://localhost:9000
+MAGIC_COMPARE_S3_ACCESS_KEY_ID=rustfsadmin
+MAGIC_COMPARE_S3_SECRET_ACCESS_KEY=rustfsadmin
+MAGIC_COMPARE_S3_FORCE_PATH_STYLE=true
+MAGIC_COMPARE_S3_INTERNAL_PREFIX=internal-assets
 MAGIC_COMPARE_CF_ACCESS_TOKEN=
 MAGIC_COMPARE_CF_ACCESS_CLIENT_ID=
 MAGIC_COMPARE_CF_ACCESS_CLIENT_SECRET=
@@ -88,6 +95,7 @@ Default meanings:
 
 - `MAGIC_COMPARE_SITE_URL`: the internal site homepage and Cloudflare Access app URL
 - `MAGIC_COMPARE_API_URL`: optional override; if blank, the uploader derives `/api/ops/import-sync` from `MAGIC_COMPARE_SITE_URL`
+- `MAGIC_COMPARE_S3_*`: shared S3-compatible storage config for internal assets
 - `MAGIC_COMPARE_CF_ACCESS_TOKEN`: a human login token written by the CLI after successful `cloudflared` login
 - `MAGIC_COMPARE_CF_ACCESS_CLIENT_ID` / `MAGIC_COMPARE_CF_ACCESS_CLIENT_SECRET`: optional CI credentials
 
@@ -136,7 +144,7 @@ It will:
 9. generate `case.yaml`, `group.yaml`, `frame.yaml`, and `assets.yaml`
 10. open metadata in the system editor for confirmation
 11. auto-generate `heatmap.png` when missing
-12. stage assets, build the import manifest, and sync it
+12. upload assets to S3-compatible storage, build the import manifest, and sync it
 
 Default work directory:
 
@@ -195,7 +203,7 @@ magic-compare-uploader manifest /path/to/sample-case -o /tmp/demo-manifest.json
 Important:
 
 - this command is not read-only
-- it copies files into `apps/internal-site/.runtime/internal-assets`
+- it uploads original files and thumbnails into S3-compatible storage
 - it generates thumbnails
 
 ### `sync`
@@ -392,22 +400,23 @@ When using the default wizard on a flat source directory:
 - all other same-frame outputs are treated as `misc`
 - `heatmap` is preserved when explicitly present, otherwise auto-generated
 
-## How staging works
+## How asset upload works
 
-The uploader does not upload binaries over HTTP today.
+The uploader does not upload binaries through the internal-site HTTP API.
 
-Instead it performs a local staging step:
+Instead it performs an S3 upload step:
 
-1. copy original assets into `apps/internal-site/.runtime/internal-assets/[caseSlug]/[groupSlug]/[frameOrder]/`
-2. generate thumbnails alongside them with `thumb-` prefix
+1. upload original assets into `MAGIC_COMPARE_S3_BUCKET` under `internal-assets/[caseSlug]/[groupSlug]/[frameOrder]/`
+2. generate thumbnails in a temporary directory with `thumb-` prefix
 3. compute `imageUrl` and `thumbUrl` as `/internal-assets/...` URLs served by the internal site's dynamic asset route
-4. construct the import manifest
-5. optionally send the manifest JSON to the internal site
+4. upload both originals and thumbnails into the configured S3 bucket/prefix
+5. construct the import manifest
+6. optionally send the manifest JSON to the internal site
 
-Example staged output:
+Example object keys:
 
 ```text
-apps/internal-site/.runtime/internal-assets/
+internal-assets/
   grain-retention-study/
     banding-check/
       001/
@@ -474,11 +483,9 @@ The internal site then:
 The uploader currently assumes:
 
 - it runs inside this repository
-- it can write into `apps/internal-site/.runtime/internal-assets`
+- it can upload into the configured S3 bucket
 - the internal site is reachable over HTTP or HTTPS if `sync` is used
 - protected remote sites are fronted by Cloudflare Access if Zero Trust is enabled
-
-If you install the uploader outside this repository without adapting the staging logic, `manifest` and `sync` will stage into the wrong place.
 
 ## Typical workflows
 
@@ -516,7 +523,8 @@ magic-compare-uploader sync ~/work/cases/grain-retention-study
 3. reorder groups if needed
 4. open a group and reorder frames if needed
 5. click publish in the case workspace
-6. run `pnpm sync:published` before building or deploying `public-site`
+6. click `Export public site` or run `pnpm public:export`
+7. click `Deploy to Pages` or run `pnpm public:deploy` when Cloudflare env is ready
 
 ## Troubleshooting
 
@@ -550,7 +558,7 @@ Symptom:
 Fix:
 
 - ensure you are running the uploader from this repository layout
-- confirm the staged files exist under `apps/internal-site/.runtime/internal-assets`
+- confirm the uploaded objects exist in the configured S3 bucket and prefix
 
 ### `sync` cannot reach the internal site
 
@@ -585,12 +593,11 @@ Symptom:
 
 Fix:
 
-- run `pnpm sync:published`
-- rebuild or restart the public site
+- run `pnpm public:export`
+- rebuild or redeploy the public static site
 
 ## Future improvements
 
-- remote binary upload instead of repo-local staging
-- manifest dry-run mode that validates without mutating staged assets
+- dry-run mode that validates without uploading binaries
 - richer metadata support in `frame.yaml`
 - uploader-side validation for duplicate labels and more explicit publish defaults

@@ -62,6 +62,9 @@ tmp/
 
 # Generated workspace artifacts
 apps/public-site/public/published/
+apps/public-site/out/
 apps/internal-site/prisma/dev.db*
 apps/internal-site/public/internal-assets/
 apps/internal-site/.runtime/
+dist/
+docker-data/

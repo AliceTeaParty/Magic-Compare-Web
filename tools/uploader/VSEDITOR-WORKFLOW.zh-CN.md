@@ -64,12 +64,21 @@ magic-compare-uploader
 ```text
 MAGIC_COMPARE_SITE_URL=http://localhost:3000
 MAGIC_COMPARE_API_URL=
+MAGIC_COMPARE_S3_BUCKET=magic-compare-assets
+MAGIC_COMPARE_S3_REGION=us-east-1
+MAGIC_COMPARE_S3_ENDPOINT=http://localhost:9000
+MAGIC_COMPARE_S3_ACCESS_KEY_ID=rustfsadmin
+MAGIC_COMPARE_S3_SECRET_ACCESS_KEY=rustfsadmin
+MAGIC_COMPARE_S3_FORCE_PATH_STYLE=true
+MAGIC_COMPARE_S3_INTERNAL_PREFIX=internal-assets
 MAGIC_COMPARE_CF_ACCESS_TOKEN=
 ```
 
 说明：
 
 - 本地开发时，`MAGIC_COMPARE_SITE_URL=http://localhost:3000` 就够了
+- uploader 现在会把原图、缩略图和自动 heatmap 直接上传到 S3-compatible 存储，不再写入仓库内的 runtime 目录
+- 如果本地用 `docker compose up -d rustfs rustfs-init`，上面这组 S3 默认值可以直接使用
 - 如果内部站放在 Cloudflare Zero Trust 后面，把它改成真实内部域名，例如 `https://compare-internal.example.com`
 - `MAGIC_COMPARE_CF_ACCESS_TOKEN` 不需要手填，CLI 会在登录成功后自动写回
 
