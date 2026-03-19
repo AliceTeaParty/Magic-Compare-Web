@@ -1,5 +1,6 @@
 .git
 .github
+.env
 .next
 .turbo
 .venv
@@ -7,5 +8,6 @@ node_modules
 **/node_modules
 **/.next
 **/coverage
+apps/internal-site/prisma/dev.db*
 docker-data
 tmp

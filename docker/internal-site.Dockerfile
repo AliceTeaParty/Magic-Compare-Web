@@ -28,4 +28,4 @@ COPY --from=builder /app /app
 
 EXPOSE 3000
 
-CMD ["sh", "-c", "pnpm db:push && pnpm --filter @magic-compare/internal-site start"]
+CMD ["sh", "-c", "pnpm db:push && pnpm db:seed && pnpm --filter @magic-compare/internal-site start"]

@@ -15,8 +15,12 @@ services:
 
   rustfs-init:
     image: amazon/aws-cli:2.31.18
+    entrypoint:
+      - /bin/sh
+      - -lc
     depends_on:
-      - rustfs
+      rustfs:
+        condition: service_started
     restart: "no"
     environment:
       AWS_ACCESS_KEY_ID: ${MAGIC_COMPARE_S3_ACCESS_KEY_ID:-rustfsadmin}
@@ -24,14 +28,10 @@ services:
       AWS_DEFAULT_REGION: ${MAGIC_COMPARE_S3_REGION:-us-east-1}
       MAGIC_COMPARE_S3_BUCKET: ${MAGIC_COMPARE_S3_BUCKET:-magic-compare-assets}
     command:
-      - /bin/sh
-      - -lc
       - >
-        until aws --endpoint-url http://rustfs:9000 s3api list-buckets >/dev/null 2>&1; do
-          sleep 2;
-        done;
+        until aws --endpoint-url http://rustfs:9000 s3api list-buckets >/dev/null 2>&1; do sleep 2; done;
         aws --endpoint-url http://rustfs:9000 s3api head-bucket --bucket "$MAGIC_COMPARE_S3_BUCKET" >/dev/null 2>&1 ||
-        aws --endpoint-url http://rustfs:9000 s3api create-bucket --bucket "$MAGIC_COMPARE_S3_BUCKET";
+        aws --endpoint-url http://rustfs:9000 s3api create-bucket --bucket "$MAGIC_COMPARE_S3_BUCKET"
 
   internal-site:
     build:
@@ -39,18 +39,20 @@ services:
       dockerfile: docker/internal-site.Dockerfile
     container_name: magic-compare-internal-site
     depends_on:
-      - rustfs
-      - rustfs-init
+      rustfs:
+        condition: service_started
+      rustfs-init:
+        condition: service_completed_successfully
     ports:
       - "3000:3000"
     environment:
-      DATABASE_URL: ${DATABASE_URL:-file:/app/data/sqlite/internal-site.db}
+      DATABASE_URL: ${MAGIC_COMPARE_DOCKER_DATABASE_URL:-file:/app/data/sqlite/internal-site.db}
       MAGIC_COMPARE_HIDE_DEMO: ${MAGIC_COMPARE_HIDE_DEMO:-true}
       MAGIC_COMPARE_PUBLISHED_ROOT: ${MAGIC_COMPARE_PUBLISHED_ROOT:-/app/data/published}
       MAGIC_COMPARE_PUBLIC_EXPORT_DIR: ${MAGIC_COMPARE_PUBLIC_EXPORT_DIR:-/app/data/public-export}
       MAGIC_COMPARE_S3_BUCKET: ${MAGIC_COMPARE_S3_BUCKET:-magic-compare-assets}
       MAGIC_COMPARE_S3_REGION: ${MAGIC_COMPARE_S3_REGION:-us-east-1}
-      MAGIC_COMPARE_S3_ENDPOINT: ${MAGIC_COMPARE_S3_ENDPOINT:-http://rustfs:9000}
+      MAGIC_COMPARE_S3_ENDPOINT: ${MAGIC_COMPARE_DOCKER_S3_ENDPOINT:-http://rustfs:9000}
       MAGIC_COMPARE_S3_ACCESS_KEY_ID: ${MAGIC_COMPARE_S3_ACCESS_KEY_ID:-rustfsadmin}
       MAGIC_COMPARE_S3_SECRET_ACCESS_KEY: ${MAGIC_COMPARE_S3_SECRET_ACCESS_KEY:-rustfsadmin}
       MAGIC_COMPARE_S3_FORCE_PATH_STYLE: ${MAGIC_COMPARE_S3_FORCE_PATH_STYLE:-true}
