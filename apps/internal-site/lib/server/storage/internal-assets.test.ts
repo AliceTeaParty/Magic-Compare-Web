@@ -1,48 +1,65 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { mkdir, rm, writeFile } from "node:fs/promises";
-import path from "node:path";
 import {
-  getRuntimeInternalAssetRoot,
-  resolveExistingInternalAssetFile,
-  resolveLegacyInternalAssetFile,
-  resolveRuntimeInternalAssetFile,
-} from "./internal-assets";
+  S3_BUCKET_ENV_NAME,
+  S3_ENDPOINT_ENV_NAME,
+  S3_ACCESS_KEY_ID_ENV_NAME,
+  S3_SECRET_ACCESS_KEY_ENV_NAME,
+  S3_INTERNAL_PREFIX_ENV_NAME,
+  getInternalAssetStorageConfig,
+} from "@/lib/server/runtime-config";
+import { internalAssetObjectKey } from "./internal-assets";
 
-const runtimeTestRoot = path.join(getRuntimeInternalAssetRoot(), "__tests__");
-const legacyTestRoot = path.join(process.cwd(), "public", "internal-assets", "__tests__");
+const originalEnv = {
+  bucket: process.env[S3_BUCKET_ENV_NAME],
+  endpoint: process.env[S3_ENDPOINT_ENV_NAME],
+  accessKeyId: process.env[S3_ACCESS_KEY_ID_ENV_NAME],
+  secretAccessKey: process.env[S3_SECRET_ACCESS_KEY_ENV_NAME],
+  internalPrefix: process.env[S3_INTERNAL_PREFIX_ENV_NAME],
+};
 
-afterEach(async () => {
-  await rm(runtimeTestRoot, { recursive: true, force: true });
-  await rm(legacyTestRoot, { recursive: true, force: true });
+afterEach(() => {
+  process.env[S3_BUCKET_ENV_NAME] = originalEnv.bucket;
+  process.env[S3_ENDPOINT_ENV_NAME] = originalEnv.endpoint;
+  process.env[S3_ACCESS_KEY_ID_ENV_NAME] = originalEnv.accessKeyId;
+  process.env[S3_SECRET_ACCESS_KEY_ENV_NAME] = originalEnv.secretAccessKey;
+  process.env[S3_INTERNAL_PREFIX_ENV_NAME] = originalEnv.internalPrefix;
 });
 
 describe("internal asset storage helpers", () => {
-  it("prefers runtime assets over legacy public assets", async () => {
-    const assetUrl = "/internal-assets/__tests__/runtime-first.png";
-    const runtimeFile = resolveRuntimeInternalAssetFile(assetUrl);
-    const legacyFile = resolveLegacyInternalAssetFile(assetUrl);
+  it("builds object keys from logical internal asset urls", () => {
+    process.env[S3_BUCKET_ENV_NAME] = "magic-compare-assets";
+    process.env[S3_ACCESS_KEY_ID_ENV_NAME] = "rustfsadmin";
+    process.env[S3_SECRET_ACCESS_KEY_ENV_NAME] = "rustfsadmin";
+    process.env[S3_INTERNAL_PREFIX_ENV_NAME] = "internal-assets";
 
-    await mkdir(path.dirname(runtimeFile), { recursive: true });
-    await mkdir(path.dirname(legacyFile), { recursive: true });
-    await writeFile(runtimeFile, "runtime");
-    await writeFile(legacyFile, "legacy");
-
-    await expect(resolveExistingInternalAssetFile(assetUrl)).resolves.toBe(runtimeFile);
+    expect(internalAssetObjectKey("/internal-assets/2026/test-example/001/before.png")).toBe(
+      "internal-assets/2026/test-example/001/before.png",
+    );
   });
 
-  it("falls back to the legacy public path", async () => {
-    const assetUrl = "/internal-assets/__tests__/legacy-only.png";
-    const legacyFile = resolveLegacyInternalAssetFile(assetUrl);
+  it("rejects path traversal in logical asset urls", () => {
+    process.env[S3_BUCKET_ENV_NAME] = "magic-compare-assets";
+    process.env[S3_ACCESS_KEY_ID_ENV_NAME] = "rustfsadmin";
+    process.env[S3_SECRET_ACCESS_KEY_ENV_NAME] = "rustfsadmin";
 
-    await mkdir(path.dirname(legacyFile), { recursive: true });
-    await writeFile(legacyFile, "legacy");
-
-    await expect(resolveExistingInternalAssetFile(assetUrl)).resolves.toBe(legacyFile);
+    expect(() => internalAssetObjectKey("/internal-assets/2026/test-example/../before.png")).toThrow(
+      /Invalid internal asset path/,
+    );
   });
 
-  it("rejects path traversal", async () => {
-    await expect(
-      resolveExistingInternalAssetFile("/internal-assets/__tests__/../escape.png"),
-    ).rejects.toThrow(/Invalid internal asset path/);
+  it("reads env-driven s3 storage configuration", () => {
+    process.env[S3_BUCKET_ENV_NAME] = "magic-compare-assets";
+    process.env[S3_ENDPOINT_ENV_NAME] = "http://localhost:9000";
+    process.env[S3_ACCESS_KEY_ID_ENV_NAME] = "rustfsadmin";
+    process.env[S3_SECRET_ACCESS_KEY_ENV_NAME] = "rustfsadmin";
+    process.env[S3_INTERNAL_PREFIX_ENV_NAME] = "internal-assets";
+
+    expect(getInternalAssetStorageConfig()).toMatchObject({
+      bucket: "magic-compare-assets",
+      endpoint: "http://localhost:9000",
+      accessKeyId: "rustfsadmin",
+      secretAccessKey: "rustfsadmin",
+      objectPrefix: "internal-assets",
+    });
   });
 });

@@ -1,13 +1,11 @@
-import { copyFile, mkdir, rm, writeFile } from "node:fs/promises";
+import { mkdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { PublishManifest } from "@magic-compare/content-schema";
-import { resolveExistingInternalAssetFile } from "@/lib/server/storage/internal-assets";
-
-const workspaceRoot = path.resolve(process.cwd(), "../..");
-const publishedRoot = path.join(workspaceRoot, "content", "published");
+import { getPublishedRoot } from "@/lib/server/runtime-config";
+import { readInternalAsset } from "@/lib/server/storage/internal-assets";
 
 export function getPublishedGroupDirectory(publicSlug: string): string {
-  return path.join(publishedRoot, "groups", publicSlug);
+  return path.join(getPublishedRoot(), "groups", publicSlug);
 }
 
 export function getPublishedAssetDirectory(publicSlug: string): string {
@@ -29,10 +27,10 @@ export async function copyInternalAssetToPublished(
   publicSlug: string,
   fileName: string,
 ): Promise<string> {
-  const source = await resolveExistingInternalAssetFile(assetUrl);
   const target = path.join(getPublishedAssetDirectory(publicSlug), fileName);
+  const asset = await readInternalAsset(assetUrl);
   await mkdir(path.dirname(target), { recursive: true });
-  await copyFile(source, target);
+  await writeFile(target, asset.body);
   return target;
 }
 

@@ -8,11 +8,12 @@
     "start": "next start",
     "typecheck": "next build",
     "test": "vitest run --passWithNoTests",
-    "db:generate": "prisma generate --schema prisma/schema.prisma",
-    "db:push": "tsx prisma/init-db.ts",
-    "db:seed": "tsx prisma/seed.ts"
+    "db:generate": "DATABASE_URL=${DATABASE_URL:-file:./dev.db} prisma generate --schema prisma/schema.prisma",
+    "db:push": "DATABASE_URL=${DATABASE_URL:-file:./dev.db} tsx prisma/init-db.ts",
+    "db:seed": "DATABASE_URL=${DATABASE_URL:-file:./dev.db} tsx prisma/seed.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.916.0",
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",

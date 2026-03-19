@@ -292,6 +292,14 @@ def _ensure_remote_auth(config: UploaderConfig) -> None:
         ensure_user_access_token(config)
 
 
+def _ensure_s3_ready(config: UploaderConfig) -> None:
+    if config.has_s3_config:
+        return
+    raise RuntimeError(
+        "缺少 S3 配置。请在 .env 中补齐 MAGIC_COMPARE_S3_BUCKET / REGION / ACCESS KEY / SECRET。"
+    )
+
+
 def _run_wizard(
     *,
     site_url: str | None,
@@ -317,6 +325,7 @@ def _run_wizard(
     _render_source_summary(source_group)
     work_dir = _resolve_work_dir(build_default_work_dir(source_dir))
     config = _prepare_runtime_config(work_dir, site_url=site_url, api_url=api_url)
+    _ensure_s3_ready(config)
     _ensure_remote_auth(config)
 
     selected_case = _choose_case(config, current_year)
@@ -356,7 +365,7 @@ def _run_wizard(
         raise typer.Abort()
 
     with console.status("[bold green]正在生成 manifest、缩略图并上传...[/]"):
-        manifest_payload = build_import_manifest(prepared.work_dir)
+        manifest_payload = build_import_manifest(prepared.work_dir, config)
         result = sync_manifest(config, manifest_payload)
 
     viewer_url = f"{config.site_url}/cases/{result['slug']}/groups/{prepared.group_slug}"
@@ -417,9 +426,21 @@ def scan(source: Path) -> None:
 def manifest(
     source: Path,
     output: Path | None = typer.Option(None, "--output", "-o"),
+    site_url: str | None = typer.Option(
+        None,
+        "--site-url",
+        help=f"内部站点主页，优先读取 {ENV_SITE_URL_NAME}。",
+    ),
+    api_url: str | None = typer.Option(
+        None,
+        "--api-url",
+        help=f"内部站点导入接口，优先读取 {ENV_API_URL_NAME}。",
+    ),
 ) -> None:
     """生成 import manifest JSON，并执行本地 staging。"""
-    manifest_text = manifest_json(source)
+    config = _prepare_runtime_config(source, site_url=site_url, api_url=api_url)
+    _ensure_s3_ready(config)
+    manifest_text = manifest_json(source, config)
     if output:
         output.write_text(manifest_text, encoding="utf-8")
         typer.echo(f"已写入 manifest：{output}")
@@ -444,8 +465,9 @@ def sync(
 ) -> None:
     """对结构化 case 目录执行 staging 并同步到内部站。"""
     config = _prepare_runtime_config(source, site_url=site_url, api_url=api_url)
+    _ensure_s3_ready(config)
     _ensure_remote_auth(config)
-    manifest_payload = build_import_manifest(source)
+    manifest_payload = build_import_manifest(source, config)
     result = sync_manifest(config, manifest_payload)
     typer.echo(json.dumps(result, indent=2, ensure_ascii=False))
 

@@ -9,7 +9,7 @@ import { DEMO_CASE_SLUG } from "@magic-compare/shared-utils";
 import { validateImportManifest } from "@/lib/server/validators/import-manifest";
 import { prisma } from "@/lib/server/db/client";
 import { deletePublishedGroup } from "@/lib/server/storage/published-content";
-import { deleteInternalAssetGroupDirectories } from "@/lib/server/storage/internal-assets";
+import { deleteInternalAssetGroupObjects } from "@/lib/server/storage/internal-assets";
 import { isHiddenDemoCaseSlug, shouldHideDemoContent } from "@/lib/server/runtime-config";
 
 interface CaseRowSummary {
@@ -541,7 +541,7 @@ export async function deleteGroup(caseSlug: string, groupSlug: string) {
     where: { id: targetGroup.id },
   });
 
-  await deleteInternalAssetGroupDirectories(caseSlug, groupSlug);
+  await deleteInternalAssetGroupObjects(caseSlug, groupSlug);
 
   if (targetGroup.publicSlug) {
     await deletePublishedGroup(targetGroup.publicSlug);

@@ -1,7 +1,7 @@
-import { copyFile, mkdir } from "node:fs/promises";
 import path from "node:path";
 import { prisma } from "../lib/server/db/client";
 import { applyImportManifest } from "../lib/server/repositories/content-repository";
+import { uploadLocalFileToInternalAsset } from "../lib/server/storage/internal-assets";
 
 async function main() {
   const existingCases = await prisma.case.count();
@@ -10,24 +10,35 @@ async function main() {
     return;
   }
 
-  const internalAssetRoot = path.join(process.cwd(), "public", "internal-assets", "demo-grain-study");
   const publishedAssetRoot = path.resolve(
     process.cwd(),
     "../../content/published/groups/demo-grain-study--banding-check/assets",
   );
-
-  await mkdir(internalAssetRoot, { recursive: true });
-
-  const files = [
-    "001-before.svg",
-    "001-after.svg",
-    "001-heatmap.svg",
-    "002-before.svg",
-    "002-after.svg",
+  const demoAssets = [
+    {
+      source: "001-before.svg",
+      target: "/internal-assets/demo-grain-study/banding-check/001/before.svg",
+    },
+    {
+      source: "001-after.svg",
+      target: "/internal-assets/demo-grain-study/banding-check/001/after.svg",
+    },
+    {
+      source: "001-heatmap.svg",
+      target: "/internal-assets/demo-grain-study/banding-check/001/heatmap.svg",
+    },
+    {
+      source: "002-before.svg",
+      target: "/internal-assets/demo-grain-study/banding-check/002/before.svg",
+    },
+    {
+      source: "002-after.svg",
+      target: "/internal-assets/demo-grain-study/banding-check/002/after.svg",
+    },
   ];
 
-  for (const file of files) {
-    await copyFile(path.join(publishedAssetRoot, file), path.join(internalAssetRoot, file));
+  for (const asset of demoAssets) {
+    await uploadLocalFileToInternalAsset(path.join(publishedAssetRoot, asset.source), asset.target);
   }
 
   await applyImportManifest({
@@ -63,8 +74,8 @@ async function main() {
               {
                 kind: "before",
                 label: "Before",
-                imageUrl: "/internal-assets/demo-grain-study/001-before.svg",
-                thumbUrl: "/internal-assets/demo-grain-study/001-before.svg",
+                imageUrl: "/internal-assets/demo-grain-study/banding-check/001/before.svg",
+                thumbUrl: "/internal-assets/demo-grain-study/banding-check/001/before.svg",
                 width: 1280,
                 height: 720,
                 note: "Original gradient",
@@ -74,8 +85,8 @@ async function main() {
               {
                 kind: "after",
                 label: "After",
-                imageUrl: "/internal-assets/demo-grain-study/001-after.svg",
-                thumbUrl: "/internal-assets/demo-grain-study/001-after.svg",
+                imageUrl: "/internal-assets/demo-grain-study/banding-check/001/after.svg",
+                thumbUrl: "/internal-assets/demo-grain-study/banding-check/001/after.svg",
                 width: 1280,
                 height: 720,
                 note: "Debanded output",
@@ -85,8 +96,8 @@ async function main() {
               {
                 kind: "heatmap",
                 label: "Heatmap",
-                imageUrl: "/internal-assets/demo-grain-study/001-heatmap.svg",
-                thumbUrl: "/internal-assets/demo-grain-study/001-heatmap.svg",
+                imageUrl: "/internal-assets/demo-grain-study/banding-check/001/heatmap.svg",
+                thumbUrl: "/internal-assets/demo-grain-study/banding-check/001/heatmap.svg",
                 width: 1280,
                 height: 720,
                 note: "Difference emphasis",
@@ -106,8 +117,8 @@ async function main() {
               {
                 kind: "before",
                 label: "Before",
-                imageUrl: "/internal-assets/demo-grain-study/002-before.svg",
-                thumbUrl: "/internal-assets/demo-grain-study/002-before.svg",
+                imageUrl: "/internal-assets/demo-grain-study/banding-check/002/before.svg",
+                thumbUrl: "/internal-assets/demo-grain-study/banding-check/002/before.svg",
                 width: 1280,
                 height: 720,
                 note: "Original edge detail",
@@ -117,8 +128,8 @@ async function main() {
               {
                 kind: "after",
                 label: "After",
-                imageUrl: "/internal-assets/demo-grain-study/002-after.svg",
-                thumbUrl: "/internal-assets/demo-grain-study/002-after.svg",
+                imageUrl: "/internal-assets/demo-grain-study/banding-check/002/after.svg",
+                thumbUrl: "/internal-assets/demo-grain-study/banding-check/002/after.svg",
                 width: 1280,
                 height: 720,
                 note: "Refined edge detail",
@@ -132,7 +143,7 @@ async function main() {
     ],
   });
 
-  console.log("Seeded demo case into SQLite and staged internal assets.");
+  console.log("Seeded demo case into SQLite and uploaded demo assets to S3.");
 }
 
 main()

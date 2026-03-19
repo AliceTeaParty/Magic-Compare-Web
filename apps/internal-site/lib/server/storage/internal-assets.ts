@@ -1,11 +1,39 @@
-import { access, rm } from "node:fs/promises";
-import path from "node:path";
+import { extname } from "node:path";
+import { readFile } from "node:fs/promises";
+import {
+  DeleteObjectsCommand,
+  GetObjectCommand,
+  ListObjectsV2Command,
+  PutObjectCommand,
+  S3Client,
+} from "@aws-sdk/client-s3";
+import { getInternalAssetStorageConfig } from "@/lib/server/runtime-config";
 
-const runtimeInternalAssetRoot = path.join(process.cwd(), ".runtime", "internal-assets");
-const legacyPublicInternalAssetRoot = path.join(process.cwd(), "public", "internal-assets");
+const MIME_TYPES: Record<string, string> = {
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".webp": "image/webp",
+  ".avif": "image/avif",
+  ".svg": "image/svg+xml",
+};
+
+export interface InternalAssetObject {
+  body: Uint8Array;
+  contentType: string;
+  contentLength: number;
+  lastModified: Date | null;
+}
+
+let cachedClient: S3Client | null = null;
+let cachedSignature: string | null = null;
 
 function hasTraversal(input: string): boolean {
   return input.split("/").some((segment) => segment === ".." || segment.length === 0);
+}
+
+function guessMimeType(fileName: string): string {
+  return MIME_TYPES[extname(fileName).toLowerCase()] ?? "application/octet-stream";
 }
 
 function assetRelativePath(assetUrl: string): string {
@@ -22,53 +50,114 @@ function assetRelativePath(assetUrl: string): string {
   return relativePath;
 }
 
-export function getRuntimeInternalAssetRoot(): string {
-  return runtimeInternalAssetRoot;
+function buildS3Client(): S3Client {
+  const config = getInternalAssetStorageConfig();
+  const signature = JSON.stringify(config);
+
+  if (cachedClient && cachedSignature === signature) {
+    return cachedClient;
+  }
+
+  cachedSignature = signature;
+  cachedClient = new S3Client({
+    region: config.region,
+    endpoint: config.endpoint,
+    forcePathStyle: config.forcePathStyle,
+    credentials: {
+      accessKeyId: config.accessKeyId,
+      secretAccessKey: config.secretAccessKey,
+    },
+  });
+
+  return cachedClient;
 }
 
-export function resolveRuntimeInternalAssetFile(assetUrl: string): string {
-  return path.join(runtimeInternalAssetRoot, assetRelativePath(assetUrl));
+export function internalAssetObjectKey(assetUrl: string): string {
+  const { objectPrefix } = getInternalAssetStorageConfig();
+  const relativePath = assetRelativePath(assetUrl);
+  return objectPrefix ? `${objectPrefix}/${relativePath}` : relativePath;
 }
 
-export function resolveLegacyInternalAssetFile(assetUrl: string): string {
-  return path.join(legacyPublicInternalAssetRoot, assetRelativePath(assetUrl));
+export async function readInternalAsset(assetUrl: string): Promise<InternalAssetObject> {
+  const client = buildS3Client();
+  const config = getInternalAssetStorageConfig();
+  const response = await client.send(
+    new GetObjectCommand({
+      Bucket: config.bucket,
+      Key: internalAssetObjectKey(assetUrl),
+    }),
+  );
+
+  const body = response.Body ? await response.Body.transformToByteArray() : null;
+  if (!body) {
+    throw new Error(`Internal asset body missing: ${assetUrl}`);
+  }
+
+  return {
+    body: new Uint8Array(body),
+    contentType: response.ContentType || guessMimeType(assetUrl),
+    contentLength: Number(response.ContentLength ?? body.byteLength),
+    lastModified: response.LastModified ?? null,
+  };
 }
 
-export async function deleteInternalAssetGroupDirectories(
+export async function uploadLocalFileToInternalAsset(localFilePath: string, assetUrl: string): Promise<void> {
+  const content = await readFile(localFilePath);
+  await uploadInternalAssetBuffer(content, assetUrl, guessMimeType(localFilePath));
+}
+
+export async function uploadInternalAssetBuffer(
+  content: Uint8Array | Buffer,
+  assetUrl: string,
+  contentType?: string,
+): Promise<void> {
+  const client = buildS3Client();
+  const config = getInternalAssetStorageConfig();
+  await client.send(
+    new PutObjectCommand({
+      Bucket: config.bucket,
+      Key: internalAssetObjectKey(assetUrl),
+      Body: content,
+      ContentType: contentType || guessMimeType(assetUrl),
+    }),
+  );
+}
+
+export async function deleteInternalAssetGroupObjects(
   caseSlug: string,
   groupSlug: string,
 ): Promise<void> {
-  await Promise.all([
-    rm(path.join(runtimeInternalAssetRoot, caseSlug, groupSlug), {
-      recursive: true,
-      force: true,
-    }),
-    rm(path.join(legacyPublicInternalAssetRoot, caseSlug, groupSlug), {
-      recursive: true,
-      force: true,
-    }),
-  ]);
-}
+  const client = buildS3Client();
+  const config = getInternalAssetStorageConfig();
+  const prefix = [config.objectPrefix, caseSlug, groupSlug].filter(Boolean).join("/") + "/";
 
-async function fileExists(filePath: string): Promise<boolean> {
-  try {
-    await access(filePath);
-    return true;
-  } catch {
-    return false;
-  }
-}
+  let continuationToken: string | undefined;
 
-export async function resolveExistingInternalAssetFile(assetUrl: string): Promise<string> {
-  const runtimePath = resolveRuntimeInternalAssetFile(assetUrl);
-  if (await fileExists(runtimePath)) {
-    return runtimePath;
-  }
+  do {
+    const page = await client.send(
+      new ListObjectsV2Command({
+        Bucket: config.bucket,
+        Prefix: prefix,
+        ContinuationToken: continuationToken,
+      }),
+    );
 
-  const legacyPath = resolveLegacyInternalAssetFile(assetUrl);
-  if (await fileExists(legacyPath)) {
-    return legacyPath;
-  }
+    const keys = (page.Contents ?? [])
+      .map((item) => item.Key)
+      .filter((key): key is string => Boolean(key));
 
-  throw new Error(`Internal asset not found: ${assetUrl}`);
+    if (keys.length > 0) {
+      await client.send(
+        new DeleteObjectsCommand({
+          Bucket: config.bucket,
+          Delete: {
+            Objects: keys.map((Key) => ({ Key })),
+            Quiet: true,
+          },
+        }),
+      );
+    }
+
+    continuationToken = page.IsTruncated ? page.NextContinuationToken : undefined;
+  } while (continuationToken);
 }

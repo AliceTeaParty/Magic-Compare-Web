@@ -1,4 +1,5 @@
 import { PrismaClient } from "@prisma/client";
+import { getDatabaseUrl } from "@/lib/server/db/database-url";
 
 declare global {
   var magicComparePrisma: PrismaClient | undefined;
@@ -7,6 +8,11 @@ declare global {
 export const prisma =
   globalThis.magicComparePrisma ??
   new PrismaClient({
+    datasources: {
+      db: {
+        url: getDatabaseUrl(),
+      },
+    },
     log: process.env.NODE_ENV === "development" ? ["error", "warn"] : ["error"],
   });
 

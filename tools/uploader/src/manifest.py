@@ -1,56 +1,41 @@
 from __future__ import annotations
 
 import json
-import shutil
 from pathlib import Path
+from tempfile import TemporaryDirectory
 
+from .auth import UploaderConfig
 from .scanner import CaseSource, scan_case_directory
+from .storage import upload_file_to_internal_assets
 from .thumbnailer import build_thumbnail, image_dimensions
-
-
-def _workspace_root(current_file: Path) -> Path:
-    return current_file.resolve().parents[3]
-
 
 def _stage_asset(
     asset_path: Path,
     case_slug: str,
     group_slug: str,
     frame_order: int,
-    workspace_root: Path,
+    config: UploaderConfig,
 ) -> tuple[str, str, int, int]:
-    target_root = (
-        workspace_root
-        / "apps"
-        / "internal-site"
-        / ".runtime"
-        / "internal-assets"
-        / case_slug
-        / group_slug
-        / f"{frame_order + 1:03d}"
-    )
-    target_root.mkdir(parents=True, exist_ok=True)
+    relative_root = Path("internal-assets") / case_slug / group_slug / f"{frame_order + 1:03d}"
+    image_url = f"/{(relative_root / asset_path.name).as_posix()}"
+    thumb_name = f"thumb-{asset_path.name}"
+    thumb_url = f"/{(relative_root / thumb_name).as_posix()}"
 
-    image_target = target_root / asset_path.name
-    thumb_target = target_root / f"thumb-{asset_path.name}"
+    upload_file_to_internal_assets(config, asset_path, image_url)
 
-    shutil.copy2(asset_path, image_target)
-    build_thumbnail(asset_path, thumb_target)
+    with TemporaryDirectory(prefix="magic-compare-thumb-") as temp_dir:
+        thumb_target = Path(temp_dir) / thumb_name
+        build_thumbnail(asset_path, thumb_target)
+        upload_file_to_internal_assets(config, thumb_target, thumb_url)
+
     width, height = image_dimensions(asset_path)
 
-    relative_root = Path("internal-assets") / case_slug / group_slug / f"{frame_order + 1:03d}"
-    return (
-        f"/{(relative_root / image_target.name).as_posix()}",
-        f"/{(relative_root / thumb_target.name).as_posix()}",
-        width,
-        height,
-    )
+    return (image_url, thumb_url, width, height)
 
 
-def build_import_manifest(case_root: Path, workspace_root: Path | None = None) -> dict:
+def build_import_manifest(case_root: Path, config: UploaderConfig) -> dict:
     scanned_case: CaseSource = scan_case_directory(case_root)
-    resolved_workspace_root = workspace_root or _workspace_root(Path(__file__))
-    case_slug = scanned_case.metadata.get("slug", scanned_case.root.name.lower())
+    case_slug = str(scanned_case.metadata.get("slug", scanned_case.root.name.lower()))
 
     groups_payload = []
     for group in scanned_case.groups:
@@ -63,7 +48,7 @@ def build_import_manifest(case_root: Path, workspace_root: Path | None = None) -
                     case_slug=case_slug,
                     group_slug=group.slug,
                     frame_order=frame.order,
-                    workspace_root=resolved_workspace_root,
+                    config=config,
                 )
                 assets_payload.append(
                     {
@@ -95,10 +80,10 @@ def build_import_manifest(case_root: Path, workspace_root: Path | None = None) -
             {
                 "group": {
                     "slug": group.slug,
-                    "title": group.metadata.get("title", group.slug.replace("-", " ").title()),
-                    "description": group.metadata.get("description", ""),
+                    "title": str(group.metadata.get("title", group.slug.replace("-", " ").title())),
+                    "description": str(group.metadata.get("description", "")),
                     "order": group.order,
-                    "defaultMode": group.metadata.get("defaultMode", "before-after"),
+                    "defaultMode": str(group.metadata.get("defaultMode", "before-after")),
                     "isPublic": bool(group.metadata.get("isPublic", False)),
                     "tags": group.metadata.get("tags", []),
                 },
@@ -109,17 +94,17 @@ def build_import_manifest(case_root: Path, workspace_root: Path | None = None) -
     return {
         "case": {
             "slug": case_slug,
-            "title": scanned_case.metadata.get("title", case_slug.replace("-", " ").title()),
-            "subtitle": scanned_case.metadata.get("subtitle", ""),
-            "summary": scanned_case.metadata.get("summary", ""),
+            "title": str(scanned_case.metadata.get("title", case_slug.replace("-", " ").title())),
+            "subtitle": str(scanned_case.metadata.get("subtitle", "")),
+            "summary": str(scanned_case.metadata.get("summary", "")),
             "tags": scanned_case.metadata.get("tags", []),
-            "status": scanned_case.metadata.get("status", "draft"),
-            "coverAssetLabel": scanned_case.metadata.get("coverAssetLabel", "After"),
+            "status": str(scanned_case.metadata.get("status", "draft")),
+            "coverAssetLabel": str(scanned_case.metadata.get("coverAssetLabel", "After")),
         },
         "groups": groups_payload,
     }
 
 
-def manifest_json(case_root: Path, workspace_root: Path | None = None) -> str:
-    manifest = build_import_manifest(case_root, workspace_root)
+def manifest_json(case_root: Path, config: UploaderConfig) -> str:
+    manifest = build_import_manifest(case_root, config)
     return json.dumps(manifest, indent=2, ensure_ascii=True)

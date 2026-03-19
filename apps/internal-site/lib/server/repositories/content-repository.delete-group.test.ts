@@ -6,13 +6,13 @@ const {
   caseUpdate,
   groupDelete,
   deletePublishedGroup,
-  deleteInternalAssetGroupDirectories,
+  deleteInternalAssetGroupObjects,
 } = vi.hoisted(() => ({
   caseFindUnique: vi.fn(),
   caseUpdate: vi.fn(),
   groupDelete: vi.fn(),
   deletePublishedGroup: vi.fn(),
-  deleteInternalAssetGroupDirectories: vi.fn(),
+  deleteInternalAssetGroupObjects: vi.fn(),
 }));
 
 vi.mock("@/lib/server/db/client", () => ({
@@ -32,7 +32,7 @@ vi.mock("@/lib/server/storage/published-content", () => ({
 }));
 
 vi.mock("@/lib/server/storage/internal-assets", () => ({
-  deleteInternalAssetGroupDirectories,
+  deleteInternalAssetGroupObjects,
 }));
 
 describe("deleteGroup", () => {
@@ -41,7 +41,7 @@ describe("deleteGroup", () => {
     caseUpdate.mockReset();
     groupDelete.mockReset();
     deletePublishedGroup.mockReset();
-    deleteInternalAssetGroupDirectories.mockReset();
+    deleteInternalAssetGroupObjects.mockReset();
   });
 
   it("deletes the group and cleans internal assets", async () => {
@@ -65,7 +65,7 @@ describe("deleteGroup", () => {
     expect(groupDelete).toHaveBeenCalledWith({
       where: { id: "group-1" },
     });
-    expect(deleteInternalAssetGroupDirectories).toHaveBeenCalledWith("2026", "test-example");
+    expect(deleteInternalAssetGroupObjects).toHaveBeenCalledWith("2026", "test-example");
     expect(deletePublishedGroup).not.toHaveBeenCalled();
     expect(caseUpdate).not.toHaveBeenCalled();
     expect(result).toEqual({

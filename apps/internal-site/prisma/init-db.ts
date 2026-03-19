@@ -2,9 +2,10 @@ import { execFileSync } from "node:child_process";
 import { mkdirSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { resolveSqliteDatabasePath } from "../lib/server/db/database-url";
 
 const prismaDir = path.dirname(fileURLToPath(import.meta.url));
-const databasePath = path.join(prismaDir, "dev.db");
+const databasePath = resolveSqliteDatabasePath();
 
 const sql = `
 PRAGMA foreign_keys = ON;
@@ -73,7 +74,7 @@ CREATE TABLE IF NOT EXISTS "Asset" (
 CREATE INDEX IF NOT EXISTS "Asset_frameId_idx" ON "Asset"("frameId");
 `;
 
-mkdirSync(prismaDir, { recursive: true });
+mkdirSync(path.dirname(databasePath), { recursive: true });
 execFileSync("sqlite3", [databasePath], {
   input: sql,
   stdio: ["pipe", "inherit", "inherit"],

@@ -1,6 +1,42 @@
+import path from "node:path";
 import { DEMO_CASE_SLUG, parseEnvFlag } from "@magic-compare/shared-utils";
 
 export const HIDE_DEMO_ENV_NAME = "MAGIC_COMPARE_HIDE_DEMO";
+export const PUBLISHED_ROOT_ENV_NAME = "MAGIC_COMPARE_PUBLISHED_ROOT";
+export const PUBLIC_EXPORT_DIR_ENV_NAME = "MAGIC_COMPARE_PUBLIC_EXPORT_DIR";
+export const S3_BUCKET_ENV_NAME = "MAGIC_COMPARE_S3_BUCKET";
+export const S3_REGION_ENV_NAME = "MAGIC_COMPARE_S3_REGION";
+export const S3_ENDPOINT_ENV_NAME = "MAGIC_COMPARE_S3_ENDPOINT";
+export const S3_ACCESS_KEY_ID_ENV_NAME = "MAGIC_COMPARE_S3_ACCESS_KEY_ID";
+export const S3_SECRET_ACCESS_KEY_ENV_NAME = "MAGIC_COMPARE_S3_SECRET_ACCESS_KEY";
+export const S3_FORCE_PATH_STYLE_ENV_NAME = "MAGIC_COMPARE_S3_FORCE_PATH_STYLE";
+export const S3_INTERNAL_PREFIX_ENV_NAME = "MAGIC_COMPARE_S3_INTERNAL_PREFIX";
+export const CF_PAGES_PROJECT_NAME_ENV_NAME = "MAGIC_COMPARE_CF_PAGES_PROJECT_NAME";
+export const CF_PAGES_BRANCH_ENV_NAME = "MAGIC_COMPARE_CF_PAGES_BRANCH";
+export const CF_ACCOUNT_ID_ENV_NAME = "CLOUDFLARE_ACCOUNT_ID";
+export const CF_API_TOKEN_ENV_NAME = "CLOUDFLARE_API_TOKEN";
+
+export interface InternalAssetStorageConfig {
+  bucket: string;
+  region: string;
+  endpoint: string | undefined;
+  accessKeyId: string;
+  secretAccessKey: string;
+  forcePathStyle: boolean;
+  objectPrefix: string;
+}
+
+function workspaceRoot(): string {
+  return path.resolve(process.cwd(), "../..");
+}
+
+function requireEnv(name: string): string {
+  const value = process.env[name]?.trim();
+  if (!value) {
+    throw new Error(`Missing required environment variable: ${name}`);
+  }
+  return value;
+}
 
 export function shouldHideDemoContent(): boolean {
   return parseEnvFlag(process.env[HIDE_DEMO_ENV_NAME]);
@@ -8,4 +44,38 @@ export function shouldHideDemoContent(): boolean {
 
 export function isHiddenDemoCaseSlug(caseSlug: string): boolean {
   return shouldHideDemoContent() && caseSlug === DEMO_CASE_SLUG;
+}
+
+export function getPublishedRoot(): string {
+  const configured = process.env[PUBLISHED_ROOT_ENV_NAME]?.trim();
+  return configured
+    ? path.resolve(configured)
+    : path.join(workspaceRoot(), "content", "published");
+}
+
+export function getPublicExportDir(): string {
+  const configured = process.env[PUBLIC_EXPORT_DIR_ENV_NAME]?.trim();
+  return configured
+    ? path.resolve(configured)
+    : path.join(workspaceRoot(), "dist", "public-site");
+}
+
+export function getInternalAssetStorageConfig(): InternalAssetStorageConfig {
+  return {
+    bucket: requireEnv(S3_BUCKET_ENV_NAME),
+    region: process.env[S3_REGION_ENV_NAME]?.trim() || "us-east-1",
+    endpoint: process.env[S3_ENDPOINT_ENV_NAME]?.trim() || undefined,
+    accessKeyId: requireEnv(S3_ACCESS_KEY_ID_ENV_NAME),
+    secretAccessKey: requireEnv(S3_SECRET_ACCESS_KEY_ENV_NAME),
+    forcePathStyle: parseEnvFlag(process.env[S3_FORCE_PATH_STYLE_ENV_NAME]),
+    objectPrefix: process.env[S3_INTERNAL_PREFIX_ENV_NAME]?.trim() || "internal-assets",
+  };
+}
+
+export function isCloudflarePagesDeployConfigured(): boolean {
+  return Boolean(
+    process.env[CF_PAGES_PROJECT_NAME_ENV_NAME]?.trim() &&
+      process.env[CF_ACCOUNT_ID_ENV_NAME]?.trim() &&
+      process.env[CF_API_TOKEN_ENV_NAME]?.trim(),
+  );
 }
