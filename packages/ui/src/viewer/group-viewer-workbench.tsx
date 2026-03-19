@@ -453,6 +453,11 @@ export function GroupViewerWorkbench({
         controller.setMode("a-b");
       }
 
+      if ((event.key === "ArrowUp" || event.key === "ArrowDown") && controller.mode === "a-b") {
+        event.preventDefault();
+        controller.setAbSide(controller.abSide === "before" ? "after" : "before");
+      }
+
       if (event.key === "3") {
         controller.setMode("heatmap");
       }
@@ -499,8 +504,7 @@ export function GroupViewerWorkbench({
             alignItems: { xs: "stretch", md: "center" },
             justifyContent: "space-between",
             gap: 1.5,
-            px: { xs: 2.25, md: 3 },
-            py: { xs: 1.85, md: 2 },
+            p: { xs: 2.25, md: 3 },
             borderBottom: "1px solid",
             borderColor: "divider",
             background:
@@ -531,11 +535,13 @@ export function GroupViewerWorkbench({
                 overflow: "visible",
                 alignItems: "stretch",
                 "& .MuiToggleButtonGroup-grouped": {
+                  height: 34,
                   minHeight: 34,
                   px: 1.3,
                   border: "1px solid",
                   borderColor: "divider",
                   borderRadius: "999px !important",
+                  fontSize: "0.92rem",
                 },
                 "& .MuiToggleButtonGroup-grouped:not(:first-of-type)": {
                   marginLeft: "0 !important",
@@ -565,13 +571,19 @@ export function GroupViewerWorkbench({
               <FormControl
                 size="small"
                 sx={{
-                  minWidth: 112,
+                  minWidth: 104,
                   "& .MuiOutlinedInput-root": {
+                    height: 34,
                     minHeight: 34,
                   },
                   "& .MuiSelect-select": {
-                    py: 0.75,
+                    display: "flex",
+                    alignItems: "center",
+                    minHeight: "34px !important",
+                    py: "0 !important",
+                    pl: 1.5,
                     pr: 3.75,
+                    fontSize: "0.92rem",
                   },
                 }}
               >
@@ -594,6 +606,9 @@ export function GroupViewerWorkbench({
                 sx={{
                   width: 34,
                   height: 34,
+                  "& .MuiSvgIcon-root": {
+                    fontSize: 18,
+                  },
                 }}
               >
                 <ViewSidebar />
@@ -612,56 +627,42 @@ export function GroupViewerWorkbench({
           }}
         >
           <Box sx={{ minHeight: 0, p: { xs: 1.5, md: 2.25 } }}>
-            <Paper
-              elevation={0}
-              sx={{
-                height: "100%",
-                minHeight: { xs: 340, md: 460 },
-                p: { xs: 1.25, md: 1.75 },
-                borderRadius: 3,
-                border: "1px solid",
-                borderColor: "divider",
-                background:
-                  "radial-gradient(circle at top, rgba(200, 161, 111, 0.07), transparent 28%), rgba(13, 15, 18, 0.88)",
-              }}
-            >
-              <Stack spacing={2} sx={{ height: "100%" }}>
-                {/* Stage header stays hidden for now to keep the comparison surface as the focal point. */}
-                {controller.mode === "heatmap" && !controller.heatmapAsset ? <HeatmapNotice /> : null}
+            <Stack spacing={1.5} sx={{ height: "100%", minHeight: { xs: 340, md: 460 } }}>
+              {/* Stage header stays hidden for now to keep the comparison surface as the focal point. */}
+              {controller.mode === "heatmap" && !controller.heatmapAsset ? <HeatmapNotice /> : null}
 
-                <Box sx={{ flex: 1, minHeight: 0 }}>
-                  <ViewerStage
-                    beforeAsset={controller.beforeAsset}
-                    afterAsset={controller.afterAsset}
-                    heatmapAsset={controller.heatmapAsset}
-                    mode={controller.mode}
-                    abSide={controller.abSide}
-                    overlayOpacity={controller.overlayOpacity}
-                  />
-                </Box>
+              <Box sx={{ flex: 1, minHeight: 0 }}>
+                <ViewerStage
+                  beforeAsset={controller.beforeAsset}
+                  afterAsset={controller.afterAsset}
+                  heatmapAsset={controller.heatmapAsset}
+                  mode={controller.mode}
+                  abSide={controller.abSide}
+                  overlayOpacity={controller.overlayOpacity}
+                />
+              </Box>
 
-                {controller.mode === "heatmap" && controller.heatmapAsset ? (
-                  <Stack direction={{ xs: "column", md: "row" }} spacing={2} alignItems="center">
-                    <Stack direction="row" spacing={1} alignItems="center">
-                      <Tune fontSize="small" />
-                      <Typography variant="body2">Overlay opacity</Typography>
-                    </Stack>
-                    <Slider
-                      min={20}
-                      max={95}
-                      value={controller.overlayOpacity}
-                      onChange={(_, value) =>
-                        controller.setOverlayOpacity(
-                          clampNumber(Array.isArray(value) ? value[0] : value, 20, 95),
-                        )
-                      }
-                      valueLabelDisplay="auto"
-                      sx={{ maxWidth: 320 }}
-                    />
+              {controller.mode === "heatmap" && controller.heatmapAsset ? (
+                <Stack direction={{ xs: "column", md: "row" }} spacing={2} alignItems="center">
+                  <Stack direction="row" spacing={1} alignItems="center">
+                    <Tune fontSize="small" />
+                    <Typography variant="body2">Overlay opacity</Typography>
                   </Stack>
-                ) : null}
-              </Stack>
-            </Paper>
+                  <Slider
+                    min={20}
+                    max={95}
+                    value={controller.overlayOpacity}
+                    onChange={(_, value) =>
+                      controller.setOverlayOpacity(
+                        clampNumber(Array.isArray(value) ? value[0] : value, 20, 95),
+                      )
+                    }
+                    valueLabelDisplay="auto"
+                    sx={{ maxWidth: 320 }}
+                  />
+                </Stack>
+              ) : null}
+            </Stack>
           </Box>
 
           <Box
