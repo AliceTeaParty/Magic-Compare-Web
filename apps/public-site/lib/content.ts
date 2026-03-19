@@ -1,13 +1,15 @@
 import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import { parsePublishManifest, type PublishManifest } from "@magic-compare/content-schema";
-import { isHiddenDemoCaseSlug, shouldHideDemoContent } from "@/lib/runtime-config";
-
-const publishedGroupsRoot = path.resolve(process.cwd(), "../../content/published/groups");
+import {
+  getPublishedGroupsRoot,
+  isHiddenDemoCaseSlug,
+  shouldHideDemoContent,
+} from "@/lib/runtime-config";
 
 export async function listPublishedGroupSlugs(): Promise<string[]> {
   try {
-    const entries = await readdir(publishedGroupsRoot, { withFileTypes: true });
+    const entries = await readdir(getPublishedGroupsRoot(), { withFileTypes: true });
     const slugs = entries.filter((entry) => entry.isDirectory()).map((entry) => entry.name).sort();
 
     if (!shouldHideDemoContent()) {
@@ -29,7 +31,7 @@ export async function listPublishedGroupSlugs(): Promise<string[]> {
 
 export async function getPublishedManifest(publicSlug: string): Promise<PublishManifest | null> {
   try {
-    const filePath = path.join(publishedGroupsRoot, publicSlug, "manifest.json");
+    const filePath = path.join(getPublishedGroupsRoot(), publicSlug, "manifest.json");
     const fileContents = await readFile(filePath, "utf8");
     const manifest = parsePublishManifest(JSON.parse(fileContents));
     if (isHiddenDemoCaseSlug(manifest.case.slug)) {

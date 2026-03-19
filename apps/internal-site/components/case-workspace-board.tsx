@@ -2,7 +2,9 @@
 
 import { useState, useTransition } from "react";
 import {
+  CloudUpload,
   DragIndicator,
+  FileUpload,
   OpenInNew,
   Publish,
 } from "@mui/icons-material";
@@ -116,11 +118,21 @@ function SortableGroupRow({
   );
 }
 
-export function CaseWorkspaceBoard({ data }: { data: CaseWorkspaceData }) {
+export function CaseWorkspaceBoard({
+  data,
+  canDeployPublicSite,
+  publicExportDir,
+}: {
+  data: CaseWorkspaceData;
+  canDeployPublicSite: boolean;
+  publicExportDir: string;
+}) {
   const router = useRouter();
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
   const [groups, setGroups] = useState(data.groups);
   const [isPending, startTransition] = useTransition();
+  const [feedback, setFeedback] = useState<string | null>(null);
+  const [feedbackTone, setFeedbackTone] = useState<"error" | "success" | null>(null);
 
   async function saveGroupOrder(nextGroupIds: string[]) {
     const response = await fetch("/api/ops/group-reorder", {
@@ -151,8 +163,37 @@ export function CaseWorkspaceBoard({ data }: { data: CaseWorkspaceData }) {
     });
 
     if (!response.ok) {
-      throw new Error("Failed to publish case.");
+      const payload = await response.json().catch(() => null);
+      throw new Error(payload?.error || "Failed to publish case.");
     }
+
+    return response.json();
+  }
+
+  async function exportPublicSite() {
+    const response = await fetch("/api/ops/public-export", {
+      method: "POST",
+    });
+
+    if (!response.ok) {
+      const payload = await response.json().catch(() => null);
+      throw new Error(payload?.error || "Failed to export public site.");
+    }
+
+    return response.json();
+  }
+
+  async function deployPublicSite() {
+    const response = await fetch("/api/ops/public-deploy", {
+      method: "POST",
+    });
+
+    if (!response.ok) {
+      const payload = await response.json().catch(() => null);
+      throw new Error(payload?.error || "Failed to deploy public site.");
+    }
+
+    return response.json();
   }
 
   return (
@@ -189,14 +230,93 @@ export function CaseWorkspaceBoard({ data }: { data: CaseWorkspaceData }) {
               disabled={isPending || groups.length === 0}
               onClick={() =>
                 startTransition(() => {
-                  void publishCurrentCase().then(() => router.refresh());
+                  setFeedback(null);
+                  setFeedbackTone(null);
+                  void publishCurrentCase()
+                    .then(() => {
+                      setFeedback("Published case bundle to the shared published root.");
+                      setFeedbackTone("success");
+                      router.refresh();
+                    })
+                    .catch((error) => {
+                      setFeedback(error instanceof Error ? error.message : "Failed to publish case.");
+                      setFeedbackTone("error");
+                    });
                 })
               }
             >
               Publish case
             </Button>
+            <Button
+              variant="outlined"
+              startIcon={<FileUpload />}
+              disabled={isPending}
+              onClick={() =>
+                startTransition(() => {
+                  setFeedback(null);
+                  setFeedbackTone(null);
+                  void exportPublicSite()
+                    .then((result) => {
+                      setFeedback(`Exported static public site to ${result.exportDir}.`);
+                      setFeedbackTone("success");
+                    })
+                    .catch((error) => {
+                      setFeedback(
+                        error instanceof Error ? error.message : "Failed to export public site.",
+                      );
+                      setFeedbackTone("error");
+                    });
+                })
+              }
+            >
+              Export public site
+            </Button>
+            <Button
+              variant="outlined"
+              startIcon={<CloudUpload />}
+              disabled={isPending || !canDeployPublicSite}
+              onClick={() =>
+                startTransition(() => {
+                  setFeedback(null);
+                  setFeedbackTone(null);
+                  void deployPublicSite()
+                    .then((result) => {
+                      setFeedback(
+                        `Deployed fresh static export to Cloudflare Pages project ${result.projectName}.`,
+                      );
+                      setFeedbackTone("success");
+                    })
+                    .catch((error) => {
+                      setFeedback(
+                        error instanceof Error ? error.message : "Failed to deploy public site.",
+                      );
+                      setFeedbackTone("error");
+                    });
+                })
+              }
+            >
+              Deploy to Pages
+            </Button>
           </Stack>
         </Box>
+        <Stack spacing={0.5}>
+          <Typography variant="body2" color="text.secondary">
+            Export and deploy operate on all published groups. Static export target: {publicExportDir}
+          </Typography>
+          {!canDeployPublicSite ? (
+            <Typography variant="caption" color="warning.main">
+              Deploy to Pages is disabled until Cloudflare Pages env is configured.
+            </Typography>
+          ) : null}
+          {feedback ? (
+            <Typography
+              variant="caption"
+              color={feedbackTone === "error" ? "error.main" : "primary.main"}
+            >
+              {feedback}
+            </Typography>
+          ) : null}
+        </Stack>
       </Stack>
 
       <Paper

@@ -5,6 +5,7 @@ import type { NextConfig } from "next";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const nextConfig: NextConfig = {
+  output: "export",
   outputFileTracingRoot: path.join(__dirname, "../.."),
   transpilePackages: [
     "@magic-compare/content-schema",

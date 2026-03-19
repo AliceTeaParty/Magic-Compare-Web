@@ -1,11 +1,18 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getPublishedManifest, listPublishedGroupSlugs } from "./content";
 
-const { readdir, readFile, shouldHideDemoContent, isHiddenDemoCaseSlug } = vi.hoisted(() => ({
+const {
+  readdir,
+  readFile,
+  shouldHideDemoContent,
+  isHiddenDemoCaseSlug,
+  getPublishedGroupsRoot,
+} = vi.hoisted(() => ({
   readdir: vi.fn(),
   readFile: vi.fn(),
   shouldHideDemoContent: vi.fn(),
   isHiddenDemoCaseSlug: vi.fn(),
+  getPublishedGroupsRoot: vi.fn(),
 }));
 
 vi.mock("node:fs/promises", () => ({
@@ -16,6 +23,7 @@ vi.mock("node:fs/promises", () => ({
 vi.mock("@/lib/runtime-config", () => ({
   shouldHideDemoContent,
   isHiddenDemoCaseSlug,
+  getPublishedGroupsRoot,
 }));
 
 describe("public published content helpers", () => {
@@ -24,8 +32,10 @@ describe("public published content helpers", () => {
     readFile.mockReset();
     shouldHideDemoContent.mockReset();
     isHiddenDemoCaseSlug.mockReset();
+    getPublishedGroupsRoot.mockReset();
     shouldHideDemoContent.mockReturnValue(false);
     isHiddenDemoCaseSlug.mockReturnValue(false);
+    getPublishedGroupsRoot.mockReturnValue("/tmp/published/groups");
   });
 
   it("lists published slugs directly when demo hiding is disabled", async () => {

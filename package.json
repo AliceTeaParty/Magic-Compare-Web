@@ -9,6 +9,9 @@
     "typecheck": "pnpm --recursive --if-present typecheck",
     "test": "pnpm --recursive --if-present test",
     "sync:published": "node scripts/sync-published.mjs",
+    "public:export": "tsx scripts/export-public.ts",
+    "public:deploy": "tsx scripts/deploy-public.ts",
+    "docker:build:internal": "docker build -f docker/internal-site.Dockerfile -t magic-compare/internal-site .",
     "db:generate": "pnpm --filter @magic-compare/internal-site db:generate",
     "db:push": "pnpm --filter @magic-compare/internal-site db:push",
     "db:seed": "pnpm --filter @magic-compare/internal-site db:seed",
@@ -20,6 +23,7 @@
     "@types/react-dom": "^19.2.3",
     "tsx": "^4.20.5",
     "typescript": "^5.8.3",
-    "vitest": "^3.2.4"
+    "vitest": "^3.2.4",
+    "wrangler": "^4.49.1"
   }
 }

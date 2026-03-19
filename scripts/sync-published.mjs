@@ -4,7 +4,9 @@ import { fileURLToPath } from "node:url";
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const workspaceRoot = path.resolve(scriptDir, "..");
-const sourceDir = path.join(workspaceRoot, "content", "published");
+const sourceDir = process.env.MAGIC_COMPARE_PUBLISHED_ROOT
+  ? path.resolve(process.env.MAGIC_COMPARE_PUBLISHED_ROOT)
+  : path.join(workspaceRoot, "content", "published");
 const destinationDir = path.join(
   workspaceRoot,
   "apps",

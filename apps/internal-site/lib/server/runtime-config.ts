@@ -1,4 +1,5 @@
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { DEMO_CASE_SLUG, parseEnvFlag } from "@magic-compare/shared-utils";
 
 export const HIDE_DEMO_ENV_NAME = "MAGIC_COMPARE_HIDE_DEMO";
@@ -27,7 +28,8 @@ export interface InternalAssetStorageConfig {
 }
 
 function workspaceRoot(): string {
-  return path.resolve(process.cwd(), "../..");
+  const currentDir = path.dirname(fileURLToPath(import.meta.url));
+  return path.resolve(currentDir, "../../../..");
 }
 
 function requireEnv(name: string): string {
