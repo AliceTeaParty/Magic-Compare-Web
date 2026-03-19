@@ -1,8 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { searchCases } from "./content-repository";
 
-const { findMany } = vi.hoisted(() => ({
+const { findMany, shouldHideDemoContent } = vi.hoisted(() => ({
   findMany: vi.fn(),
+  shouldHideDemoContent: vi.fn(),
 }));
 
 vi.mock("@/lib/server/db/client", () => ({
@@ -13,9 +14,16 @@ vi.mock("@/lib/server/db/client", () => ({
   },
 }));
 
+vi.mock("@/lib/server/runtime-config", () => ({
+  shouldHideDemoContent,
+  isHiddenDemoCaseSlug: vi.fn(),
+}));
+
 describe("searchCases", () => {
   beforeEach(() => {
     findMany.mockReset();
+    shouldHideDemoContent.mockReset();
+    shouldHideDemoContent.mockReturnValue(false);
   });
 
   it("returns recent cases when the query is empty", async () => {
@@ -129,6 +137,36 @@ describe("searchCases", () => {
       },
       orderBy: [{ updatedAt: "desc" }],
       take: 5,
+    });
+  });
+
+  it("filters the fixed demo case when the env flag is enabled", async () => {
+    shouldHideDemoContent.mockReturnValue(true);
+    findMany.mockResolvedValue([]);
+
+    await searchCases("", 8);
+
+    expect(findMany).toHaveBeenCalledWith({
+      where: {
+        slug: {
+          not: "demo-grain-study",
+        },
+      },
+      include: {
+        groups: {
+          select: {
+            slug: true,
+            title: true,
+            isPublic: true,
+            order: true,
+          },
+          orderBy: {
+            order: "asc",
+          },
+        },
+      },
+      orderBy: [{ updatedAt: "desc" }],
+      take: 8,
     });
   });
 });

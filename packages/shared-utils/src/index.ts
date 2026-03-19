@@ -1,3 +1,5 @@
+export const DEMO_CASE_SLUG = "demo-grain-study";
+
 export function kebabCase(input: string): string {
   return input
     .trim()
@@ -9,6 +11,15 @@ export function kebabCase(input: string): string {
 
 export function buildPublicGroupSlug(caseSlug: string, groupSlug: string): string {
   return `${caseSlug}--${groupSlug}`;
+}
+
+export function parseEnvFlag(value: string | undefined): boolean {
+  if (!value) {
+    return false;
+  }
+
+  const normalized = value.trim().toLowerCase();
+  return normalized === "1" || normalized === "true" || normalized === "yes" || normalized === "on";
 }
 
 export function orderByNumericOrder<T extends { order: number }>(items: T[]): T[] {

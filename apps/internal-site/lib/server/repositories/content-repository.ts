@@ -5,10 +5,12 @@ import type {
   ImportManifest,
   ViewerMode,
 } from "@magic-compare/content-schema";
+import { DEMO_CASE_SLUG } from "@magic-compare/shared-utils";
 import { validateImportManifest } from "@/lib/server/validators/import-manifest";
 import { prisma } from "@/lib/server/db/client";
 import { deletePublishedGroup } from "@/lib/server/storage/published-content";
 import { deleteInternalAssetGroupDirectories } from "@/lib/server/storage/internal-assets";
+import { isHiddenDemoCaseSlug, shouldHideDemoContent } from "@/lib/server/runtime-config";
 
 interface CaseRowSummary {
   id: string;
@@ -110,6 +112,13 @@ function sortFrames<T extends { order: number }>(frames: T[]): T[] {
 
 export async function listCases(): Promise<CaseRowSummary[]> {
   const cases = await prisma.case.findMany({
+    where: shouldHideDemoContent()
+      ? {
+          slug: {
+            not: DEMO_CASE_SLUG,
+          },
+        }
+      : undefined,
     include: {
       groups: {
         select: {
@@ -137,23 +146,54 @@ export async function listCases(): Promise<CaseRowSummary[]> {
 
 export async function searchCases(query: string, limit = 8): Promise<CaseSearchResult[]> {
   const normalizedQuery = query.trim();
+  const hideDemo = shouldHideDemoContent();
   const cases = await prisma.case.findMany({
-    where: normalizedQuery
-      ? {
-          OR: [
-            {
-              slug: {
-                contains: normalizedQuery,
+    where: hideDemo
+      ? normalizedQuery
+        ? {
+            AND: [
+              {
+                slug: {
+                  not: DEMO_CASE_SLUG,
+                },
               },
-            },
-            {
-              title: {
-                contains: normalizedQuery,
+              {
+                OR: [
+                  {
+                    slug: {
+                      contains: normalizedQuery,
+                    },
+                  },
+                  {
+                    title: {
+                      contains: normalizedQuery,
+                    },
+                  },
+                ],
               },
+            ],
+          }
+        : {
+            slug: {
+              not: DEMO_CASE_SLUG,
             },
-          ],
-        }
-      : undefined,
+          }
+      : normalizedQuery
+        ? {
+            OR: [
+              {
+                slug: {
+                  contains: normalizedQuery,
+                },
+              },
+              {
+                title: {
+                  contains: normalizedQuery,
+                },
+              },
+            ],
+          }
+        : undefined,
     include: {
       groups: {
         select: {
@@ -191,6 +231,10 @@ export async function searchCases(query: string, limit = 8): Promise<CaseSearchR
 }
 
 export async function getCaseWorkspace(caseSlug: string): Promise<CaseWorkspaceData | null> {
+  if (isHiddenDemoCaseSlug(caseSlug)) {
+    return null;
+  }
+
   const caseRow = await prisma.case.findUnique({
     where: { slug: caseSlug },
     include: {
@@ -235,6 +279,10 @@ export async function getCaseWorkspace(caseSlug: string): Promise<CaseWorkspaceD
 }
 
 export async function getViewerDataset(caseSlug: string, groupSlug: string): Promise<ViewerDataset | null> {
+  if (isHiddenDemoCaseSlug(caseSlug)) {
+    return null;
+  }
+
   const caseRow = await prisma.case.findUnique({
     where: { slug: caseSlug },
     include: {
