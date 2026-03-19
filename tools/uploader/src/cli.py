@@ -37,8 +37,17 @@ app = typer.Typer(add_completion=False, help="Magic Compare 中文导入工具")
 console = Console()
 
 
+def _normalize_path_text(path_text: str) -> str:
+    normalized = path_text.strip()
+
+    while len(normalized) >= 2 and normalized[0] == normalized[-1] and normalized[0] in {"'", '"'}:
+        normalized = normalized[1:-1].strip()
+
+    return normalized
+
+
 def _resolve_source_dir(path_text: str) -> Path:
-    source_dir = Path(path_text).expanduser().resolve()
+    source_dir = Path(_normalize_path_text(path_text)).expanduser().resolve()
     if not source_dir.exists() or not source_dir.is_dir():
         raise ValueError(f"素材目录不存在：{source_dir}")
     return source_dir
