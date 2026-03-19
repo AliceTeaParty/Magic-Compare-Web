@@ -124,6 +124,7 @@ function ThumbnailButton({ frame, isActive, onClick, buttonRef }: ThumbnailButto
   return (
     <Button
       ref={buttonRef}
+      data-frame-id={frame.id}
       onClick={onClick}
       sx={{
         minWidth: 168,
@@ -153,7 +154,16 @@ function ThumbnailButton({ frame, isActive, onClick, buttonRef }: ThumbnailButto
             component="img"
             src={thumbAsset.thumbUrl || thumbAsset.imageUrl}
             alt={frame.title}
-            sx={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+            draggable={false}
+            sx={{
+              width: "100%",
+              height: "100%",
+              objectFit: "cover",
+              display: "block",
+              pointerEvents: "none",
+              userSelect: "none",
+              WebkitUserDrag: "none",
+            }}
           />
         ) : (
           <Box sx={{ width: "100%", height: "100%", display: "grid", placeItems: "center" }}>
@@ -181,11 +191,15 @@ function StageImage({ asset, alt }: { asset: ViewerAsset; alt: string }) {
       component="img"
       src={asset.imageUrl}
       alt={alt}
+      draggable={false}
       sx={{
         width: "100%",
         height: "100%",
         objectFit: "contain",
         display: "block",
+        pointerEvents: "none",
+        userSelect: "none",
+        WebkitUserDrag: "none",
       }}
     />
   );
@@ -199,6 +213,7 @@ function StageAssetLayer({ asset, alt }: { asset: ViewerAsset; alt: string }) {
         inset: 0,
         display: "grid",
         placeItems: "center",
+        pointerEvents: "none",
       }}
     >
       <StageImage asset={asset} alt={alt} />
@@ -273,6 +288,7 @@ function SwipeCompareStage({
       onPointerMove={handlePointerMove}
       onPointerUp={finishPointerDrag}
       onPointerCancel={finishPointerDrag}
+      onDragStart={(event) => event.preventDefault()}
       sx={{
         position: "relative",
         width: "100%",
@@ -316,9 +332,9 @@ function SwipeCompareStage({
           height: 42,
           borderRadius: "999px",
           border: "1px solid",
-          borderColor: "rgba(246, 241, 232, 0.78)",
-          backgroundColor: "rgba(19, 21, 24, 0.72)",
-          boxShadow: "0 14px 28px rgba(0, 0, 0, 0.28)",
+          borderColor: "rgba(246, 241, 232, 0.52)",
+          backgroundColor: "rgba(56, 60, 66, 0.26)",
+          boxShadow: "0 10px 24px rgba(0, 0, 0, 0.16)",
           display: "grid",
           placeItems: "center",
           pointerEvents: "none",
@@ -328,8 +344,8 @@ function SwipeCompareStage({
             top: "50%",
             width: 9,
             height: 9,
-            borderTop: "2px solid rgba(246, 241, 232, 0.94)",
-            borderRight: "2px solid rgba(246, 241, 232, 0.94)",
+            borderTop: "2px solid rgba(246, 241, 232, 0.72)",
+            borderRight: "2px solid rgba(246, 241, 232, 0.72)",
           },
           "&::before": {
             left: 10,
@@ -346,7 +362,7 @@ function SwipeCompareStage({
             width: 3,
             height: 18,
             borderRadius: "999px",
-            backgroundColor: "rgba(246, 241, 232, 0.94)",
+            backgroundColor: "rgba(246, 241, 232, 0.58)",
           }}
         />
       </Box>
@@ -356,11 +372,13 @@ function SwipeCompareStage({
 
 function StagePresentationShell({
   children,
-  emphasized = false,
+  fittedSize,
 }: {
   children: ReactNode;
-  emphasized?: boolean;
+  fittedSize: StageSize | null;
 }) {
+  const fitActive = Boolean(fittedSize);
+
   return (
     <Box
       sx={{
@@ -368,18 +386,19 @@ function StagePresentationShell({
         display: "grid",
         placeItems: "center",
         width: "100%",
-        maxWidth: "100%",
+        maxWidth: fittedSize ? `${fittedSize.width}px` : "100%",
         minWidth: 0,
-        height: emphasized ? "100%" : "auto",
-        aspectRatio: emphasized ? "auto" : "16 / 9",
-        minHeight: emphasized ? 0 : { xs: 220, md: 340 },
+        aspectRatio: "16 / 9",
+        minHeight: fitActive ? 0 : { xs: 220, md: 340 },
+        maxHeight: fittedSize ? `${fittedSize.height}px` : "none",
+        marginInline: "auto",
         borderRadius: 2.5,
         overflow: "hidden",
         border: "1px solid",
-        borderColor: emphasized ? "rgba(200, 161, 111, 0.35)" : "divider",
+        borderColor: fitActive ? "rgba(200, 161, 111, 0.32)" : "divider",
         background:
           "radial-gradient(circle at top, rgba(200, 161, 111, 0.07), transparent 28%), rgba(12, 14, 17, 0.96)",
-        boxShadow: emphasized ? "0 34px 110px rgba(0, 0, 0, 0.52)" : "none",
+        boxShadow: fitActive ? "0 20px 48px rgba(0, 0, 0, 0.28)" : "none",
       }}
     >
       {children}
@@ -447,6 +466,7 @@ function ViewerStageContent({
           component="img"
           src={heatmapAsset.imageUrl}
           alt={heatmapAsset.label}
+          draggable={false}
           sx={{
             position: "absolute",
             inset: 0,
@@ -455,6 +475,8 @@ function ViewerStageContent({
             objectFit: "contain",
             opacity: overlayOpacity / 100,
             pointerEvents: "none",
+            userSelect: "none",
+            WebkitUserDrag: "none",
           }}
         />
       </>
@@ -479,6 +501,7 @@ function ViewerStage({
   abSide,
   overlayOpacity,
   fittedStageSize,
+  stageRef,
   swipePosition,
   setSwipePosition,
 }: {
@@ -489,6 +512,7 @@ function ViewerStage({
   abSide: "before" | "after";
   overlayOpacity: number;
   fittedStageSize: StageSize | null;
+  stageRef: (node: HTMLDivElement | null) => void;
   swipePosition: number;
   setSwipePosition: (value: number) => void;
 }) {
@@ -513,37 +537,19 @@ function ViewerStage({
   };
 
   return (
-    <>
-      <StagePresentationShell>
+    <Box
+      ref={stageRef}
+      sx={{
+        width: "100%",
+        minWidth: 0,
+        display: "grid",
+        placeItems: "center",
+      }}
+    >
+      <StagePresentationShell fittedSize={fittedStageSize}>
         <ViewerStageContent {...contentProps} />
       </StagePresentationShell>
-      {fittedStageSize ? (
-        <Box
-          sx={{
-            position: "fixed",
-            inset: 0,
-            zIndex: 1,
-            pointerEvents: "none",
-          }}
-        >
-          <Box
-            sx={{
-              position: "absolute",
-              left: "50%",
-              top: "50%",
-              transform: "translate(-50%, -50%)",
-              width: fittedStageSize.width,
-              height: fittedStageSize.height,
-              pointerEvents: "auto",
-            }}
-          >
-            <StagePresentationShell emphasized>
-              <ViewerStageContent {...contentProps} />
-            </StagePresentationShell>
-          </Box>
-        </Box>
-      ) : null}
-    </>
+    </Box>
   );
 }
 
@@ -665,10 +671,11 @@ export function GroupViewerWorkbench({
   const [viewportSize, setViewportSize] = useState<ViewportSize>(() => getViewportSize());
   const [fitViewViewportSignature, setFitViewViewportSignature] = useState<string | null>(null);
   const [swipePosition, setSwipePosition] = useState(50);
-  const filmstripViewportRef = useRef<HTMLDivElement | null>(null);
+  const stageRef = useRef<HTMLDivElement | null>(null);
   const filmstripFrameRefs = useRef(new Map<string, HTMLButtonElement>());
   const filmstripDragStateRef = useRef<{
     moved: boolean;
+    originFrameId: string | null;
     pointerId: number;
     startScrollLeft: number;
     startX: number;
@@ -690,6 +697,18 @@ export function GroupViewerWorkbench({
       });
     }
   }, [controller.currentFrame]);
+
+  useEffect(() => {
+    if (!fittedStageSize) {
+      return;
+    }
+
+    stageRef.current?.scrollIntoView({
+      behavior: "smooth",
+      block: "center",
+      inline: "nearest",
+    });
+  }, [fittedStageSize]);
 
   useEffect(() => {
     setSwipePosition(50);
@@ -782,6 +801,10 @@ export function GroupViewerWorkbench({
 
     filmstripDragStateRef.current = {
       moved: false,
+      originFrameId:
+        event.target instanceof Element
+          ? event.target.closest<HTMLElement>("[data-frame-id]")?.dataset.frameId ?? null
+          : null,
       pointerId: event.pointerId,
       startScrollLeft: event.currentTarget.scrollLeft,
       startX: event.clientX,
@@ -828,6 +851,10 @@ export function GroupViewerWorkbench({
     }
 
     suppressFilmstripClickRef.current = false;
+
+    if (dragState.originFrameId) {
+      controller.selectFrame(dragState.originFrameId);
+    }
   }
 
   function handleThumbnailSelection(frameId: string) {
@@ -978,22 +1005,20 @@ export function GroupViewerWorkbench({
                   : "Fit the compare stage to the current viewport"
               }
             >
-              <Button
-                variant={fittedStageSize ? "contained" : "outlined"}
+              <IconButton
                 size="small"
-                startIcon={<FitScreen fontSize="small" />}
                 onClick={toggleFittedStageView}
                 sx={{
+                  width: 34,
                   height: 34,
-                  minHeight: 34,
-                  px: 1.5,
-                  borderRadius: "999px",
-                  fontSize: "0.92rem",
-                  flexShrink: 0,
+                  borderColor: fittedStageSize ? "rgba(200, 161, 111, 0.36)" : "divider",
+                  backgroundColor: fittedStageSize
+                    ? "rgba(200, 161, 111, 0.12)"
+                    : "rgba(255,255,255,0.035)",
                 }}
               >
-                Fit view
-              </Button>
+                <FitScreen fontSize="small" />
+              </IconButton>
             </Tooltip>
             <Tooltip title={controller.sidebarOpen ? "Close details (I)" : "Open details (I)"}>
               <IconButton
@@ -1035,7 +1060,13 @@ export function GroupViewerWorkbench({
               {/* Stage header stays hidden for now to keep the comparison surface as the focal point. */}
               {controller.mode === "heatmap" && !controller.heatmapAsset ? <HeatmapNotice /> : null}
 
-              <Box sx={{ flex: 1, minWidth: 0, minHeight: 0 }}>
+              <Box
+                sx={{
+                  flex: 1,
+                  minWidth: 0,
+                  minHeight: fittedStageSize ? `${fittedStageSize.height}px` : 0,
+                }}
+              >
                 <ViewerStage
                   beforeAsset={controller.beforeAsset}
                   afterAsset={controller.afterAsset}
@@ -1044,6 +1075,9 @@ export function GroupViewerWorkbench({
                   abSide={controller.abSide}
                   overlayOpacity={controller.overlayOpacity}
                   fittedStageSize={fittedStageSize}
+                  stageRef={(node) => {
+                    stageRef.current = node;
+                  }}
                   swipePosition={swipePosition}
                   setSwipePosition={setSwipePosition}
                 />
@@ -1075,18 +1109,20 @@ export function GroupViewerWorkbench({
           <Box
             sx={{
               minWidth: 0,
-              p: { xs: 1.5, md: 2.25 },
+              px: { xs: 1.5, md: 2.25 },
+              pt: { xs: 1.35, md: 2 },
+              pb: { xs: 0.75, md: 1 },
               borderTop: "1px solid",
               borderColor: "divider",
               backgroundColor: "rgba(255,255,255,0.012)",
             }}
           >
             <Box
-              ref={filmstripViewportRef}
               onPointerDown={handleFilmstripPointerDown}
               onPointerMove={handleFilmstripPointerMove}
               onPointerUp={finishFilmstripPointerDrag}
               onPointerCancel={finishFilmstripPointerDrag}
+              onDragStart={(event) => event.preventDefault()}
               sx={{
                 width: "100%",
                 minWidth: 0,
@@ -1097,11 +1133,12 @@ export function GroupViewerWorkbench({
                 scrollbarWidth: "thin",
                 touchAction: "pan-y",
                 cursor: controller.frames.length > 1 ? "grab" : "default",
+                pb: 0.35,
                 "&:active": {
                   cursor: controller.frames.length > 1 ? "grabbing" : "default",
                 },
                 "&::-webkit-scrollbar": {
-                  height: 10,
+                  height: 8,
                 },
                 "&::-webkit-scrollbar-thumb": {
                   backgroundColor: "rgba(246, 241, 232, 0.16)",
