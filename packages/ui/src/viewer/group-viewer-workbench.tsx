@@ -529,8 +529,24 @@ export function GroupViewerWorkbench({
               value={controller.mode}
               sx={{
                 overflow: "visible",
+                alignItems: "stretch",
+                "& .MuiToggleButtonGroup-grouped": {
+                  minHeight: 34,
+                  px: 1.3,
+                  border: "1px solid",
+                  borderColor: "divider",
+                  borderRadius: "999px !important",
+                },
                 "& .MuiToggleButtonGroup-grouped:not(:first-of-type)": {
-                  marginLeft: 0,
+                  marginLeft: "0 !important",
+                  borderLeft: "1px solid",
+                  borderLeftColor: "divider",
+                },
+                "& .MuiToggleButtonGroup-grouped.Mui-selected": {
+                  borderColor: "rgba(200, 161, 111, 0.45)",
+                },
+                "& .MuiToggleButtonGroup-grouped.Mui-disabled": {
+                  borderColor: "divider",
                 },
               }}
               onChange={(_, nextMode: ViewerMode | null) => {
@@ -546,7 +562,19 @@ export function GroupViewerWorkbench({
               </ToggleButton>
             </ToggleButtonGroup>
             {controller.mode === "a-b" ? (
-              <FormControl size="small" sx={{ minWidth: 132 }}>
+              <FormControl
+                size="small"
+                sx={{
+                  minWidth: 112,
+                  "& .MuiOutlinedInput-root": {
+                    minHeight: 34,
+                  },
+                  "& .MuiSelect-select": {
+                    py: 0.75,
+                    pr: 3.75,
+                  },
+                }}
+              >
                 <Select
                   value={controller.abSide}
                   onChange={(event) =>
@@ -560,7 +588,14 @@ export function GroupViewerWorkbench({
               </FormControl>
             ) : null}
             <Tooltip title={controller.sidebarOpen ? "Close details (I)" : "Open details (I)"}>
-              <IconButton onClick={controller.toggleSidebar}>
+              <IconButton
+                size="small"
+                onClick={controller.toggleSidebar}
+                sx={{
+                  width: 34,
+                  height: 34,
+                }}
+              >
                 <ViewSidebar />
               </IconButton>
             </Tooltip>
@@ -591,23 +626,7 @@ export function GroupViewerWorkbench({
               }}
             >
               <Stack spacing={2} sx={{ height: "100%" }}>
-                <Stack
-                  direction={{ xs: "column", md: "row" }}
-                  alignItems={{ xs: "flex-start", md: "flex-end" }}
-                  justifyContent="space-between"
-                  spacing={1.25}
-                >
-                  <Typography variant="h5">
-                    {controller.currentFrame?.title ?? "No frame selected"}
-                  </Typography>
-                  <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-                    <Chip size="small" label={`${controller.frames.length} frames`} variant="outlined" />
-                    {dataset.group.tags.map((tag) => (
-                      <Chip key={tag} label={tag} size="small" variant="outlined" />
-                    ))}
-                  </Stack>
-                </Stack>
-
+                {/* Stage header stays hidden for now to keep the comparison surface as the focal point. */}
                 {controller.mode === "heatmap" && !controller.heatmapAsset ? <HeatmapNotice /> : null}
 
                 <Box sx={{ flex: 1, minHeight: 0 }}>
@@ -647,9 +666,7 @@ export function GroupViewerWorkbench({
 
           <Box
             sx={{
-              px: { xs: 1.5, md: 2.25 },
-              pt: { xs: 1.25, md: 1.5 },
-              pb: { xs: 1.5, md: 2.25 },
+              p: { xs: 1.5, md: 2.25 },
               borderTop: "1px solid",
               borderColor: "divider",
               backgroundColor: "rgba(255,255,255,0.012)",
