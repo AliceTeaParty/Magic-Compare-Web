@@ -1,11 +1,12 @@
 import { spawn } from "node:child_process";
-import { cp, mkdir, rm } from "node:fs/promises";
+import { cp, mkdir, readdir, rm } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   CF_API_TOKEN_ENV_NAME,
   CF_PAGES_BRANCH_ENV_NAME,
   CF_PAGES_PROJECT_NAME_ENV_NAME,
+  getPublishedRoot,
   getPublicExportDir,
   isCloudflarePagesDeployConfigured,
 } from "../runtime-config";
@@ -24,6 +25,15 @@ export interface PublicDeployResult extends PublicExportResult {
   projectName: string;
   branch: string | null;
 }
+
+export class PublicSiteOperationConflictError extends Error {}
+
+let activePublicSiteOperation:
+  | {
+      label: "export" | "deploy";
+      promise: Promise<unknown>;
+    }
+  | null = null;
 
 function workspaceRoot(): string {
   const currentDir = path.dirname(fileURLToPath(import.meta.url));
@@ -113,10 +123,57 @@ async function mirrorExportDirectory(sourceDir: string, targetDir: string): Prom
   await cp(sourceDir, targetDir, { recursive: true });
 }
 
-export async function exportPublicSite(): Promise<PublicExportResult> {
+function publishedGroupsDirectory(): string {
+  return path.join(getPublishedRoot(), "groups");
+}
+
+async function ensurePublishedGroupsExist(): Promise<void> {
+  try {
+    const entries = await readdir(publishedGroupsDirectory(), { withFileTypes: true });
+    if (entries.some((entry) => entry.isDirectory())) {
+      return;
+    }
+  } catch {
+    // Fall through to the explicit error below.
+  }
+
+  throw new Error(
+    `No published groups were found in ${publishedGroupsDirectory()}. Publish at least one case first.`,
+  );
+}
+
+async function withPublicSiteOperationLock<T>(
+  label: "export" | "deploy",
+  action: () => Promise<T>,
+): Promise<T> {
+  if (activePublicSiteOperation) {
+    throw new PublicSiteOperationConflictError(
+      `Public site ${activePublicSiteOperation.label} is already running. Please wait for it to finish.`,
+    );
+  }
+
+  const promise = action();
+  activePublicSiteOperation = {
+    label,
+    promise,
+  };
+
+  try {
+    return await promise;
+  } finally {
+    if (activePublicSiteOperation?.promise === promise) {
+      activePublicSiteOperation = null;
+    }
+  }
+}
+
+async function performPublicExport(): Promise<PublicExportResult> {
   const root = workspaceRoot();
   const buildOutputDir = publicBuildOutputDirectory();
   const exportDir = getPublicExportDir();
+  await ensurePublishedGroupsExist();
+  await rm(path.join(publicSiteDirectory(), ".next"), { recursive: true, force: true });
+  await rm(buildOutputDir, { recursive: true, force: true });
   const commandResult = await runCommand("pnpm", getPublicSiteBuildArgs(), root);
   await mirrorExportDirectory(buildOutputDir, exportDir);
 
@@ -127,6 +184,14 @@ export async function exportPublicSite(): Promise<PublicExportResult> {
   };
 }
 
+export function getPublicSiteOperationErrorStatus(error: unknown): number {
+  return error instanceof PublicSiteOperationConflictError ? 409 : 400;
+}
+
+export async function exportPublicSite(): Promise<PublicExportResult> {
+  return withPublicSiteOperationLock("export", performPublicExport);
+}
+
 export async function deployPublicSite(): Promise<PublicDeployResult> {
   if (!isCloudflarePagesDeployConfigured()) {
     throw new Error(
@@ -134,20 +199,26 @@ export async function deployPublicSite(): Promise<PublicDeployResult> {
     );
   }
 
-  const exportResult = await exportPublicSite();
-  const projectName = process.env[CF_PAGES_PROJECT_NAME_ENV_NAME]?.trim() || "";
-  const branch = process.env[CF_PAGES_BRANCH_ENV_NAME]?.trim() || null;
-  const deployResult = await runCommand("pnpm", getWranglerPagesDeployArgs(exportResult.exportDir), workspaceRoot());
+  return withPublicSiteOperationLock("deploy", async () => {
+    const exportResult = await performPublicExport();
+    const projectName = process.env[CF_PAGES_PROJECT_NAME_ENV_NAME]?.trim() || "";
+    const branch = process.env[CF_PAGES_BRANCH_ENV_NAME]?.trim() || null;
+    const deployResult = await runCommand(
+      "pnpm",
+      getWranglerPagesDeployArgs(exportResult.exportDir),
+      workspaceRoot(),
+    );
 
-  if (!process.env[CF_API_TOKEN_ENV_NAME]?.trim()) {
-    throw new Error("Cloudflare API token is missing.");
-  }
+    if (!process.env[CF_API_TOKEN_ENV_NAME]?.trim()) {
+      throw new Error("Cloudflare API token is missing.");
+    }
 
-  return {
-    ...exportResult,
-    stdout: [exportResult.stdout.trim(), deployResult.stdout.trim()].filter(Boolean).join("\n"),
-    stderr: [exportResult.stderr.trim(), deployResult.stderr.trim()].filter(Boolean).join("\n"),
-    projectName,
-    branch,
-  };
+    return {
+      ...exportResult,
+      stdout: [exportResult.stdout.trim(), deployResult.stdout.trim()].filter(Boolean).join("\n"),
+      stderr: [exportResult.stderr.trim(), deployResult.stderr.trim()].filter(Boolean).join("\n"),
+      projectName,
+      branch,
+    };
+  });
 }

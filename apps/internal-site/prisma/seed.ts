@@ -1,9 +1,21 @@
 import path from "node:path";
 import { prisma } from "../lib/server/db/client";
+import { publishCase } from "../lib/server/publish/publish-case";
 import { applyImportManifest } from "../lib/server/repositories/content-repository";
 import { uploadLocalFileToInternalAsset } from "../lib/server/storage/internal-assets";
 
 async function main() {
+  const existingDemoCase = await prisma.case.findUnique({
+    where: { slug: "demo-grain-study" },
+    select: { id: true },
+  });
+
+  if (existingDemoCase) {
+    await publishCase(existingDemoCase.id);
+    console.log("Published demo bundle for existing seeded case.");
+    return;
+  }
+
   const existingCases = await prisma.case.count();
 
   if (existingCases > 0) {
@@ -143,7 +155,18 @@ async function main() {
     ],
   });
 
-  console.log("Seeded demo case into SQLite and uploaded demo assets to S3.");
+  const demoCase = await prisma.case.findUnique({
+    where: { slug: "demo-grain-study" },
+    select: { id: true },
+  });
+
+  if (!demoCase) {
+    throw new Error("Demo case was not created during seed.");
+  }
+
+  await publishCase(demoCase.id);
+
+  console.log("Seeded demo case into SQLite, published demo bundle, and uploaded demo assets to S3.");
 }
 
 main()

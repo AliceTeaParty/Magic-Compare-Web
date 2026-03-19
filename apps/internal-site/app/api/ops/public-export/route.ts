@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
-import { exportPublicSite } from "@/lib/server/public-site/runtime";
+import {
+  exportPublicSite,
+  getPublicSiteOperationErrorStatus,
+} from "@/lib/server/public-site/runtime";
 
 export async function POST() {
   try {
@@ -8,7 +11,7 @@ export async function POST() {
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Public export failed." },
-      { status: 400 },
+      { status: getPublicSiteOperationErrorStatus(error) },
     );
   }
 }

@@ -133,6 +133,7 @@ export function CaseWorkspaceBoard({
   const [isPending, startTransition] = useTransition();
   const [feedback, setFeedback] = useState<string | null>(null);
   const [feedbackTone, setFeedbackTone] = useState<"error" | "success" | null>(null);
+  const [publicSiteAction, setPublicSiteAction] = useState<"export" | "deploy" | null>(null);
 
   async function saveGroupOrder(nextGroupIds: string[]) {
     const response = await fetch("/api/ops/group-reorder", {
@@ -250,8 +251,13 @@ export function CaseWorkspaceBoard({
             <Button
               variant="outlined"
               startIcon={<FileUpload />}
-              disabled={isPending}
-              onClick={() =>
+              disabled={isPending || publicSiteAction !== null}
+              onClick={() => {
+                if (publicSiteAction) {
+                  return;
+                }
+
+                setPublicSiteAction("export");
                 startTransition(() => {
                   setFeedback(null);
                   setFeedbackTone(null);
@@ -265,17 +271,25 @@ export function CaseWorkspaceBoard({
                         error instanceof Error ? error.message : "Failed to export public site.",
                       );
                       setFeedbackTone("error");
+                    })
+                    .finally(() => {
+                      setPublicSiteAction(null);
                     });
-                })
-              }
+                });
+              }}
             >
               Export public site
             </Button>
             <Button
               variant="outlined"
               startIcon={<CloudUpload />}
-              disabled={isPending || !canDeployPublicSite}
-              onClick={() =>
+              disabled={isPending || publicSiteAction !== null || !canDeployPublicSite}
+              onClick={() => {
+                if (publicSiteAction) {
+                  return;
+                }
+
+                setPublicSiteAction("deploy");
                 startTransition(() => {
                   setFeedback(null);
                   setFeedbackTone(null);
@@ -291,9 +305,12 @@ export function CaseWorkspaceBoard({
                         error instanceof Error ? error.message : "Failed to deploy public site.",
                       );
                       setFeedbackTone("error");
+                    })
+                    .finally(() => {
+                      setPublicSiteAction(null);
                     });
-                })
-              }
+                });
+              }}
             >
               Deploy to Pages
             </Button>
