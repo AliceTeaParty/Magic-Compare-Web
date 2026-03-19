@@ -1,8 +1,10 @@
 import path from "node:path";
+import { loadWorkspaceEnv } from "@/lib/server/env/load-workspace-env";
 
 export const DEFAULT_DATABASE_URL = "file:./dev.db";
 
 export function getDatabaseUrl(): string {
+  loadWorkspaceEnv();
   return process.env.DATABASE_URL?.trim() || DEFAULT_DATABASE_URL;
 }
 

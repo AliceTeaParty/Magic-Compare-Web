@@ -1,6 +1,7 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { DEMO_CASE_SLUG, parseEnvFlag } from "@magic-compare/shared-utils";
+import { loadWorkspaceEnv } from "@/lib/server/env/load-workspace-env";
 
 export const HIDE_DEMO_ENV_NAME = "MAGIC_COMPARE_HIDE_DEMO";
 export const PUBLISHED_ROOT_ENV_NAME = "MAGIC_COMPARE_PUBLISHED_ROOT";
@@ -33,6 +34,7 @@ function workspaceRoot(): string {
 }
 
 function requireEnv(name: string): string {
+  loadWorkspaceEnv();
   const value = process.env[name]?.trim();
   if (!value) {
     throw new Error(`Missing required environment variable: ${name}`);
@@ -41,6 +43,7 @@ function requireEnv(name: string): string {
 }
 
 export function shouldHideDemoContent(): boolean {
+  loadWorkspaceEnv();
   return parseEnvFlag(process.env[HIDE_DEMO_ENV_NAME]);
 }
 
@@ -49,6 +52,7 @@ export function isHiddenDemoCaseSlug(caseSlug: string): boolean {
 }
 
 export function getPublishedRoot(): string {
+  loadWorkspaceEnv();
   const configured = process.env[PUBLISHED_ROOT_ENV_NAME]?.trim();
   return configured
     ? path.resolve(configured)
@@ -56,6 +60,7 @@ export function getPublishedRoot(): string {
 }
 
 export function getPublicExportDir(): string {
+  loadWorkspaceEnv();
   const configured = process.env[PUBLIC_EXPORT_DIR_ENV_NAME]?.trim();
   return configured
     ? path.resolve(configured)
@@ -63,6 +68,7 @@ export function getPublicExportDir(): string {
 }
 
 export function getInternalAssetStorageConfig(): InternalAssetStorageConfig {
+  loadWorkspaceEnv();
   return {
     bucket: requireEnv(S3_BUCKET_ENV_NAME),
     region: process.env[S3_REGION_ENV_NAME]?.trim() || "us-east-1",
@@ -75,6 +81,7 @@ export function getInternalAssetStorageConfig(): InternalAssetStorageConfig {
 }
 
 export function isCloudflarePagesDeployConfigured(): boolean {
+  loadWorkspaceEnv();
   return Boolean(
     process.env[CF_PAGES_PROJECT_NAME_ENV_NAME]?.trim() &&
       process.env[CF_ACCOUNT_ID_ENV_NAME]?.trim() &&
