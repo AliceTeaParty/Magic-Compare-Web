@@ -84,18 +84,54 @@ export function CaseDirectoryGrid({ items }: { items: DirectoryItem[] }) {
                 icon={<Collections fontSize="small" />}
                 label={`${item.groupCount} groups`}
                 variant="outlined"
+                sx={{
+                  height: 32,
+                  pl: 0.5,
+                  pr: 0.75,
+                  "& .MuiChip-label": {
+                    px: 1.5,
+                  },
+                  "& .MuiChip-icon": {
+                    ml: 0.9,
+                    mr: -0.4,
+                  },
+                }}
               />
               <Chip
                 size="small"
                 icon={<Public fontSize="small" />}
                 label={`${item.publicGroupCount} public`}
                 variant="outlined"
+                sx={{
+                  height: 32,
+                  pl: 0.5,
+                  pr: 0.75,
+                  "& .MuiChip-label": {
+                    px: 1.5,
+                  },
+                  "& .MuiChip-icon": {
+                    ml: 0.9,
+                    mr: -0.4,
+                  },
+                }}
               />
               <Chip
                 size="small"
                 icon={<ImageSearch fontSize="small" />}
                 label={new Date(item.updatedAt).toLocaleDateString()}
                 variant="outlined"
+                sx={{
+                  height: 32,
+                  pl: 0.5,
+                  pr: 0.75,
+                  "& .MuiChip-label": {
+                    px: 1.5,
+                  },
+                  "& .MuiChip-icon": {
+                    ml: 0.9,
+                    mr: -0.4,
+                  },
+                }}
               />
             </Stack>
             <Stack direction="row" spacing={1} sx={{ pt: 1, mt: "auto" }}>
