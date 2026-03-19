@@ -22,6 +22,15 @@ interface CaseRowSummary {
   publicGroupCount: number;
 }
 
+export interface CaseSearchGroupSummary {
+  slug: string;
+  title: string;
+}
+
+export interface CaseSearchResult extends CaseRowSummary {
+  groups: CaseSearchGroupSummary[];
+}
+
 export interface CaseWorkspaceGroup {
   id: string;
   slug: string;
@@ -121,6 +130,61 @@ export async function listCases(): Promise<CaseRowSummary[]> {
     updatedAt: caseRow.updatedAt.toISOString(),
     groupCount: caseRow.groups.length,
     publicGroupCount: caseRow.groups.filter((group) => group.isPublic).length,
+  }));
+}
+
+export async function searchCases(query: string, limit = 8): Promise<CaseSearchResult[]> {
+  const normalizedQuery = query.trim();
+  const cases = await prisma.case.findMany({
+    where: normalizedQuery
+      ? {
+          OR: [
+            {
+              slug: {
+                contains: normalizedQuery,
+              },
+            },
+            {
+              title: {
+                contains: normalizedQuery,
+              },
+            },
+          ],
+        }
+      : undefined,
+    include: {
+      groups: {
+        select: {
+          slug: true,
+          title: true,
+          isPublic: true,
+          order: true,
+        },
+        orderBy: {
+          order: "asc",
+        },
+      },
+    },
+    orderBy: [{ updatedAt: "desc" }],
+    take: limit,
+  });
+
+  return cases.map((caseRow) => ({
+    id: caseRow.id,
+    slug: caseRow.slug,
+    title: caseRow.title,
+    subtitle: caseRow.subtitle,
+    summary: caseRow.summary,
+    tags: parseTags(caseRow.tagsJson),
+    status: asCaseStatus(caseRow.status),
+    publishedAt: caseRow.publishedAt?.toISOString() ?? null,
+    updatedAt: caseRow.updatedAt.toISOString(),
+    groupCount: caseRow.groups.length,
+    publicGroupCount: caseRow.groups.filter((group) => group.isPublic).length,
+    groups: sortGroups(caseRow.groups).map((group) => ({
+      slug: group.slug,
+      title: group.title,
+    })),
   }));
 }
 
