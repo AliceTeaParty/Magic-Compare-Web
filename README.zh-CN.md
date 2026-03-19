@@ -11,7 +11,8 @@
 <p align="center">
   <a href="#quick-start">快速开始</a> ·
   <a href="#workflow-overview">查看流程</a> ·
-  <a href="./tools/uploader/README.md">Uploader 文档</a>
+  <a href="./tools/uploader/README.md">Uploader 文档</a> ·
+  <a href="./docs/viewer-stage-and-filmstrip-notes.zh-CN.md">Viewer 复盘</a>
 </p>
 
 <table>
