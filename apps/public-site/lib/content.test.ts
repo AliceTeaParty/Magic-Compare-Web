@@ -1,5 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { getPublishedManifest, listPublishedGroupSlugs } from "./content";
+import {
+  getPublishedGroupRouteAlias,
+  getPublishedManifest,
+  listPublishedGroupRouteAliases,
+  listPublishedGroupSlugs,
+} from "./content";
 
 const {
   readdir,
@@ -235,5 +240,79 @@ describe("public published content helpers", () => {
     isHiddenDemoCaseSlug.mockReturnValue(true);
 
     await expect(getPublishedManifest("demo-grain-study--banding-check")).resolves.toBeNull();
+  });
+
+  it("builds route aliases from published manifests", async () => {
+    readdir.mockResolvedValue([{ isDirectory: () => true, name: "demo-grain-study--banding-check" }]);
+    readFile.mockResolvedValue(
+      JSON.stringify({
+        schemaVersion: 1,
+        publicSlug: "demo-grain-study--banding-check",
+        generatedAt: "2026-03-20T00:00:00.000Z",
+        assetBasePath: "/published/groups/demo-grain-study--banding-check/assets",
+        case: {
+          slug: "demo-grain-study",
+          title: "Demo Grain Study",
+          subtitle: "",
+          summary: "",
+          tags: [],
+          publishedAt: "2026-03-20T00:00:00.000Z",
+        },
+        group: {
+          id: "group-demo",
+          slug: "banding-check",
+          publicSlug: "demo-grain-study--banding-check",
+          title: "Banding Check",
+          description: "",
+          defaultMode: "before-after",
+          tags: [],
+        },
+        frames: [
+          {
+            id: "frame-1",
+            title: "Frame 1",
+            caption: "",
+            order: 0,
+            assets: [
+              {
+                id: "asset-1",
+                kind: "before",
+                label: "Before",
+                imageUrl: "/published/groups/demo-grain-study--banding-check/assets/a.png",
+                thumbUrl: "/published/groups/demo-grain-study--banding-check/assets/a.png",
+                width: 1280,
+                height: 720,
+                note: "",
+                isPrimaryDisplay: true,
+              },
+              {
+                id: "asset-2",
+                kind: "after",
+                label: "After",
+                imageUrl: "/published/groups/demo-grain-study--banding-check/assets/b.png",
+                thumbUrl: "/published/groups/demo-grain-study--banding-check/assets/b.png",
+                width: 1280,
+                height: 720,
+                note: "",
+                isPrimaryDisplay: true,
+              },
+            ],
+          },
+        ],
+      }),
+    );
+
+    await expect(listPublishedGroupRouteAliases()).resolves.toEqual([
+      {
+        caseSlug: "demo-grain-study",
+        groupSlug: "banding-check",
+        publicSlug: "demo-grain-study--banding-check",
+      },
+    ]);
+    await expect(getPublishedGroupRouteAlias("demo-grain-study", "banding-check")).resolves.toEqual({
+      caseSlug: "demo-grain-study",
+      groupSlug: "banding-check",
+      publicSlug: "demo-grain-study--banding-check",
+    });
   });
 });

@@ -7,6 +7,12 @@ import {
   shouldHideDemoContent,
 } from "@/lib/runtime-config";
 
+export interface PublishedGroupRouteAlias {
+  caseSlug: string;
+  groupSlug: string;
+  publicSlug: string;
+}
+
 export async function listPublishedGroupSlugs(): Promise<string[]> {
   try {
     const entries = await readdir(getPublishedGroupsRoot(), { withFileTypes: true });
@@ -41,4 +47,27 @@ export async function getPublishedManifest(publicSlug: string): Promise<PublishM
   } catch {
     return null;
   }
+}
+
+export async function listPublishedGroupRouteAliases(): Promise<PublishedGroupRouteAlias[]> {
+  const publicSlugs = await listPublishedGroupSlugs();
+  const manifests = await Promise.all(publicSlugs.map((publicSlug) => getPublishedManifest(publicSlug)));
+
+  return manifests
+    .filter((manifest): manifest is PublishManifest => Boolean(manifest))
+    .map((manifest) => ({
+      caseSlug: manifest.case.slug,
+      groupSlug: manifest.group.slug,
+      publicSlug: manifest.publicSlug,
+    }));
+}
+
+export async function getPublishedGroupRouteAlias(
+  caseSlug: string,
+  groupSlug: string,
+): Promise<PublishedGroupRouteAlias | null> {
+  const aliases = await listPublishedGroupRouteAliases();
+  return (
+    aliases.find((alias) => alias.caseSlug === caseSlug && alias.groupSlug === groupSlug) ?? null
+  );
 }
