@@ -6,6 +6,7 @@ import {
   DragIndicator,
   FileUpload,
   OpenInNew,
+  Public,
   Publish,
 } from "@mui/icons-material";
 import {
@@ -35,9 +36,13 @@ import type { CaseWorkspaceData } from "@/lib/server/repositories/content-reposi
 function SortableGroupRow({
   group,
   caseSlug,
+  isPending,
+  onToggleVisibility,
 }: {
   group: CaseWorkspaceData["groups"][number];
   caseSlug: string;
+  isPending: boolean;
+  onToggleVisibility: (group: CaseWorkspaceData["groups"][number]) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: group.id });
 
@@ -54,7 +59,7 @@ function SortableGroupRow({
         elevation={0}
         sx={{
           width: "100%",
-          p: { xs: 1.75, md: 2 },
+          p: { xs: 1.6, md: 1.9 },
           borderRadius: 2.5,
           border: "1px solid",
           borderColor: "divider",
@@ -63,7 +68,7 @@ function SortableGroupRow({
       >
         <Stack
           direction={{ xs: "column", md: "row" }}
-          spacing={{ xs: 1.25, md: 1.5 }}
+          spacing={{ xs: 1.2, md: 1.35 }}
           alignItems={{ xs: "stretch", md: "center" }}
         >
           <Tooltip title="Drag to reorder within this case">
@@ -73,16 +78,18 @@ function SortableGroupRow({
               sx={{
                 alignSelf: { xs: "flex-start", md: "center" },
                 color: "text.secondary",
+                width: 34,
+                height: 34,
               }}
             >
               <DragIndicator />
             </IconButton>
           </Tooltip>
           <Box sx={{ flex: 1, minWidth: 0 }}>
-            <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+            <Typography variant="subtitle1" sx={{ fontWeight: 600, lineHeight: 1.15 }}>
               {group.title}
             </Typography>
-            <Typography variant="body2" color="text.secondary" noWrap>
+            <Typography variant="body2" color="text.secondary" noWrap sx={{ mt: 0.55 }}>
               {group.description || "No group description yet."}
             </Typography>
           </Box>
@@ -91,23 +98,45 @@ function SortableGroupRow({
               display: "flex",
               alignItems: "center",
               justifyContent: { xs: "flex-start", md: "flex-end" },
-              gap: 1,
+              gap: 0.9,
               flexWrap: "wrap",
             }}
           >
-            <Chip size="small" label={group.defaultMode} variant="outlined" />
-            <Chip size="small" label={`${group.frameCount} frames`} variant="outlined" />
+            <Chip
+              size="small"
+              label={group.defaultMode}
+              variant="outlined"
+              sx={{ height: 34, "& .MuiChip-label": { px: 1.35 } }}
+            />
+            <Chip
+              size="small"
+              label={`${group.frameCount} frames`}
+              variant="outlined"
+              sx={{ height: 34, "& .MuiChip-label": { px: 1.35 } }}
+            />
             <Chip
               size="small"
               label={group.isPublic ? "public" : "internal"}
               color={group.isPublic ? "primary" : "default"}
+              sx={{ height: 34, "& .MuiChip-label": { px: 1.35 } }}
             />
+            <Button
+              variant="outlined"
+              size="small"
+              startIcon={<Public />}
+              disabled={isPending}
+              onClick={() => onToggleVisibility(group)}
+              sx={{ minHeight: 34, px: 1.35 }}
+            >
+              {group.isPublic ? "Make internal" : "Make public"}
+            </Button>
             <Button
               component={Link}
               href={`/cases/${caseSlug}/groups/${group.slug}`}
               variant="text"
               size="small"
               endIcon={<OpenInNew />}
+              sx={{ minHeight: 34, px: 1.35 }}
             >
               Open
             </Button>
@@ -197,34 +226,109 @@ export function CaseWorkspaceBoard({
     return response.json();
   }
 
+  async function updateGroupVisibility(groupSlug: string, isPublic: boolean) {
+    const response = await fetch("/api/ops/group-visibility", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        caseSlug: data.slug,
+        groupSlug,
+        isPublic,
+      }),
+    });
+
+    if (!response.ok) {
+      const payload = await response.json().catch(() => null);
+      throw new Error(payload?.error || "Failed to update group visibility.");
+    }
+
+    return response.json();
+  }
+
+  function toggleGroupVisibility(targetGroup: CaseWorkspaceData["groups"][number]) {
+    const previousGroups = groups;
+    const nextVisibility = !targetGroup.isPublic;
+    const nextGroups = groups.map((group) =>
+      group.id === targetGroup.id ? { ...group, isPublic: nextVisibility } : group,
+    );
+
+    setGroups(nextGroups);
+
+    startTransition(() => {
+      setFeedback(null);
+      setFeedbackTone(null);
+      void updateGroupVisibility(targetGroup.slug, nextVisibility)
+        .then(() => {
+          setFeedback(
+            nextVisibility
+              ? `Marked ${targetGroup.title} as public. Publish the case to refresh the public bundle.`
+              : `Marked ${targetGroup.title} as internal. Publish the case to remove it from the next public bundle.`,
+          );
+          setFeedbackTone("success");
+          router.refresh();
+        })
+        .catch((error) => {
+          setGroups(previousGroups);
+          setFeedback(
+            error instanceof Error ? error.message : "Failed to update group visibility.",
+          );
+          setFeedbackTone("error");
+        });
+    });
+  }
+
   return (
     <Stack spacing={{ xs: 2.25, md: 3 }}>
-      <Stack spacing={1.5} sx={{ maxWidth: 940 }}>
+      <Stack spacing={1.7} sx={{ maxWidth: 980 }}>
         <Typography variant="overline" color="primary.main">
           Case workspace
         </Typography>
         <Box
           sx={{
             display: "grid",
-            gap: 1.5,
-            alignItems: "end",
-            gridTemplateColumns: { xs: "1fr", lg: "minmax(0, 1.1fr) auto" },
-            pb: 2.5,
+            gap: { xs: 1.4, xl: 1.85 },
+            alignItems: "start",
+            gridTemplateColumns: { xs: "1fr", xl: "minmax(0, 1.18fr) auto" },
+            pb: 2.65,
             borderBottom: "1px solid",
             borderColor: "divider",
           }}
         >
-          <Box>
-            <Typography variant="h2">{data.title}</Typography>
-            <Typography variant="body1" color="text.secondary">
+          <Stack spacing={1.1} sx={{ minWidth: 0, pr: { xl: 2 } }}>
+            <Typography variant="h2" sx={{ lineHeight: 0.98 }}>
+              {data.title}
+            </Typography>
+            <Stack direction="row" spacing={0.9} flexWrap="wrap" useFlexGap>
+              <Chip
+                label={data.status}
+                color={data.status === "published" ? "primary" : "default"}
+                sx={{ height: 36, "& .MuiChip-label": { px: 1.4 } }}
+              />
+              <Chip
+                label={`${groups.length} groups`}
+                variant="outlined"
+                sx={{ height: 36, "& .MuiChip-label": { px: 1.4 } }}
+              />
+            </Stack>
+            <Typography variant="body1" color="text.secondary" sx={{ maxWidth: 760 }}>
               {data.summary || "No summary yet."}
             </Typography>
-          </Box>
-          <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
-            <Chip
-              label={data.status}
-              color={data.status === "published" ? "primary" : "default"}
-            />
+          </Stack>
+          <Stack
+            direction="row"
+            spacing={1}
+            alignItems="center"
+            justifyContent={{ xs: "flex-start", xl: "flex-end" }}
+            flexWrap="wrap"
+            useFlexGap
+            sx={{
+              "& .MuiButton-root": {
+                minHeight: 40,
+              },
+            }}
+          >
             <Button
               variant="contained"
               startIcon={<Publish />}
@@ -383,7 +487,13 @@ export function CaseWorkspaceBoard({
             <SortableContext items={groups.map((group) => group.id)} strategy={rectSortingStrategy}>
               <List sx={{ display: "grid", gap: 1.25 }}>
                 {groups.map((group) => (
-                  <SortableGroupRow key={group.id} group={group} caseSlug={data.slug} />
+                  <SortableGroupRow
+                    key={group.id}
+                    group={group}
+                    caseSlug={data.slug}
+                    isPending={isPending}
+                    onToggleVisibility={toggleGroupVisibility}
+                  />
                 ))}
               </List>
             </SortableContext>

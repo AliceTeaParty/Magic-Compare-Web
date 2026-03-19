@@ -511,6 +511,45 @@ export async function reorderFrames(groupId: string, frameIds: string[]): Promis
   );
 }
 
+export async function setGroupVisibility(caseSlug: string, groupSlug: string, isPublic: boolean) {
+  const caseRow = await prisma.case.findUnique({
+    where: { slug: caseSlug },
+    include: {
+      groups: {
+        select: {
+          id: true,
+          slug: true,
+          title: true,
+          isPublic: true,
+        },
+      },
+    },
+  });
+
+  if (!caseRow) {
+    throw new Error("Case not found.");
+  }
+
+  const targetGroup = caseRow.groups.find((group) => group.slug === groupSlug);
+
+  if (!targetGroup) {
+    throw new Error("Group not found.");
+  }
+
+  await prisma.group.update({
+    where: { id: targetGroup.id },
+    data: {
+      isPublic,
+    },
+  });
+
+  return {
+    caseSlug: caseRow.slug,
+    groupSlug: targetGroup.slug,
+    isPublic,
+  };
+}
+
 export async function deleteGroup(caseSlug: string, groupSlug: string) {
   const caseRow = await prisma.case.findUnique({
     where: { slug: caseSlug },
