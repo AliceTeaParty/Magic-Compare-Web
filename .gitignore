@@ -45,6 +45,7 @@ project-guide.md
 mcp-guide.md
 commit-guide.md
 design-example-old.pdf
+tmp/
 
 # Generated workspace artifacts
 apps/public-site/public/published/

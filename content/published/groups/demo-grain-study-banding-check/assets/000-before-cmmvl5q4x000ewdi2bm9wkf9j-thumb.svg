@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720">
+  <rect width="1280" height="720" fill="#1d2028" />
+  <rect x="128" y="120" width="1024" height="480" rx="24" fill="#404a5f" />
+  <rect x="190" y="182" width="900" height="356" rx="14" fill="#ced5e2" opacity="0.9" />
+  <g opacity="0.22">
+    <path d="M210 228 L1070 228" stroke="#3c4254" stroke-width="8" />
+    <path d="M210 278 L1070 278" stroke="#3c4254" stroke-width="8" />
+    <path d="M210 328 L1070 328" stroke="#3c4254" stroke-width="8" />
+    <path d="M210 378 L1070 378" stroke="#3c4254" stroke-width="8" />
+  </g>
+  <text x="68" y="92" fill="#f4f8ff" font-size="42" font-family="IBM Plex Sans, sans-serif">
+    Before
+  </text>
+</svg>
