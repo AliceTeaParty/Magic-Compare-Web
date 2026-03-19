@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import json
+import os
 import shutil
 from datetime import datetime
 from pathlib import Path
 
 import typer
+from dotenv import find_dotenv, load_dotenv
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
@@ -26,7 +28,14 @@ from .scanner import scan_case_directory
 from .source_parser import ParsedSourceGroup, discover_source_group
 from .workspace_builder import prepare_workspace
 
-DEFAULT_API_URL = "http://localhost:3000/api/ops/import-sync"
+ENV_API_URL_NAME = "MAGIC_COMPARE_API_URL"
+FALLBACK_API_URL = "http://localhost:3000/api/ops/import-sync"
+
+dotenv_path = find_dotenv(usecwd=True)
+if dotenv_path:
+    load_dotenv(dotenv_path, override=False)
+
+DEFAULT_API_URL = os.environ.get(ENV_API_URL_NAME, FALLBACK_API_URL)
 
 app = typer.Typer(add_completion=False, help="Magic Compare 中文导入工具")
 console = Console()

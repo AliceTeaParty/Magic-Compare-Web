@@ -34,6 +34,12 @@ Current default sync endpoint:
 http://localhost:3000/api/ops/import-sync
 ```
 
+You can override the uploader default by setting this variable in a `.env` file:
+
+```text
+MAGIC_COMPARE_API_URL=http://localhost:3000/api/ops/import-sync
+```
+
 ## Installation
 
 From the repository root:
