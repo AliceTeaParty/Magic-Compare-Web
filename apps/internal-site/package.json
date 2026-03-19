@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "next dev",
+    "dev": "tsx scripts/dev.ts",
     "build": "next build",
     "start": "next start",
     "typecheck": "next build",
