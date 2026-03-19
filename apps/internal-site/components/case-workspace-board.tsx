@@ -52,7 +52,7 @@ function SortableGroupRow({
         elevation={0}
         sx={{
           width: "100%",
-          p: { xs: 1.5, md: 1.75 },
+          p: { xs: 1.75, md: 2 },
           borderRadius: 2.5,
           border: "1px solid",
           borderColor: "divider",

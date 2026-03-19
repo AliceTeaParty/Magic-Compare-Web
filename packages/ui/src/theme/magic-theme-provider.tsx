@@ -152,10 +152,20 @@ export function MagicThemeProvider({ children }: PropsWithChildren) {
           MuiChip: {
             styleOverrides: {
               root: {
+                border: "1px solid transparent",
                 borderRadius: 999,
                 height: 28,
                 borderColor: divider,
                 backgroundColor: alpha(backgroundRaised, 0.44),
+                color: textPrimary,
+                "& .MuiChip-icon": {
+                  color: "inherit",
+                },
+                "&.MuiChip-colorPrimary": {
+                  color: brass,
+                  borderColor: alpha(brass, 0.34),
+                  backgroundColor: alpha(brass, 0.14),
+                },
               },
               label: {
                 paddingInline: 10,

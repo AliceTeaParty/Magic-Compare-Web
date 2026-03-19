@@ -50,7 +50,7 @@ export function CaseDirectoryGrid({ items }: { items: DirectoryItem[] }) {
           key={item.id}
           elevation={0}
           sx={{
-            p: { xs: 2.25, md: 2.75 },
+            p: { xs: 2.5, md: 3 },
             borderRadius: 3,
             border: "1px solid",
             borderColor: "divider",
@@ -58,7 +58,7 @@ export function CaseDirectoryGrid({ items }: { items: DirectoryItem[] }) {
             minHeight: 236,
           }}
         >
-          <Stack spacing={1.75} sx={{ height: "100%" }}>
+          <Stack spacing={2} sx={{ height: "100%" }}>
             <Stack
               direction="row"
               justifyContent="space-between"
@@ -78,7 +78,7 @@ export function CaseDirectoryGrid({ items }: { items: DirectoryItem[] }) {
             <Typography variant="body2" color="text.secondary" sx={{ minHeight: 48 }}>
               {item.summary || "No summary yet."}
             </Typography>
-            <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+            <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ pt: 0.25 }}>
               <Chip
                 size="small"
                 icon={<Collections fontSize="small" />}
@@ -98,7 +98,7 @@ export function CaseDirectoryGrid({ items }: { items: DirectoryItem[] }) {
                 variant="outlined"
               />
             </Stack>
-            <Stack direction="row" spacing={1} sx={{ pt: 0.5, mt: "auto" }}>
+            <Stack direction="row" spacing={1} sx={{ pt: 1, mt: "auto" }}>
               <Button
                 component={Link}
                 href={`/cases/${item.slug}`}
