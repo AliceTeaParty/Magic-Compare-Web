@@ -142,6 +142,22 @@ Use a custom internal API URL:
 magic-compare-uploader sync /path/to/sample-case --api-url http://localhost:3100/api/ops/import-sync
 ```
 
+### `delete-group`
+
+Delete a group from an existing case and clean its related internal assets.
+
+Interactive selection:
+
+```bash
+magic-compare-uploader delete-group
+```
+
+Direct deletion:
+
+```bash
+magic-compare-uploader delete-group --case-slug 2026 --group-slug test-example
+```
+
 ## Required directory convention
 
 The uploader expects ordered directories.

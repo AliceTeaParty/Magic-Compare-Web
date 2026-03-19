@@ -37,6 +37,10 @@ def case_search_url(api_url: str) -> str:
     return _replace_operation_url(api_url, "case-search")
 
 
+def group_delete_url(api_url: str) -> str:
+    return _replace_operation_url(api_url, "group-delete")
+
+
 def internal_site_base_url(api_url: str) -> str:
     marker = "/api/ops/"
     if marker not in api_url:
@@ -77,5 +81,15 @@ def search_cases(api_url: str, query: str, limit: int = 8) -> list[CaseSearchRes
 
 def sync_manifest(api_url: str, manifest: dict) -> dict:
     response = httpx.post(api_url, json=manifest, timeout=30.0)
+    response.raise_for_status()
+    return response.json()
+
+
+def delete_group(api_url: str, case_slug: str, group_slug: str) -> dict:
+    response = httpx.post(
+        group_delete_url(api_url),
+        json={"caseSlug": case_slug, "groupSlug": group_slug},
+        timeout=30.0,
+    )
     response.raise_for_status()
     return response.json()

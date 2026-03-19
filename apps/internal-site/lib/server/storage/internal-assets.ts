@@ -1,4 +1,4 @@
-import { access } from "node:fs/promises";
+import { access, rm } from "node:fs/promises";
 import path from "node:path";
 
 const runtimeInternalAssetRoot = path.join(process.cwd(), ".runtime", "internal-assets");
@@ -32,6 +32,22 @@ export function resolveRuntimeInternalAssetFile(assetUrl: string): string {
 
 export function resolveLegacyInternalAssetFile(assetUrl: string): string {
   return path.join(legacyPublicInternalAssetRoot, assetRelativePath(assetUrl));
+}
+
+export async function deleteInternalAssetGroupDirectories(
+  caseSlug: string,
+  groupSlug: string,
+): Promise<void> {
+  await Promise.all([
+    rm(path.join(runtimeInternalAssetRoot, caseSlug, groupSlug), {
+      recursive: true,
+      force: true,
+    }),
+    rm(path.join(legacyPublicInternalAssetRoot, caseSlug, groupSlug), {
+      recursive: true,
+      force: true,
+    }),
+  ]);
 }
 
 async function fileExists(filePath: string): Promise<boolean> {

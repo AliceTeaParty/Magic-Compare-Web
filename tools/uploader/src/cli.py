@@ -11,7 +11,14 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 
-from .api_client import CaseSearchResult, internal_site_base_url, search_cases, sync_manifest
+from .api_client import (
+    CaseSearchGroup,
+    CaseSearchResult,
+    delete_group,
+    internal_site_base_url,
+    search_cases,
+    sync_manifest,
+)
 from .editor import open_in_editor
 from .manifest import build_import_manifest, manifest_json
 from .naming import build_default_work_dir, build_unique_slug
@@ -87,6 +94,18 @@ def _render_case_table(results: list[CaseSearchResult], query: str) -> None:
     console.print(table)
 
 
+def _render_group_table(case: CaseSearchResult) -> None:
+    table = Table(title=f"Case {case.title} 的 Groups")
+    table.add_column("#", justify="right", style="cyan", no_wrap=True)
+    table.add_column("Title", style="bold white")
+    table.add_column("Slug", style="green")
+
+    for index, group in enumerate(case.groups, start=1):
+        table.add_row(str(index), group.title, group.slug)
+
+    console.print(table)
+
+
 def _choose_case(api_url: str, current_year: str) -> CaseSearchResult | None:
     query = current_year
 
@@ -118,6 +137,79 @@ def _choose_case(api_url: str, current_year: str) -> CaseSearchResult | None:
                 return results[index - 1]
 
         console.print("[red]输入无效，请重新选择。[/]")
+
+
+def _choose_existing_case(api_url: str, initial_query: str = "") -> CaseSearchResult:
+    query = initial_query
+
+    while True:
+        with console.status("[bold green]正在请求已有 case 列表...[/]"):
+            results = search_cases(api_url, query, limit=8)
+
+        if not results:
+            console.print("[yellow]没有找到匹配的 case。输入 / 重新搜索，或 Ctrl+C 取消。[/]")
+        else:
+            _render_case_table(results, query)
+
+        choice = console.input(
+            "[bold]输入编号选择 case，输入 / 重新搜索，输入 q 取消：[/]"
+        ).strip()
+
+        if choice.lower() == "q":
+            raise typer.Abort()
+
+        if choice == "/":
+            query = typer.prompt("新的搜索关键词", default=query).strip()
+            continue
+
+        if choice.isdigit():
+            index = int(choice)
+            if 1 <= index <= len(results):
+                return results[index - 1]
+
+        console.print("[red]输入无效，请重新选择。[/]")
+
+
+def _resolve_case_for_delete(
+    api_url: str,
+    case_slug: str | None,
+) -> CaseSearchResult:
+    if not case_slug:
+        return _choose_existing_case(api_url)
+
+    with console.status("[bold green]正在查询指定 case...[/]"):
+        results = search_cases(api_url, case_slug, limit=20)
+
+    for result in results:
+        if result.slug == case_slug:
+            return result
+
+    raise ValueError(f"未找到 case：{case_slug}")
+
+
+def _resolve_group_for_delete(
+    case: CaseSearchResult,
+    group_slug: str | None,
+) -> CaseSearchGroup:
+    if group_slug:
+        for group in case.groups:
+            if group.slug == group_slug:
+                return group
+        raise ValueError(f"在 case {case.slug} 下未找到 group：{group_slug}")
+
+    if not case.groups:
+        raise ValueError(f"case {case.slug} 下没有可删除的 group。")
+
+    _render_group_table(case)
+    choice = console.input("[bold]输入要删除的 group 编号，输入 q 取消：[/]").strip()
+    if choice.lower() == "q":
+        raise typer.Abort()
+    if choice.isdigit():
+        index = int(choice)
+        if 1 <= index <= len(case.groups):
+            return case.groups[index - 1]
+
+    raise ValueError("输入无效，无法确定要删除的 group。")
 
 
 def _resolve_work_dir(default_work_dir: Path) -> Path:
@@ -309,6 +401,59 @@ def sync(
     manifest_payload = build_import_manifest(source)
     result = sync_manifest(api_url, manifest_payload)
     typer.echo(json.dumps(result, indent=2, ensure_ascii=False))
+
+
+@app.command("delete-group")
+def delete_group_command(
+    case_slug: str | None = typer.Option(None, "--case-slug", help="要删除 group 所在的 case slug。"),
+    group_slug: str | None = typer.Option(None, "--group-slug", help="要删除的 group slug。"),
+    api_url: str = typer.Option(
+        DEFAULT_API_URL,
+        help="内部站点导入接口。",
+    ),
+) -> None:
+    """删除内部站某个 case 下的 group，并清理关联资产。"""
+    try:
+        selected_case = _resolve_case_for_delete(api_url, case_slug)
+        selected_group = _resolve_group_for_delete(selected_case, group_slug)
+
+        console.print(
+            Panel(
+                Text.from_markup(
+                    f"[bold]Case[/bold]: {selected_case.title} ({selected_case.slug})\n"
+                    f"[bold]Group[/bold]: {selected_group.title} ({selected_group.slug})\n"
+                    "此操作会删除 group、frame、asset，以及关联的内部图片目录。"
+                ),
+                border_style="red",
+                title="确认删除",
+            )
+        )
+
+        if not typer.confirm("确认删除这个 group？", default=False):
+            raise typer.Abort()
+
+        with console.status("[bold red]正在删除 group...[/]"):
+            result = delete_group(api_url, selected_case.slug, selected_group.slug)
+
+        public_cleanup = "已清理" if result.get("removedPublishedBundle") else "无公开产物"
+        console.print(
+            Panel(
+                Text.from_markup(
+                    "[bold green]删除成功[/]\n"
+                    f"Case slug: {result['caseSlug']}\n"
+                    f"Group slug: {result['groupSlug']}\n"
+                    f"公开产物: {public_cleanup}"
+                ),
+                border_style="green",
+                title="完成",
+            )
+        )
+    except typer.Abort:
+        console.print("[yellow]已取消删除。[/]")
+        raise typer.Exit(code=1) from None
+    except Exception as error:  # pragma: no cover - user-facing guard
+        console.print(f"[red]删除失败：{error}[/]")
+        raise typer.Exit(code=1) from error
 
 
 if __name__ == "__main__":

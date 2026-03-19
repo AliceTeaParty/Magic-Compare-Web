@@ -7,6 +7,8 @@ import type {
 } from "@magic-compare/content-schema";
 import { validateImportManifest } from "@/lib/server/validators/import-manifest";
 import { prisma } from "@/lib/server/db/client";
+import { deletePublishedGroup } from "@/lib/server/storage/published-content";
+import { deleteInternalAssetGroupDirectories } from "@/lib/server/storage/internal-assets";
 
 interface CaseRowSummary {
   id: string;
@@ -459,4 +461,63 @@ export async function reorderFrames(groupId: string, frameIds: string[]): Promis
       }),
     ),
   );
+}
+
+export async function deleteGroup(caseSlug: string, groupSlug: string) {
+  const caseRow = await prisma.case.findUnique({
+    where: { slug: caseSlug },
+    include: {
+      groups: {
+        select: {
+          id: true,
+          slug: true,
+          title: true,
+          isPublic: true,
+          publicSlug: true,
+        },
+      },
+    },
+  });
+
+  if (!caseRow) {
+    throw new Error("Case not found.");
+  }
+
+  const targetGroup = caseRow.groups.find((group) => group.slug === groupSlug);
+
+  if (!targetGroup) {
+    throw new Error("Group not found.");
+  }
+
+  await prisma.group.delete({
+    where: { id: targetGroup.id },
+  });
+
+  await deleteInternalAssetGroupDirectories(caseSlug, groupSlug);
+
+  if (targetGroup.publicSlug) {
+    await deletePublishedGroup(targetGroup.publicSlug);
+  }
+
+  const remainingPublicGroups = caseRow.groups.filter(
+    (group) => group.id !== targetGroup.id && group.isPublic,
+  ).length;
+
+  if (caseRow.status === "published" && remainingPublicGroups === 0) {
+    await prisma.case.update({
+      where: { id: caseRow.id },
+      data: {
+        status: "internal",
+        publishedAt: null,
+      },
+    });
+  }
+
+  return {
+    caseSlug: caseRow.slug,
+    groupSlug: targetGroup.slug,
+    groupTitle: targetGroup.title,
+    removedPublishedBundle: Boolean(targetGroup.publicSlug),
+    publicSlug: targetGroup.publicSlug,
+  };
 }

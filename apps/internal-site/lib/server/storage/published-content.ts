@@ -20,6 +20,10 @@ export async function resetPublishedGroup(publicSlug: string): Promise<void> {
   await mkdir(getPublishedAssetDirectory(publicSlug), { recursive: true });
 }
 
+export async function deletePublishedGroup(publicSlug: string): Promise<void> {
+  await rm(getPublishedGroupDirectory(publicSlug), { recursive: true, force: true });
+}
+
 export async function copyInternalAssetToPublished(
   assetUrl: string,
   publicSlug: string,
