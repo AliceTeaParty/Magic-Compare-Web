@@ -27,18 +27,10 @@ import {
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import useMediaQuery from "@mui/material/useMediaQuery";
-import { DndContext, PointerSensor, closestCenter, useSensor, useSensors } from "@dnd-kit/core";
-import {
-  SortableContext,
-  arrayMove,
-  horizontalListSortingStrategy,
-  useSortable,
-} from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
 import useEmblaCarousel from "embla-carousel-react";
 import Link from "next/link";
 import { AnimatePresence, motion } from "motion/react";
-import { type ReactNode, useEffect, useMemo, useState, useTransition } from "react";
+import { type ReactNode, useEffect } from "react";
 import { ReactCompareSlider, ReactCompareSliderImage } from "react-compare-slider";
 import type { ViewerMode } from "@magic-compare/content-schema";
 import { clampNumber, formatUtcDate } from "@magic-compare/shared-utils";
@@ -53,7 +45,6 @@ import type {
 interface GroupViewerWorkbenchProps {
   dataset: ViewerDataset;
   variant: "public" | "internal";
-  onFrameReorder?: (frameIds: string[]) => Promise<void>;
 }
 
 interface ThumbnailButtonProps {
@@ -123,30 +114,6 @@ function ThumbnailButton({ frame, isActive, onClick }: ThumbnailButtonProps) {
         </Typography>
       </Stack>
     </Button>
-  );
-}
-
-function SortableThumbnailItem({
-  frame,
-  isActive,
-  onClick,
-}: ThumbnailButtonProps & { frame: ViewerFrame }) {
-  const { attributes, listeners, setNodeRef, transform, transition } = useSortable({
-    id: frame.id,
-  });
-
-  return (
-    <Box
-      ref={setNodeRef}
-      sx={{
-        transform: CSS.Transform.toString(transform),
-        transition,
-      }}
-    >
-      <Box {...attributes} {...listeners}>
-        <ThumbnailButton frame={frame} isActive={isActive} onClick={onClick} />
-      </Box>
-    </Box>
   );
 }
 
@@ -399,24 +366,12 @@ function ViewerSidebarContent({
 export function GroupViewerWorkbench({
   dataset,
   variant,
-  onFrameReorder,
 }: GroupViewerWorkbenchProps) {
-  const [frames, setFrames] = useState(dataset.group.frames);
-  const [isSavingOrder, startSavingOrder] = useTransition();
-  const group = useMemo(
-    () => ({
-      ...dataset.group,
-      frames,
-    }),
-    [dataset.group, frames],
-  );
-  const controller = useViewerController(group);
-  const frameIds = controller.frames.map((frame) => frame.id);
+  const controller = useViewerController(dataset.group);
   const [emblaRef, emblaApi] = useEmblaCarousel({
     dragFree: true,
     align: "start",
   });
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
   const theme = useTheme();
   const showDesktopSidebar = useMediaQuery(theme.breakpoints.up("lg"), { noSsr: true });
 
@@ -674,69 +629,27 @@ export function GroupViewerWorkbench({
               backgroundColor: "rgba(255,255,255,0.012)",
             }}
           >
-            <Box sx={{ overflow: "hidden" }} ref={emblaRef}>
-              {variant === "internal" && onFrameReorder ? (
-                <DndContext
-                  sensors={sensors}
-                  collisionDetection={closestCenter}
-                  onDragEnd={(event) => {
-                    const activeId = String(event.active.id);
-                    const overId = event.over ? String(event.over.id) : null;
-
-                    if (!overId || activeId === overId) {
-                      return;
-                    }
-
-                    const oldIndex = frames.findIndex((frame) => frame.id === activeId);
-                    const newIndex = frames.findIndex((frame) => frame.id === overId);
-
-                    if (oldIndex === -1 || newIndex === -1) {
-                      return;
-                    }
-
-                    const reordered = arrayMove(frames, oldIndex, newIndex).map((frame, index) => ({
-                      ...frame,
-                      order: index,
-                    }));
-                    const reorderedIds = reordered.map((frame) => frame.id);
-
-                    setFrames(reordered);
-                    startSavingOrder(() => {
-                      void onFrameReorder(reorderedIds);
-                    });
-                  }}
-                >
-                  <SortableContext items={frameIds} strategy={horizontalListSortingStrategy}>
-                    <Stack direction="row" spacing={1.25}>
-                      {controller.frames.map((frame) => (
-                        <SortableThumbnailItem
-                          key={frame.id}
-                          frame={frame}
-                          isActive={frame.id === controller.currentFrame?.id}
-                          onClick={() => controller.selectFrame(frame.id)}
-                        />
-                      ))}
-                    </Stack>
-                  </SortableContext>
-                </DndContext>
-              ) : (
-                <Stack direction="row" spacing={1.25}>
-                  {controller.frames.map((frame) => (
-                    <ThumbnailButton
-                      key={frame.id}
-                      frame={frame}
-                      isActive={frame.id === controller.currentFrame?.id}
-                      onClick={() => controller.selectFrame(frame.id)}
-                    />
-                  ))}
-                </Stack>
-              )}
+            <Box
+              sx={{
+                overflow: "hidden",
+                cursor: controller.frames.length > 1 ? "grab" : "default",
+                "&:active": {
+                  cursor: controller.frames.length > 1 ? "grabbing" : "default",
+                },
+              }}
+              ref={emblaRef}
+            >
+              <Stack direction="row" spacing={1.25}>
+                {controller.frames.map((frame) => (
+                  <ThumbnailButton
+                    key={frame.id}
+                    frame={frame}
+                    isActive={frame.id === controller.currentFrame?.id}
+                    onClick={() => controller.selectFrame(frame.id)}
+                  />
+                ))}
+              </Stack>
             </Box>
-            {isSavingOrder ? (
-              <Typography variant="caption" color="primary.main" sx={{ display: "block", mt: 1 }}>
-                Saving frame order...
-              </Typography>
-            ) : null}
           </Box>
         </Box>
 
@@ -755,7 +668,7 @@ export function GroupViewerWorkbench({
               }}
             >
               <ViewerSidebarContent
-                currentGroup={group}
+                currentGroup={dataset.group}
                 currentFrame={controller.currentFrame}
                 groups={dataset.siblingGroups}
                 heatmapAsset={controller.heatmapAsset}
@@ -781,7 +694,7 @@ export function GroupViewerWorkbench({
           }}
         >
           <ViewerSidebarContent
-            currentGroup={group}
+            currentGroup={dataset.group}
             currentFrame={controller.currentFrame}
             groups={dataset.siblingGroups}
             heatmapAsset={controller.heatmapAsset}
