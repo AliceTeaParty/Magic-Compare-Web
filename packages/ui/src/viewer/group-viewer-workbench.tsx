@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  FitScreen,
   PhotoLibrary,
   Tune,
   ViewSidebar,
@@ -30,7 +31,7 @@ import useMediaQuery from "@mui/material/useMediaQuery";
 import useEmblaCarousel from "embla-carousel-react";
 import Link from "next/link";
 import { AnimatePresence, motion } from "motion/react";
-import { type ReactNode, useEffect } from "react";
+import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { ReactCompareSlider, ReactCompareSliderImage } from "react-compare-slider";
 import type { ViewerMode } from "@magic-compare/content-schema";
 import { clampNumber, formatUtcDate } from "@magic-compare/shared-utils";
@@ -51,6 +52,56 @@ interface ThumbnailButtonProps {
   frame: ViewerFrame;
   isActive: boolean;
   onClick: () => void;
+}
+
+interface ViewportSize {
+  width: number;
+  height: number;
+}
+
+interface StageSize {
+  width: number;
+  height: number;
+}
+
+function getViewportSize(): ViewportSize {
+  if (typeof window === "undefined") {
+    return { width: 0, height: 0 };
+  }
+
+  return {
+    width: window.innerWidth,
+    height: window.innerHeight,
+  };
+}
+
+function getViewportSignature(viewportSize: ViewportSize): string {
+  return `${viewportSize.width}x${viewportSize.height}`;
+}
+
+function getFittedStageSize(viewportSize: ViewportSize): StageSize | null {
+  if (viewportSize.width <= 0 || viewportSize.height <= 0) {
+    return null;
+  }
+
+  const horizontalPadding = viewportSize.width < 760 ? 20 : 56;
+  const verticalPadding = viewportSize.height < 760 ? 20 : 56;
+  const maxWidth = Math.max(viewportSize.width - horizontalPadding * 2, 220);
+  const maxHeight = Math.max(viewportSize.height - verticalPadding * 2, 140);
+  const aspectRatio = 16 / 9;
+
+  let width = Math.min(maxWidth, maxHeight * aspectRatio);
+  let height = width / aspectRatio;
+
+  if (height > maxHeight) {
+    height = maxHeight;
+    width = height * aspectRatio;
+  }
+
+  return {
+    width,
+    height,
+  };
 }
 
 function resolveThumbnailAsset(frame: ViewerFrame): ViewerAsset | undefined {
@@ -133,7 +184,13 @@ function StageImage({ asset, alt }: { asset: ViewerAsset; alt: string }) {
   );
 }
 
-function StagePresentationShell({ children }: { children: ReactNode }) {
+function StagePresentationShell({
+  children,
+  emphasized = false,
+}: {
+  children: ReactNode;
+  emphasized?: boolean;
+}) {
   return (
     <Box
       sx={{
@@ -141,14 +198,16 @@ function StagePresentationShell({ children }: { children: ReactNode }) {
         display: "grid",
         placeItems: "center",
         width: "100%",
-        aspectRatio: "16 / 9",
-        minHeight: { xs: 220, md: 340 },
+        height: emphasized ? "100%" : "auto",
+        aspectRatio: emphasized ? "auto" : "16 / 9",
+        minHeight: emphasized ? 0 : { xs: 220, md: 340 },
         borderRadius: 2.5,
         overflow: "hidden",
         border: "1px solid",
-        borderColor: "divider",
+        borderColor: emphasized ? "rgba(200, 161, 111, 0.35)" : "divider",
         background:
           "radial-gradient(circle at top, rgba(200, 161, 111, 0.07), transparent 28%), rgba(12, 14, 17, 0.96)",
+        boxShadow: emphasized ? "0 34px 110px rgba(0, 0, 0, 0.52)" : "none",
       }}
     >
       {children}
@@ -171,13 +230,15 @@ function HeatmapNotice() {
   );
 }
 
-function ViewerStage({
+function ViewerStageContent({
   beforeAsset,
   afterAsset,
   heatmapAsset,
   mode,
   abSide,
   overlayOpacity,
+  swipePosition,
+  setSwipePosition,
 }: {
   beforeAsset: ViewerAsset | undefined;
   afterAsset: ViewerAsset | undefined;
@@ -185,32 +246,30 @@ function ViewerStage({
   mode: ViewerMode;
   abSide: "before" | "after";
   overlayOpacity: number;
+  swipePosition: number;
+  setSwipePosition: (value: number) => void;
 }) {
   if (!beforeAsset || !afterAsset) {
     return (
-      <StagePresentationShell>
-        <Stack spacing={1.5} alignItems="center">
-          <PhotoLibrary sx={{ color: "text.secondary" }} />
-          <Typography variant="body1">This frame is missing its before/after pair.</Typography>
-        </Stack>
-      </StagePresentationShell>
+      <Stack spacing={1.5} alignItems="center">
+        <PhotoLibrary sx={{ color: "text.secondary" }} />
+        <Typography variant="body1">This frame is missing its before/after pair.</Typography>
+      </Stack>
     );
   }
 
   if (mode === "a-b") {
     const visibleAsset = abSide === "before" ? beforeAsset : afterAsset;
     return (
-      <StagePresentationShell>
-        <Box sx={{ width: "100%", height: "100%", display: "grid", placeItems: "center" }}>
-          <StageImage asset={visibleAsset} alt={`${visibleAsset.label} preview`} />
-        </Box>
-      </StagePresentationShell>
+      <Box sx={{ width: "100%", height: "100%", display: "grid", placeItems: "center" }}>
+        <StageImage asset={visibleAsset} alt={`${visibleAsset.label} preview`} />
+      </Box>
     );
   }
 
   if (mode === "heatmap" && heatmapAsset) {
     return (
-      <StagePresentationShell>
+      <>
         <StageImage asset={afterAsset} alt={`${afterAsset.label} base`} />
         <Box
           component="img"
@@ -226,32 +285,106 @@ function ViewerStage({
             pointerEvents: "none",
           }}
         />
-      </StagePresentationShell>
+      </>
     );
   }
 
   return (
-    <StagePresentationShell>
-      <ReactCompareSlider
-        style={{ width: "100%", height: "100%" }}
-        itemOne={
-          <ReactCompareSliderImage
-            src={beforeAsset.imageUrl}
-            alt={beforeAsset.label}
-            style={{ objectFit: "contain", height: "100%", width: "100%" }}
-          />
-        }
-        itemTwo={
-          <ReactCompareSliderImage
-            src={afterAsset.imageUrl}
-            alt={afterAsset.label}
-            style={{ objectFit: "contain", height: "100%", width: "100%" }}
-          />
-        }
-        onlyHandleDraggable
-        position={50}
-      />
-    </StagePresentationShell>
+    <ReactCompareSlider
+      style={{ width: "100%", height: "100%", cursor: "ew-resize" }}
+      itemOne={
+        <ReactCompareSliderImage
+          src={beforeAsset.imageUrl}
+          alt={beforeAsset.label}
+          style={{ objectFit: "contain", height: "100%", width: "100%" }}
+        />
+      }
+      itemTwo={
+        <ReactCompareSliderImage
+          src={afterAsset.imageUrl}
+          alt={afterAsset.label}
+          style={{ objectFit: "contain", height: "100%", width: "100%" }}
+        />
+      }
+      position={swipePosition}
+      onPositionChange={(value) => setSwipePosition(clampNumber(value, 0, 100))}
+    />
+  );
+}
+
+function ViewerStage({
+  beforeAsset,
+  afterAsset,
+  heatmapAsset,
+  mode,
+  abSide,
+  overlayOpacity,
+  fittedStageSize,
+  swipePosition,
+  setSwipePosition,
+}: {
+  beforeAsset: ViewerAsset | undefined;
+  afterAsset: ViewerAsset | undefined;
+  heatmapAsset: ViewerAsset | undefined;
+  mode: ViewerMode;
+  abSide: "before" | "after";
+  overlayOpacity: number;
+  fittedStageSize: StageSize | null;
+  swipePosition: number;
+  setSwipePosition: (value: number) => void;
+}) {
+  const contentProps = {
+    beforeAsset,
+    afterAsset,
+    heatmapAsset,
+    mode,
+    abSide,
+    overlayOpacity,
+    swipePosition,
+    setSwipePosition,
+  } satisfies {
+    beforeAsset: ViewerAsset | undefined;
+    afterAsset: ViewerAsset | undefined;
+    heatmapAsset: ViewerAsset | undefined;
+    mode: ViewerMode;
+    abSide: "before" | "after";
+    overlayOpacity: number;
+    swipePosition: number;
+    setSwipePosition: (value: number) => void;
+  };
+
+  return (
+    <>
+      <StagePresentationShell>
+        <ViewerStageContent {...contentProps} />
+      </StagePresentationShell>
+      {fittedStageSize ? (
+        <Box
+          sx={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 1,
+            pointerEvents: "none",
+          }}
+        >
+          <Box
+            sx={{
+              position: "absolute",
+              left: "50%",
+              top: "50%",
+              transform: "translate(-50%, -50%)",
+              width: fittedStageSize.width,
+              height: fittedStageSize.height,
+              pointerEvents: "auto",
+            }}
+          >
+            <StagePresentationShell emphasized>
+              <ViewerStageContent {...contentProps} />
+            </StagePresentationShell>
+          </Box>
+        </Box>
+      ) : null}
+    </>
   );
 }
 
@@ -374,12 +507,33 @@ export function GroupViewerWorkbench({
   });
   const theme = useTheme();
   const showDesktopSidebar = useMediaQuery(theme.breakpoints.up("lg"), { noSsr: true });
+  const [viewportSize, setViewportSize] = useState<ViewportSize>(() => getViewportSize());
+  const [fitViewViewportSignature, setFitViewViewportSignature] = useState<string | null>(null);
+  const [swipePosition, setSwipePosition] = useState(50);
+  const fittedStageSize = useMemo(
+    () => (fitViewViewportSignature ? getFittedStageSize(viewportSize) : null),
+    [fitViewViewportSignature, viewportSize],
+  );
 
   useEffect(() => {
     if (controller.currentFrameIndex >= 0) {
       emblaApi?.scrollTo(controller.currentFrameIndex);
     }
   }, [controller.currentFrameIndex, emblaApi]);
+
+  useEffect(() => {
+    setSwipePosition(50);
+  }, [controller.currentFrame?.id]);
+
+  useEffect(() => {
+    function syncViewportSize() {
+      setViewportSize(getViewportSize());
+    }
+
+    syncViewportSize();
+    window.addEventListener("resize", syncViewportSize);
+    return () => window.removeEventListener("resize", syncViewportSize);
+  }, []);
 
   useEffect(() => {
     function handleKeydown(event: KeyboardEvent) {
@@ -426,6 +580,16 @@ export function GroupViewerWorkbench({
     return () => window.removeEventListener("keydown", handleKeydown);
   }, [controller]);
 
+  function toggleFittedStageView() {
+    const nextViewportSize = getViewportSize();
+    const nextSignature = getViewportSignature(nextViewportSize);
+
+    setViewportSize(nextViewportSize);
+    setFitViewViewportSignature((previousSignature) =>
+      previousSignature && previousSignature === nextSignature ? null : nextSignature,
+    );
+  }
+
   return (
     <Box
       sx={{
@@ -454,6 +618,8 @@ export function GroupViewerWorkbench({
         <Box
           sx={{
             gridColumn: "1 / -1",
+            position: "relative",
+            zIndex: 2,
             display: "flex",
             flexDirection: { xs: "column", md: "row" },
             alignItems: { xs: "stretch", md: "center" },
@@ -517,7 +683,7 @@ export function GroupViewerWorkbench({
                 }
               }}
             >
-              <ToggleButton value="before-after">Before / After</ToggleButton>
+              <ToggleButton value="before-after">Swipe</ToggleButton>
               <ToggleButton value="a-b">A / B</ToggleButton>
               <ToggleButton value="heatmap" disabled={!controller.availableModes.includes("heatmap")}>
                 Heatmap
@@ -555,6 +721,30 @@ export function GroupViewerWorkbench({
                 </Select>
               </FormControl>
             ) : null}
+            <Tooltip
+              title={
+                fittedStageSize
+                  ? "Restore compare scale"
+                  : "Fit the compare stage to the current viewport"
+              }
+            >
+              <Button
+                variant={fittedStageSize ? "contained" : "outlined"}
+                size="small"
+                startIcon={<FitScreen fontSize="small" />}
+                onClick={toggleFittedStageView}
+                sx={{
+                  height: 34,
+                  minHeight: 34,
+                  px: 1.5,
+                  borderRadius: "999px",
+                  fontSize: "0.92rem",
+                  flexShrink: 0,
+                }}
+              >
+                Fit view
+              </Button>
+            </Tooltip>
             <Tooltip title={controller.sidebarOpen ? "Close details (I)" : "Open details (I)"}>
               <IconButton
                 size="small"
@@ -595,6 +785,9 @@ export function GroupViewerWorkbench({
                   mode={controller.mode}
                   abSide={controller.abSide}
                   overlayOpacity={controller.overlayOpacity}
+                  fittedStageSize={fittedStageSize}
+                  swipePosition={swipePosition}
+                  setSwipePosition={setSwipePosition}
                 />
               </Box>
 
