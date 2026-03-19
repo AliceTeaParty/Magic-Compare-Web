@@ -103,6 +103,8 @@ pnpm dev:public
   - `internal-site`
   - 作为 S3-compatible 后端的 `rustfs`
   - 启动时自动建 bucket 的 `rustfs-init`
+- `rustfs` 现在默认以低占用模式启动：console 默认关闭、日志级别默认为 `warn`、默认内存上限为 `512m`
+- 如需启用 RustFS WebUI，可在 `.env` 中显式设置 `MAGIC_COMPARE_RUSTFS_CONSOLE_ENABLE=true`
 - 内部原图、缩略图和 heatmap 统一由 `MAGIC_COMPARE_S3_*` 配置的对象存储承载
 - 发布产物继续写到 `MAGIC_COMPARE_PUBLISHED_ROOT`
 - 公开静态导出目录由 `MAGIC_COMPARE_PUBLIC_EXPORT_DIR` 控制
