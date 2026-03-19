@@ -538,6 +538,7 @@ export function GroupViewerWorkbench({
                   height: 34,
                   minHeight: 34,
                   px: 1.3,
+                  fontWeight: 400,
                   border: "1px solid",
                   borderColor: "divider",
                   borderRadius: "999px !important",
