@@ -1,11 +1,17 @@
 import type { Metadata } from "next";
-import { IBM_Plex_Sans, Newsreader } from "next/font/google";
+import { IBM_Plex_Sans, Noto_Serif_JP, Noto_Serif_SC } from "next/font/google";
 import { MagicThemeProvider } from "@magic-compare/ui";
 import "./globals.css";
 
-const displayFont = Newsreader({
+const displayFontSc = Noto_Serif_SC({
+  preload: false,
+  variable: "--font-display-sc",
+  weight: ["400", "500", "600", "700"],
+});
+
+const displayFontJp = Noto_Serif_JP({
   subsets: ["latin"],
-  variable: "--font-display",
+  variable: "--font-display-jp",
   weight: ["400", "500", "600", "700"],
 });
 
@@ -22,7 +28,10 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${displayFont.variable} ${bodyFont.variable}`}>
+    <html
+      lang="en"
+      className={`${displayFontSc.variable} ${displayFontJp.variable} ${bodyFont.variable}`}
+    >
       <body>
         <MagicThemeProvider>{children}</MagicThemeProvider>
       </body>
