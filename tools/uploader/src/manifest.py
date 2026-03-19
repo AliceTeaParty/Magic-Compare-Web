@@ -23,7 +23,7 @@ def _stage_asset(
         workspace_root
         / "apps"
         / "internal-site"
-        / "public"
+        / ".runtime"
         / "internal-assets"
         / case_slug
         / group_slug

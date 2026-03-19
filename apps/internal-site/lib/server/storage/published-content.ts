@@ -1,10 +1,10 @@
 import { copyFile, mkdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { PublishManifest } from "@magic-compare/content-schema";
+import { resolveExistingInternalAssetFile } from "@/lib/server/storage/internal-assets";
 
 const workspaceRoot = path.resolve(process.cwd(), "../..");
 const publishedRoot = path.join(workspaceRoot, "content", "published");
-const internalPublicRoot = path.join(process.cwd(), "public");
 
 export function getPublishedGroupDirectory(publicSlug: string): string {
   return path.join(publishedRoot, "groups", publicSlug);
@@ -12,11 +12,6 @@ export function getPublishedGroupDirectory(publicSlug: string): string {
 
 export function getPublishedAssetDirectory(publicSlug: string): string {
   return path.join(getPublishedGroupDirectory(publicSlug), "assets");
-}
-
-export function resolveInternalAssetFile(assetUrl: string): string {
-  const normalizedUrl = assetUrl.replace(/^\/+/, "");
-  return path.join(internalPublicRoot, normalizedUrl);
 }
 
 export async function resetPublishedGroup(publicSlug: string): Promise<void> {
@@ -30,7 +25,7 @@ export async function copyInternalAssetToPublished(
   publicSlug: string,
   fileName: string,
 ): Promise<string> {
-  const source = resolveInternalAssetFile(assetUrl);
+  const source = await resolveExistingInternalAssetFile(assetUrl);
   const target = path.join(getPublishedAssetDirectory(publicSlug), fileName);
   await mkdir(path.dirname(target), { recursive: true });
   await copyFile(source, target);

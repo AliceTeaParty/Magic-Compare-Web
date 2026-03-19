@@ -64,3 +64,4 @@ tmp/
 apps/public-site/public/published/
 apps/internal-site/prisma/dev.db*
 apps/internal-site/public/internal-assets/
+apps/internal-site/.runtime/
