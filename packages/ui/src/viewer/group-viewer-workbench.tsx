@@ -90,8 +90,8 @@ function getFittedStageSize(viewportSize: ViewportSize): StageSize | null {
     return null;
   }
 
-  const horizontalPadding = viewportSize.width < 760 ? 20 : 56;
-  const verticalPadding = viewportSize.height < 760 ? 20 : 56;
+  const horizontalPadding = viewportSize.width < 760 ? 10 : 22;
+  const verticalPadding = viewportSize.height < 760 ? 12 : 24;
   const maxWidth = Math.max(viewportSize.width - horizontalPadding * 2, 220);
   const maxHeight = Math.max(viewportSize.height - verticalPadding * 2, 140);
   const aspectRatio = 16 / 9;
@@ -318,7 +318,7 @@ function SwipeCompareStage({
           left: `calc(${swipePosition}% - 1px)`,
           width: 2,
           backgroundColor: "rgba(246, 241, 232, 0.92)",
-          boxShadow: "0 0 0 1px rgba(12, 14, 17, 0.7)",
+          boxShadow: "0 0 12px rgba(244, 238, 230, 0.28)",
           pointerEvents: "none",
         }}
       />
@@ -334,7 +334,7 @@ function SwipeCompareStage({
           border: "1px solid",
           borderColor: "rgba(246, 241, 232, 0.52)",
           backgroundColor: "rgba(56, 60, 66, 0.26)",
-          boxShadow: "0 10px 24px rgba(0, 0, 0, 0.16)",
+          boxShadow: "0 8px 18px rgba(0, 0, 0, 0.12)",
           display: "grid",
           placeItems: "center",
           pointerEvents: "none",
@@ -346,6 +346,7 @@ function SwipeCompareStage({
             height: 9,
             borderTop: "2px solid rgba(246, 241, 232, 0.72)",
             borderRight: "2px solid rgba(246, 241, 232, 0.72)",
+            filter: "drop-shadow(0 0 3px rgba(12, 14, 17, 0.26))",
           },
           "&::before": {
             left: 10,
@@ -363,6 +364,7 @@ function SwipeCompareStage({
             height: 18,
             borderRadius: "999px",
             backgroundColor: "rgba(246, 241, 232, 0.58)",
+            boxShadow: "0 0 8px rgba(244, 238, 230, 0.18)",
           }}
         />
       </Box>
@@ -913,7 +915,7 @@ export function GroupViewerWorkbench({
             <Typography variant="h4" noWrap>
               {dataset.group.title}
             </Typography>
-            <Typography variant="body2" color="text.secondary" noWrap>
+            <Typography variant="body2" color="text.secondary" noWrap sx={{ mt: "0.25em" }}>
               {dataset.caseMeta.title}
             </Typography>
           </Stack>
@@ -1111,7 +1113,7 @@ export function GroupViewerWorkbench({
               minWidth: 0,
               px: { xs: 1.5, md: 2.25 },
               pt: { xs: 1.35, md: 2 },
-              pb: { xs: 0.75, md: 1 },
+              pb: { xs: 0.4, md: 0.55 },
               borderTop: "1px solid",
               borderColor: "divider",
               backgroundColor: "rgba(255,255,255,0.012)",
@@ -1130,10 +1132,10 @@ export function GroupViewerWorkbench({
                 overflowY: "hidden",
                 overscrollBehaviorX: "contain",
                 WebkitOverflowScrolling: "touch",
+                scrollbarGutter: "stable",
                 scrollbarWidth: "thin",
                 touchAction: "pan-y",
                 cursor: controller.frames.length > 1 ? "grab" : "default",
-                pb: 0.35,
                 "&:active": {
                   cursor: controller.frames.length > 1 ? "grabbing" : "default",
                 },
@@ -1155,6 +1157,7 @@ export function GroupViewerWorkbench({
                   gap: 1.25,
                   width: "max-content",
                   minWidth: "100%",
+                  pb: 0.85,
                   pr: 0.25,
                 }}
               >
