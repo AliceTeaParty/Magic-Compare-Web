@@ -2,6 +2,46 @@
 
 [English](./README.md) | [简体中文](./README.zh-CN.md)
 
+<p align="center">
+  <strong>Compare image changes with three focused review modes</strong>
+</p>
+<p align="center">
+  Built for encoding-group review workflows with a fast path from local imports to published static compare pages.
+</p>
+<p align="center">
+  <a href="#quick-start">Quick Start</a> ·
+  <a href="#workflow-overview">View Workflow</a> ·
+  <a href="./tools/uploader/README.md">Uploader Docs</a>
+</p>
+
+<table>
+  <tr>
+    <td width="33%" align="center">
+      <img src="./content/published/groups/demo-grain-study--banding-check/assets/001-before.svg" alt="Slider mode before preview" width="49%" />
+      <img src="./content/published/groups/demo-grain-study--banding-check/assets/001-after.svg" alt="Slider mode after preview" width="49%" />
+      <br />
+      <strong>Slider</strong>
+      <br />
+      <sub>Drag across before and after frames to inspect cleanup, texture recovery, and edge handling.</sub>
+    </td>
+    <td width="33%" align="center">
+      <img src="./content/published/groups/demo-grain-study--banding-check/assets/002-before.svg" alt="A/B mode before preview" width="49%" />
+      <img src="./content/published/groups/demo-grain-study--banding-check/assets/002-after.svg" alt="A/B mode after preview" width="49%" />
+      <br />
+      <strong>A/B</strong>
+      <br />
+      <sub>Flip between two versions to check decisions frame by frame without leaving the viewer.</sub>
+    </td>
+    <td width="33%" align="center">
+      <img src="./content/published/groups/demo-grain-study--banding-check/assets/001-heatmap.svg" alt="Heatmap mode preview" width="100%" />
+      <br />
+      <strong>Heatmap</strong>
+      <br />
+      <sub>Highlight difference regions and change intensity when a direct visual diff needs more emphasis.</sub>
+    </td>
+  </tr>
+</table>
+
 Magic Compare Web is a monorepo for an image compare platform aimed at encoding groups.
 
 The project has two deployment targets:
@@ -11,7 +51,82 @@ The project has two deployment targets:
 
 This repository is deliberately not a video previewer, not an online VapourSynth runner, and not an in-site review/comment system. The current scope is "look" and "publish".
 
-## Current Status
+## ✨ Highlights
+
+- `Slider` for before/after inspection on the same frame.
+- `A/B` for direct version toggling during image review.
+- `Heatmap` for difference emphasis when visual deltas need extra contrast.
+- An internal import-to-publish workflow that turns local image sets into reviewable cases.
+- A static public delivery target that reads published bundles from `content/published`.
+
+<a id="quick-start"></a>
+
+## 🚀 Quick Start
+
+```bash
+pnpm install
+pnpm db:push
+pnpm db:seed
+pnpm sync:published
+
+# terminal 1
+pnpm dev:internal
+
+# terminal 2
+pnpm dev:public
+```
+
+Local entry points:
+
+- internal site: `http://localhost:3000`
+- public site: `http://localhost:3001`
+- demo public page: `http://localhost:3001/g/demo-grain-study--banding-check`
+
+Demo content:
+
+- internal case slug: `demo-grain-study`
+- internal group slug: `banding-check`
+- public group slug: `demo-grain-study--banding-check`
+
+💡 Note:
+
+- `pnpm db:push` currently runs `apps/internal-site/prisma/init-db.ts` because `prisma db push` fails in the current local environment.
+
+<a id="workflow-overview"></a>
+
+## 🔄 Workflow Overview
+
+### 📥 Import Workflow
+
+1. Prepare a local case directory that matches the uploader convention.
+2. Run the uploader to validate required files and scan the source set.
+3. Stage source images into `apps/internal-site/public/internal-assets/...`.
+4. Generate thumbnails next to the staged files.
+5. Build an `ImportManifest` and post it to `POST /api/ops/import-sync`.
+6. Let the internal site upsert case and group metadata, then recreate replaced frame and asset rows from the manifest.
+
+Result:
+
+- imported review data is available in the internal site workspace
+- staged assets stay repo-local for the current v1 flow
+- detailed uploader usage lives in `tools/uploader/README.md`
+
+### 📦 Publish Workflow
+
+1. Trigger `POST /api/ops/case-publish` from the internal site.
+2. Filter `group.isPublic`, `frame.isPublic`, and `asset.isPublic` for the selected case.
+3. Derive or reuse a stable `publicSlug` for each public group.
+4. Copy public assets into `content/published/groups/[publicSlug]/assets`.
+5. Write a `manifest.json` with `schemaVersion` for each published group.
+6. Run `pnpm sync:published` so the public app can serve the published bundle.
+
+Result:
+
+- published artifacts live under `content/published`
+- `apps/public-site` consumes those artifacts as static content
+- the public deployment target stays read-only
+
+## ✅ What Works Now
 
 The repository is fully bootstrapped and verified:
 
@@ -28,7 +143,7 @@ The seeded demo case is:
 - Internal group slug: `banding-check`
 - Public group slug: `demo-grain-study--banding-check`
 
-## Monorepo Layout
+## 🧱 Monorepo Layout
 
 ```text
 apps/
@@ -47,6 +162,11 @@ tools/
 content/
   published/
 ```
+
+## 🧠 Technical Details
+
+<details>
+<summary><strong>🏗️ Architecture Notes</strong></summary>
 
 ### apps/internal-site
 
@@ -133,7 +253,10 @@ Python CLI that:
 
 There is a dedicated uploader document at `tools/uploader/README.md`.
 
-## Data Model
+</details>
+
+<details>
+<summary><strong>🗂️ Data Model</strong></summary>
 
 The current implementation uses four content entities.
 
@@ -209,7 +332,10 @@ Current semantic rules:
 - `heatmap` is optional
 - `crop` and `misc` are optional
 
-## Routing
+</details>
+
+<details>
+<summary><strong>🛣️ Routing</strong></summary>
 
 ### Internal site
 
@@ -227,7 +353,10 @@ Current semantic rules:
 
 The public site intentionally has no index page.
 
-## Viewer Behavior
+</details>
+
+<details>
+<summary><strong>🖼️ Viewer Behavior</strong></summary>
 
 The shared viewer layout follows the agreed workbench structure:
 
@@ -257,7 +386,10 @@ Keyboard support currently includes:
 - `3` for heatmap
 - `i` for sidebar toggle
 
-## Import Flow
+</details>
+
+<details>
+<summary><strong>📥 Detailed Import Flow</strong></summary>
 
 The current import flow is filesystem-first.
 
@@ -273,7 +405,10 @@ Important current limitation:
 
 - the uploader assumes it is running inside this repository, because staging currently writes directly into `apps/internal-site/public/internal-assets`
 
-## Publish Flow
+</details>
+
+<details>
+<summary><strong>📦 Detailed Publish Flow</strong></summary>
 
 The current publish flow is explicit and case-scoped.
 
@@ -288,7 +423,10 @@ Important current rule:
 
 - a public frame without both `before` and `after` causes publish to fail
 
-## Local Development
+</details>
+
+<details>
+<summary><strong>🛠️ Local Development Details</strong></summary>
 
 ### 1. Install dependencies
 
@@ -329,7 +467,21 @@ Suggested local URLs:
 - internal site: `http://localhost:3000`
 - public site: `http://localhost:3001` or another port if you launch it separately
 
-## Build and Test
+</details>
+
+<details>
+<summary><strong>🧪 Build, Test, and Useful Commands</strong></summary>
+
+| Task | Command |
+| --- | --- |
+| Build both apps | `pnpm build` |
+| Run all tests | `pnpm test` |
+| Run workspace type checks | `pnpm typecheck` |
+| Start internal site | `pnpm dev:internal` |
+| Start public site | `pnpm dev:public` |
+| Initialize SQLite | `pnpm db:push` |
+| Seed demo content | `pnpm db:seed` |
+| Sync published assets | `pnpm sync:published` |
 
 Build everything:
 
@@ -349,7 +501,9 @@ Run workspace type checks:
 pnpm typecheck
 ```
 
-## Demo Assets and Published Bundle
+</details>
+
+## 🧾 Demo Assets and Published Bundle
 
 The repository includes a checked-in published demo bundle:
 
@@ -362,7 +516,7 @@ This is used for:
 - local verification of the publish artifact shape
 - seed/bootstrap reference content
 
-## Current Limitations
+## ⚠️ Current Limitations
 
 - Prisma migrations are not yet wired; SQLite bootstrap is currently implemented through a manual init script.
 - Internal asset staging is repo-local, not remote-storage-backed.
@@ -371,9 +525,19 @@ This is used for:
 - There is no browser-side upload UI in v1.
 - There is no in-site discussion, scoring, annotation, or review workflow.
 
-## Recommended Next Steps
+## 🔗 Related Docs
+
+- [Uploader README](./tools/uploader/README.md)
+- [VSEditor workflow guide (Simplified Chinese)](./tools/uploader/VSEDITOR-WORKFLOW.zh-CN.md)
+- [Chinese root README](./README.zh-CN.md)
+
+## 🛣️ Roadmap
 
 - add a proper migration workflow once the Prisma schema engine issue is resolved in this environment
 - move internal assets from app public storage to object storage or a dedicated managed path
 - add richer error reporting for reorder and publish failures in the UI
 - add end-to-end tests around internal reorder and publish flows
+
+## 📄 License
+
+Released under the [MIT License](./LICENSE).
