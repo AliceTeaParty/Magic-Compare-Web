@@ -54,9 +54,9 @@ pnpm db:seed
 
 当前 demo 约定：
 
-- case slug：`demo-grain-study`
-- group slug：`banding-check`
-- public slug：`demo-grain-study--banding-check`
+- case slug: `demo-grain-study`
+- group slug: `banding-check`
+- public slug: `demo-grain-study--banding-check`
 
 这几个值应视为内置样本标识，不应拿它们去模拟真实导入策略。
 
@@ -166,6 +166,17 @@ pnpm db:seed
 ### 你在调 internal-site UI
 
 优先使用 demo：
+
+```bash
+pnpm dev:internal
+```
+
+当前行为是：
+
+- 如果本地数据库已经有内容，`pnpm dev:internal` 只会直接启动 `next dev`
+- 如果本地数据库为空，`pnpm dev:internal` 会先自动执行首次 `db:push + db:seed`
+
+如果你想显式重建数据库，仍然可以手动运行：
 
 ```bash
 pnpm db:push
