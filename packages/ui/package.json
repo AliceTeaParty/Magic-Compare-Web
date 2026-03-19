@@ -19,11 +19,9 @@
     "@magic-compare/shared-utils": "workspace:*",
     "@mui/icons-material": "^7.0.2",
     "@mui/material": "^7.0.2",
-    "embla-carousel-react": "^8.6.0",
     "motion": "^12.23.24",
     "next": "^15.3.1",
-    "react": "^19.1.0",
-    "react-compare-slider": "^3.1.0"
+    "react": "^19.1.0"
   },
   "peerDependencies": {
     "@emotion/react": "^11.14.0",

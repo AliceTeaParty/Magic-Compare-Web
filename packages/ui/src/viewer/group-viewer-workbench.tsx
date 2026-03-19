@@ -28,11 +28,16 @@ import {
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import useMediaQuery from "@mui/material/useMediaQuery";
-import useEmblaCarousel from "embla-carousel-react";
 import Link from "next/link";
 import { AnimatePresence, motion } from "motion/react";
-import { type ReactNode, useEffect, useMemo, useState } from "react";
-import { ReactCompareSlider, ReactCompareSliderImage } from "react-compare-slider";
+import {
+  type PointerEvent as ReactPointerEvent,
+  type ReactNode,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import type { ViewerMode } from "@magic-compare/content-schema";
 import { clampNumber, formatUtcDate } from "@magic-compare/shared-utils";
 import { useViewerController } from "@magic-compare/compare-core/use-viewer-controller";
@@ -52,6 +57,7 @@ interface ThumbnailButtonProps {
   frame: ViewerFrame;
   isActive: boolean;
   onClick: () => void;
+  buttonRef?: (node: HTMLButtonElement | null) => void;
 }
 
 interface ViewportSize {
@@ -112,11 +118,12 @@ function resolveThumbnailAsset(frame: ViewerFrame): ViewerAsset | undefined {
   );
 }
 
-function ThumbnailButton({ frame, isActive, onClick }: ThumbnailButtonProps) {
+function ThumbnailButton({ frame, isActive, onClick, buttonRef }: ThumbnailButtonProps) {
   const thumbAsset = resolveThumbnailAsset(frame);
 
   return (
     <Button
+      ref={buttonRef}
       onClick={onClick}
       sx={{
         minWidth: 168,
@@ -184,6 +191,169 @@ function StageImage({ asset, alt }: { asset: ViewerAsset; alt: string }) {
   );
 }
 
+function StageAssetLayer({ asset, alt }: { asset: ViewerAsset; alt: string }) {
+  return (
+    <Box
+      sx={{
+        position: "absolute",
+        inset: 0,
+        display: "grid",
+        placeItems: "center",
+      }}
+    >
+      <StageImage asset={asset} alt={alt} />
+    </Box>
+  );
+}
+
+function SwipeCompareStage({
+  beforeAsset,
+  afterAsset,
+  swipePosition,
+  setSwipePosition,
+}: {
+  beforeAsset: ViewerAsset;
+  afterAsset: ViewerAsset;
+  swipePosition: number;
+  setSwipePosition: (value: number) => void;
+}) {
+  const viewportRef = useRef<HTMLDivElement | null>(null);
+  const activePointerIdRef = useRef<number | null>(null);
+
+  function updateSwipePosition(clientX: number) {
+    const viewport = viewportRef.current;
+
+    if (!viewport) {
+      return;
+    }
+
+    const rect = viewport.getBoundingClientRect();
+
+    if (rect.width <= 0) {
+      return;
+    }
+
+    setSwipePosition(clampNumber(((clientX - rect.left) / rect.width) * 100, 0, 100));
+  }
+
+  function handlePointerDown(event: ReactPointerEvent<HTMLDivElement>) {
+    if (event.pointerType === "mouse" && event.button !== 0) {
+      return;
+    }
+
+    activePointerIdRef.current = event.pointerId;
+    event.currentTarget.setPointerCapture(event.pointerId);
+    updateSwipePosition(event.clientX);
+  }
+
+  function handlePointerMove(event: ReactPointerEvent<HTMLDivElement>) {
+    if (activePointerIdRef.current !== event.pointerId) {
+      return;
+    }
+
+    updateSwipePosition(event.clientX);
+  }
+
+  function finishPointerDrag(event: ReactPointerEvent<HTMLDivElement>) {
+    if (activePointerIdRef.current !== event.pointerId) {
+      return;
+    }
+
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+
+    activePointerIdRef.current = null;
+  }
+
+  return (
+    <Box
+      ref={viewportRef}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={finishPointerDrag}
+      onPointerCancel={finishPointerDrag}
+      sx={{
+        position: "relative",
+        width: "100%",
+        height: "100%",
+        overflow: "hidden",
+        touchAction: "none",
+        cursor: "ew-resize",
+        userSelect: "none",
+      }}
+    >
+      <StageAssetLayer asset={beforeAsset} alt={`${beforeAsset.label} preview`} />
+      <Box
+        sx={{
+          position: "absolute",
+          inset: 0,
+          overflow: "hidden",
+          clipPath: `inset(0 ${100 - swipePosition}% 0 0)`,
+        }}
+      >
+        <StageAssetLayer asset={afterAsset} alt={`${afterAsset.label} preview`} />
+      </Box>
+      <Box
+        sx={{
+          position: "absolute",
+          top: 0,
+          bottom: 0,
+          left: `calc(${swipePosition}% - 1px)`,
+          width: 2,
+          backgroundColor: "rgba(246, 241, 232, 0.92)",
+          boxShadow: "0 0 0 1px rgba(12, 14, 17, 0.7)",
+          pointerEvents: "none",
+        }}
+      />
+      <Box
+        sx={{
+          position: "absolute",
+          left: `${swipePosition}%`,
+          top: "50%",
+          transform: "translate(-50%, -50%)",
+          width: 42,
+          height: 42,
+          borderRadius: "999px",
+          border: "1px solid",
+          borderColor: "rgba(246, 241, 232, 0.78)",
+          backgroundColor: "rgba(19, 21, 24, 0.72)",
+          boxShadow: "0 14px 28px rgba(0, 0, 0, 0.28)",
+          display: "grid",
+          placeItems: "center",
+          pointerEvents: "none",
+          "&::before, &::after": {
+            content: '""',
+            position: "absolute",
+            top: "50%",
+            width: 9,
+            height: 9,
+            borderTop: "2px solid rgba(246, 241, 232, 0.94)",
+            borderRight: "2px solid rgba(246, 241, 232, 0.94)",
+          },
+          "&::before": {
+            left: 10,
+            transform: "translateY(-50%) rotate(-135deg)",
+          },
+          "&::after": {
+            right: 10,
+            transform: "translateY(-50%) rotate(45deg)",
+          },
+        }}
+      >
+        <Box
+          sx={{
+            width: 3,
+            height: 18,
+            borderRadius: "999px",
+            backgroundColor: "rgba(246, 241, 232, 0.94)",
+          }}
+        />
+      </Box>
+    </Box>
+  );
+}
+
 function StagePresentationShell({
   children,
   emphasized = false,
@@ -198,6 +368,8 @@ function StagePresentationShell({
         display: "grid",
         placeItems: "center",
         width: "100%",
+        maxWidth: "100%",
+        minWidth: 0,
         height: emphasized ? "100%" : "auto",
         aspectRatio: emphasized ? "auto" : "16 / 9",
         minHeight: emphasized ? 0 : { xs: 220, md: 340 },
@@ -290,24 +462,11 @@ function ViewerStageContent({
   }
 
   return (
-    <ReactCompareSlider
-      style={{ width: "100%", height: "100%", cursor: "ew-resize" }}
-      itemOne={
-        <ReactCompareSliderImage
-          src={beforeAsset.imageUrl}
-          alt={beforeAsset.label}
-          style={{ objectFit: "contain", height: "100%", width: "100%" }}
-        />
-      }
-      itemTwo={
-        <ReactCompareSliderImage
-          src={afterAsset.imageUrl}
-          alt={afterAsset.label}
-          style={{ objectFit: "contain", height: "100%", width: "100%" }}
-        />
-      }
-      position={swipePosition}
-      onPositionChange={(value) => setSwipePosition(clampNumber(value, 0, 100))}
+    <SwipeCompareStage
+      beforeAsset={beforeAsset}
+      afterAsset={afterAsset}
+      swipePosition={swipePosition}
+      setSwipePosition={setSwipePosition}
     />
   );
 }
@@ -501,25 +660,36 @@ export function GroupViewerWorkbench({
   variant,
 }: GroupViewerWorkbenchProps) {
   const controller = useViewerController(dataset.group);
-  const [emblaRef, emblaApi] = useEmblaCarousel({
-    dragFree: true,
-    align: "start",
-  });
   const theme = useTheme();
   const showDesktopSidebar = useMediaQuery(theme.breakpoints.up("lg"), { noSsr: true });
   const [viewportSize, setViewportSize] = useState<ViewportSize>(() => getViewportSize());
   const [fitViewViewportSignature, setFitViewViewportSignature] = useState<string | null>(null);
   const [swipePosition, setSwipePosition] = useState(50);
+  const filmstripViewportRef = useRef<HTMLDivElement | null>(null);
+  const filmstripFrameRefs = useRef(new Map<string, HTMLButtonElement>());
+  const filmstripDragStateRef = useRef<{
+    moved: boolean;
+    pointerId: number;
+    startScrollLeft: number;
+    startX: number;
+  } | null>(null);
+  const suppressFilmstripClickRef = useRef(false);
   const fittedStageSize = useMemo(
     () => (fitViewViewportSignature ? getFittedStageSize(viewportSize) : null),
     [fitViewViewportSignature, viewportSize],
   );
 
   useEffect(() => {
-    if (controller.currentFrameIndex >= 0) {
-      emblaApi?.scrollTo(controller.currentFrameIndex);
+    if (controller.currentFrame) {
+      const activeThumbnail = filmstripFrameRefs.current.get(controller.currentFrame.id);
+
+      activeThumbnail?.scrollIntoView({
+        behavior: "smooth",
+        block: "nearest",
+        inline: "center",
+      });
     }
-  }, [controller.currentFrameIndex, emblaApi]);
+  }, [controller.currentFrame]);
 
   useEffect(() => {
     setSwipePosition(50);
@@ -590,6 +760,84 @@ export function GroupViewerWorkbench({
     );
   }
 
+  function setFilmstripFrameRef(frameId: string) {
+    return (node: HTMLButtonElement | null) => {
+      if (node) {
+        filmstripFrameRefs.current.set(frameId, node);
+        return;
+      }
+
+      filmstripFrameRefs.current.delete(frameId);
+    };
+  }
+
+  function handleFilmstripPointerDown(event: ReactPointerEvent<HTMLDivElement>) {
+    if (controller.frames.length <= 1) {
+      return;
+    }
+
+    if (event.pointerType === "mouse" && event.button !== 0) {
+      return;
+    }
+
+    filmstripDragStateRef.current = {
+      moved: false,
+      pointerId: event.pointerId,
+      startScrollLeft: event.currentTarget.scrollLeft,
+      startX: event.clientX,
+    };
+
+    event.currentTarget.setPointerCapture(event.pointerId);
+  }
+
+  function handleFilmstripPointerMove(event: ReactPointerEvent<HTMLDivElement>) {
+    const dragState = filmstripDragStateRef.current;
+
+    if (!dragState || dragState.pointerId !== event.pointerId) {
+      return;
+    }
+
+    const travelX = event.clientX - dragState.startX;
+
+    if (!dragState.moved && Math.abs(travelX) > 4) {
+      dragState.moved = true;
+      suppressFilmstripClickRef.current = true;
+    }
+
+    event.currentTarget.scrollLeft = dragState.startScrollLeft - travelX;
+  }
+
+  function finishFilmstripPointerDrag(event: ReactPointerEvent<HTMLDivElement>) {
+    const dragState = filmstripDragStateRef.current;
+
+    if (!dragState || dragState.pointerId !== event.pointerId) {
+      return;
+    }
+
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+
+    filmstripDragStateRef.current = null;
+
+    if (dragState.moved) {
+      window.setTimeout(() => {
+        suppressFilmstripClickRef.current = false;
+      }, 0);
+      return;
+    }
+
+    suppressFilmstripClickRef.current = false;
+  }
+
+  function handleThumbnailSelection(frameId: string) {
+    if (suppressFilmstripClickRef.current) {
+      return;
+    }
+
+    controller.selectFrame(frameId);
+  }
+
   return (
     <Box
       sx={{
@@ -603,6 +851,8 @@ export function GroupViewerWorkbench({
       <Paper
         elevation={0}
         sx={{
+          width: "100%",
+          maxWidth: "100%",
           display: "grid",
           gridTemplateColumns:
             controller.sidebarOpen && showDesktopSidebar ? "minmax(0, 1fr) 320px" : "1fr",
@@ -773,11 +1023,19 @@ export function GroupViewerWorkbench({
           }}
         >
           <Box sx={{ minHeight: 0, p: { xs: 1.5, md: 2.25 } }}>
-            <Stack spacing={1.5} sx={{ height: "100%", minHeight: { xs: 340, md: 460 } }}>
+            <Stack
+              spacing={1.5}
+              sx={{
+                width: "100%",
+                minWidth: 0,
+                height: "100%",
+                minHeight: { xs: 340, md: 460 },
+              }}
+            >
               {/* Stage header stays hidden for now to keep the comparison surface as the focal point. */}
               {controller.mode === "heatmap" && !controller.heatmapAsset ? <HeatmapNotice /> : null}
 
-              <Box sx={{ flex: 1, minHeight: 0 }}>
+              <Box sx={{ flex: 1, minWidth: 0, minHeight: 0 }}>
                 <ViewerStage
                   beforeAsset={controller.beforeAsset}
                   afterAsset={controller.afterAsset}
@@ -816,6 +1074,7 @@ export function GroupViewerWorkbench({
 
           <Box
             sx={{
+              minWidth: 0,
               p: { xs: 1.5, md: 2.25 },
               borderTop: "1px solid",
               borderColor: "divider",
@@ -823,25 +1082,55 @@ export function GroupViewerWorkbench({
             }}
           >
             <Box
+              ref={filmstripViewportRef}
+              onPointerDown={handleFilmstripPointerDown}
+              onPointerMove={handleFilmstripPointerMove}
+              onPointerUp={finishFilmstripPointerDrag}
+              onPointerCancel={finishFilmstripPointerDrag}
               sx={{
-                overflow: "hidden",
+                width: "100%",
+                minWidth: 0,
+                overflowX: "auto",
+                overflowY: "hidden",
+                overscrollBehaviorX: "contain",
+                WebkitOverflowScrolling: "touch",
+                scrollbarWidth: "thin",
+                touchAction: "pan-y",
                 cursor: controller.frames.length > 1 ? "grab" : "default",
                 "&:active": {
                   cursor: controller.frames.length > 1 ? "grabbing" : "default",
                 },
+                "&::-webkit-scrollbar": {
+                  height: 10,
+                },
+                "&::-webkit-scrollbar-thumb": {
+                  backgroundColor: "rgba(246, 241, 232, 0.16)",
+                  borderRadius: "999px",
+                },
+                "&::-webkit-scrollbar-track": {
+                  backgroundColor: "transparent",
+                },
               }}
-              ref={emblaRef}
             >
-              <Stack direction="row" spacing={1.25}>
+              <Box
+                sx={{
+                  display: "flex",
+                  gap: 1.25,
+                  width: "max-content",
+                  minWidth: "100%",
+                  pr: 0.25,
+                }}
+              >
                 {controller.frames.map((frame) => (
                   <ThumbnailButton
                     key={frame.id}
                     frame={frame}
                     isActive={frame.id === controller.currentFrame?.id}
-                    onClick={() => controller.selectFrame(frame.id)}
+                    onClick={() => handleThumbnailSelection(frame.id)}
+                    buttonRef={setFilmstripFrameRef(frame.id)}
                   />
                 ))}
-              </Stack>
+              </Box>
             </Box>
           </Box>
         </Box>
