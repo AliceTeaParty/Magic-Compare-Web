@@ -124,6 +124,7 @@ Result:
 - imported review data is available in the internal site workspace
 - internal assets live in S3-compatible storage behind `/internal-assets/...`
 - detailed uploader usage lives in `tools/uploader/README.md`
+- a Chinese note about the difference between built-in demo content and real case/group flows lives in `docs/demo-vs-real-case-flow.zh-CN.md`
 
 ### 📦 Publish Workflow
 
@@ -542,7 +543,8 @@ This is used for:
 ## 🔗 Related Docs
 
 - [Uploader README](./tools/uploader/README.md)
-- [VSEditor workflow guide (Simplified Chinese)](./tools/uploader/VSEDITOR-WORKFLOW.zh-CN.md)
+- [VSEditor workflow guide (Simplified Chinese)](./docs/VSEDITOR-WORKFLOW.zh-CN.md)
+- [Demo vs real case/group flow (Simplified Chinese)](./docs/demo-vs-real-case-flow.zh-CN.md)
 - [Chinese root README](./README.zh-CN.md)
 
 ## 🛣️ Roadmap

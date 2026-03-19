@@ -124,6 +124,7 @@ pnpm dev:public
 - 导入后的 review 数据可直接在 internal-site 工作区查看
 - 内部素材通过 `/internal-assets/...` 动态读取，真实对象落在 S3-compatible 存储
 - uploader 的详细使用方式见 `tools/uploader/README.md`
+- demo 与真实内容处理流程的区别见 `docs/demo-vs-real-case-flow.zh-CN.md`
 
 ### 📦 发布流程
 
@@ -272,7 +273,8 @@ Python CLI，负责：
 
 如果你要从 VSEditor 已保存的平铺导图目录开始整理并导入，可直接参考：
 
-- `tools/uploader/VSEDITOR-WORKFLOW.zh-CN.md`
+- `docs/VSEDITOR-WORKFLOW.zh-CN.md`
+- `docs/demo-vs-real-case-flow.zh-CN.md`
 
 </details>
 
@@ -546,7 +548,8 @@ pnpm typecheck
 ## 🔗 相关文档
 
 - [Uploader README](./tools/uploader/README.md)
-- [VSEditor 平铺导图工作流](./tools/uploader/VSEDITOR-WORKFLOW.zh-CN.md)
+- [VSEditor 平铺导图工作流](./docs/VSEDITOR-WORKFLOW.zh-CN.md)
+- [Demo 与真实 Case / Group 流程差异](./docs/demo-vs-real-case-flow.zh-CN.md)
 - [English root README](./README.md)
 
 ## 🛣️ 后续方向
