@@ -16,8 +16,8 @@ export function CaseDirectoryGrid({ items }: { items: DirectoryItem[] }) {
       <Paper
         elevation={0}
         sx={{
-          p: 4,
-          borderRadius: 5,
+          p: { xs: 3, md: 4 },
+          borderRadius: 3,
           border: "1px dashed",
           borderColor: "divider",
           backgroundColor: "rgba(255,255,255,0.02)",
@@ -41,8 +41,8 @@ export function CaseDirectoryGrid({ items }: { items: DirectoryItem[] }) {
     <Box
       sx={{
         display: "grid",
-        gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
-        gap: 2,
+        gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
+        gap: { xs: 1.5, md: 2 },
       }}
     >
       {items.map((item) => (
@@ -50,16 +50,22 @@ export function CaseDirectoryGrid({ items }: { items: DirectoryItem[] }) {
           key={item.id}
           elevation={0}
           sx={{
-            p: 2.25,
-            borderRadius: 4,
+            p: { xs: 2.25, md: 2.75 },
+            borderRadius: 3,
             border: "1px solid",
             borderColor: "divider",
             backgroundColor: "rgba(255,255,255,0.025)",
+            minHeight: 236,
           }}
         >
-          <Stack spacing={1.5}>
-            <Stack direction="row" justifyContent="space-between" alignItems="flex-start" spacing={1}>
-              <Box>
+          <Stack spacing={1.75} sx={{ height: "100%" }}>
+            <Stack
+              direction="row"
+              justifyContent="space-between"
+              alignItems="flex-start"
+              spacing={1.5}
+            >
+              <Box sx={{ minWidth: 0 }}>
                 <Typography variant="h6">{item.title}</Typography>
                 {item.subtitle ? (
                   <Typography variant="body2" color="text.secondary">
@@ -69,19 +75,34 @@ export function CaseDirectoryGrid({ items }: { items: DirectoryItem[] }) {
               </Box>
               <Chip label={item.status} size="small" color={item.status === "published" ? "primary" : "default"} />
             </Stack>
-            <Typography variant="body2" color="text.secondary" sx={{ minHeight: 40 }}>
+            <Typography variant="body2" color="text.secondary" sx={{ minHeight: 48 }}>
               {item.summary || "No summary yet."}
             </Typography>
-            <Stack direction="row" spacing={1} flexWrap="wrap">
-              <Chip size="small" icon={<Collections fontSize="small" />} label={`${item.groupCount} groups`} variant="outlined" />
-              <Chip size="small" icon={<Public fontSize="small" />} label={`${item.publicGroupCount} public`} variant="outlined" />
-              <Chip size="small" icon={<ImageSearch fontSize="small" />} label={new Date(item.updatedAt).toLocaleDateString()} variant="outlined" />
+            <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+              <Chip
+                size="small"
+                icon={<Collections fontSize="small" />}
+                label={`${item.groupCount} groups`}
+                variant="outlined"
+              />
+              <Chip
+                size="small"
+                icon={<Public fontSize="small" />}
+                label={`${item.publicGroupCount} public`}
+                variant="outlined"
+              />
+              <Chip
+                size="small"
+                icon={<ImageSearch fontSize="small" />}
+                label={new Date(item.updatedAt).toLocaleDateString()}
+                variant="outlined"
+              />
             </Stack>
-            <Stack direction="row" spacing={1}>
+            <Stack direction="row" spacing={1} sx={{ pt: 0.5, mt: "auto" }}>
               <Button
                 component={Link}
                 href={`/cases/${item.slug}`}
-                variant="contained"
+                variant="outlined"
                 endIcon={<ArrowOutward />}
               >
                 Open workspace

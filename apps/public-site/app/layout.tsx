@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
-import { IBM_Plex_Sans, Space_Grotesk } from "next/font/google";
+import { IBM_Plex_Sans, Newsreader } from "next/font/google";
 import { MagicThemeProvider } from "@magic-compare/ui";
 import "./globals.css";
 
-const displayFont = Space_Grotesk({
+const displayFont = Newsreader({
   subsets: ["latin"],
   variable: "--font-display",
+  weight: ["400", "500", "600", "700"],
 });
 
 const bodyFont = IBM_Plex_Sans({

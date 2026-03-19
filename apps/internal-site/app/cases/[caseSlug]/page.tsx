@@ -18,7 +18,7 @@ export default async function CaseWorkspacePage({
   }
 
   return (
-    <Container maxWidth="lg" sx={{ py: 4 }}>
+    <Container maxWidth="xl" sx={{ py: { xs: 4, md: 5 } }}>
       <CaseWorkspaceBoard data={data} />
     </Container>
   );
