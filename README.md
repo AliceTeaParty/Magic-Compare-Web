@@ -1,5 +1,7 @@
 # Magic Compare Web
 
+[English](./README.md) | [简体中文](./README.zh-CN.md)
+
 Magic Compare Web is a monorepo for an image compare platform aimed at encoding groups.
 
 The project has two deployment targets:
