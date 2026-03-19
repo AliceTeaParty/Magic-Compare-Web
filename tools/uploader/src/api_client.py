@@ -4,6 +4,7 @@ from dataclasses import dataclass
 
 import httpx
 
+from .auth import UploaderConfig, build_request_headers, clear_access_token
 
 @dataclass(frozen=True)
 class CaseSearchGroup:
@@ -41,21 +42,32 @@ def group_delete_url(api_url: str) -> str:
     return _replace_operation_url(api_url, "group-delete")
 
 
-def internal_site_base_url(api_url: str) -> str:
-    marker = "/api/ops/"
-    if marker not in api_url:
-        return api_url.rstrip("/")
-    return api_url.split(marker, maxsplit=1)[0].rstrip("/")
+def _request_error(error: httpx.HTTPStatusError) -> RuntimeError:
+    status_code = error.response.status_code
+    if status_code in {401, 403}:
+        return RuntimeError("请求被 Cloudflare Access 或内部站拒绝。请确认 Zero Trust 登录状态或 Service Token 配置。")
+    return RuntimeError(f"请求失败：HTTP {status_code}")
 
 
-def search_cases(api_url: str, query: str, limit: int = 8) -> list[CaseSearchResult]:
-    response = httpx.post(
-        case_search_url(api_url),
-        json={"query": query, "limit": limit},
-        timeout=30.0,
-    )
-    response.raise_for_status()
-    payload = response.json()
+def _post_json(config: UploaderConfig, url: str, payload: dict) -> dict:
+    headers = build_request_headers(config)
+    response = httpx.post(url, json=payload, timeout=30.0, headers=headers)
+
+    if response.status_code in {401, 403} and not config.has_service_token and not config.is_local_site:
+        clear_access_token(config)
+        headers = build_request_headers(config, force_refresh_access_token=True)
+        response = httpx.post(url, json=payload, timeout=30.0, headers=headers)
+
+    try:
+        response.raise_for_status()
+    except httpx.HTTPStatusError as error:
+        raise _request_error(error) from error
+
+    return response.json()
+
+
+def search_cases(config: UploaderConfig, query: str, limit: int = 8) -> list[CaseSearchResult]:
+    payload = _post_json(config, case_search_url(config.api_url), {"query": query, "limit": limit})
     results: list[CaseSearchResult] = []
     for item in payload.get("cases", []):
         results.append(
@@ -79,17 +91,13 @@ def search_cases(api_url: str, query: str, limit: int = 8) -> list[CaseSearchRes
     return results
 
 
-def sync_manifest(api_url: str, manifest: dict) -> dict:
-    response = httpx.post(api_url, json=manifest, timeout=30.0)
-    response.raise_for_status()
-    return response.json()
+def sync_manifest(config: UploaderConfig, manifest: dict) -> dict:
+    return _post_json(config, config.api_url, manifest)
 
 
-def delete_group(api_url: str, case_slug: str, group_slug: str) -> dict:
-    response = httpx.post(
-        group_delete_url(api_url),
-        json={"caseSlug": case_slug, "groupSlug": group_slug},
-        timeout=30.0,
+def delete_group(config: UploaderConfig, case_slug: str, group_slug: str) -> dict:
+    return _post_json(
+        config,
+        group_delete_url(config.api_url),
+        {"caseSlug": case_slug, "groupSlug": group_slug},
     )
-    response.raise_for_status()
-    return response.json()

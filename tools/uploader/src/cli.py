@@ -1,13 +1,11 @@
 from __future__ import annotations
 
 import json
-import os
 import shutil
 from datetime import datetime
 from pathlib import Path
 
 import typer
-from dotenv import find_dotenv, load_dotenv
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
@@ -17,9 +15,16 @@ from .api_client import (
     CaseSearchGroup,
     CaseSearchResult,
     delete_group,
-    internal_site_base_url,
     search_cases,
     sync_manifest,
+)
+from .auth import (
+    ENV_API_URL_NAME,
+    ENV_SITE_URL_NAME,
+    UploaderConfig,
+    ensure_user_access_token,
+    persist_config_overrides,
+    resolve_uploader_config,
 )
 from .editor import open_in_editor
 from .manifest import build_import_manifest, manifest_json
@@ -27,15 +32,6 @@ from .naming import build_default_work_dir, build_unique_slug
 from .scanner import scan_case_directory
 from .source_parser import ParsedSourceGroup, discover_source_group
 from .workspace_builder import prepare_workspace
-
-ENV_API_URL_NAME = "MAGIC_COMPARE_API_URL"
-FALLBACK_API_URL = "http://localhost:3000/api/ops/import-sync"
-
-dotenv_path = find_dotenv(usecwd=True)
-if dotenv_path:
-    load_dotenv(dotenv_path, override=False)
-
-DEFAULT_API_URL = os.environ.get(ENV_API_URL_NAME, FALLBACK_API_URL)
 
 app = typer.Typer(add_completion=False, help="Magic Compare 中文导入工具")
 console = Console()
@@ -115,12 +111,12 @@ def _render_group_table(case: CaseSearchResult) -> None:
     console.print(table)
 
 
-def _choose_case(api_url: str, current_year: str) -> CaseSearchResult | None:
+def _choose_case(config: UploaderConfig, current_year: str) -> CaseSearchResult | None:
     query = current_year
 
     while True:
         with console.status("[bold green]正在请求已有 case 列表...[/]"):
-            results = search_cases(api_url, query, limit=8)
+            results = search_cases(config, query, limit=8)
 
         _render_case_table(results, query)
         choice = console.input(
@@ -148,12 +144,12 @@ def _choose_case(api_url: str, current_year: str) -> CaseSearchResult | None:
         console.print("[red]输入无效，请重新选择。[/]")
 
 
-def _choose_existing_case(api_url: str, initial_query: str = "") -> CaseSearchResult:
+def _choose_existing_case(config: UploaderConfig, initial_query: str = "") -> CaseSearchResult:
     query = initial_query
 
     while True:
         with console.status("[bold green]正在请求已有 case 列表...[/]"):
-            results = search_cases(api_url, query, limit=8)
+            results = search_cases(config, query, limit=8)
 
         if not results:
             console.print("[yellow]没有找到匹配的 case。输入 / 重新搜索，或 Ctrl+C 取消。[/]")
@@ -180,14 +176,14 @@ def _choose_existing_case(api_url: str, initial_query: str = "") -> CaseSearchRe
 
 
 def _resolve_case_for_delete(
-    api_url: str,
+    config: UploaderConfig,
     case_slug: str | None,
 ) -> CaseSearchResult:
     if not case_slug:
-        return _choose_existing_case(api_url)
+        return _choose_existing_case(config)
 
     with console.status("[bold green]正在查询指定 case...[/]"):
-        results = search_cases(api_url, case_slug, limit=20)
+        results = search_cases(config, case_slug, limit=20)
 
     for result in results:
         if result.slug == case_slug:
@@ -273,7 +269,34 @@ def _confirm_editor(path: Path, label: str) -> None:
         raise typer.Abort()
 
 
-def _run_wizard(api_url: str) -> None:
+def _prepare_runtime_config(
+    work_dir: Path,
+    *,
+    site_url: str | None,
+    api_url: str | None,
+) -> UploaderConfig:
+    config = resolve_uploader_config(work_dir, site_url_override=site_url, api_url_override=api_url)
+
+    if site_url:
+        persist_config_overrides(config, site_url=site_url)
+    if api_url:
+        persist_config_overrides(config, api_url=api_url)
+
+    return config
+
+
+def _ensure_remote_auth(config: UploaderConfig) -> None:
+    if config.has_service_token or config.is_local_site:
+        return
+    with console.status("[bold green]正在登录 Cloudflare Access...[/]"):
+        ensure_user_access_token(config)
+
+
+def _run_wizard(
+    *,
+    site_url: str | None,
+    api_url: str | None,
+) -> None:
     current_year = str(datetime.now().year)
     console.print(
         Panel(
@@ -292,9 +315,12 @@ def _run_wizard(api_url: str) -> None:
         source_group = discover_source_group(source_dir)
 
     _render_source_summary(source_group)
-    selected_case = _choose_case(api_url, current_year)
-    group_slug = _resolve_group_slug(source_group.slug, selected_case)
     work_dir = _resolve_work_dir(build_default_work_dir(source_dir))
+    config = _prepare_runtime_config(work_dir, site_url=site_url, api_url=api_url)
+    _ensure_remote_auth(config)
+
+    selected_case = _choose_case(config, current_year)
+    group_slug = _resolve_group_slug(source_group.slug, selected_case)
 
     with console.status("[bold green]正在生成工作目录与 metadata...[/]"):
         prepared = prepare_workspace(
@@ -331,10 +357,9 @@ def _run_wizard(api_url: str) -> None:
 
     with console.status("[bold green]正在生成 manifest、缩略图并上传...[/]"):
         manifest_payload = build_import_manifest(prepared.work_dir)
-        result = sync_manifest(api_url, manifest_payload)
+        result = sync_manifest(config, manifest_payload)
 
-    base_url = internal_site_base_url(api_url)
-    viewer_url = f"{base_url}/cases/{result['slug']}/groups/{prepared.group_slug}"
+    viewer_url = f"{config.site_url}/cases/{result['slug']}/groups/{prepared.group_slug}"
     console.print(
         Panel(
             Text.from_markup(
@@ -353,10 +378,15 @@ def _run_wizard(api_url: str) -> None:
 @app.callback(invoke_without_command=True)
 def main(
     ctx: typer.Context,
-    api_url: str = typer.Option(
-        DEFAULT_API_URL,
+    site_url: str | None = typer.Option(
+        None,
+        "--site-url",
+        help=f"内部站点主页，优先读取 {ENV_SITE_URL_NAME}。",
+    ),
+    api_url: str | None = typer.Option(
+        None,
         "--api-url",
-        help="内部站点导入接口。",
+        help=f"内部站点导入接口，优先读取 {ENV_API_URL_NAME}。",
     ),
 ) -> None:
     """Magic Compare 中文导入工具。"""
@@ -364,7 +394,7 @@ def main(
         return
 
     try:
-        _run_wizard(api_url)
+        _run_wizard(site_url=site_url, api_url=api_url)
     except typer.Abort:
         console.print("[yellow]已取消本次导入。[/]")
         raise typer.Exit(code=1) from None
@@ -401,14 +431,22 @@ def manifest(
 @app.command()
 def sync(
     source: Path,
-    api_url: str = typer.Option(
-        DEFAULT_API_URL,
-        help="内部站点导入接口。",
+    site_url: str | None = typer.Option(
+        None,
+        "--site-url",
+        help=f"内部站点主页，优先读取 {ENV_SITE_URL_NAME}。",
+    ),
+    api_url: str | None = typer.Option(
+        None,
+        "--api-url",
+        help=f"内部站点导入接口，优先读取 {ENV_API_URL_NAME}。",
     ),
 ) -> None:
     """对结构化 case 目录执行 staging 并同步到内部站。"""
+    config = _prepare_runtime_config(source, site_url=site_url, api_url=api_url)
+    _ensure_remote_auth(config)
     manifest_payload = build_import_manifest(source)
-    result = sync_manifest(api_url, manifest_payload)
+    result = sync_manifest(config, manifest_payload)
     typer.echo(json.dumps(result, indent=2, ensure_ascii=False))
 
 
@@ -416,14 +454,28 @@ def sync(
 def delete_group_command(
     case_slug: str | None = typer.Option(None, "--case-slug", help="要删除 group 所在的 case slug。"),
     group_slug: str | None = typer.Option(None, "--group-slug", help="要删除的 group slug。"),
-    api_url: str = typer.Option(
-        DEFAULT_API_URL,
-        help="内部站点导入接口。",
+    work_dir: Path = typer.Option(
+        Path.cwd(),
+        "--work-dir",
+        help="用于读取工作目录 .env 的目录。",
+    ),
+    site_url: str | None = typer.Option(
+        None,
+        "--site-url",
+        help=f"内部站点主页，优先读取 {ENV_SITE_URL_NAME}。",
+    ),
+    api_url: str | None = typer.Option(
+        None,
+        "--api-url",
+        help=f"内部站点导入接口，优先读取 {ENV_API_URL_NAME}。",
     ),
 ) -> None:
     """删除内部站某个 case 下的 group，并清理关联资产。"""
     try:
-        selected_case = _resolve_case_for_delete(api_url, case_slug)
+        config = _prepare_runtime_config(work_dir.resolve(), site_url=site_url, api_url=api_url)
+        _ensure_remote_auth(config)
+
+        selected_case = _resolve_case_for_delete(config, case_slug)
         selected_group = _resolve_group_for_delete(selected_case, group_slug)
 
         console.print(
@@ -442,7 +494,7 @@ def delete_group_command(
             raise typer.Abort()
 
         with console.status("[bold red]正在删除 group...[/]"):
-            result = delete_group(api_url, selected_case.slug, selected_group.slug)
+            result = delete_group(config, selected_case.slug, selected_group.slug)
 
         public_cleanup = "已清理" if result.get("removedPublishedBundle") else "无公开产物"
         console.print(
