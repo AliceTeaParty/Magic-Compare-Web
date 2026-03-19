@@ -13,6 +13,7 @@ HEATMAP_VARIANTS = {"heatmap"}
 FILENAME_RE = re.compile(
     r"(?P<prefix>.+?)[_\-.](?P<frame>\d+)(?:[_\-.](?P<variant>[^_\-.]+))?$"
 )
+FALLBACK_FILENAME_RE = re.compile(r"^(?P<frame>\d+)(?P<variant>[A-Za-z][A-Za-z0-9]*)$")
 
 
 @dataclass(frozen=True)
@@ -26,6 +27,7 @@ class SourceCandidate:
     title: str
     caption: str
     root_hint: str
+    is_fallback: bool
 
     @property
     def frame_key(self) -> tuple[str, str, int]:
@@ -92,27 +94,48 @@ def _normalize_variant(raw_variant: str | None) -> str:
 def _parse_candidate(path: Path) -> SourceCandidate:
     stem = path.stem
     match = FILENAME_RE.search(stem)
-    if not match:
+    if match:
+        prefix = match.group("prefix")
+        fps = _extract_fps(stem)
+        episode = _extract_episode(prefix)
+        frame_number = int(match.group("frame").lstrip("0") or "0")
+        variant = _normalize_variant(match.group("variant"))
+        title = f"{fps}_{episode}_{frame_number}"
+        caption = f"fps {fps} • episode {episode} • frame {frame_number}"
+
+        return SourceCandidate(
+            path=path,
+            original_name=path.name,
+            variant=variant,
+            fps=fps,
+            episode=episode,
+            frame_number=frame_number,
+            title=title,
+            caption=caption,
+            root_hint=prefix,
+            is_fallback=False,
+        )
+
+    fallback_match = FALLBACK_FILENAME_RE.match(stem)
+    if not fallback_match:
         raise ValueError(f"无法从文件名解析帧信息：{path.name}")
 
-    prefix = match.group("prefix")
-    fps = _extract_fps(stem)
-    episode = _extract_episode(prefix)
-    frame_number = int(match.group("frame").lstrip("0") or "0")
-    variant = _normalize_variant(match.group("variant"))
-    title = f"{fps}_{episode}_{frame_number}"
-    caption = f"fps {fps} • episode {episode} • frame {frame_number}"
+    frame_number = int(fallback_match.group("frame").lstrip("0") or "0")
+    variant = _normalize_variant(fallback_match.group("variant"))
+    title = str(frame_number)
+    caption = f"frame {frame_number}"
 
     return SourceCandidate(
         path=path,
         original_name=path.name,
         variant=variant,
-        fps=fps,
-        episode=episode,
+        fps="00",
+        episode="00",
         frame_number=frame_number,
         title=title,
         caption=caption,
-        root_hint=prefix,
+        root_hint=path.stem,
+        is_fallback=True,
     )
 
 
@@ -124,7 +147,7 @@ def _after_priority(candidate: SourceCandidate) -> tuple[int, str, str]:
     return (2, candidate.variant, candidate.original_name.lower())
 
 
-def _resolve_frame(order: int, candidates: list[SourceCandidate]) -> ParsedFrame:
+def _resolve_frame(order: int, candidates: list[SourceCandidate], fallback_width: int) -> ParsedFrame:
     before_candidates = [candidate for candidate in candidates if candidate.variant in SOURCE_VARIANTS]
     if len(before_candidates) != 1:
         raise ValueError(
@@ -150,13 +173,19 @@ def _resolve_frame(order: int, candidates: list[SourceCandidate]) -> ParsedFrame
     )
 
     before = before_candidates[0]
+    title = before.title
+    caption = before.caption
+    if before.is_fallback:
+        title = str(before.frame_number).zfill(fallback_width)
+        caption = f"frame {before.frame_number}"
+
     return ParsedFrame(
         order=order,
         fps=before.fps,
         episode=before.episode,
         frame_number=before.frame_number,
-        title=before.title,
-        caption=before.caption,
+        title=title,
+        caption=caption,
         before=before,
         after=after,
         explicit_heatmap=heatmap_candidates[0] if heatmap_candidates else None,
@@ -193,8 +222,9 @@ def discover_source_group(source_root: Path) -> ParsedSourceGroup:
         grouped_candidates.setdefault(candidate.frame_key, []).append(candidate)
 
     ordered_keys = sorted(grouped_candidates.keys(), key=lambda key: (int(key[1]), key[2], key[0]))
+    fallback_width = max(4, len(str(max((key[2] for key in ordered_keys), default=0))))
     frames = [
-        _resolve_frame(order, grouped_candidates[key])
+        _resolve_frame(order, grouped_candidates[key], fallback_width)
         for order, key in enumerate(ordered_keys)
     ]
     group_slug, group_title = _derive_group_identity(source_root, parsed_candidates)

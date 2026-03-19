@@ -69,3 +69,21 @@ class DiscoverSourceGroupTests(unittest.TestCase):
 
         with self.assertRaisesRegex(ValueError, "没有可用的 after 候选"):
             discover_source_group(self.source_dir)
+
+    def test_falls_back_to_zero_padded_numeric_titles_when_metadata_is_missing(self) -> None:
+        names = [
+            "01src.png",
+            "01out.png",
+            "10src.png",
+            "10output.png",
+            "10degrain.png",
+        ]
+        for name in names:
+            self._touch(name)
+
+        group = discover_source_group(self.source_dir)
+
+        self.assertEqual([frame.title for frame in group.frames], ["0001", "0010"])
+        self.assertEqual(group.frames[0].after.variant, "out")
+        self.assertEqual(group.frames[1].after.variant, "output")
+        self.assertEqual([item.variant for item in group.frames[1].misc], ["degrain"])
