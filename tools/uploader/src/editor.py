@@ -15,7 +15,7 @@ def _editor_command(path: Path) -> list[str]:
             return [*shlex.split(value), str(path)]
 
     if sys.platform == "darwin":
-        return ["open", "-W", "-t", str(path)]
+        return ["open", "-t", str(path)]
 
     if os.name == "nt":
         return ["notepad", str(path)]
@@ -31,6 +31,10 @@ def _editor_command(path: Path) -> list[str]:
 
 def open_in_editor(path: Path) -> None:
     command = _editor_command(path)
-    result = subprocess.run(command, check=False)
-    if result.returncode != 0:
-        raise RuntimeError(f"无法打开编辑器：{' '.join(command)}")
+    try:
+        subprocess.Popen(  # noqa: S603
+            command,
+            start_new_session=True,
+        )
+    except OSError as error:
+        raise RuntimeError(f"无法打开编辑器：{' '.join(command)}") from error

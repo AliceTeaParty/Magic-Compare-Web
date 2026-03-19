@@ -46,7 +46,48 @@ class CaseSource:
 def _load_yaml(path: Path) -> dict:
     if not path.exists():
         return {}
-    return yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    text = path.read_text(encoding="utf-8")
+    try:
+        return yaml.safe_load(text) or {}
+    except yaml.YAMLError:
+        if path.name not in {"case.yaml", "group.yaml", "frame.yaml"}:
+            raise
+        return _load_relaxed_simple_mapping(text)
+
+
+def _coerce_relaxed_value(raw_value: str):
+    if raw_value == "":
+        return ""
+
+    try:
+        parsed = yaml.safe_load(raw_value)
+    except yaml.YAMLError:
+        return raw_value
+
+    if isinstance(parsed, dict):
+        return raw_value
+
+    return parsed
+
+
+def _load_relaxed_simple_mapping(text: str) -> dict:
+    data: dict[str, object] = {}
+    for raw_line in text.splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            continue
+
+        if ":" not in raw_line:
+            raise ValueError(f"无法解析 metadata 行：{raw_line}")
+
+        key, raw_value = raw_line.split(":", 1)
+        normalized_key = key.strip()
+        if not normalized_key:
+            raise ValueError(f"metadata key 不能为空：{raw_line}")
+
+        data[normalized_key] = _coerce_relaxed_value(raw_value.strip())
+
+    return data
 
 
 def _parse_ordered_directory(directory: Path) -> tuple[int, str]:
