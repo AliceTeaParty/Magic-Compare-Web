@@ -38,7 +38,7 @@ export function useViewerController(group: ViewerGroup): ViewerController {
   const [mode, setModeState] = useState<ViewerMode>(group.defaultMode);
   const [overlayOpacity, setOverlayOpacity] = useState<number>(58);
   const [abSide, setAbSide] = useState<"before" | "after">("after");
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
     if (!currentFrameId || !frames.some((frame) => frame.id === currentFrameId)) {

@@ -5,7 +5,6 @@ import {
   FullscreenExit,
   KeyboardArrowLeft,
   KeyboardArrowRight,
-  Layers,
   PhotoLibrary,
   Tune,
   ViewSidebar,
@@ -16,9 +15,13 @@ import {
   Button,
   Chip,
   Divider,
+  Drawer,
+  FormControl,
   IconButton,
   Link as MuiLink,
+  MenuItem,
   Paper,
+  Select,
   Slider,
   Stack,
   ToggleButton,
@@ -26,6 +29,8 @@ import {
   Tooltip,
   Typography,
 } from "@mui/material";
+import { useTheme } from "@mui/material/styles";
+import useMediaQuery from "@mui/material/useMediaQuery";
 import { DndContext, PointerSensor, closestCenter, useSensor, useSensors } from "@dnd-kit/core";
 import {
   SortableContext,
@@ -37,7 +42,7 @@ import { CSS } from "@dnd-kit/utilities";
 import useEmblaCarousel from "embla-carousel-react";
 import Link from "next/link";
 import { AnimatePresence, motion } from "motion/react";
-import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { type ReactNode, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { ReactCompareSlider, ReactCompareSliderImage } from "react-compare-slider";
 import type { ViewerMode } from "@magic-compare/content-schema";
 import { clampNumber, formatUtcDate } from "@magic-compare/shared-utils";
@@ -76,24 +81,25 @@ function ThumbnailButton({ frame, isActive, onClick }: ThumbnailButtonProps) {
     <Button
       onClick={onClick}
       sx={{
-        minWidth: 172,
-        maxWidth: 172,
+        minWidth: 168,
+        maxWidth: 168,
         display: "flex",
         flexDirection: "column",
         alignItems: "stretch",
-        gap: 1,
-        borderRadius: 2.5,
+        gap: 0.9,
+        borderRadius: 2.25,
         border: "1px solid",
         borderColor: isActive ? "primary.main" : "divider",
-        backgroundColor: isActive ? "rgba(140, 193, 255, 0.12)" : "rgba(255, 255, 255, 0.02)",
-        p: 1,
+        backgroundColor: isActive ? "rgba(200, 161, 111, 0.08)" : "rgba(255, 255, 255, 0.015)",
+        boxShadow: isActive ? "inset 0 0 0 1px rgba(200, 161, 111, 0.18)" : "none",
+        p: 1.1,
       }}
     >
       <Box
         sx={{
           borderRadius: 2,
           overflow: "hidden",
-          backgroundColor: "rgba(255,255,255,0.04)",
+          backgroundColor: "rgba(255,255,255,0.035)",
           aspectRatio: "16 / 9",
         }}
       >
@@ -110,15 +116,15 @@ function ThumbnailButton({ frame, isActive, onClick }: ThumbnailButtonProps) {
           </Box>
         )}
       </Box>
-      <Stack spacing={0.25} alignItems="flex-start">
-        <Typography variant="body2" fontWeight={600} noWrap>
+      <Stack spacing={0.1} alignItems="center">
+        <Typography
+          variant="body2"
+          fontWeight={600}
+          noWrap
+          sx={{ width: "100%", textAlign: "center" }}
+        >
           {frame.title}
         </Typography>
-        {frame.caption ? (
-          <Typography variant="caption" color="text.secondary" noWrap>
-            {frame.caption}
-          </Typography>
-        ) : null}
       </Stack>
     </Button>
   );
@@ -155,13 +161,35 @@ function StageImage({ asset, alt }: { asset: ViewerAsset; alt: string }) {
       src={asset.imageUrl}
       alt={alt}
       sx={{
-        maxWidth: "100%",
-        maxHeight: "100%",
+        width: "100%",
+        height: "100%",
         objectFit: "contain",
         display: "block",
-        mx: "auto",
       }}
     />
+  );
+}
+
+function StagePresentationShell({ children }: { children: ReactNode }) {
+  return (
+    <Box
+      sx={{
+        position: "relative",
+        display: "grid",
+        placeItems: "center",
+        width: "100%",
+        aspectRatio: "16 / 9",
+        minHeight: { xs: 220, md: 340 },
+        borderRadius: 2.5,
+        overflow: "hidden",
+        border: "1px solid",
+        borderColor: "divider",
+        background:
+          "radial-gradient(circle at top, rgba(200, 161, 111, 0.07), transparent 28%), rgba(12, 14, 17, 0.96)",
+      }}
+    >
+      {children}
+    </Box>
   );
 }
 
@@ -170,8 +198,8 @@ function HeatmapNotice() {
     <Alert
       severity="info"
       sx={{
-        borderRadius: 3,
-        bgcolor: "rgba(241, 168, 99, 0.1)",
+        borderRadius: 2.5,
+        bgcolor: "rgba(200, 161, 111, 0.12)",
         color: "text.primary",
       }}
     >
@@ -187,7 +215,6 @@ function ViewerStage({
   mode,
   abSide,
   overlayOpacity,
-  onAbSideChange,
 }: {
   beforeAsset: ViewerAsset | undefined;
   afterAsset: ViewerAsset | undefined;
@@ -195,56 +222,32 @@ function ViewerStage({
   mode: ViewerMode;
   abSide: "before" | "after";
   overlayOpacity: number;
-  onAbSideChange: (value: "before" | "after") => void;
 }) {
   if (!beforeAsset || !afterAsset) {
     return (
-      <Box
-        sx={{
-          display: "grid",
-          placeItems: "center",
-          height: "100%",
-          borderRadius: 4,
-          border: "1px dashed",
-          borderColor: "divider",
-        }}
-      >
+      <StagePresentationShell>
         <Stack spacing={1.5} alignItems="center">
           <PhotoLibrary sx={{ color: "text.secondary" }} />
           <Typography variant="body1">This frame is missing its before/after pair.</Typography>
         </Stack>
-      </Box>
+      </StagePresentationShell>
     );
   }
 
   if (mode === "a-b") {
     const visibleAsset = abSide === "before" ? beforeAsset : afterAsset;
     return (
-      <Stack spacing={2} sx={{ height: "100%" }}>
-        <ToggleButtonGroup
-          exclusive
-          size="small"
-          value={abSide}
-          onChange={(_, next) => {
-            if (next) {
-              onAbSideChange(next);
-            }
-          }}
-          sx={{ alignSelf: "center" }}
-        >
-          <ToggleButton value="before">Before</ToggleButton>
-          <ToggleButton value="after">After</ToggleButton>
-        </ToggleButtonGroup>
-        <Box sx={{ flex: 1, minHeight: 0, display: "grid", placeItems: "center" }}>
+      <StagePresentationShell>
+        <Box sx={{ width: "100%", height: "100%", display: "grid", placeItems: "center" }}>
           <StageImage asset={visibleAsset} alt={`${visibleAsset.label} preview`} />
         </Box>
-      </Stack>
+      </StagePresentationShell>
     );
   }
 
   if (mode === "heatmap" && heatmapAsset) {
     return (
-      <Box sx={{ position: "relative", height: "100%", display: "grid", placeItems: "center" }}>
+      <StagePresentationShell>
         <StageImage asset={afterAsset} alt={`${afterAsset.label} base`} />
         <Box
           component="img"
@@ -260,30 +263,32 @@ function ViewerStage({
             pointerEvents: "none",
           }}
         />
-      </Box>
+      </StagePresentationShell>
     );
   }
 
   return (
-    <ReactCompareSlider
-      style={{ width: "100%", height: "100%" }}
-      itemOne={
-        <ReactCompareSliderImage
-          src={beforeAsset.imageUrl}
-          alt={beforeAsset.label}
-          style={{ objectFit: "contain", height: "100%", width: "100%" }}
-        />
-      }
-      itemTwo={
-        <ReactCompareSliderImage
-          src={afterAsset.imageUrl}
-          alt={afterAsset.label}
-          style={{ objectFit: "contain", height: "100%", width: "100%" }}
-        />
-      }
-      onlyHandleDraggable
-      position={50}
-    />
+    <StagePresentationShell>
+      <ReactCompareSlider
+        style={{ width: "100%", height: "100%" }}
+        itemOne={
+          <ReactCompareSliderImage
+            src={beforeAsset.imageUrl}
+            alt={beforeAsset.label}
+            style={{ objectFit: "contain", height: "100%", width: "100%" }}
+          />
+        }
+        itemTwo={
+          <ReactCompareSliderImage
+            src={afterAsset.imageUrl}
+            alt={afterAsset.label}
+            style={{ objectFit: "contain", height: "100%", width: "100%" }}
+          />
+        }
+        onlyHandleDraggable
+        position={50}
+      />
+    </StagePresentationShell>
   );
 }
 
@@ -320,6 +325,81 @@ function GroupLinks({
   );
 }
 
+function ViewerSidebarContent({
+  currentGroup,
+  currentFrame,
+  groups,
+  heatmapAsset,
+  publishStatus,
+  variant,
+}: {
+  currentGroup: ViewerGroup;
+  currentFrame: ViewerFrame | undefined;
+  groups: ViewerDataset["siblingGroups"];
+  heatmapAsset: ViewerAsset | undefined;
+  publishStatus: ViewerDataset["publishStatus"];
+  variant: "public" | "internal";
+}) {
+  return (
+    <Stack spacing={2} sx={{ p: 2.25 }}>
+      <Stack spacing={0.5}>
+        <Typography variant="body2" color="text.secondary">
+          Group navigator
+        </Typography>
+        <GroupLinks currentGroup={currentGroup} groups={groups} />
+      </Stack>
+      <Divider />
+      <Stack spacing={0.75}>
+        <Typography variant="body2" color="text.secondary">
+          Frame details
+        </Typography>
+        <Typography variant="subtitle1">{currentFrame?.title}</Typography>
+        <Typography variant="body2" color="text.secondary">
+          {currentFrame?.caption || "No frame note."}
+        </Typography>
+      </Stack>
+      <Divider />
+      <Stack spacing={0.75}>
+        <Typography variant="body2" color="text.secondary">
+          Asset metadata
+        </Typography>
+        <Typography variant="body2">
+          Primary assets:{" "}
+          {(currentFrame?.assets ?? [])
+            .filter((asset) => asset.isPrimaryDisplay)
+            .map((asset) => asset.label)
+            .join(", ") || "None"}
+        </Typography>
+        <Typography variant="body2">
+          Heatmap: {heatmapAsset ? "Available" : "Unavailable"}
+        </Typography>
+      </Stack>
+      {variant === "internal" && publishStatus ? (
+        <>
+          <Divider />
+          <Stack spacing={0.75}>
+            <Typography variant="body2" color="text.secondary">
+              Publish status
+            </Typography>
+            <Chip
+              label={publishStatus.status}
+              color={publishStatus.status === "published" ? "primary" : "default"}
+              size="small"
+              sx={{ alignSelf: "flex-start" }}
+            />
+            <Typography variant="body2">
+              Public slug: {publishStatus.publicSlug ?? "Pending first publish"}
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              {formatUtcDate(publishStatus.publishedAt ?? null)}
+            </Typography>
+          </Stack>
+        </>
+      ) : null}
+    </Stack>
+  );
+}
+
 export function GroupViewerWorkbench({
   dataset,
   variant,
@@ -343,6 +423,8 @@ export function GroupViewerWorkbench({
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
   const rootRef = useRef<HTMLDivElement | null>(null);
   const [fullscreen, setFullscreen] = useState(false);
+  const theme = useTheme();
+  const showDesktopSidebar = useMediaQuery(theme.breakpoints.up("lg"), { noSsr: true });
 
   useEffect(() => {
     if (controller.currentFrameIndex >= 0) {
@@ -415,52 +497,60 @@ export function GroupViewerWorkbench({
     <Box
       ref={rootRef}
       sx={{
-        minHeight: "100vh",
-        px: { xs: 1.5, md: 3 },
-        py: { xs: 1.5, md: 2.5 },
+        minHeight: "100svh",
+        px: { xs: 1, md: 2.25 },
+        py: { xs: 1, md: 2 },
         background:
-          "linear-gradient(180deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0) 18%), transparent",
+          "linear-gradient(180deg, rgba(255,255,255,0.02) 0%, rgba(255,255,255,0) 22%), transparent",
       }}
     >
       <Paper
         elevation={0}
         sx={{
           display: "grid",
-          gridTemplateColumns: controller.sidebarOpen ? { xs: "1fr", lg: "1fr 320px" } : "1fr",
+          gridTemplateColumns:
+            controller.sidebarOpen && showDesktopSidebar ? "minmax(0, 1fr) 320px" : "1fr",
           gridTemplateRows: "auto minmax(0, 1fr) auto",
-          minHeight: "calc(100vh - 32px)",
+          minHeight: "calc(100svh - 16px)",
           overflow: "hidden",
-          border: "1px solid rgba(140, 193, 255, 0.12)",
-          borderRadius: 5,
-          backgroundColor: "rgba(18, 23, 31, 0.86)",
-          backdropFilter: "blur(18px)",
+          border: "1px solid",
+          borderColor: "divider",
+          borderRadius: 3,
+          backgroundColor: "rgba(19, 21, 24, 0.92)",
         }}
       >
         <Box
           sx={{
             gridColumn: "1 / -1",
             display: "flex",
-            alignItems: "center",
+            flexDirection: { xs: "column", md: "row" },
+            alignItems: { xs: "stretch", md: "center" },
             justifyContent: "space-between",
-            gap: 2,
-            px: { xs: 2, md: 2.5 },
-            py: 1.5,
+            gap: 1.5,
+            px: { xs: 1.5, md: 2.25 },
+            py: 1.35,
             borderBottom: "1px solid",
             borderColor: "divider",
+            background:
+              "linear-gradient(180deg, rgba(255,255,255,0.028) 0%, rgba(255,255,255,0.012) 100%)",
           }}
         >
-          <Stack spacing={0.25} sx={{ minWidth: 0 }}>
-            <Typography variant="overline" color="text.secondary">
-              {variant === "public" ? "Published group" : "Internal workbench"}
-            </Typography>
-            <Typography variant="h5" noWrap>
+          <Stack spacing={0.2} sx={{ minWidth: 0, pr: { md: 2 } }}>
+            <Typography variant="h4" noWrap>
               {dataset.group.title}
             </Typography>
             <Typography variant="body2" color="text.secondary" noWrap>
               {dataset.caseMeta.title}
             </Typography>
           </Stack>
-          <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+          <Stack
+            direction="row"
+            spacing={1}
+            alignItems="center"
+            justifyContent={{ xs: "flex-start", md: "flex-end" }}
+            flexWrap="wrap"
+            useFlexGap
+          >
             <ToggleButtonGroup
               exclusive
               size="small"
@@ -477,7 +567,21 @@ export function GroupViewerWorkbench({
                 Heatmap
               </ToggleButton>
             </ToggleButtonGroup>
-            <Tooltip title="Toggle sidebar (I)">
+            {controller.mode === "a-b" ? (
+              <FormControl size="small" sx={{ minWidth: 132 }}>
+                <Select
+                  value={controller.abSide}
+                  onChange={(event) =>
+                    controller.setAbSide(String(event.target.value) as "before" | "after")
+                  }
+                  inputProps={{ "aria-label": "Choose A/B side" }}
+                >
+                  <MenuItem value="before">Before</MenuItem>
+                  <MenuItem value="after">After</MenuItem>
+                </Select>
+              </FormControl>
+            ) : null}
+            <Tooltip title={controller.sidebarOpen ? "Close details (I)" : "Open details (I)"}>
               <IconButton onClick={controller.toggleSidebar}>
                 <ViewSidebar />
               </IconButton>
@@ -503,38 +607,37 @@ export function GroupViewerWorkbench({
               elevation={0}
               sx={{
                 height: "100%",
-                minHeight: 420,
-                p: { xs: 1.5, md: 2 },
-                borderRadius: 4,
+                minHeight: { xs: 340, md: 460 },
+                p: { xs: 1.25, md: 1.75 },
+                borderRadius: 3,
                 border: "1px solid",
                 borderColor: "divider",
                 background:
-                  "radial-gradient(circle at top, rgba(140, 193, 255, 0.08), transparent 30%), rgba(8, 10, 15, 0.82)",
+                  "radial-gradient(circle at top, rgba(200, 161, 111, 0.07), transparent 28%), rgba(13, 15, 18, 0.88)",
               }}
             >
-              <Stack spacing={2.5} sx={{ height: "100%" }}>
+              <Stack spacing={2} sx={{ height: "100%" }}>
                 <Stack
                   direction={{ xs: "column", md: "row" }}
-                  alignItems={{ xs: "flex-start", md: "center" }}
+                  alignItems={{ xs: "flex-start", md: "flex-end" }}
                   justifyContent="space-between"
-                  spacing={1.5}
+                  spacing={1.25}
                 >
                   <Stack spacing={0.5}>
-                    <Typography variant="h6">{controller.currentFrame?.title ?? "No frame selected"}</Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      {controller.currentFrame?.caption || dataset.group.description}
+                    <Typography variant="overline" color="primary.main">
+                      {controller.currentFrameIndex >= 0
+                        ? `Frame ${controller.currentFrameIndex + 1} / ${controller.frames.length}`
+                        : "No frame"}
+                    </Typography>
+                    <Typography variant="h5">
+                      {controller.currentFrame?.title ?? "No frame selected"}
                     </Typography>
                   </Stack>
-                  <Stack direction="row" spacing={1} flexWrap="wrap">
+                  <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                    <Chip size="small" label={`${controller.frames.length} frames`} variant="outlined" />
                     {dataset.group.tags.map((tag) => (
                       <Chip key={tag} label={tag} size="small" variant="outlined" />
                     ))}
-                    <Chip
-                      size="small"
-                      icon={<Layers fontSize="small" />}
-                      label={`${controller.frames.length} frames`}
-                      variant="outlined"
-                    />
                   </Stack>
                 </Stack>
 
@@ -548,7 +651,6 @@ export function GroupViewerWorkbench({
                     mode={controller.mode}
                     abSide={controller.abSide}
                     overlayOpacity={controller.overlayOpacity}
-                    onAbSideChange={controller.setAbSide}
                   />
                 </Box>
 
@@ -582,18 +684,13 @@ export function GroupViewerWorkbench({
               pb: { xs: 1.5, md: 2.25 },
               borderTop: "1px solid",
               borderColor: "divider",
-              backgroundColor: "rgba(255,255,255,0.015)",
+              backgroundColor: "rgba(255,255,255,0.012)",
             }}
           >
             <Stack direction="row" justifyContent="space-between" alignItems="center" py={1.25}>
-              <Stack spacing={0.25}>
-                <Typography variant="body2" fontWeight={600}>
-                  Filmstrip
-                </Typography>
-                <Typography variant="caption" color="text.secondary">
-                  Arrow keys navigate. Drag thumbnails in internal mode.
-                </Typography>
-              </Stack>
+              <Typography variant="body2" fontWeight={600}>
+                Filmstrip
+              </Typography>
               <Stack direction="row" spacing={0.5}>
                 <IconButton onClick={() => controller.stepFrame(-1)} size="small">
                   <KeyboardArrowLeft />
@@ -670,7 +767,7 @@ export function GroupViewerWorkbench({
         </Box>
 
         <AnimatePresence initial={false}>
-          {controller.sidebarOpen ? (
+          {controller.sidebarOpen && showDesktopSidebar ? (
             <Box
               component={motion.aside}
               initial={{ opacity: 0, x: 18 }}
@@ -678,71 +775,46 @@ export function GroupViewerWorkbench({
               exit={{ opacity: 0, x: 18 }}
               transition={{ duration: 0.18, ease: "easeOut" }}
               sx={{
-                display: { xs: "none", lg: "block" },
                 borderLeft: "1px solid",
                 borderColor: "divider",
                 backgroundColor: "rgba(255,255,255,0.02)",
               }}
             >
-              <Stack spacing={2} sx={{ p: 2.25 }}>
-                <Stack spacing={0.5}>
-                  <Typography variant="body2" color="text.secondary">
-                    Group navigator
-                  </Typography>
-                  <GroupLinks currentGroup={group} groups={dataset.siblingGroups} />
-                </Stack>
-                <Divider />
-                <Stack spacing={0.75}>
-                  <Typography variant="body2" color="text.secondary">
-                    Frame details
-                  </Typography>
-                  <Typography variant="subtitle1">{controller.currentFrame?.title}</Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    {controller.currentFrame?.caption || "No frame note."}
-                  </Typography>
-                </Stack>
-                <Divider />
-                <Stack spacing={0.75}>
-                  <Typography variant="body2" color="text.secondary">
-                    Asset metadata
-                  </Typography>
-                  <Typography variant="body2">
-                    Primary assets:{" "}
-                    {(controller.currentFrame?.assets ?? [])
-                      .filter((asset) => asset.isPrimaryDisplay)
-                      .map((asset) => asset.label)
-                      .join(", ") || "None"}
-                  </Typography>
-                  <Typography variant="body2">
-                    Heatmap: {controller.heatmapAsset ? "Available" : "Unavailable"}
-                  </Typography>
-                </Stack>
-                {variant === "internal" && dataset.publishStatus ? (
-                  <>
-                    <Divider />
-                    <Stack spacing={0.75}>
-                      <Typography variant="body2" color="text.secondary">
-                        Publish status
-                      </Typography>
-                      <Chip
-                        label={dataset.publishStatus.status}
-                        color={dataset.publishStatus.status === "published" ? "primary" : "default"}
-                        size="small"
-                        sx={{ alignSelf: "flex-start" }}
-                      />
-                      <Typography variant="body2">
-                        Public slug: {dataset.publishStatus.publicSlug ?? "Pending first publish"}
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        {formatUtcDate(dataset.publishStatus.publishedAt ?? null)}
-                      </Typography>
-                    </Stack>
-                  </>
-                ) : null}
-              </Stack>
+              <ViewerSidebarContent
+                currentGroup={group}
+                currentFrame={controller.currentFrame}
+                groups={dataset.siblingGroups}
+                heatmapAsset={controller.heatmapAsset}
+                publishStatus={dataset.publishStatus}
+                variant={variant}
+              />
             </Box>
           ) : null}
         </AnimatePresence>
+        <Drawer
+          anchor="right"
+          open={controller.sidebarOpen && !showDesktopSidebar}
+          onClose={controller.toggleSidebar}
+          ModalProps={{ keepMounted: true }}
+          PaperProps={{
+            sx: {
+              width: "min(88vw, 360px)",
+              borderLeft: "1px solid",
+              borderColor: "divider",
+              backgroundColor: "rgba(24, 26, 29, 0.98)",
+              backgroundImage: "none",
+            },
+          }}
+        >
+          <ViewerSidebarContent
+            currentGroup={group}
+            currentFrame={controller.currentFrame}
+            groups={dataset.siblingGroups}
+            heatmapAsset={controller.heatmapAsset}
+            publishStatus={dataset.publishStatus}
+            variant={variant}
+          />
+        </Drawer>
       </Paper>
     </Box>
   );
