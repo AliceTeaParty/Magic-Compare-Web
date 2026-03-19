@@ -19,25 +19,35 @@ It can start from a flat VSEditor export folder, generate a structured work dire
 The uploader has three jobs:
 
 - validate the local case directory structure
-- stage original images and thumbnails into the repository's internal asset path
+- stage original images and thumbnails into the repository's runtime internal asset path
 - build and optionally sync an import manifest to the internal site
 
 Current staged asset destination:
 
 ```text
-apps/internal-site/public/internal-assets/
+apps/internal-site/.runtime/internal-assets/
 ```
 
-Current default sync endpoint:
+Default internal site homepage:
+
+```text
+http://localhost:3000
+```
+
+Current default sync endpoint derived from the site URL:
 
 ```text
 http://localhost:3000/api/ops/import-sync
 ```
 
-You can override the uploader default by setting this variable in a `.env` file:
+The uploader now reads configuration from a work-directory `.env` file and ships with a repository-level `.env.example` template:
 
 ```text
-MAGIC_COMPARE_API_URL=http://localhost:3000/api/ops/import-sync
+MAGIC_COMPARE_SITE_URL=http://localhost:3000
+MAGIC_COMPARE_API_URL=
+MAGIC_COMPARE_CF_ACCESS_TOKEN=
+MAGIC_COMPARE_CF_ACCESS_CLIENT_ID=
+MAGIC_COMPARE_CF_ACCESS_CLIENT_SECRET=
 ```
 
 ## Installation
@@ -57,6 +67,58 @@ After installation, the CLI entry point is:
 magic-compare-uploader
 ```
 
+## Configuration and Cloudflare Access
+
+The uploader supports two auth modes:
+
+- local human users: Cloudflare Access through `cloudflared`
+- CI / automation: Cloudflare Service Token headers
+
+### Work-directory `.env`
+
+When the wizard creates or reuses a work directory, it also creates:
+
+```text
+<work-dir>/.env
+```
+
+If no `.env` exists yet, the CLI copies the repository `.env.example` into that work directory.
+
+Default meanings:
+
+- `MAGIC_COMPARE_SITE_URL`: the internal site homepage and Cloudflare Access app URL
+- `MAGIC_COMPARE_API_URL`: optional override; if blank, the uploader derives `/api/ops/import-sync` from `MAGIC_COMPARE_SITE_URL`
+- `MAGIC_COMPARE_CF_ACCESS_TOKEN`: a human login token written by the CLI after successful `cloudflared` login
+- `MAGIC_COMPARE_CF_ACCESS_CLIENT_ID` / `MAGIC_COMPARE_CF_ACCESS_CLIENT_SECRET`: optional CI credentials
+
+### Local human login
+
+When `MAGIC_COMPARE_SITE_URL` points to a non-local site and no Service Token is configured, the uploader:
+
+1. checks whether `cloudflared` exists
+2. on macOS, tries `brew install cloudflared` if it is missing
+3. runs `cloudflared access login <site-url>`
+4. runs `cloudflared access token -app=<site-url>`
+5. writes the returned token into `<work-dir>/.env` as `MAGIC_COMPARE_CF_ACCESS_TOKEN`
+
+This keeps the one-command wizard flow intact while letting Cloudflare Access handle browser login.
+
+### CI / automation
+
+Automation should not use browser login. Instead set:
+
+```text
+MAGIC_COMPARE_CF_ACCESS_CLIENT_ID=...
+MAGIC_COMPARE_CF_ACCESS_CLIENT_SECRET=...
+```
+
+When both are present, the uploader sends:
+
+- `CF-Access-Client-Id`
+- `CF-Access-Client-Secret`
+
+and skips `cloudflared`.
+
 ## Default Wizard
 
 Running the CLI without subcommands launches the one-stop import wizard.
@@ -68,11 +130,13 @@ It will:
 3. auto-detect `before` / `after` / `misc`
 4. search existing cases from the internal site
 5. default to the current year case if you don't choose another one
-6. generate a structured work directory next to the source folder
-7. generate `case.yaml`, `group.yaml`, `frame.yaml`, and `assets.yaml`
-8. open metadata in the system editor for confirmation
-9. auto-generate `heatmap.png` when missing
-10. stage assets, build the import manifest, and sync it
+6. generate or reuse a structured work directory next to the source folder
+7. create `<work-dir>/.env` from `.env.example` when needed
+8. authenticate against Cloudflare Access when needed
+9. generate `case.yaml`, `group.yaml`, `frame.yaml`, and `assets.yaml`
+10. open metadata in the system editor for confirmation
+11. auto-generate `heatmap.png` when missing
+12. stage assets, build the import manifest, and sync it
 
 Default work directory:
 
@@ -131,7 +195,7 @@ magic-compare-uploader manifest /path/to/sample-case -o /tmp/demo-manifest.json
 Important:
 
 - this command is not read-only
-- it copies files into `apps/internal-site/public/internal-assets`
+- it copies files into `apps/internal-site/.runtime/internal-assets`
 - it generates thumbnails
 
 ### `sync`
@@ -146,6 +210,12 @@ Use a custom internal API URL:
 
 ```bash
 magic-compare-uploader sync /path/to/sample-case --api-url http://localhost:3100/api/ops/import-sync
+```
+
+Use a site URL and let the uploader derive API endpoints:
+
+```bash
+magic-compare-uploader sync /path/to/sample-case --site-url https://compare-internal.example.com
 ```
 
 ### `delete-group`
@@ -328,16 +398,16 @@ The uploader does not upload binaries over HTTP today.
 
 Instead it performs a local staging step:
 
-1. copy original assets into `apps/internal-site/public/internal-assets/[caseSlug]/[groupSlug]/[frameOrder]/`
+1. copy original assets into `apps/internal-site/.runtime/internal-assets/[caseSlug]/[groupSlug]/[frameOrder]/`
 2. generate thumbnails alongside them with `thumb-` prefix
-3. compute `imageUrl` and `thumbUrl` as internal public paths
+3. compute `imageUrl` and `thumbUrl` as `/internal-assets/...` URLs served by the internal site's dynamic asset route
 4. construct the import manifest
 5. optionally send the manifest JSON to the internal site
 
 Example staged output:
 
 ```text
-apps/internal-site/public/internal-assets/
+apps/internal-site/.runtime/internal-assets/
   grain-retention-study/
     banding-check/
       001/
@@ -404,8 +474,9 @@ The internal site then:
 The uploader currently assumes:
 
 - it runs inside this repository
-- it can write into `apps/internal-site/public/internal-assets`
-- the internal site is reachable over HTTP if `sync` is used
+- it can write into `apps/internal-site/.runtime/internal-assets`
+- the internal site is reachable over HTTP or HTTPS if `sync` is used
+- protected remote sites are fronted by Cloudflare Access if Zero Trust is enabled
 
 If you install the uploader outside this repository without adapting the staging logic, `manifest` and `sync` will stage into the wrong place.
 
@@ -479,7 +550,7 @@ Symptom:
 Fix:
 
 - ensure you are running the uploader from this repository layout
-- confirm the staged files exist under `apps/internal-site/public/internal-assets`
+- confirm the staged files exist under `apps/internal-site/.runtime/internal-assets`
 
 ### `sync` cannot reach the internal site
 
@@ -490,7 +561,21 @@ Symptom:
 Fix:
 
 - start `pnpm dev:internal`
-- confirm the site is listening on the URL passed to `--api-url`
+- confirm the site is listening on the URL passed to `--site-url` or `--api-url`
+
+### Cloudflare Access login fails
+
+Symptom:
+
+- the uploader cannot reach a protected internal site
+- `cloudflared` login does not complete
+
+Fix:
+
+- confirm `MAGIC_COMPARE_SITE_URL` points at the protected internal site homepage
+- confirm that the site is configured as a Cloudflare Access self-hosted application
+- if `cloudflared` is missing on macOS, let the CLI install it or run `brew install cloudflared`
+- if the token is stale, rerun the command; the uploader clears `MAGIC_COMPARE_CF_ACCESS_TOKEN` and retries once on 401/403
 
 ### Public site still shows old content after publish
 
