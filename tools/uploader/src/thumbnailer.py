@@ -4,7 +4,7 @@ import shutil
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
-from PIL import Image
+from PIL import Image, ImageChops, ImageEnhance, ImageOps
 
 
 def image_dimensions(source: Path) -> tuple[int, int]:
@@ -33,3 +33,27 @@ def build_thumbnail(source: Path, destination: Path, size: tuple[int, int] = (48
         thumbnail = image.copy()
         thumbnail.thumbnail(size)
         thumbnail.save(destination)
+
+
+def generate_heatmap(before: Path, after: Path, destination: Path) -> None:
+    destination.parent.mkdir(parents=True, exist_ok=True)
+
+    with Image.open(before) as before_image, Image.open(after) as after_image:
+        before_rgb = before_image.convert("RGB")
+        after_rgb = after_image.convert("RGB")
+
+        if before_rgb.size != after_rgb.size:
+            raise ValueError(
+                f"热力图生成失败：{before.name} 与 {after.name} 尺寸不一致。"
+            )
+
+        difference = ImageChops.difference(before_rgb, after_rgb).convert("L")
+        contrast = ImageEnhance.Contrast(ImageOps.autocontrast(difference)).enhance(2.4)
+        brightened = contrast.point(lambda value: min(255, int(value * 1.6)))
+        heatmap = ImageOps.colorize(
+            brightened,
+            black="#0b0f17",
+            mid="#4f7c99",
+            white="#f1b75a",
+        )
+        heatmap.save(destination)

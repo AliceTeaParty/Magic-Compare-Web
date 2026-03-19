@@ -69,25 +69,54 @@ def _find_asset_file(frame_directory: Path, stem: str) -> Path | None:
 def _discover_assets(frame_directory: Path) -> list[AssetSource]:
     note_path = frame_directory / "note.md"
     note = note_path.read_text(encoding="utf-8").strip() if note_path.exists() else ""
+    asset_notes = _load_yaml(frame_directory / "assets.yaml")
     assets: list[AssetSource] = []
 
     for kind, label in (("before", "Before"), ("after", "After")):
         candidate = _find_asset_file(frame_directory, kind)
         if not candidate:
             raise ValueError(f"{frame_directory} is missing required asset '{kind}'.")
-        assets.append(AssetSource(kind=kind, label=label, path=candidate, note=note))
+        assets.append(
+            AssetSource(
+                kind=kind,
+                label=label,
+                path=candidate,
+                note=asset_notes.get(kind, {}).get("note", note or candidate.name),
+            )
+        )
 
     heatmap = _find_asset_file(frame_directory, "heatmap")
     if heatmap:
-        assets.append(AssetSource(kind="heatmap", label="Heatmap", path=heatmap, note=note))
+        assets.append(
+            AssetSource(
+                kind="heatmap",
+                label="Heatmap",
+                path=heatmap,
+                note=asset_notes.get("heatmap", {}).get("note", note or heatmap.name),
+            )
+        )
 
     for candidate in sorted(frame_directory.iterdir()):
         if candidate.suffix.lower() not in SUPPORTED_EXTENSIONS:
             continue
         if candidate.stem.startswith("crop-"):
-            assets.append(AssetSource(kind="crop", label=candidate.stem, path=candidate, note=note))
+            assets.append(
+                AssetSource(
+                    kind="crop",
+                    label=asset_notes.get(candidate.stem, {}).get("label", candidate.stem),
+                    path=candidate,
+                    note=asset_notes.get(candidate.stem, {}).get("note", note or candidate.name),
+                )
+            )
         elif candidate.stem not in {"before", "after", "heatmap"}:
-            assets.append(AssetSource(kind="misc", label=candidate.stem, path=candidate, note=note))
+            assets.append(
+                AssetSource(
+                    kind="misc",
+                    label=asset_notes.get(candidate.stem, {}).get("label", candidate.stem),
+                    path=candidate,
+                    note=asset_notes.get(candidate.stem, {}).get("note", note or candidate.name),
+                )
+            )
 
     return assets
 
