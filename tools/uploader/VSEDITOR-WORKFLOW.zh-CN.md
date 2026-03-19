@@ -48,7 +48,7 @@ magic-compare-uploader
 这里输入：
 
 ```text
-~/Downloads/test-example/
+~/Downloads/test-example
 ```
 
 如果你当前终端已经 `cd` 到这个目录，也可以直接回车使用默认值。
@@ -56,7 +56,7 @@ magic-compare-uploader
 接下来，向导会为这次导入准备工作目录，并在其中生成一份：
 
 ```text
-~/Downloads/test-example/-case/.env
+~/Downloads/test-example-case/.env
 ```
 
 它来自仓库根目录的 `.env.example`。最常用的字段是：
@@ -104,7 +104,7 @@ frame 标题会从文件名自动提取，格式固定为：
 例如：
 
 ```text
-24_BDMV250725ざつ旅_That's_Journey_Vol_1_00002_gen_vpy_3537_src.png
+******py_3537_src.png
 ```
 
 会生成：
@@ -173,13 +173,13 @@ frame 标题会从文件名自动提取，格式固定为：
 工具会自动在素材目录同级生成工作目录：
 
 ```text
-~/Downloads/test-example/-case
+~/Downloads/test-example-case
 ```
 
 默认 group 目录是：
 
 ```text
-~/Downloads/test-example/-case/groups/001-test-example
+~/Downloads/test-example-case/groups/001-test-example
 ```
 
 如果这个工作目录已经存在，工具会询问你：
@@ -200,7 +200,7 @@ frame 标题会从文件名自动提取，格式固定为：
 slug: 2026
 title: 2026
 subtitle: ""
-summary: <随机 ACG 名言>
+summary: <random>
 tags: []
 status: internal
 coverAssetLabel: After
@@ -247,7 +247,7 @@ caption: fps 24 • episode 02 • frame 3537
 对当前示例，大致会生成：
 
 ```text
-~/Downloads/test-example/-case/
+~/Downloads/test-example-case/
   case.yaml
   groups/
     001-test-example/
@@ -260,14 +260,7 @@ caption: fps 24 • episode 02 • frame 3537
           after.png
           heatmap.png
         002-24-02-3537/
-          ...
-        005-24-02-30516/
-          frame.yaml
-          assets.yaml
-          before.png
-          after.png
-          heatmap.png
-          rip.png
+          ......
 ```
 
 其中：
@@ -301,7 +294,7 @@ http://localhost:3000/cases/2026/groups/test-example
 
 ## 9. 这个示例里几条最关键的自动规则
 
-针对 `~/Downloads/test-example/`，默认结果是：
+针对 `~/Downloads/test-example`，默认结果是：
 
 - 一个素材目录导入成一个 group
 - `*_src.png` -> `before`
@@ -309,7 +302,7 @@ http://localhost:3000/cases/2026/groups/test-example
 - `*-rip.png` -> `misc`
 - 所有 frame 自动生成 `heatmap.png`
 - `24_BDMV250725..._3537_src.png` -> `24_02_3537`
-- 默认工作目录 -> `~/Downloads/test-example/-case`
+- 默认工作目录 -> `~/Downloads/test-example-case`
 - 默认新 case -> `2026`
 
 ## 10. 失败时优先检查什么
