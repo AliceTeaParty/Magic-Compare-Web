@@ -1,10 +1,6 @@
 # 从 VSEditor 导图到上传成功
 
-本文用真实示例目录：
-
-`/Users/crop/Downloads/Telegram/test-example`
-
-说明如何在**已经激活好 Python 环境**之后，只输入一次：
+本文档说明，如何在**已经激活好 Python 环境**之后，只输入一次：
 
 ```bash
 magic-compare-uploader
@@ -12,22 +8,15 @@ magic-compare-uploader
 
 就把一组 VSEditor 已保存到磁盘的图片，从原始平铺目录整理、生成 metadata、自动生成 heatmap，并上传到 Magic Compare Web 内部站。
 
-这份文档不再讲安装环境，只关注“一站式导入”本身。
-
 ## 1. 示例目录现状
 
 示例目录是一个典型的 VSEditor 平铺导图目录：
 
 ```text
-/Users/crop/Downloads/Telegram/test-example/
+~/Downloads/test-example/
   24_BDMV250725..._2087_src.png
   24_BDMV250725..._2087_output.png
-  24_BDMV250725..._3537_src.png
-  24_BDMV250725..._3537_output.png
-  24_BDMV250725..._3893_src.png
-  24_BDMV250725..._3893_output.png
-  24_BDMV250725..._15237_src.png
-  24_BDMV250725..._15237_output.png
+......
   24_BDMV250725..._30516_src.png
   24_BDMV250725..._30516_output.png
   24_Vol.1_00002.gen.vpy-30516-rip.png
@@ -59,7 +48,7 @@ magic-compare-uploader
 这里输入：
 
 ```text
-/Users/crop/Downloads/Telegram/test-example
+~/Downloads/test-example/
 ```
 
 如果你当前终端已经 `cd` 到这个目录，也可以直接回车使用默认值。
@@ -67,7 +56,7 @@ magic-compare-uploader
 接下来，向导会为这次导入准备工作目录，并在其中生成一份：
 
 ```text
-/Users/crop/Downloads/Telegram/test-example-case/.env
+~/Downloads/test-example/-case/.env
 ```
 
 它来自仓库根目录的 `.env.example`。最常用的字段是：
@@ -184,13 +173,13 @@ frame 标题会从文件名自动提取，格式固定为：
 工具会自动在素材目录同级生成工作目录：
 
 ```text
-/Users/crop/Downloads/Telegram/test-example-case
+~/Downloads/test-example/-case
 ```
 
 默认 group 目录是：
 
 ```text
-/Users/crop/Downloads/Telegram/test-example-case/groups/001-test-example
+~/Downloads/test-example/-case/groups/001-test-example
 ```
 
 如果这个工作目录已经存在，工具会询问你：
@@ -258,7 +247,7 @@ caption: fps 24 • episode 02 • frame 3537
 对当前示例，大致会生成：
 
 ```text
-/Users/crop/Downloads/Telegram/test-example-case/
+~/Downloads/test-example/-case/
   case.yaml
   groups/
     001-test-example/
@@ -312,7 +301,7 @@ http://localhost:3000/cases/2026/groups/test-example
 
 ## 9. 这个示例里几条最关键的自动规则
 
-针对 `/Users/crop/Downloads/Telegram/test-example`，默认结果是：
+针对 `~/Downloads/test-example/`，默认结果是：
 
 - 一个素材目录导入成一个 group
 - `*_src.png` -> `before`
@@ -320,7 +309,7 @@ http://localhost:3000/cases/2026/groups/test-example
 - `*-rip.png` -> `misc`
 - 所有 frame 自动生成 `heatmap.png`
 - `24_BDMV250725..._3537_src.png` -> `24_02_3537`
-- 默认工作目录 -> `/Users/crop/Downloads/Telegram/test-example-case`
+- 默认工作目录 -> `~/Downloads/test-example/-case`
 - 默认新 case -> `2026`
 
 ## 10. 失败时优先检查什么
