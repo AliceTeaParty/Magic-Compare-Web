@@ -6,6 +6,14 @@ For a concrete Chinese walkthrough that starts with a flat VSEditor export folde
 
 The uploader is intentionally local-first. It is designed for the current v1 workflow where images already live on disk and the web app should not implement a complex browser upload experience.
 
+The default entry point is now an interactive Chinese wizard:
+
+```bash
+magic-compare-uploader
+```
+
+It can start from a flat VSEditor export folder, generate a structured work directory, open metadata files in the system editor for confirmation, auto-generate heatmaps, and sync the result into the internal site.
+
 ## What the uploader does
 
 The uploader has three jobs:
@@ -43,7 +51,47 @@ After installation, the CLI entry point is:
 magic-compare-uploader
 ```
 
-## Commands
+## Default Wizard
+
+Running the CLI without subcommands launches the one-stop import wizard.
+
+It will:
+
+1. ask for a source directory
+2. recursively scan image files
+3. auto-detect `before` / `after` / `misc`
+4. search existing cases from the internal site
+5. default to the current year case if you don't choose another one
+6. generate a structured work directory next to the source folder
+7. generate `case.yaml`, `group.yaml`, `frame.yaml`, and `assets.yaml`
+8. open metadata in the system editor for confirmation
+9. auto-generate `heatmap.png` when missing
+10. stage assets, build the import manifest, and sync it
+
+Default work directory:
+
+```text
+<source-dir>-case
+```
+
+Example:
+
+```text
+/Users/crop/Downloads/Telegram/test-example
+-> /Users/crop/Downloads/Telegram/test-example-case
+```
+
+Case selection behavior:
+
+- pressing Enter reuses the current year case if it exists
+- otherwise pressing Enter creates the current year case
+- choosing an existing case preserves that case's title, summary, tags, and status
+
+Group conflict behavior:
+
+- if the selected case already has the same group slug, the wizard asks whether to overwrite it or create a suffixed slug such as `group-2`
+
+## Expert Commands
 
 ### `scan`
 
@@ -196,11 +244,29 @@ title: Gradient Sweep
 caption: Sky gradient with visible banding.
 ```
 
+### `assets.yaml`
+
+`assets.yaml` is optional.
+
+When present, it can override per-asset notes and labels keyed by file stem.
+
+Example:
+
+```yaml
+before:
+  note: raw-src.png
+after:
+  note: output-v2.png
+heatmap:
+  note: Auto-generated from raw-src.png vs output-v2.png
+```
+
 ### `note.md`
 
 `note.md` is optional.
 
-If present, its contents become the `note` field of every asset in that frame.
+If present, its contents become the fallback `note` field of every asset in that frame.
+`assets.yaml` takes priority over `note.md`.
 
 ## Supported asset discovery
 
@@ -225,6 +291,14 @@ Supported extensions:
 - `heatmap.*`
 - `crop-*.*`
 - any other supported file, which is treated as `misc`
+
+When using the default wizard on a flat source directory:
+
+- `src` or `source` becomes the unique `before`
+- `out` is preferred as `after`
+- `output` is second
+- all other same-frame outputs are treated as `misc`
+- `heatmap` is preserved when explicitly present, otherwise auto-generated
 
 ## How staging works
 
@@ -314,6 +388,14 @@ The uploader currently assumes:
 If you install the uploader outside this repository without adapting the staging logic, `manifest` and `sync` will stage into the wrong place.
 
 ## Typical workflows
+
+### Start from a flat source folder
+
+```bash
+magic-compare-uploader
+```
+
+Follow the prompts, choose or reuse a case, confirm generated metadata, and let the wizard sync the result.
 
 ### Validate a new case folder
 
