@@ -2,6 +2,8 @@
 
 This document covers the Python uploader in `tools/uploader`.
 
+For a concrete Chinese walkthrough that starts with a flat VSEditor export folder and ends with a successful `sync`, see `tools/uploader/VSEDITOR-WORKFLOW.zh-CN.md`.
+
 The uploader is intentionally local-first. It is designed for the current v1 workflow where images already live on disk and the web app should not implement a complex browser upload experience.
 
 ## What the uploader does

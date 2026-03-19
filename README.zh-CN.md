@@ -133,6 +133,10 @@ Python CLI，负责：
 
 上传工具另有独立文档：`tools/uploader/README.md`。
 
+如果你要从 VSEditor 已保存的平铺导图目录开始整理并导入，可直接参考：
+
+- `tools/uploader/VSEDITOR-WORKFLOW.zh-CN.md`
+
 ## 数据模型
 
 当前实现使用四个核心内容实体。
