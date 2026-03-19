@@ -1,10 +1,6 @@
 "use client";
 
 import {
-  Fullscreen,
-  FullscreenExit,
-  KeyboardArrowLeft,
-  KeyboardArrowRight,
   PhotoLibrary,
   Tune,
   ViewSidebar,
@@ -42,7 +38,7 @@ import { CSS } from "@dnd-kit/utilities";
 import useEmblaCarousel from "embla-carousel-react";
 import Link from "next/link";
 import { AnimatePresence, motion } from "motion/react";
-import { type ReactNode, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { type ReactNode, useEffect, useMemo, useState, useTransition } from "react";
 import { ReactCompareSlider, ReactCompareSliderImage } from "react-compare-slider";
 import type { ViewerMode } from "@magic-compare/content-schema";
 import { clampNumber, formatUtcDate } from "@magic-compare/shared-utils";
@@ -421,8 +417,6 @@ export function GroupViewerWorkbench({
     align: "start",
   });
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
-  const rootRef = useRef<HTMLDivElement | null>(null);
-  const [fullscreen, setFullscreen] = useState(false);
   const theme = useTheme();
   const showDesktopSidebar = useMediaQuery(theme.breakpoints.up("lg"), { noSsr: true });
 
@@ -472,34 +466,12 @@ export function GroupViewerWorkbench({
     return () => window.removeEventListener("keydown", handleKeydown);
   }, [controller]);
 
-  useEffect(() => {
-    function handleFullscreenChange() {
-      setFullscreen(Boolean(document.fullscreenElement));
-    }
-
-    document.addEventListener("fullscreenchange", handleFullscreenChange);
-    return () => document.removeEventListener("fullscreenchange", handleFullscreenChange);
-  }, []);
-
-  async function toggleFullscreen() {
-    if (!rootRef.current) {
-      return;
-    }
-
-    if (document.fullscreenElement) {
-      await document.exitFullscreen();
-    } else {
-      await rootRef.current.requestFullscreen();
-    }
-  }
-
   return (
     <Box
-      ref={rootRef}
       sx={{
         minHeight: "100svh",
-        px: { xs: 1, md: 2.25 },
-        py: { xs: 1, md: 2 },
+        px: { xs: 1.25, md: 2.5 },
+        py: { xs: 1.25, md: 2.25 },
         background:
           "linear-gradient(180deg, rgba(255,255,255,0.02) 0%, rgba(255,255,255,0) 22%), transparent",
       }}
@@ -527,8 +499,8 @@ export function GroupViewerWorkbench({
             alignItems: { xs: "stretch", md: "center" },
             justifyContent: "space-between",
             gap: 1.5,
-            px: { xs: 1.5, md: 2.25 },
-            py: 1.35,
+            px: { xs: 2.25, md: 3 },
+            py: { xs: 1.85, md: 2 },
             borderBottom: "1px solid",
             borderColor: "divider",
             background:
@@ -555,6 +527,12 @@ export function GroupViewerWorkbench({
               exclusive
               size="small"
               value={controller.mode}
+              sx={{
+                overflow: "visible",
+                "& .MuiToggleButtonGroup-grouped:not(:first-of-type)": {
+                  marginLeft: 0,
+                },
+              }}
               onChange={(_, nextMode: ViewerMode | null) => {
                 if (nextMode) {
                   controller.setMode(nextMode);
@@ -586,11 +564,7 @@ export function GroupViewerWorkbench({
                 <ViewSidebar />
               </IconButton>
             </Tooltip>
-            <Tooltip title="Fullscreen (browser)">
-              <IconButton onClick={toggleFullscreen}>
-                {fullscreen ? <FullscreenExit /> : <Fullscreen />}
-              </IconButton>
-            </Tooltip>
+            {/* Fullscreen stays hidden until the viewer has a more useful in-page browsing model. */}
           </Stack>
         </Box>
 
@@ -623,16 +597,9 @@ export function GroupViewerWorkbench({
                   justifyContent="space-between"
                   spacing={1.25}
                 >
-                  <Stack spacing={0.5}>
-                    <Typography variant="overline" color="primary.main">
-                      {controller.currentFrameIndex >= 0
-                        ? `Frame ${controller.currentFrameIndex + 1} / ${controller.frames.length}`
-                        : "No frame"}
-                    </Typography>
-                    <Typography variant="h5">
-                      {controller.currentFrame?.title ?? "No frame selected"}
-                    </Typography>
-                  </Stack>
+                  <Typography variant="h5">
+                    {controller.currentFrame?.title ?? "No frame selected"}
+                  </Typography>
                   <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
                     <Chip size="small" label={`${controller.frames.length} frames`} variant="outlined" />
                     {dataset.group.tags.map((tag) => (
@@ -681,25 +648,13 @@ export function GroupViewerWorkbench({
           <Box
             sx={{
               px: { xs: 1.5, md: 2.25 },
+              pt: { xs: 1.25, md: 1.5 },
               pb: { xs: 1.5, md: 2.25 },
               borderTop: "1px solid",
               borderColor: "divider",
               backgroundColor: "rgba(255,255,255,0.012)",
             }}
           >
-            <Stack direction="row" justifyContent="space-between" alignItems="center" py={1.25}>
-              <Typography variant="body2" fontWeight={600}>
-                Filmstrip
-              </Typography>
-              <Stack direction="row" spacing={0.5}>
-                <IconButton onClick={() => controller.stepFrame(-1)} size="small">
-                  <KeyboardArrowLeft />
-                </IconButton>
-                <IconButton onClick={() => controller.stepFrame(1)} size="small">
-                  <KeyboardArrowRight />
-                </IconButton>
-              </Stack>
-            </Stack>
             <Box sx={{ overflow: "hidden" }} ref={emblaRef}>
               {variant === "internal" && onFrameReorder ? (
                 <DndContext
