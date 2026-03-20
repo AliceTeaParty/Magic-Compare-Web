@@ -63,11 +63,11 @@ export function buildMagicColorTokens(): MagicColorTokens {
   return {
     seeds,
     background: {
-      default: seeds.night,
-      paper: tone(seeds.night, 22),
-      raised: tone(seeds.night, 26),
-      elevated: tone(seeds.deep, 24),
-      veil: tone(seeds.deep, 18),
+      default: tone(seeds.night, 8),
+      paper: tone(seeds.night, 12),
+      raised: tone(seeds.night, 16),
+      elevated: tone(seeds.night, 20),
+      veil: tone(seeds.night, 4),
     },
     primary: {
       main: tone(seeds.lavender, 84),

@@ -318,9 +318,9 @@ export function MagicThemeProvider({ children }: PropsWithChildren) {
           },
           html: {
             background: `
-              radial-gradient(circle at 12% 0%, ${alpha(tokens.primary.main, 0.1)} 0%, transparent 30%),
-              radial-gradient(circle at 88% 12%, ${alpha(tokens.secondary.main, 0.12)} 0%, transparent 28%),
-              radial-gradient(circle at 52% 100%, ${alpha(tokens.tertiary.main, 0.08)} 0%, transparent 34%),
+              radial-gradient(circle at 12% 0%, ${alpha(tokens.primary.main, 0.06)} 0%, transparent 28%),
+              radial-gradient(circle at 88% 12%, ${alpha(tokens.secondary.main, 0.08)} 0%, transparent 26%),
+              radial-gradient(circle at 52% 100%, ${alpha(tokens.tertiary.main, 0.04)} 0%, transparent 32%),
               linear-gradient(180deg, ${tokens.background.default} 0%, ${tokens.background.veil} 100%)
             `,
           },
@@ -346,7 +346,7 @@ export function MagicThemeProvider({ children }: PropsWithChildren) {
             border: `3px solid ${alpha(tokens.background.veil, 0)}`,
           },
           "::-webkit-scrollbar-track": {
-            background: alpha(tokens.background.veil, 0.2),
+            background: alpha(tokens.background.veil, 0.14),
           },
         }}
       />
