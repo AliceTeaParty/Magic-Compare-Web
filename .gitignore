@@ -61,6 +61,7 @@ tools/uploader/VSEDITOR-WORKFLOW.zh-CN.md
 tmp/
 
 # Generated workspace artifacts
+content/published/
 apps/public-site/public/published/
 apps/public-site/out/
 apps/internal-site/prisma/*.db*

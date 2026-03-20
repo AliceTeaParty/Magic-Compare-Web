@@ -18,23 +18,23 @@
 <table>
   <tr>
     <td width="33%" align="center">
-      <img src="./content/published/groups/demo-grain-study--banding-check/assets/001-before.svg" alt="Slider 模式预览" width="49%" />
-      <img src="./content/published/groups/demo-grain-study--banding-check/assets/001-after.svg" alt="Slider 模式预览 after" width="49%" />
+      <img src="./apps/internal-site/prisma/demo-assets/001-before.svg" alt="Slider 模式预览" width="49%" />
+      <img src="./apps/internal-site/prisma/demo-assets/001-after.svg" alt="Slider 模式预览 after" width="49%" />
       <br />
       <strong>Slider</strong>
       <br />
       <sub>通过拖动滑块查看前后版本差异，适合观察去色带、纹理恢复和边缘处理。</sub>
     </td>
     <td width="33%" align="center">
-      <img src="./content/published/groups/demo-grain-study--banding-check/assets/002-before.svg" alt="A/B 模式预览 before" width="49%" />
-      <img src="./content/published/groups/demo-grain-study--banding-check/assets/002-after.svg" alt="A/B 模式预览 after" width="49%" />
+      <img src="./apps/internal-site/prisma/demo-assets/002-before.svg" alt="A/B 模式预览 before" width="49%" />
+      <img src="./apps/internal-site/prisma/demo-assets/002-after.svg" alt="A/B 模式预览 after" width="49%" />
       <br />
       <strong>A/B</strong>
       <br />
       <sub>在两个版本之间快速切换，适合逐帧确认处理决策，不需要离开当前 viewer。</sub>
     </td>
     <td width="33%" align="center">
-      <img src="./content/published/groups/demo-grain-study--banding-check/assets/001-heatmap.svg" alt="Heatmap 模式预览" width="100%" />
+      <img src="./apps/internal-site/prisma/demo-assets/001-heatmap.svg" alt="Heatmap 模式预览" width="100%" />
       <br />
       <strong>Heatmap</strong>
       <br />

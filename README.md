@@ -17,23 +17,23 @@
 <table>
   <tr>
     <td width="33%" align="center">
-      <img src="./content/published/groups/demo-grain-study--banding-check/assets/001-before.svg" alt="Slider mode before preview" width="49%" />
-      <img src="./content/published/groups/demo-grain-study--banding-check/assets/001-after.svg" alt="Slider mode after preview" width="49%" />
+      <img src="./apps/internal-site/prisma/demo-assets/001-before.svg" alt="Slider mode before preview" width="49%" />
+      <img src="./apps/internal-site/prisma/demo-assets/001-after.svg" alt="Slider mode after preview" width="49%" />
       <br />
       <strong>Slider</strong>
       <br />
       <sub>Drag across before and after frames to inspect cleanup, texture recovery, and edge handling.</sub>
     </td>
     <td width="33%" align="center">
-      <img src="./content/published/groups/demo-grain-study--banding-check/assets/002-before.svg" alt="A/B mode before preview" width="49%" />
-      <img src="./content/published/groups/demo-grain-study--banding-check/assets/002-after.svg" alt="A/B mode after preview" width="49%" />
+      <img src="./apps/internal-site/prisma/demo-assets/002-before.svg" alt="A/B mode before preview" width="49%" />
+      <img src="./apps/internal-site/prisma/demo-assets/002-after.svg" alt="A/B mode after preview" width="49%" />
       <br />
       <strong>A/B</strong>
       <br />
       <sub>Flip between two versions to check decisions frame by frame without leaving the viewer.</sub>
     </td>
     <td width="33%" align="center">
-      <img src="./content/published/groups/demo-grain-study--banding-check/assets/001-heatmap.svg" alt="Heatmap mode preview" width="100%" />
+      <img src="./apps/internal-site/prisma/demo-assets/001-heatmap.svg" alt="Heatmap mode preview" width="100%" />
       <br />
       <strong>Heatmap</strong>
       <br />
