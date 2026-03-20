@@ -49,6 +49,66 @@ describe("public published content helpers", () => {
       { isDirectory: () => true, name: "group-a" },
       { isDirectory: () => false, name: "ignore.txt" },
     ]);
+    readFile.mockImplementation(async (filePath: string) => {
+      const publicSlug = filePath.includes("group-a") ? "group-a" : "group-b";
+      const groupSlug = publicSlug === "group-a" ? "group-a" : "group-b";
+
+      return JSON.stringify({
+        schemaVersion: 1,
+        publicSlug,
+        generatedAt: "2026-03-20T00:00:00.000Z",
+        assetBasePath: `/published/groups/${publicSlug}/assets`,
+        case: {
+          slug: "2026",
+          title: "2026",
+          subtitle: "",
+          summary: "",
+          tags: [],
+          publishedAt: "2026-03-20T00:00:00.000Z",
+        },
+        group: {
+          id: `group-${groupSlug}`,
+          slug: groupSlug,
+          publicSlug,
+          title: groupSlug,
+          description: "",
+          defaultMode: "before-after",
+          tags: [],
+        },
+        frames: [
+          {
+            id: "frame-1",
+            title: "Frame 1",
+            caption: "",
+            order: 0,
+            assets: [
+              {
+                id: "asset-1",
+                kind: "before",
+                label: "Before",
+                imageUrl: `/published/groups/${publicSlug}/assets/a.png`,
+                thumbUrl: `/published/groups/${publicSlug}/assets/a.png`,
+                width: 1280,
+                height: 720,
+                note: "",
+                isPrimaryDisplay: true,
+              },
+              {
+                id: "asset-2",
+                kind: "after",
+                label: "After",
+                imageUrl: `/published/groups/${publicSlug}/assets/b.png`,
+                thumbUrl: `/published/groups/${publicSlug}/assets/b.png`,
+                width: 1280,
+                height: 720,
+                note: "",
+                isPrimaryDisplay: true,
+              },
+            ],
+          },
+        ],
+      });
+    });
 
     await expect(listPublishedGroupSlugs()).resolves.toEqual(["group-a", "group-b"]);
   });
