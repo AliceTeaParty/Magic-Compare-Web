@@ -2,14 +2,17 @@
 
 import { useState, useTransition } from "react";
 import {
+  CheckCircleOutline,
   CloudUpload,
   DragIndicator,
   FileUpload,
+  LockOutlined,
   OpenInNew,
   Public,
   Publish,
 } from "@mui/icons-material";
 import {
+  Alert,
   Box,
   Button,
   Chip,
@@ -18,6 +21,8 @@ import {
   ListItem,
   Paper,
   Stack,
+  ToggleButton,
+  ToggleButtonGroup,
   Tooltip,
   Typography,
 } from "@mui/material";
@@ -31,6 +36,7 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { AnimatePresence, motion } from "motion/react";
 import type { CaseWorkspaceData } from "@/lib/server/repositories/content-repository";
 
 function SortableGroupRow({
@@ -67,17 +73,18 @@ function SortableGroupRow({
         }}
       >
         <Stack
-          direction={{ xs: "column", md: "row" }}
-          spacing={{ xs: 1.2, md: 1.35 }}
-          alignItems={{ xs: "stretch", md: "center" }}
+          direction={{ xs: "column", xl: "row" }}
+          spacing={{ xs: 1.25, xl: 1.5 }}
+          alignItems={{ xs: "stretch", xl: "center" }}
         >
           <Tooltip title="Drag to reorder within this case">
             <IconButton
               {...attributes}
               {...listeners}
               sx={{
-                alignSelf: { xs: "flex-start", md: "center" },
+                alignSelf: { xs: "flex-start", xl: "center" },
                 color: "text.secondary",
+                opacity: 0.78,
                 width: 34,
                 height: 34,
               }}
@@ -85,11 +92,16 @@ function SortableGroupRow({
               <DragIndicator />
             </IconButton>
           </Tooltip>
-          <Box sx={{ flex: 1, minWidth: 0 }}>
+          <Box sx={{ flex: 1, minWidth: 0, pr: { xl: 1 } }}>
             <Typography variant="subtitle1" sx={{ fontWeight: 600, lineHeight: 1.15 }}>
               {group.title}
             </Typography>
-            <Typography variant="body2" color="text.secondary" noWrap sx={{ mt: 0.55 }}>
+            <Typography
+              variant="body2"
+              color="text.secondary"
+              noWrap
+              sx={{ mt: 0.65, lineHeight: 1.6 }}
+            >
               {group.description || "No group description yet."}
             </Typography>
           </Box>
@@ -97,7 +109,7 @@ function SortableGroupRow({
             sx={{
               display: "flex",
               alignItems: "center",
-              justifyContent: { xs: "flex-start", md: "flex-end" },
+              justifyContent: { xs: "flex-start", xl: "flex-end" },
               gap: 0.9,
               flexWrap: "wrap",
             }}
@@ -112,31 +124,39 @@ function SortableGroupRow({
               size="small"
               label={`${group.frameCount} frames`}
               variant="outlined"
-              sx={{ height: 34, "& .MuiChip-label": { px: 1.35 } }}
+              sx={{ height: 36, "& .MuiChip-label": { px: 1.35 } }}
             />
-            <Chip
+            <ToggleButtonGroup
+              exclusive
               size="small"
-              label={group.isPublic ? "public" : "internal"}
-              color={group.isPublic ? "primary" : "default"}
-              sx={{ height: 34, "& .MuiChip-label": { px: 1.35 } }}
-            />
-            <Button
-              variant="outlined"
-              size="small"
-              startIcon={<Public />}
-              disabled={isPending}
-              onClick={() => onToggleVisibility(group)}
               sx={{ minHeight: 34, px: 1.35 }}
+              value={group.isPublic ? "public" : "internal"}
+              onChange={(_, nextValue: "public" | "internal" | null) => {
+                if (!nextValue) {
+                  return;
+                }
+
+                if ((group.isPublic ? "public" : "internal") !== nextValue) {
+                  onToggleVisibility(group);
+                }
+              }}
             >
-              {group.isPublic ? "Make internal" : "Make public"}
-            </Button>
+              <ToggleButton value="internal" disabled={isPending} sx={{ minHeight: 36 }}>
+                <LockOutlined sx={{ mr: 0.65, fontSize: 16 }} />
+                Internal
+              </ToggleButton>
+              <ToggleButton value="public" disabled={isPending} sx={{ minHeight: 36 }}>
+                <Public sx={{ mr: 0.65, fontSize: 16 }} />
+                Public
+              </ToggleButton>
+            </ToggleButtonGroup>
             <Button
               component={Link}
               href={`/cases/${caseSlug}/groups/${group.slug}`}
               variant="text"
               size="small"
               endIcon={<OpenInNew />}
-              sx={{ minHeight: 34, px: 1.35 }}
+              sx={{ minHeight: 36, px: 1.45 }}
             >
               Open
             </Button>
@@ -163,6 +183,7 @@ export function CaseWorkspaceBoard({
   const [feedback, setFeedback] = useState<string | null>(null);
   const [feedbackTone, setFeedbackTone] = useState<"error" | "success" | null>(null);
   const [publicSiteAction, setPublicSiteAction] = useState<"export" | "deploy" | null>(null);
+  const publicGroupCount = groups.filter((group) => group.isPublic).length;
 
   async function saveGroupOrder(nextGroupIds: string[]) {
     const response = await fetch("/api/ops/group-reorder", {
@@ -281,230 +302,284 @@ export function CaseWorkspaceBoard({
 
   return (
     <Stack spacing={{ xs: 2.25, md: 3 }}>
-      <Stack spacing={1.7} sx={{ maxWidth: 980 }}>
-        <Typography variant="overline" color="primary.main">
-          Case workspace
-        </Typography>
-        <Box
+      <Box
+        component={motion.div}
+        initial={{ opacity: 0, y: 18 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+      >
+        <Stack spacing={1.9} sx={{ width: "100%" }}>
+          <Typography variant="overline" color="primary.main">
+            Case workspace
+          </Typography>
+          <Box
+            sx={{
+              display: "grid",
+              gap: { xs: 1.8, xl: 2.2 },
+              alignItems: "start",
+              gridTemplateColumns: { xs: "1fr", xl: "minmax(0, 1.22fr) auto" },
+              pb: { xs: 2.8, md: 3.1 },
+              borderBottom: "1px solid",
+              borderColor: "divider",
+            }}
+          >
+            <Stack spacing={1.25} sx={{ minWidth: 0, pr: { xl: 2.2 } }}>
+              <Typography variant="h2" sx={{ lineHeight: 0.98 }}>
+                {data.title}
+              </Typography>
+              <Stack direction="row" spacing={0.9} flexWrap="wrap" useFlexGap>
+                <Chip
+                  label={data.status}
+                  color={data.status === "published" ? "primary" : "default"}
+                  sx={{ height: 38, "& .MuiChip-label": { px: 1.55 } }}
+                />
+                <Chip
+                  label={`${groups.length} groups`}
+                  variant="outlined"
+                  sx={{ height: 38, "& .MuiChip-label": { px: 1.55 } }}
+                />
+                <Chip
+                  label={`${publicGroupCount} public`}
+                  variant="outlined"
+                  sx={{ height: 38, "& .MuiChip-label": { px: 1.55 } }}
+                />
+              </Stack>
+              <Typography variant="body1" color="text.secondary" sx={{ maxWidth: 820 }}>
+                {data.summary || "No summary yet."}
+              </Typography>
+            </Stack>
+            <Stack
+              direction="row"
+              spacing={1}
+              alignItems="center"
+              justifyContent={{ xs: "flex-start", xl: "flex-end" }}
+              flexWrap="wrap"
+              useFlexGap
+              sx={{
+                "& .MuiButton-root": {
+                  minHeight: 42,
+                  px: 2.1,
+                },
+              }}
+            >
+              <Button
+                variant="contained"
+                startIcon={<Publish />}
+                disabled={isPending || groups.length === 0}
+                onClick={() =>
+                  startTransition(() => {
+                    setFeedback(null);
+                    setFeedbackTone(null);
+                    void publishCurrentCase()
+                      .then(() => {
+                        setFeedback("Published case bundle to the shared published root.");
+                        setFeedbackTone("success");
+                        router.refresh();
+                      })
+                      .catch((error) => {
+                        setFeedback(
+                          error instanceof Error ? error.message : "Failed to publish case.",
+                        );
+                        setFeedbackTone("error");
+                      });
+                  })
+                }
+              >
+                Publish case
+              </Button>
+              <Button
+                variant="outlined"
+                startIcon={<FileUpload />}
+                disabled={isPending || publicSiteAction !== null}
+                onClick={() => {
+                  if (publicSiteAction) {
+                    return;
+                  }
+
+                  setPublicSiteAction("export");
+                  startTransition(() => {
+                    setFeedback(null);
+                    setFeedbackTone(null);
+                    void exportPublicSite()
+                      .then((result) => {
+                        setFeedback(`Exported static public site to ${result.exportDir}.`);
+                        setFeedbackTone("success");
+                      })
+                      .catch((error) => {
+                        setFeedback(
+                          error instanceof Error ? error.message : "Failed to export public site.",
+                        );
+                        setFeedbackTone("error");
+                      })
+                      .finally(() => {
+                        setPublicSiteAction(null);
+                      });
+                  });
+                }}
+              >
+                Export public site
+              </Button>
+              <Button
+                variant="outlined"
+                startIcon={<CloudUpload />}
+                disabled={isPending || publicSiteAction !== null || !canDeployPublicSite}
+                onClick={() => {
+                  if (publicSiteAction) {
+                    return;
+                  }
+
+                  setPublicSiteAction("deploy");
+                  startTransition(() => {
+                    setFeedback(null);
+                    setFeedbackTone(null);
+                    void deployPublicSite()
+                      .then((result) => {
+                        setFeedback(
+                          `Deployed fresh static export to Cloudflare Pages project ${result.projectName}.`,
+                        );
+                        setFeedbackTone("success");
+                      })
+                      .catch((error) => {
+                        setFeedback(
+                          error instanceof Error ? error.message : "Failed to deploy public site.",
+                        );
+                        setFeedbackTone("error");
+                      })
+                      .finally(() => {
+                        setPublicSiteAction(null);
+                      });
+                  });
+                }}
+              >
+                Deploy to Pages
+              </Button>
+            </Stack>
+          </Box>
+          <Stack spacing={0.85}>
+            <Typography variant="body2" color="text.secondary">
+              Export and deploy operate on all published groups. Static export target:{" "}
+              {publicExportDir}
+            </Typography>
+            {publicGroupCount === 0 ? (
+              <Alert
+                severity="warning"
+                icon={<CheckCircleOutline fontSize="inherit" />}
+                sx={{
+                  borderRadius: 3,
+                  bgcolor: "rgba(255,255,255,0.05)",
+                  color: "text.primary",
+                }}
+              >
+                This case has no public groups yet. Use the per-group internal/public toggle below
+                before publishing.
+              </Alert>
+            ) : null}
+            {!canDeployPublicSite ? (
+              <Typography variant="caption" color="warning.main">
+                Deploy to Pages is disabled until Cloudflare Pages env is configured.
+              </Typography>
+            ) : null}
+            <AnimatePresence initial={false}>
+              {feedback ? (
+                <Typography
+                  component={motion.p}
+                  key={feedback}
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -4 }}
+                  transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+                  variant="caption"
+                  color={feedbackTone === "error" ? "error.main" : "primary.main"}
+                  sx={{ m: 0 }}
+                >
+                  {feedback}
+                </Typography>
+              ) : null}
+            </AnimatePresence>
+          </Stack>
+        </Stack>
+      </Box>
+
+      <Box
+        component={motion.div}
+        initial={{ opacity: 0, y: 22 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.32, delay: 0.06, ease: [0.22, 1, 0.36, 1] }}
+      >
+        <Paper
+          elevation={0}
           sx={{
-            display: "grid",
-            gap: { xs: 1.4, xl: 1.85 },
-            alignItems: "start",
-            gridTemplateColumns: { xs: "1fr", xl: "minmax(0, 1.18fr) auto" },
-            pb: 2.65,
-            borderBottom: "1px solid",
+            p: { xs: 2.2, md: 2.7 },
+            borderRadius: 3.5,
+            border: "1px solid",
             borderColor: "divider",
+            background:
+              "linear-gradient(180deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.02) 100%)",
           }}
         >
-          <Stack spacing={1.1} sx={{ minWidth: 0, pr: { xl: 2 } }}>
-            <Typography variant="h2" sx={{ lineHeight: 0.98 }}>
-              {data.title}
-            </Typography>
-            <Stack direction="row" spacing={0.9} flexWrap="wrap" useFlexGap>
-              <Chip
-                label={data.status}
-                color={data.status === "published" ? "primary" : "default"}
-                sx={{ height: 36, "& .MuiChip-label": { px: 1.4 } }}
-              />
-              <Chip
-                label={`${groups.length} groups`}
-                variant="outlined"
-                sx={{ height: 36, "& .MuiChip-label": { px: 1.4 } }}
-              />
+          <Stack spacing={1.65}>
+            <Stack spacing={0.6}>
+              <Typography variant="h6">Groups</Typography>
+              <Typography variant="body2" color="text.secondary">
+                Drag to define case order. Group pages open in the viewer workbench.
+              </Typography>
             </Stack>
-            <Typography variant="body1" color="text.secondary" sx={{ maxWidth: 760 }}>
-              {data.summary || "No summary yet."}
-            </Typography>
-          </Stack>
-          <Stack
-            direction="row"
-            spacing={1}
-            alignItems="center"
-            justifyContent={{ xs: "flex-start", xl: "flex-end" }}
-            flexWrap="wrap"
-            useFlexGap
-            sx={{
-              "& .MuiButton-root": {
-                minHeight: 40,
-              },
-            }}
-          >
-            <Button
-              variant="contained"
-              startIcon={<Publish />}
-              disabled={isPending || groups.length === 0}
-              onClick={() =>
-                startTransition(() => {
-                  setFeedback(null);
-                  setFeedbackTone(null);
-                  void publishCurrentCase()
-                    .then(() => {
-                      setFeedback("Published case bundle to the shared published root.");
-                      setFeedbackTone("success");
-                      router.refresh();
-                    })
-                    .catch((error) => {
-                      setFeedback(error instanceof Error ? error.message : "Failed to publish case.");
-                      setFeedbackTone("error");
-                    });
-                })
-              }
-            >
-              Publish case
-            </Button>
-            <Button
-              variant="outlined"
-              startIcon={<FileUpload />}
-              disabled={isPending || publicSiteAction !== null}
-              onClick={() => {
-                if (publicSiteAction) {
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={(event) => {
+                const activeId = String(event.active.id);
+                const overId = event.over ? String(event.over.id) : null;
+
+                if (!overId || activeId === overId) {
                   return;
                 }
 
-                setPublicSiteAction("export");
-                startTransition(() => {
-                  setFeedback(null);
-                  setFeedbackTone(null);
-                  void exportPublicSite()
-                    .then((result) => {
-                      setFeedback(`Exported static public site to ${result.exportDir}.`);
-                      setFeedbackTone("success");
-                    })
-                    .catch((error) => {
-                      setFeedback(
-                        error instanceof Error ? error.message : "Failed to export public site.",
-                      );
-                      setFeedbackTone("error");
-                    })
-                    .finally(() => {
-                      setPublicSiteAction(null);
-                    });
-                });
-              }}
-            >
-              Export public site
-            </Button>
-            <Button
-              variant="outlined"
-              startIcon={<CloudUpload />}
-              disabled={isPending || publicSiteAction !== null || !canDeployPublicSite}
-              onClick={() => {
-                if (publicSiteAction) {
+                const oldIndex = groups.findIndex((group) => group.id === activeId);
+                const newIndex = groups.findIndex((group) => group.id === overId);
+
+                if (oldIndex === -1 || newIndex === -1) {
                   return;
                 }
 
-                setPublicSiteAction("deploy");
+                const reordered = arrayMove(groups, oldIndex, newIndex).map((group, order) => ({
+                  ...group,
+                  order,
+                }));
+
+                setGroups(reordered);
                 startTransition(() => {
-                  setFeedback(null);
-                  setFeedbackTone(null);
-                  void deployPublicSite()
-                    .then((result) => {
-                      setFeedback(
-                        `Deployed fresh static export to Cloudflare Pages project ${result.projectName}.`,
-                      );
-                      setFeedbackTone("success");
-                    })
-                    .catch((error) => {
-                      setFeedback(
-                        error instanceof Error ? error.message : "Failed to deploy public site.",
-                      );
-                      setFeedbackTone("error");
-                    })
-                    .finally(() => {
-                      setPublicSiteAction(null);
-                    });
+                  void saveGroupOrder(reordered.map((group) => group.id)).then(() =>
+                    router.refresh(),
+                  );
                 });
               }}
             >
-              Deploy to Pages
-            </Button>
+              <SortableContext
+                items={groups.map((group) => group.id)}
+                strategy={rectSortingStrategy}
+              >
+                <List sx={{ display: "grid", gap: 1.25 }}>
+                  {groups.map((group) => (
+                    <SortableGroupRow
+                      key={group.id}
+                      group={group}
+                      caseSlug={data.slug}
+                      isPending={isPending}
+                      onToggleVisibility={toggleGroupVisibility}
+                    />
+                  ))}
+                </List>
+              </SortableContext>
+            </DndContext>
+            {isPending ? (
+              <Typography variant="caption" color="primary.main">
+                Saving workspace updates...
+              </Typography>
+            ) : null}
           </Stack>
-        </Box>
-        <Stack spacing={0.5}>
-          <Typography variant="body2" color="text.secondary">
-            Export and deploy operate on all published groups. Static export target: {publicExportDir}
-          </Typography>
-          {!canDeployPublicSite ? (
-            <Typography variant="caption" color="warning.main">
-              Deploy to Pages is disabled until Cloudflare Pages env is configured.
-            </Typography>
-          ) : null}
-          {feedback ? (
-            <Typography
-              variant="caption"
-              color={feedbackTone === "error" ? "error.main" : "primary.main"}
-            >
-              {feedback}
-            </Typography>
-          ) : null}
-        </Stack>
-      </Stack>
-
-      <Paper
-        elevation={0}
-        sx={{
-          p: { xs: 2, md: 2.5 },
-          borderRadius: 3,
-          border: "1px solid",
-          borderColor: "divider",
-          backgroundColor: "rgba(255,255,255,0.025)",
-        }}
-      >
-        <Stack spacing={1.5}>
-          <Typography variant="h6">Groups</Typography>
-          <Typography variant="body2" color="text.secondary">
-            Drag to define case order. Group pages open in the viewer workbench.
-          </Typography>
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            onDragEnd={(event) => {
-              const activeId = String(event.active.id);
-              const overId = event.over ? String(event.over.id) : null;
-
-              if (!overId || activeId === overId) {
-                return;
-              }
-
-              const oldIndex = groups.findIndex((group) => group.id === activeId);
-              const newIndex = groups.findIndex((group) => group.id === overId);
-
-              if (oldIndex === -1 || newIndex === -1) {
-                return;
-              }
-
-              const reordered = arrayMove(groups, oldIndex, newIndex).map((group, order) => ({
-                ...group,
-                order,
-              }));
-
-              setGroups(reordered);
-              startTransition(() => {
-                void saveGroupOrder(reordered.map((group) => group.id)).then(() => router.refresh());
-              });
-            }}
-          >
-            <SortableContext items={groups.map((group) => group.id)} strategy={rectSortingStrategy}>
-              <List sx={{ display: "grid", gap: 1.25 }}>
-                {groups.map((group) => (
-                  <SortableGroupRow
-                    key={group.id}
-                    group={group}
-                    caseSlug={data.slug}
-                    isPending={isPending}
-                    onToggleVisibility={toggleGroupVisibility}
-                  />
-                ))}
-              </List>
-            </SortableContext>
-          </DndContext>
-          {isPending ? (
-            <Typography variant="caption" color="primary.main">
-              Saving workspace updates...
-            </Typography>
-          ) : null}
-        </Stack>
-      </Paper>
+        </Paper>
+      </Box>
     </Stack>
   );
 }

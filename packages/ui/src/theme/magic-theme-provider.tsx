@@ -6,9 +6,9 @@ import { ThemeProvider, alpha, createTheme } from "@mui/material/styles";
 import { buildMagicColorTokens } from "./magic-color-tokens";
 
 export function MagicThemeProvider({ children }: PropsWithChildren) {
+  const tokens = useMemo(() => buildMagicColorTokens(), []);
   const theme = useMemo(
     () => {
-      const tokens = buildMagicColorTokens();
       const backgroundDefault = tokens.background.default;
       const backgroundPaper = tokens.background.paper;
       const backgroundRaised = tokens.background.raised;
@@ -293,7 +293,7 @@ export function MagicThemeProvider({ children }: PropsWithChildren) {
         },
       });
     },
-    [],
+    [tokens],
   );
 
   return (
@@ -303,8 +303,8 @@ export function MagicThemeProvider({ children }: PropsWithChildren) {
         styles={{
           ":root": {
             colorScheme: "dark",
-            "--mc-bg-default": backgroundDefault,
-            "--mc-bg-paper": backgroundPaper,
+            "--mc-bg-default": tokens.background.default,
+            "--mc-bg-paper": tokens.background.paper,
             "--mc-bg-raised": tokens.background.raised,
             "--mc-bg-elevated": tokens.background.elevated,
             "--mc-outline": tokens.outline.default,
@@ -321,13 +321,13 @@ export function MagicThemeProvider({ children }: PropsWithChildren) {
               radial-gradient(circle at 12% 0%, ${alpha(tokens.primary.main, 0.1)} 0%, transparent 30%),
               radial-gradient(circle at 88% 12%, ${alpha(tokens.secondary.main, 0.12)} 0%, transparent 28%),
               radial-gradient(circle at 52% 100%, ${alpha(tokens.tertiary.main, 0.08)} 0%, transparent 34%),
-              linear-gradient(180deg, ${backgroundDefault} 0%, ${tokens.background.veil} 100%)
+              linear-gradient(180deg, ${tokens.background.default} 0%, ${tokens.background.veil} 100%)
             `,
           },
           body: {
             minHeight: "100vh",
             background: "transparent",
-            color: textPrimary,
+            color: tokens.text.primary,
           },
           "*": {
             boxSizing: "border-box",
