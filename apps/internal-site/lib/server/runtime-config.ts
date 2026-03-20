@@ -1,7 +1,7 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { DEMO_CASE_SLUG, parseEnvFlag } from "@magic-compare/shared-utils";
-import { loadWorkspaceEnv } from "@/lib/server/env/load-workspace-env";
+import { loadWorkspaceEnv } from "./env/load-workspace-env";
 
 export const HIDE_DEMO_ENV_NAME = "MAGIC_COMPARE_HIDE_DEMO";
 export const PUBLISHED_ROOT_ENV_NAME = "MAGIC_COMPARE_PUBLISHED_ROOT";

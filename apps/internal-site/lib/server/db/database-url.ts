@@ -1,5 +1,5 @@
 import path from "node:path";
-import { loadWorkspaceEnv } from "@/lib/server/env/load-workspace-env";
+import { loadWorkspaceEnv } from "../env/load-workspace-env";
 
 export const DEFAULT_DATABASE_URL = "file:./dev.db";
 
