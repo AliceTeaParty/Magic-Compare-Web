@@ -38,7 +38,7 @@ export default async function InternalHomePage() {
               },
             }}
           >
-            <Box sx={{ display: "grid", gap: 1.05, minWidth: 0 }}>
+            <Box sx={{ display: "grid", gap: 1.35, minWidth: 0 }}>
               <Typography variant="h2">Internal catalog</Typography>
               <Typography variant="body1" color="text.secondary" sx={{ maxWidth: 720 }}>
                 Browse draft, internal, and published compare cases. Viewer pages stay focused on

@@ -110,6 +110,16 @@ export function CaseDirectoryGrid({ items }: { items: DirectoryItem[] }) {
             <Typography variant="body2" color="text.secondary" sx={{ minHeight: 52 }}>
               {item.summary || "No summary yet."}
             </Typography>
+            <Box
+              sx={{
+                minHeight: "1.6em",
+                color: "text.secondary",
+                fontSize: "0.875rem",
+                lineHeight: 1.6,
+              }}
+            >
+              &nbsp;
+            </Box>
             <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ pt: 0.1 }}>
               <Chip
                 size="small"

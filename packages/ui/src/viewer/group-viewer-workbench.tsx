@@ -174,6 +174,11 @@ function ThumbnailButton({ frame, isActive, onClick, buttonRef }: ThumbnailButto
         backgroundColor: isActive ? "rgba(232, 198, 246, 0.1)" : "rgba(255, 255, 255, 0.018)",
         boxShadow: isActive ? "inset 0 0 0 1px rgba(232, 198, 246, 0.18)" : "none",
         p: 1.1,
+        transition:
+          "transform 180ms cubic-bezier(0.22, 1, 0.36, 1), border-color 180ms cubic-bezier(0.22, 1, 0.36, 1), background-color 180ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 180ms cubic-bezier(0.22, 1, 0.36, 1)",
+        "&:hover": {
+          transform: "translateY(-3px)",
+        },
       }}
     >
       <Box
@@ -1377,7 +1382,7 @@ export function GroupViewerWorkbench({
           }}
         >
           <Stack spacing={0.2} sx={{ minWidth: 0, pr: { md: 2 } }}>
-            <Typography variant="h4" noWrap>
+            <Typography variant="h4" noWrap sx={{ lineHeight: 1.14, pb: 0.08 }}>
               {dataset.group.title}
             </Typography>
             <Typography variant="body2" color="text.secondary" noWrap sx={{ mt: "0.25em" }}>
@@ -1584,7 +1589,7 @@ export function GroupViewerWorkbench({
               minWidth: 0,
               px: { xs: 1.5, md: 2.25 },
               pt: { xs: 1.35, md: 2 },
-              pb: { xs: 1.25, md: 1.4 },
+              pb: { xs: 2.1, md: 2.35 },
               borderTop: "1px solid",
               borderColor: "divider",
               backgroundColor: "rgba(255,255,255,0.014)",
@@ -1602,7 +1607,7 @@ export function GroupViewerWorkbench({
                 width: "100%",
                 minWidth: 0,
                 overflowX: "auto",
-                overflowY: "hidden",
+                overflowY: "visible",
                 overscrollBehaviorX: "contain",
                 WebkitOverflowScrolling: "touch",
                 scrollbarWidth: "none",
@@ -1622,7 +1627,8 @@ export function GroupViewerWorkbench({
                   gap: 1.25,
                   width: "max-content",
                   minWidth: "100%",
-                  pb: 0.1,
+                  pt: 0.35,
+                  pb: 0.75,
                   pr: 0.25,
                   transform: `translate3d(${filmstripEdgeOffset}px, 0, 0)`,
                   transition:
@@ -1649,7 +1655,7 @@ export function GroupViewerWorkbench({
                   position: "absolute",
                   left: { xs: 20, md: 28 },
                   right: { xs: 20, md: 28 },
-                  bottom: { xs: 8, md: 10 },
+                  bottom: { xs: 10, md: 12 },
                   height: 6,
                   borderRadius: 999,
                   backgroundColor: "rgba(255,255,255,0.08)",

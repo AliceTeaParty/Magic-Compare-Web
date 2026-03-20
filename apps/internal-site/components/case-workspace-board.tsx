@@ -100,7 +100,7 @@ function SortableGroupRow({
               variant="body2"
               color="text.secondary"
               noWrap
-              sx={{ mt: 0.65, lineHeight: 1.6 }}
+              sx={{ mt: 0.65, lineHeight: 1.6, minHeight: "1.6em" }}
             >
               {group.description || "No group description yet."}
             </Typography>
@@ -129,7 +129,15 @@ function SortableGroupRow({
             <ToggleButtonGroup
               exclusive
               size="small"
-              sx={{ minHeight: 34, px: 1.35 }}
+              sx={{
+                minHeight: 34,
+                px: 0.35,
+                py: 0.35,
+                borderRadius: 999,
+                border: "1px solid",
+                borderColor: "divider",
+                backgroundColor: "rgba(255,255,255,0.04)",
+              }}
               value={group.isPublic ? "public" : "internal"}
               onChange={(_, nextValue: "public" | "internal" | null) => {
                 if (!nextValue) {
@@ -323,7 +331,7 @@ export function CaseWorkspaceBoard({
               borderColor: "divider",
             }}
           >
-            <Stack spacing={1.25} sx={{ minWidth: 0, pr: { xl: 2.2 } }}>
+            <Stack spacing={1.6} sx={{ minWidth: 0, pr: { xl: 2.2 } }}>
               <Typography variant="h2" sx={{ lineHeight: 0.98 }}>
                 {data.title}
               </Typography>
