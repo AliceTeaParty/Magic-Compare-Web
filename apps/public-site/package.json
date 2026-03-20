@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "dev": "node ../../scripts/sync-published.mjs && next dev",
-    "build": "node ../../scripts/sync-published.mjs && next build",
+    "build": "node ../../scripts/sync-published.mjs && next build && node ../../scripts/write-public-route-aliases.mjs",
     "start": "serve out --listen 3001",
     "typecheck": "next build",
     "test": "vitest run --passWithNoTests"

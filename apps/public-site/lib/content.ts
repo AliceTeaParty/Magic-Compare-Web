@@ -4,7 +4,6 @@ import { parsePublishManifest, type PublishManifest } from "@magic-compare/conte
 import {
   getPublishedGroupsRoot,
   isHiddenDemoCaseSlug,
-  shouldHideDemoContent,
 } from "@/lib/runtime-config";
 
 export interface PublishedGroupRouteAlias {
@@ -17,11 +16,6 @@ export async function listPublishedGroupSlugs(): Promise<string[]> {
   try {
     const entries = await readdir(getPublishedGroupsRoot(), { withFileTypes: true });
     const slugs = entries.filter((entry) => entry.isDirectory()).map((entry) => entry.name).sort();
-
-    if (!shouldHideDemoContent()) {
-      return slugs;
-    }
-
     const visibleSlugs = await Promise.all(
       slugs.map(async (publicSlug) => {
         const manifest = await getPublishedManifest(publicSlug);
