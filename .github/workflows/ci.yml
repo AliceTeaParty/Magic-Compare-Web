@@ -1,0 +1,154 @@
+name: CI
+
+on:
+  pull_request:
+    paths:
+      - "apps/**"
+      - "packages/**"
+      - "scripts/**"
+      - "docker/**"
+      - ".env.example"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - "tsconfig*.json"
+      - "**/tsconfig*.json"
+      - ".github/workflows/**"
+  push:
+    branches:
+      - main
+    paths:
+      - "apps/**"
+      - "packages/**"
+      - "scripts/**"
+      - "docker/**"
+      - ".env.example"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - "tsconfig*.json"
+      - "**/tsconfig*.json"
+      - ".github/workflows/**"
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  MAGIC_COMPARE_HIDE_DEMO: "false"
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.32.1
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run tests
+        run: pnpm test
+
+      - name: Build workspace
+        run: pnpm build
+
+  public-export-demo:
+    needs: verify
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: file:./dev.db
+      MAGIC_COMPARE_S3_BUCKET: magic-compare-assets
+      MAGIC_COMPARE_S3_REGION: us-east-1
+      MAGIC_COMPARE_S3_ENDPOINT: http://127.0.0.1:9000
+      MAGIC_COMPARE_S3_ACCESS_KEY_ID: rustfsadmin
+      MAGIC_COMPARE_S3_SECRET_ACCESS_KEY: rustfsadmin
+      MAGIC_COMPARE_S3_FORCE_PATH_STYLE: "true"
+      MAGIC_COMPARE_S3_INTERNAL_PREFIX: internal-assets
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.32.1
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Start RustFS services
+        run: docker compose up -d rustfs rustfs-init
+
+      - name: Wait for RustFS bucket initialization
+        shell: bash
+        run: |
+          set -euo pipefail
+          for _ in {1..60}; do
+            container_id="$(docker compose ps -q rustfs-init)"
+            if [[ -z "$container_id" ]]; then
+              sleep 2
+              continue
+            fi
+
+            status="$(docker inspect -f '{{.State.Status}}' "$container_id")"
+            if [[ "$status" == "exited" ]]; then
+              exit_code="$(docker inspect -f '{{.State.ExitCode}}' "$container_id")"
+              if [[ "$exit_code" == "0" ]]; then
+                exit 0
+              fi
+
+              docker compose logs rustfs rustfs-init
+              exit 1
+            fi
+
+            sleep 2
+          done
+
+          echo "Timed out waiting for rustfs-init to finish."
+          docker compose logs rustfs rustfs-init
+          exit 1
+
+      - name: Reset demo workspace state
+        run: |
+          rm -f dev.db dev.db-*
+          rm -rf content/published dist/public-site apps/public-site/public/published apps/public-site/out
+
+      - name: Initialize database schema
+        run: pnpm db:push
+
+      - name: Seed demo data
+        run: pnpm db:seed
+
+      - name: Export public demo site
+        run: pnpm public:export
+
+      - name: Print RustFS logs on failure
+        if: failure()
+        run: docker compose logs rustfs rustfs-init
+
+      - name: Stop RustFS services
+        if: always()
+        run: docker compose down --volumes --remove-orphans
