@@ -130,9 +130,9 @@ function SortableGroupRow({
               exclusive
               size="small"
               sx={{
-                minHeight: 34,
-                px: 0.35,
-                py: 0.35,
+                minHeight: 32,
+                px: 0.25,
+                py: 0.25,
                 borderRadius: 999,
                 border: "1px solid",
                 borderColor: "divider",
@@ -149,12 +149,20 @@ function SortableGroupRow({
                 }
               }}
             >
-              <ToggleButton value="internal" disabled={isPending} sx={{ minHeight: 36 }}>
-                <LockOutlined sx={{ mr: 0.65, fontSize: 16 }} />
+              <ToggleButton
+                value="internal"
+                disabled={isPending}
+                sx={{ minHeight: 32, px: 1.15, fontSize: "0.84rem" }}
+              >
+                <LockOutlined sx={{ mr: 0.55, fontSize: 14.5 }} />
                 Internal
               </ToggleButton>
-              <ToggleButton value="public" disabled={isPending} sx={{ minHeight: 36 }}>
-                <Public sx={{ mr: 0.65, fontSize: 16 }} />
+              <ToggleButton
+                value="public"
+                disabled={isPending}
+                sx={{ minHeight: 32, px: 1.15, fontSize: "0.84rem" }}
+              >
+                <Public sx={{ mr: 0.55, fontSize: 14.5 }} />
                 Public
               </ToggleButton>
             </ToggleButtonGroup>
