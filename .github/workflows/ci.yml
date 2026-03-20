@@ -99,6 +99,11 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Prepare Docker data directories
+        run: |
+          mkdir -p docker-data/rustfs docker-data/internal-data/sqlite
+          chmod -R 0777 docker-data
+
       - name: Start RustFS services
         run: docker compose up -d rustfs rustfs-init
 
