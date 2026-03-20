@@ -3,33 +3,36 @@
 import { PropsWithChildren, useMemo } from "react";
 import { CssBaseline, GlobalStyles } from "@mui/material";
 import { ThemeProvider, alpha, createTheme } from "@mui/material/styles";
+import { buildMagicColorTokens } from "./magic-color-tokens";
 
 export function MagicThemeProvider({ children }: PropsWithChildren) {
   const theme = useMemo(
     () => {
-      const backgroundDefault = "#111315";
-      const backgroundPaper = "#181a1d";
-      const backgroundRaised = "#1d2024";
-      const brass = "#c8a16f";
-      const brassDark = "#a98153";
-      const steel = "#7c8d9f";
-      const textPrimary = "#f4eee6";
-      const textSecondary = "rgba(228, 220, 209, 0.7)";
-      const divider = "rgba(239, 228, 213, 0.12)";
+      const tokens = buildMagicColorTokens();
+      const backgroundDefault = tokens.background.default;
+      const backgroundPaper = tokens.background.paper;
+      const backgroundRaised = tokens.background.raised;
+      const textPrimary = tokens.text.primary;
+      const textSecondary = alpha(tokens.text.secondary, 0.78);
+      const divider = alpha(tokens.outline.default, 0.22);
+      const subtleDivider = alpha(tokens.outline.subtle, 0.22);
+      const hoverTint = alpha(tokens.primary.main, 0.08);
+      const selectedTint = alpha(tokens.primary.main, 0.18);
+      const pressedTint = alpha(tokens.primary.main, 0.22);
 
       return createTheme({
         palette: {
           mode: "dark",
           primary: {
-            main: brass,
-            light: "#dfbf95",
-            dark: brassDark,
-            contrastText: "#18120c",
+            main: tokens.primary.main,
+            light: tokens.primary.light,
+            dark: tokens.primary.dark,
+            contrastText: tokens.primary.onMain,
           },
           secondary: {
-            main: steel,
-            light: "#a5b1bf",
-            dark: "#627384",
+            main: tokens.secondary.main,
+            light: tokens.secondary.light,
+            dark: tokens.secondary.dark,
           },
           background: {
             default: backgroundDefault,
@@ -96,7 +99,7 @@ export function MagicThemeProvider({ children }: PropsWithChildren) {
           },
           button: {
             textTransform: "none",
-            fontWeight: 600,
+            fontWeight: 520,
             letterSpacing: "0.01em",
           },
           overline: {
@@ -124,28 +127,55 @@ export function MagicThemeProvider({ children }: PropsWithChildren) {
             styleOverrides: {
               root: {
                 borderRadius: 999,
-                paddingInline: 16,
-                minHeight: 38,
+                paddingInline: 17,
+                minHeight: 40,
+                transition:
+                  "transform 160ms cubic-bezier(0.22, 1, 0.36, 1), background-color 160ms cubic-bezier(0.22, 1, 0.36, 1), border-color 160ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 160ms cubic-bezier(0.22, 1, 0.36, 1)",
+                "&:hover": {
+                  transform: "translateY(-1px)",
+                },
+                "&:active": {
+                  transform: "translateY(0)",
+                },
               },
               contained: {
-                background: `linear-gradient(180deg, ${alpha(brass, 0.98)} 0%, ${alpha(brassDark, 0.98)} 100%)`,
-                boxShadow: "none",
+                background: `linear-gradient(180deg, ${tokens.primary.light} 0%, ${tokens.primary.main} 100%)`,
+                color: tokens.primary.onMain,
+                boxShadow: `0 14px 36px ${alpha(tokens.primary.dark, 0.28)}`,
+                "&:hover": {
+                  background: `linear-gradient(180deg, ${tokens.primary.light} 0%, ${tokens.primary.main} 100%)`,
+                  boxShadow: `0 18px 42px ${alpha(tokens.primary.dark, 0.34)}`,
+                },
               },
               outlined: {
                 borderColor: divider,
-                backgroundColor: alpha(backgroundRaised, 0.55),
+                backgroundColor: alpha(backgroundRaised, 0.34),
+                "&:hover": {
+                  borderColor: alpha(tokens.primary.main, 0.42),
+                  backgroundColor: hoverTint,
+                },
               },
               text: {
                 color: textPrimary,
+                "&:hover": {
+                  backgroundColor: hoverTint,
+                },
               },
             },
           },
           MuiIconButton: {
             styleOverrides: {
               root: {
-                borderRadius: 14,
-                border: `1px solid ${divider}`,
-                backgroundColor: alpha(backgroundRaised, 0.68),
+                borderRadius: 13,
+                border: `1px solid ${subtleDivider}`,
+                backgroundColor: alpha(tokens.background.elevated, 0.76),
+                transition:
+                  "transform 160ms cubic-bezier(0.22, 1, 0.36, 1), background-color 160ms cubic-bezier(0.22, 1, 0.36, 1), border-color 160ms cubic-bezier(0.22, 1, 0.36, 1)",
+                "&:hover": {
+                  transform: "translateY(-1px)",
+                  borderColor: alpha(tokens.primary.main, 0.3),
+                  backgroundColor: alpha(tokens.background.elevated, 0.96),
+                },
               },
             },
           },
@@ -154,21 +184,21 @@ export function MagicThemeProvider({ children }: PropsWithChildren) {
               root: {
                 border: "1px solid transparent",
                 borderRadius: 999,
-                height: 28,
-                borderColor: divider,
-                backgroundColor: alpha(backgroundRaised, 0.44),
+                height: 30,
+                borderColor: subtleDivider,
+                backgroundColor: alpha(tokens.background.elevated, 0.66),
                 color: textPrimary,
                 "& .MuiChip-icon": {
                   color: "inherit",
                 },
                 "&.MuiChip-colorPrimary": {
-                  color: brass,
-                  borderColor: alpha(brass, 0.34),
-                  backgroundColor: alpha(brass, 0.14),
+                  color: tokens.tertiary.light,
+                  borderColor: alpha(tokens.primary.main, 0.34),
+                  backgroundColor: alpha(tokens.primary.main, 0.16),
                 },
               },
               label: {
-                paddingInline: 10,
+                paddingInline: 11,
                 fontWeight: 500,
               },
             },
@@ -189,14 +219,23 @@ export function MagicThemeProvider({ children }: PropsWithChildren) {
             styleOverrides: {
               root: {
                 borderRadius: 999,
-                border: `1px solid ${divider}`,
+                border: `1px solid ${subtleDivider}`,
                 color: textSecondary,
-                backgroundColor: alpha(backgroundRaised, 0.56),
+                backgroundColor: alpha(tokens.background.elevated, 0.62),
                 paddingInline: 14,
+                transition:
+                  "transform 160ms cubic-bezier(0.22, 1, 0.36, 1), background-color 160ms cubic-bezier(0.22, 1, 0.36, 1), border-color 160ms cubic-bezier(0.22, 1, 0.36, 1), color 160ms cubic-bezier(0.22, 1, 0.36, 1)",
+                "&:hover": {
+                  borderColor: alpha(tokens.secondary.main, 0.36),
+                  backgroundColor: alpha(tokens.background.elevated, 0.82),
+                },
                 "&.Mui-selected": {
                   color: textPrimary,
-                  borderColor: alpha(brass, 0.45),
-                  backgroundColor: alpha(brass, 0.14),
+                  borderColor: alpha(tokens.primary.main, 0.48),
+                  backgroundColor: selectedTint,
+                },
+                "&.Mui-selected:hover": {
+                  backgroundColor: pressedTint,
                 },
               },
             },
@@ -206,7 +245,7 @@ export function MagicThemeProvider({ children }: PropsWithChildren) {
               tooltip: {
                 borderRadius: 12,
                 padding: "8px 10px",
-                backgroundColor: alpha("#22262b", 0.96),
+                backgroundColor: alpha(tokens.background.veil, 0.98),
                 border: `1px solid ${divider}`,
                 color: textPrimary,
               },
@@ -217,7 +256,7 @@ export function MagicThemeProvider({ children }: PropsWithChildren) {
               paper: {
                 borderRadius: 18,
                 border: `1px solid ${divider}`,
-                backgroundColor: alpha(backgroundRaised, 0.98),
+                backgroundColor: alpha(tokens.background.elevated, 0.98),
                 backgroundImage: "none",
               },
             },
@@ -226,15 +265,15 @@ export function MagicThemeProvider({ children }: PropsWithChildren) {
             styleOverrides: {
               root: {
                 borderRadius: 999,
-                backgroundColor: alpha(backgroundRaised, 0.62),
+                backgroundColor: alpha(tokens.background.elevated, 0.68),
                 "& .MuiOutlinedInput-notchedOutline": {
-                  borderColor: divider,
+                  borderColor: subtleDivider,
                 },
                 "&:hover .MuiOutlinedInput-notchedOutline": {
-                  borderColor: alpha(brass, 0.4),
+                  borderColor: alpha(tokens.secondary.main, 0.4),
                 },
                 "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
-                  borderColor: alpha(brass, 0.55),
+                  borderColor: alpha(tokens.primary.main, 0.55),
                 },
               },
               input: {
@@ -264,33 +303,50 @@ export function MagicThemeProvider({ children }: PropsWithChildren) {
         styles={{
           ":root": {
             colorScheme: "dark",
+            "--mc-bg-default": backgroundDefault,
+            "--mc-bg-paper": backgroundPaper,
+            "--mc-bg-raised": tokens.background.raised,
+            "--mc-bg-elevated": tokens.background.elevated,
+            "--mc-outline": tokens.outline.default,
+            "--mc-outline-subtle": tokens.outline.subtle,
+            "--mc-primary": tokens.primary.main,
+            "--mc-primary-light": tokens.primary.light,
+            "--mc-secondary": tokens.secondary.main,
+            "--mc-tertiary": tokens.tertiary.main,
+            "--mc-text-primary": tokens.text.primary,
+            "--mc-text-secondary": tokens.text.secondary,
           },
           html: {
             background: `
-              radial-gradient(circle at top left, rgba(200, 161, 111, 0.08), transparent 34%),
-              radial-gradient(circle at top, rgba(124, 141, 159, 0.12), transparent 28%),
-              linear-gradient(180deg, #111315 0%, #0d0f11 100%)
+              radial-gradient(circle at 12% 0%, ${alpha(tokens.primary.main, 0.1)} 0%, transparent 30%),
+              radial-gradient(circle at 88% 12%, ${alpha(tokens.secondary.main, 0.12)} 0%, transparent 28%),
+              radial-gradient(circle at 52% 100%, ${alpha(tokens.tertiary.main, 0.08)} 0%, transparent 34%),
+              linear-gradient(180deg, ${backgroundDefault} 0%, ${tokens.background.veil} 100%)
             `,
           },
           body: {
             minHeight: "100vh",
             background: "transparent",
-            color: "#f4eee6",
+            color: textPrimary,
           },
           "*": {
             boxSizing: "border-box",
           },
           "::selection": {
-            background: "rgba(200, 161, 111, 0.28)",
-            color: "#f8f2ea",
+            background: alpha(tokens.primary.main, 0.3),
+            color: tokens.primary.onMain,
           },
           "::-webkit-scrollbar": {
-            width: 11,
-            height: 11,
+            width: 12,
+            height: 12,
           },
           "::-webkit-scrollbar-thumb": {
-            background: "rgba(200, 161, 111, 0.24)",
+            background: alpha(tokens.secondary.main, 0.26),
             borderRadius: 999,
+            border: `3px solid ${alpha(tokens.background.veil, 0)}`,
+          },
+          "::-webkit-scrollbar-track": {
+            background: alpha(tokens.background.veil, 0.2),
           },
         }}
       />
