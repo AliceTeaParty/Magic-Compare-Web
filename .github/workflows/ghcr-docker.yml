@@ -38,13 +38,8 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v6
 
-      - name: Prepare Docker data directories
-        run: |
-          mkdir -p docker-data/rustfs docker-data/internal-data/sqlite
-          chmod -R 0777 docker-data
-
       - name: Start compose stack
-        run: docker compose up -d --build rustfs rustfs-init internal-site
+        run: docker compose -f docker-compose.yml -f docker/ci.compose.override.yml up -d --build rustfs rustfs-init internal-site
 
       - name: Wait for internal-site
         shell: bash
@@ -58,17 +53,17 @@ jobs:
           done
 
           echo "Timed out waiting for internal-site to become ready."
-          docker compose ps
-          docker compose logs rustfs rustfs-init internal-site
+          docker compose -f docker-compose.yml -f docker/ci.compose.override.yml ps
+          docker compose -f docker-compose.yml -f docker/ci.compose.override.yml logs rustfs rustfs-init internal-site
           exit 1
 
       - name: Print compose logs on failure
         if: failure()
-        run: docker compose logs rustfs rustfs-init internal-site
+        run: docker compose -f docker-compose.yml -f docker/ci.compose.override.yml logs rustfs rustfs-init internal-site
 
       - name: Stop compose stack
         if: always()
-        run: docker compose down --volumes --remove-orphans
+        run: docker compose -f docker-compose.yml -f docker/ci.compose.override.yml down --volumes --remove-orphans
 
   publish:
     needs: smoke
