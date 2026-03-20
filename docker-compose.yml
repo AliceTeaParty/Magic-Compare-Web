@@ -51,8 +51,8 @@ services:
     command:
       - >
         until aws --endpoint-url http://rustfs:9000 s3api list-buckets >/dev/null 2>&1; do sleep 2; done;
-        aws --endpoint-url http://rustfs:9000 s3api head-bucket --bucket "$MAGIC_COMPARE_S3_BUCKET" >/dev/null 2>&1 ||
-        aws --endpoint-url http://rustfs:9000 s3api create-bucket --bucket "$MAGIC_COMPARE_S3_BUCKET"
+        aws --endpoint-url http://rustfs:9000 s3api head-bucket --bucket "$$MAGIC_COMPARE_S3_BUCKET" >/dev/null 2>&1 ||
+        aws --endpoint-url http://rustfs:9000 s3api create-bucket --bucket "$$MAGIC_COMPARE_S3_BUCKET"
 
   internal-site:
     build:

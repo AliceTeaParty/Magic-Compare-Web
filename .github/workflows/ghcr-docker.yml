@@ -33,6 +33,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       MAGIC_COMPARE_HIDE_DEMO: "false"
+      MAGIC_COMPARE_S3_BUCKET: magic-compare-assets
 
     steps:
       - name: Checkout repository
