@@ -53,11 +53,7 @@ venv/
 .mcp-vector-search/
 
 # Project References
-project-guide.md
-mcp-guide.md
-commit-guide.md
-design-example-old.pdf
-tools/uploader/VSEDITOR-WORKFLOW.zh-CN.md
+docs/project-guide.md
 tmp/
 
 # Generated workspace artifacts
