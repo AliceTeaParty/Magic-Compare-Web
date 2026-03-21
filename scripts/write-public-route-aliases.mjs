@@ -7,51 +7,13 @@ import {
   writeFileSync,
 } from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { loadWorkspaceEnvFromModule, resolveWorkspaceRoot } from "./lib/workspace-env.mjs";
 
 // legacy-compat route aliases for existing /cases/[caseSlug]/groups/[groupSlug] links
-const scriptDir = path.dirname(fileURLToPath(import.meta.url));
-const workspaceRoot = path.resolve(scriptDir, "..");
+const workspaceRoot = resolveWorkspaceRoot(import.meta.url, 1);
 const exportRoot = path.join(workspaceRoot, "apps", "public-site", "out");
 const aliasRoot = path.join(exportRoot, "cases");
 const emptyPlaceholderSlug = "__empty__";
-
-function loadWorkspaceEnv() {
-  for (const fileName of [".env.local", ".env"]) {
-    const envFilePath = path.join(workspaceRoot, fileName);
-    if (!existsSync(envFilePath)) {
-      continue;
-    }
-
-    const fileContents = readFileSync(envFilePath, "utf8");
-    for (const rawLine of fileContents.split(/\r?\n/)) {
-      const line = rawLine.trim();
-      if (!line || line.startsWith("#")) {
-        continue;
-      }
-
-      const match = /^(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$/.exec(line);
-      if (!match) {
-        continue;
-      }
-
-      const [, key, rawValue] = match;
-      if (process.env[key] !== undefined) {
-        continue;
-      }
-
-      let value = rawValue.trim();
-      if (
-        (value.startsWith('"') && value.endsWith('"')) ||
-        (value.startsWith("'") && value.endsWith("'"))
-      ) {
-        value = value.slice(1, -1);
-      }
-
-      process.env[key] = value;
-    }
-  }
-}
 
 function publishedGroupsDir() {
   const publishedRoot = process.env.MAGIC_COMPARE_PUBLISHED_ROOT?.trim()
@@ -124,7 +86,7 @@ function renderRedirectHtml(targetHref) {
 }
 
 function main() {
-  loadWorkspaceEnv();
+  loadWorkspaceEnvFromModule(import.meta.url, 1);
 
   if (!existsSync(exportRoot)) {
     throw new Error(`Public export output not found: ${exportRoot}`);
