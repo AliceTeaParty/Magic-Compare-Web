@@ -7,7 +7,10 @@ import {
   writeFileSync,
 } from "node:fs";
 import path from "node:path";
-import { loadWorkspaceEnvFromModule, resolveWorkspaceRoot } from "./lib/workspace-env.mjs";
+import {
+  loadWorkspaceEnvFromModule,
+  resolveWorkspaceRoot,
+} from "../packages/shared-utils/src/workspace-env";
 
 // legacy-compat route aliases for existing /cases/[caseSlug]/groups/[groupSlug] links
 const workspaceRoot = resolveWorkspaceRoot(import.meta.url, 1);
@@ -15,14 +18,21 @@ const exportRoot = path.join(workspaceRoot, "apps", "public-site", "out");
 const aliasRoot = path.join(exportRoot, "cases");
 const emptyPlaceholderSlug = "__empty__";
 
-function publishedGroupsDir() {
+interface PublishedAlias {
+  caseSlug: string;
+  groupSlug: string;
+  publicSlug: string;
+}
+
+function publishedGroupsDir(): string {
   const publishedRoot = process.env.MAGIC_COMPARE_PUBLISHED_ROOT?.trim()
     ? path.resolve(process.env.MAGIC_COMPARE_PUBLISHED_ROOT.trim())
     : path.join(workspaceRoot, "content", "published");
+
   return path.join(publishedRoot, "groups");
 }
 
-function readAliases() {
+function readAliases(): PublishedAlias[] {
   const groupsDir = publishedGroupsDir();
   if (!existsSync(groupsDir)) {
     return [];
@@ -36,10 +46,15 @@ function readAliases() {
         return [];
       }
 
-      const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
-      const caseSlug = manifest?.case?.slug;
-      const groupSlug = manifest?.group?.slug;
-      const publicSlug = manifest?.publicSlug;
+      const manifest = JSON.parse(readFileSync(manifestPath, "utf8")) as {
+        case?: { slug?: string };
+        group?: { slug?: string };
+        publicSlug?: string;
+      };
+
+      const caseSlug = manifest.case?.slug;
+      const groupSlug = manifest.group?.slug;
+      const publicSlug = manifest.publicSlug;
 
       if (!caseSlug || !groupSlug || !publicSlug) {
         return [];
@@ -49,7 +64,7 @@ function readAliases() {
     });
 }
 
-function renderRedirectHtml(targetHref) {
+function renderRedirectHtml(targetHref: string): string {
   return `<!doctype html>
 <html lang="en">
   <head>
@@ -85,7 +100,7 @@ function renderRedirectHtml(targetHref) {
 `;
 }
 
-function main() {
+function main(): void {
   loadWorkspaceEnvFromModule(import.meta.url, 1);
 
   if (!existsSync(exportRoot)) {

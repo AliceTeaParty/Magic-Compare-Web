@@ -9,7 +9,7 @@
     "dev:public": "pnpm --filter @magic-compare/public-site dev",
     "typecheck": "pnpm --recursive --if-present typecheck",
     "test": "pnpm --recursive --if-present test",
-    "sync:published": "node scripts/sync-published.mjs",
+    "sync:published": "tsx scripts/sync-published.ts",
     "public:export": "tsx --tsconfig apps/internal-site/tsconfig.json scripts/export-public.ts",
     "public:deploy": "tsx --tsconfig apps/internal-site/tsconfig.json scripts/deploy-public.ts",
     "docker:build:internal": "docker build -f docker/internal-site.Dockerfile -t magic-compare/internal-site .",

@@ -1,8 +1,13 @@
 import { cpSync, existsSync, mkdirSync, rmSync } from "node:fs";
 import path from "node:path";
-import { loadWorkspaceEnvFromModule } from "./lib/workspace-env.mjs";
+import {
+  loadWorkspaceEnvFromModule,
+  resolveWorkspaceRoot,
+} from "../packages/shared-utils/src/workspace-env";
 
-const workspaceRoot = loadWorkspaceEnvFromModule(import.meta.url, 1);
+const workspaceRoot = resolveWorkspaceRoot(import.meta.url, 1);
+
+loadWorkspaceEnvFromModule(import.meta.url, 1);
 
 const sourceDir = process.env.MAGIC_COMPARE_PUBLISHED_ROOT
   ? path.resolve(process.env.MAGIC_COMPARE_PUBLISHED_ROOT)
