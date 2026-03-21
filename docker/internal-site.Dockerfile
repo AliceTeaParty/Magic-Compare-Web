@@ -25,7 +25,6 @@ WORKDIR /app
 ENV NODE_ENV=production
 
 COPY --from=builder /app /app
-RUN install -Dm755 /app/docker/internal-site-init.sh /usr/local/bin/internal-site-init
 
 EXPOSE 3000
 

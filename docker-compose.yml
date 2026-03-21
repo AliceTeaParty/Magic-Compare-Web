@@ -5,6 +5,7 @@ x-internal-site-common: &internal-site-common
     MAGIC_COMPARE_HIDE_DEMO: ${MAGIC_COMPARE_HIDE_DEMO:-true}
     MAGIC_COMPARE_PUBLISHED_ROOT: ${MAGIC_COMPARE_PUBLISHED_ROOT:-/app/data/published}
     MAGIC_COMPARE_PUBLIC_EXPORT_DIR: ${MAGIC_COMPARE_PUBLIC_EXPORT_DIR:-/app/data/public-export}
+    MAGIC_COMPARE_PUBLIC_SITE_BASE_URL: ${MAGIC_COMPARE_PUBLIC_SITE_BASE_URL:-}
     MAGIC_COMPARE_S3_BUCKET: ${MAGIC_COMPARE_S3_BUCKET:-magic-compare-assets}
     MAGIC_COMPARE_S3_REGION: ${MAGIC_COMPARE_S3_REGION:-us-east-1}
     MAGIC_COMPARE_S3_ENDPOINT: ${MAGIC_COMPARE_DOCKER_S3_ENDPOINT:-http://rustfs:9000}
@@ -13,6 +14,10 @@ x-internal-site-common: &internal-site-common
     MAGIC_COMPARE_S3_SECRET_ACCESS_KEY: ${MAGIC_COMPARE_S3_SECRET_ACCESS_KEY:-rustfsadmin}
     MAGIC_COMPARE_S3_FORCE_PATH_STYLE: ${MAGIC_COMPARE_S3_FORCE_PATH_STYLE:-true}
     MAGIC_COMPARE_S3_INTERNAL_PREFIX: ${MAGIC_COMPARE_S3_INTERNAL_PREFIX:-internal-assets}
+    MAGIC_COMPARE_FOOTER_YEAR_START: ${MAGIC_COMPARE_FOOTER_YEAR_START:-2026}
+    MAGIC_COMPARE_FOOTER_AUTHOR: ${MAGIC_COMPARE_FOOTER_AUTHOR:-Magic Compare}
+    MAGIC_COMPARE_FOOTER_JOIN_US_LABEL: ${MAGIC_COMPARE_FOOTER_JOIN_US_LABEL:-}
+    MAGIC_COMPARE_FOOTER_JOIN_US_URL: ${MAGIC_COMPARE_FOOTER_JOIN_US_URL:-}
     MAGIC_COMPARE_CF_PAGES_PROJECT_NAME: ${MAGIC_COMPARE_CF_PAGES_PROJECT_NAME:-}
     MAGIC_COMPARE_CF_PAGES_BRANCH: ${MAGIC_COMPARE_CF_PAGES_BRANCH:-}
     CLOUDFLARE_ACCOUNT_ID: ${CLOUDFLARE_ACCOUNT_ID:-}
@@ -89,7 +94,16 @@ services:
   internal-site-init:
     <<: *internal-site-common
     entrypoint:
-      - /usr/local/bin/internal-site-init
+      - /bin/sh
+      - -ec
+      - |
+        echo "Running internal-site schema sync..."
+        pnpm db:push
+
+        echo "Running internal-site demo seed..."
+        pnpm db:seed
+
+        echo "internal-site init complete."
     depends_on:
       rustfs:
         condition: service_healthy
