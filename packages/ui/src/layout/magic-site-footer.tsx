@@ -38,10 +38,11 @@ export function MagicSiteFooter({
         }}
       >
         <Stack
-          direction={{ xs: "column", md: "row" }}
-          spacing={{ xs: 0.9, md: 1.4 }}
-          alignItems={{ xs: "flex-start", md: "center" }}
-          justifyContent="space-between"
+          direction="column"
+          spacing={0.9}
+          alignItems="center"
+          justifyContent="center"
+          sx={{ textAlign: "center" }}
         >
           <Typography
             variant="body2"
@@ -62,6 +63,7 @@ export function MagicSiteFooter({
               sx={{
                 display: "inline-flex",
                 alignItems: "center",
+                justifyContent: "center",
                 minHeight: 30,
                 px: 1.15,
                 borderRadius: 999,

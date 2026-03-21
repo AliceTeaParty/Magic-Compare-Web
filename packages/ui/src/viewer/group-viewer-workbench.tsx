@@ -117,6 +117,7 @@ const FILMSTRIP_TOUCH_DRAG_GAIN = 1.18;
 const FILMSTRIP_OVERSCROLL_GAIN = 0.36;
 
 const VIEWER_DETAILS_COOKIE_NAME = "magic_compare_open_details";
+const VIEWER_MODE_COOKIE_NAME = "magic_compare_viewer_mode";
 
 function readViewerDetailsCookie(): boolean | null {
   if (typeof document === "undefined") {
@@ -148,6 +149,35 @@ function writeViewerDetailsCookie(open: boolean): void {
   }
 
   document.cookie = `${VIEWER_DETAILS_COOKIE_NAME}=${open ? "1" : "0"}; Path=/; Max-Age=31536000; SameSite=Lax`;
+}
+
+function readViewerModeCookie(): ViewerMode | null {
+  if (typeof document === "undefined") {
+    return null;
+  }
+
+  const entry = document.cookie
+    .split("; ")
+    .find((part) => part.startsWith(`${VIEWER_MODE_COOKIE_NAME}=`));
+
+  if (!entry) {
+    return null;
+  }
+
+  const value = decodeURIComponent(entry.split("=")[1] ?? "");
+  if (value === "before-after" || value === "a-b" || value === "heatmap") {
+    return value;
+  }
+
+  return null;
+}
+
+function writeViewerModeCookie(mode: ViewerMode): void {
+  if (typeof document === "undefined") {
+    return;
+  }
+
+  document.cookie = `${VIEWER_MODE_COOKIE_NAME}=${encodeURIComponent(mode)}; Path=/; Max-Age=31536000; SameSite=Lax`;
 }
 
 function getViewportSize(): ViewportSize {
@@ -1287,6 +1317,8 @@ export function GroupViewerWorkbench({
   const controller = useViewerController(dataset.group);
   const sidebarPreferenceLoadedRef = useRef(false);
   const sidebarPreferencePersistReadyRef = useRef(false);
+  const modePreferenceLoadedRef = useRef(false);
+  const modePreferencePersistReadyRef = useRef(false);
   const theme = useTheme();
   const showDesktopSidebar = useMediaQuery(theme.breakpoints.up("lg"), { noSsr: true });
   const hideFitControl = useMediaQuery(theme.breakpoints.down("sm"), { noSsr: true });
@@ -1342,12 +1374,18 @@ export function GroupViewerWorkbench({
 
   useEffect(() => {
     const preferredOpenState = readViewerDetailsCookie();
+    const preferredMode = readViewerModeCookie();
 
     if (preferredOpenState !== null) {
       controller.setSidebarOpen(preferredOpenState);
     }
 
+    if (preferredMode) {
+      controller.setMode(preferredMode);
+    }
+
     sidebarPreferenceLoadedRef.current = true;
+    modePreferenceLoadedRef.current = true;
   }, []);
 
   useEffect(() => {
@@ -1362,6 +1400,19 @@ export function GroupViewerWorkbench({
 
     writeViewerDetailsCookie(controller.sidebarOpen);
   }, [controller.sidebarOpen]);
+
+  useEffect(() => {
+    if (!modePreferenceLoadedRef.current) {
+      return;
+    }
+
+    if (!modePreferencePersistReadyRef.current) {
+      modePreferencePersistReadyRef.current = true;
+      return;
+    }
+
+    writeViewerModeCookie(controller.mode);
+  }, [controller.mode]);
 
   useEffect(() => {
     if (controller.currentFrame) {
