@@ -8,6 +8,7 @@ import type {
 import { DEMO_CASE_SLUG } from "@magic-compare/shared-utils";
 import { validateImportManifest } from "@/lib/server/validators/import-manifest";
 import { prisma } from "@/lib/server/db/client";
+import { resolvePublishedGroupUrl } from "@/lib/server/public-site/url";
 import { deletePublishedGroup } from "@/lib/server/storage/published-content";
 import {
   deleteInternalAssetGroupObjects,
@@ -349,6 +350,7 @@ export async function getViewerDataset(caseSlug: string, groupSlug: string): Pro
     publishStatus: {
       status: asCaseStatus(caseRow.status),
       publicSlug: currentGroup.publicSlug,
+      publicUrl: resolvePublishedGroupUrl(currentGroup.publicSlug),
       publishedAt: caseRow.publishedAt?.toISOString() ?? null,
     },
   };

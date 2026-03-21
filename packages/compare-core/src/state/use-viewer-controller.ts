@@ -21,6 +21,7 @@ export interface ViewerController {
   overlayOpacity: number;
   abSide: "before" | "after";
   sidebarOpen: boolean;
+  setSidebarOpen: (open: boolean) => void;
   selectFrame: (frameId: string) => void;
   stepFrame: (delta: number) => void;
   setMode: (nextMode: ViewerMode) => void;
@@ -90,6 +91,7 @@ export function useViewerController(group: ViewerGroup): ViewerController {
     overlayOpacity,
     abSide,
     sidebarOpen,
+    setSidebarOpen,
     selectFrame,
     stepFrame,
     setMode,

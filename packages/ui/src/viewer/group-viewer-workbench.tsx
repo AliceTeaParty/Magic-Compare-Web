@@ -1,7 +1,9 @@
 "use client";
 
 import {
+  ArrowBack,
   FitScreen,
+  OpenInNew,
   PhotoLibrary,
   Tune,
   ViewSidebar,
@@ -97,6 +99,40 @@ const DEFAULT_PAN_ZOOM: ViewerPanZoomState = {
   x: 0,
   y: 0,
 };
+
+const VIEWER_DETAILS_COOKIE_NAME = "magic_compare_open_details";
+
+function readViewerDetailsCookie(): boolean | null {
+  if (typeof document === "undefined") {
+    return null;
+  }
+
+  const entry = document.cookie
+    .split("; ")
+    .find((part) => part.startsWith(`${VIEWER_DETAILS_COOKIE_NAME}=`));
+
+  if (!entry) {
+    return null;
+  }
+
+  const value = entry.split("=")[1];
+  if (value === "1") {
+    return true;
+  }
+  if (value === "0") {
+    return false;
+  }
+
+  return null;
+}
+
+function writeViewerDetailsCookie(open: boolean): void {
+  if (typeof document === "undefined") {
+    return;
+  }
+
+  document.cookie = `${VIEWER_DETAILS_COOKIE_NAME}=${open ? "1" : "0"}; Path=/; Max-Age=31536000; SameSite=Lax`;
+}
 
 function getViewportSize(): ViewportSize {
   if (typeof window === "undefined") {
@@ -936,6 +972,7 @@ function GroupLinks({
 }
 
 function ViewerSidebarContent({
+  caseMeta,
   currentGroup,
   currentFrame,
   groups,
@@ -943,6 +980,7 @@ function ViewerSidebarContent({
   publishStatus,
   variant,
 }: {
+  caseMeta: ViewerDataset["caseMeta"];
   currentGroup: ViewerGroup;
   currentFrame: ViewerFrame | undefined;
   groups: ViewerDataset["siblingGroups"];
@@ -951,14 +989,32 @@ function ViewerSidebarContent({
   variant: "public" | "internal";
 }) {
   return (
-      <Stack spacing={2} sx={{ p: 2.25 }}>
-      <Stack spacing={0.5}>
-        <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 500 }}>
-          Group navigator
-        </Typography>
-        <GroupLinks currentGroup={currentGroup} groups={groups} />
-      </Stack>
-      <Divider />
+    <Stack spacing={2} sx={{ p: 2.25 }}>
+      {variant === "internal" ? (
+        <>
+          <Stack spacing={0.85}>
+            <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 500 }}>
+              Group navigator
+            </Typography>
+            <Button
+              component={Link}
+              href={`/cases/${caseMeta.slug}`}
+              variant="outlined"
+              size="small"
+              startIcon={<ArrowBack fontSize="small" />}
+              sx={{
+                alignSelf: "flex-start",
+                minHeight: 34,
+                px: 1.35,
+              }}
+            >
+              Back to workspace
+            </Button>
+            <GroupLinks currentGroup={currentGroup} groups={groups} />
+          </Stack>
+          <Divider />
+        </>
+      ) : null}
       <Stack spacing={0.75}>
         <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 500 }}>
           Frame details
@@ -997,9 +1053,25 @@ function ViewerSidebarContent({
               size="small"
               sx={{ alignSelf: "flex-start" }}
             />
-            <Typography variant="body2">
-              Public slug: {publishStatus.publicSlug ?? "Pending first publish"}
-            </Typography>
+            <Stack direction="row" spacing={0.6} alignItems="center" useFlexGap>
+              <Typography variant="body2">
+                Public slug: {publishStatus.publicSlug ?? "Pending first publish"}
+              </Typography>
+              {publishStatus.publicUrl ? (
+                <Tooltip title="Open published page in a new tab">
+                  <IconButton
+                    component="a"
+                    href={publishStatus.publicUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    size="small"
+                    sx={{ width: 28, height: 28 }}
+                  >
+                    <OpenInNew sx={{ fontSize: 16 }} />
+                  </IconButton>
+                </Tooltip>
+              ) : null}
+            </Stack>
             <Typography variant="body2" color="text.secondary">
               {formatUtcDate(publishStatus.publishedAt ?? null)}
             </Typography>
@@ -1015,6 +1087,8 @@ export function GroupViewerWorkbench({
   variant,
 }: GroupViewerWorkbenchProps) {
   const controller = useViewerController(dataset.group);
+  const sidebarPreferenceLoadedRef = useRef(false);
+  const sidebarPreferencePersistReadyRef = useRef(false);
   const theme = useTheme();
   const showDesktopSidebar = useMediaQuery(theme.breakpoints.up("lg"), { noSsr: true });
   const hideFitControl = useMediaQuery(theme.breakpoints.down("sm"), { noSsr: true });
@@ -1062,6 +1136,29 @@ export function GroupViewerWorkbench({
       ),
     [filmstripScrollState],
   );
+
+  useEffect(() => {
+    const preferredOpenState = readViewerDetailsCookie();
+
+    if (preferredOpenState !== null) {
+      controller.setSidebarOpen(preferredOpenState);
+    }
+
+    sidebarPreferenceLoadedRef.current = true;
+  }, []);
+
+  useEffect(() => {
+    if (!sidebarPreferenceLoadedRef.current) {
+      return;
+    }
+
+    if (!sidebarPreferencePersistReadyRef.current) {
+      sidebarPreferencePersistReadyRef.current = true;
+      return;
+    }
+
+    writeViewerDetailsCookie(controller.sidebarOpen);
+  }, [controller.sidebarOpen]);
 
   useEffect(() => {
     if (controller.currentFrame) {
@@ -1699,6 +1796,7 @@ export function GroupViewerWorkbench({
               }}
             >
               <ViewerSidebarContent
+                caseMeta={dataset.caseMeta}
                 currentGroup={dataset.group}
                 currentFrame={controller.currentFrame}
                 groups={dataset.siblingGroups}
@@ -1725,6 +1823,7 @@ export function GroupViewerWorkbench({
           }}
         >
           <ViewerSidebarContent
+            caseMeta={dataset.caseMeta}
             currentGroup={dataset.group}
             currentFrame={controller.currentFrame}
             groups={dataset.siblingGroups}

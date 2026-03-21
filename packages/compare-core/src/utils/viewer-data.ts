@@ -60,6 +60,7 @@ export interface ViewerCaseMeta {
 export interface ViewerPublishStatus {
   status: CaseStatus;
   publicSlug?: string | null;
+  publicUrl?: string | null;
   publishedAt?: string | null;
 }
 
@@ -164,6 +165,7 @@ export function createViewerDatasetFromPublishManifest(
     publishStatus: {
       status: "published",
       publicSlug: manifest.publicSlug,
+      publicUrl: null,
       publishedAt: manifest.case.publishedAt,
     },
   };

@@ -20,6 +20,7 @@ import {
   List,
   ListItem,
   Paper,
+  Snackbar,
   Stack,
   ToggleButton,
   ToggleButtonGroup,
@@ -186,11 +187,9 @@ function SortableGroupRow({
 export function CaseWorkspaceBoard({
   data,
   canDeployPublicSite,
-  publicExportDir,
 }: {
   data: CaseWorkspaceData;
   canDeployPublicSite: boolean;
-  publicExportDir: string;
 }) {
   const router = useRouter();
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
@@ -472,10 +471,6 @@ export function CaseWorkspaceBoard({
             </Stack>
           </Box>
           <Stack spacing={0.85}>
-            <Typography variant="body2" color="text.secondary">
-              Export and deploy operate on all published groups. Static export target:{" "}
-              {publicExportDir}
-            </Typography>
             {publicGroupCount === 0 ? (
               <Alert
                 severity="warning"
@@ -495,23 +490,6 @@ export function CaseWorkspaceBoard({
                 Deploy to Pages is disabled until Cloudflare Pages env is configured.
               </Typography>
             ) : null}
-            <AnimatePresence initial={false}>
-              {feedback ? (
-                <Typography
-                  component={motion.p}
-                  key={feedback}
-                  initial={{ opacity: 0, y: 6 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -4 }}
-                  transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
-                  variant="caption"
-                  color={feedbackTone === "error" ? "error.main" : "primary.main"}
-                  sx={{ m: 0 }}
-                >
-                  {feedback}
-                </Typography>
-              ) : null}
-            </AnimatePresence>
           </Stack>
         </Stack>
       </Box>
@@ -596,6 +574,37 @@ export function CaseWorkspaceBoard({
           </Stack>
         </Paper>
       </Box>
+
+      {feedback ? (
+        <Snackbar
+          open
+          autoHideDuration={4200}
+          onClose={(_, reason) => {
+            if (reason === "clickaway") {
+              return;
+            }
+
+            setFeedback(null);
+            setFeedbackTone(null);
+          }}
+          anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+        >
+          <Alert
+            severity={feedbackTone === "error" ? "error" : "success"}
+            onClose={() => {
+              setFeedback(null);
+              setFeedbackTone(null);
+            }}
+            sx={{
+              minWidth: { xs: "min(92vw, 320px)", sm: 360 },
+              borderRadius: 2.5,
+              boxShadow: "0 18px 42px rgba(0,0,0,0.28)",
+            }}
+          >
+            {feedback}
+          </Alert>
+        </Snackbar>
+      ) : null}
     </Stack>
   );
 }
