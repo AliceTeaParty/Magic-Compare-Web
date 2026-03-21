@@ -6,8 +6,25 @@ Entries before that date are summarized at release level instead of being recons
 
 ## Unreleased
 
+## v1.0.1 - 2026-03-21
+
+First post-`v1.0.0` maintenance release focused on deployment correctness, public-link behavior, and A/B inspection polish.
+
+### Added
+
+- `A / B` inspect mode now exposes stepped `- / +` scale controls from `1x` through `8x`, keeping pixelated point-to-point inspection usable on higher-resolution sources.
+- Internal-site published links can now prefer a custom public base domain via `MAGIC_COMPARE_PUBLIC_SITE_BASE_URL`, falling back to `*.pages.dev` only when that value is unset.
+
+### Changed
+
+- `.env.example` is now grouped by runtime scope with clearer separation between uploader, host-local development, Docker runtime, shared S3, and Cloudflare deploy settings.
+- Internal object-storage container tuning is no longer exposed as a pile of low-value env knobs; the local compose runtime now keeps those values fixed in `docker-compose.yml`.
+
 ### Fixed
 
+- `Deploy Pages` now republishes the current case before export/deploy so changed public S3 URLs or other publish-time metadata do not stay stale inside `published` manifests.
+- Group viewer footer year display now collapses identical start/end years instead of rendering redundant ranges like `2026-2026`.
+- Group viewer case-title alignment and A/B scale affordances received small final polish adjustments after `v1.0.0`.
 - `docker/ci.compose.override.yml` now explicitly switches `internal-site` and `internal-site-init` back to a local CI image build, preventing the GHCR smoke workflow from trying to pull the published `:main` image before the publish job runs.
 
 ## v1.0.0 - 2026-03-21
