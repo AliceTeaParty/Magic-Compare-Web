@@ -1072,7 +1072,15 @@ function ViewerSidebarContent({
                     target="_blank"
                     rel="noreferrer"
                     size="small"
-                    sx={{ width: 28, height: 28 }}
+                    sx={{
+                      width: 38,
+                      height: 30,
+                      px: 0.9,
+                      borderRadius: 999,
+                      border: "1px solid",
+                      borderColor: "divider",
+                      backgroundColor: "background.raised",
+                    }}
                   >
                     <OpenInNew sx={{ fontSize: 16 }} />
                   </IconButton>
@@ -1590,6 +1598,47 @@ export function GroupViewerWorkbench({
             flexWrap="wrap"
             useFlexGap
           >
+            <Box
+              sx={{
+                width: 104,
+                flexShrink: 0,
+                visibility: controller.mode === "a-b" ? "visible" : "hidden",
+              }}
+            >
+              {controller.mode === "a-b" ? (
+                <FormControl
+                  size="small"
+                  fullWidth
+                  sx={{
+                    "& .MuiOutlinedInput-root": {
+                      height: 34,
+                      minHeight: 34,
+                    },
+                    "& .MuiSelect-select": {
+                      display: "flex",
+                      alignItems: "center",
+                      minHeight: "34px !important",
+                      py: "0 !important",
+                      pl: 1.5,
+                      pr: 3.75,
+                      fontSize: "0.92rem",
+                      fontWeight: 550,
+                    },
+                  }}
+                >
+                  <Select
+                    value={controller.abSide}
+                    onChange={(event) =>
+                      controller.setAbSide(String(event.target.value) as "before" | "after")
+                    }
+                    inputProps={{ "aria-label": "Choose A/B side" }}
+                  >
+                    <MenuItem value="before">Before</MenuItem>
+                    <MenuItem value="after">After</MenuItem>
+                  </Select>
+                </FormControl>
+              ) : null}
+            </Box>
             <ToggleButtonGroup
               exclusive
               size="small"
@@ -1631,39 +1680,6 @@ export function GroupViewerWorkbench({
                 Heatmap
               </ToggleButton>
             </ToggleButtonGroup>
-            {controller.mode === "a-b" ? (
-              <FormControl
-                size="small"
-                sx={{
-                  minWidth: 104,
-                  "& .MuiOutlinedInput-root": {
-                    height: 34,
-                    minHeight: 34,
-                  },
-                  "& .MuiSelect-select": {
-                    display: "flex",
-                    alignItems: "center",
-                    minHeight: "34px !important",
-                    py: "0 !important",
-                    pl: 1.5,
-                    pr: 3.75,
-                    fontSize: "0.92rem",
-                    fontWeight: 550,
-                  },
-                }}
-              >
-                <Select
-                  value={controller.abSide}
-                  onChange={(event) =>
-                    controller.setAbSide(String(event.target.value) as "before" | "after")
-                  }
-                  inputProps={{ "aria-label": "Choose A/B side" }}
-                >
-                  <MenuItem value="before">Before</MenuItem>
-                  <MenuItem value="after">After</MenuItem>
-                </Select>
-              </FormControl>
-            ) : null}
             {!hideFitControl ? (
               <Tooltip
                 title={
