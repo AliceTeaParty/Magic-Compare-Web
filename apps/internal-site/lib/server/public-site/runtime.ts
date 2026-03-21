@@ -3,7 +3,6 @@ import { cp, mkdir, readdir, rm } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
-  CF_API_TOKEN_ENV_NAME,
   CF_PAGES_BRANCH_ENV_NAME,
   CF_PAGES_PROJECT_NAME_ENV_NAME,
   getPublishedRoot,
@@ -208,10 +207,6 @@ export async function deployPublicSite(): Promise<PublicDeployResult> {
       getWranglerPagesDeployArgs(exportResult.exportDir),
       workspaceRoot(),
     );
-
-    if (!process.env[CF_API_TOKEN_ENV_NAME]?.trim()) {
-      throw new Error("Cloudflare API token is missing.");
-    }
 
     return {
       ...exportResult,

@@ -1,5 +1,13 @@
 export const DEMO_CASE_SLUG = "demo-grain-study";
 
+export interface FooterConfig {
+  author: string;
+  joinUsLabel: string | null;
+  joinUsUrl: string | null;
+  yearEnd: number;
+  yearStart: number;
+}
+
 export function kebabCase(input: string): string {
   return input
     .trim()
@@ -44,4 +52,24 @@ export function formatUtcDate(isoDate: string | null): string {
     timeStyle: "short",
     timeZone: "UTC",
   }).format(new Date(isoDate));
+}
+
+export function resolveFooterConfig(
+  env: Record<string, string | undefined>,
+  currentYear = new Date().getFullYear(),
+): FooterConfig {
+  const parsedYearStart = Number.parseInt(env.MAGIC_COMPARE_FOOTER_YEAR_START?.trim() || "", 10);
+  const yearStart =
+    Number.isFinite(parsedYearStart) && parsedYearStart > 0
+      ? Math.min(parsedYearStart, currentYear)
+      : 2026;
+  const joinUsUrl = env.MAGIC_COMPARE_FOOTER_JOIN_US_URL?.trim() || null;
+
+  return {
+    author: env.MAGIC_COMPARE_FOOTER_AUTHOR?.trim() || "Magic Compare",
+    joinUsLabel: joinUsUrl ? env.MAGIC_COMPARE_FOOTER_JOIN_US_LABEL?.trim() || "Join us" : null,
+    joinUsUrl,
+    yearEnd: currentYear,
+    yearStart,
+  };
 }

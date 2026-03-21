@@ -11,7 +11,7 @@ model Case {
   id           String   @id @default(cuid())
   slug         String   @unique
   title        String
-  subtitle     String   @default("")
+  subtitle     String?  @default("")
   summary      String   @default("")
   tagsJson     String   @default("[]")
   status       String

@@ -1,18 +1,20 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import {
   CheckCircleOutline,
+  Close,
   CloudUpload,
   DragIndicator,
-  FileUpload,
+  ErrorOutline,
+  InfoOutlined,
   LockOutlined,
   OpenInNew,
   Public,
   Publish,
+  WarningAmber,
 } from "@mui/icons-material";
 import {
-  Alert,
   Box,
   Button,
   Chip,
@@ -38,6 +40,96 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
 import type { CaseWorkspaceData } from "@/lib/server/repositories/content-repository";
+
+type WorkspaceNotificationTone = "error" | "info" | "success" | "warning";
+
+interface WorkspaceNotification {
+  id: string;
+  message: string;
+  tone: WorkspaceNotificationTone;
+  sticky?: boolean;
+}
+
+function WorkspaceNotificationCard({
+  notification,
+  index,
+  onDismiss,
+}: {
+  notification: WorkspaceNotification;
+  index: number;
+  onDismiss: (id: string) => void;
+}) {
+  const icon =
+    notification.tone === "success" ? (
+      <CheckCircleOutline fontSize="small" />
+    ) : notification.tone === "warning" ? (
+      <WarningAmber fontSize="small" />
+    ) : notification.tone === "error" ? (
+      <ErrorOutline fontSize="small" />
+    ) : (
+      <InfoOutlined fontSize="small" />
+    );
+
+  return (
+    <Paper
+      component={motion.div}
+      layout
+      initial={{ opacity: 0, y: 14, scale: 0.98 }}
+      animate={{ opacity: index === 3 ? 0.8 : 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: 10, scale: 0.98 }}
+      transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+      elevation={0}
+      sx={{
+        minWidth: { xs: "min(92vw, 320px)", sm: 360 },
+        borderRadius: 2.75,
+        border: "1px solid",
+        borderColor:
+          notification.tone === "error"
+            ? "error.main"
+            : notification.tone === "warning"
+              ? "warning.main"
+              : notification.tone === "success"
+                ? "primary.main"
+                : "divider",
+        backgroundColor:
+          notification.tone === "error"
+            ? "rgba(127, 29, 29, 0.92)"
+            : notification.tone === "warning"
+              ? "rgba(96, 61, 11, 0.92)"
+              : notification.tone === "success"
+                ? "rgba(31, 49, 92, 0.94)"
+                : "rgba(17, 28, 61, 0.94)",
+        boxShadow: "0 18px 42px rgba(0,0,0,0.28)",
+      }}
+    >
+      <Stack direction="row" spacing={1.1} alignItems="flex-start" sx={{ px: 1.5, py: 1.2 }}>
+        <Box sx={{ color: "text.primary", pt: 0.1 }}>{icon}</Box>
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+          <Box
+            component="p"
+            sx={{
+              m: 0,
+              color: "text.primary",
+              fontSize: "0.92rem",
+              lineHeight: 1.5,
+            }}
+          >
+            {notification.message}
+          </Box>
+        </Box>
+        {!notification.sticky ? (
+          <IconButton
+            size="small"
+            onClick={() => onDismiss(notification.id)}
+            sx={{ width: 28, height: 28, mt: "-2px" }}
+          >
+            <Close sx={{ fontSize: 16 }} />
+          </IconButton>
+        ) : null}
+      </Stack>
+    </Paper>
+  );
+}
 
 function SortableGroupRow({
   group,
@@ -152,7 +244,7 @@ function SortableGroupRow({
               <ToggleButton
                 value="internal"
                 disabled={isPending}
-                sx={{ minHeight: 32, px: 1.15, fontSize: "0.84rem" }}
+                sx={{ minHeight: 32, px: "10px", py: "2px", fontSize: "0.84rem" }}
               >
                 <LockOutlined sx={{ mr: 0.55, fontSize: 14.5 }} />
                 Internal
@@ -160,7 +252,7 @@ function SortableGroupRow({
               <ToggleButton
                 value="public"
                 disabled={isPending}
-                sx={{ minHeight: 32, px: 1.15, fontSize: "0.84rem" }}
+                sx={{ minHeight: 32, px: "10px", py: "2px", fontSize: "0.84rem" }}
               >
                 <Public sx={{ mr: 0.55, fontSize: 14.5 }} />
                 Public
@@ -186,20 +278,62 @@ function SortableGroupRow({
 export function CaseWorkspaceBoard({
   data,
   canDeployPublicSite,
-  publicExportDir,
 }: {
   data: CaseWorkspaceData;
   canDeployPublicSite: boolean;
-  publicExportDir: string;
 }) {
   const router = useRouter();
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
   const [groups, setGroups] = useState(data.groups);
   const [isPending, startTransition] = useTransition();
-  const [feedback, setFeedback] = useState<string | null>(null);
-  const [feedbackTone, setFeedbackTone] = useState<"error" | "success" | null>(null);
-  const [publicSiteAction, setPublicSiteAction] = useState<"export" | "deploy" | null>(null);
+  const [notifications, setNotifications] = useState<WorkspaceNotification[]>([]);
+  const [isDeployingPublicSite, setIsDeployingPublicSite] = useState(false);
   const publicGroupCount = groups.filter((group) => group.isPublic).length;
+
+  function dismissNotification(notificationId: string) {
+    setNotifications((current) => current.filter((notification) => notification.id !== notificationId));
+  }
+
+  function pushNotification(
+    message: string,
+    tone: WorkspaceNotificationTone,
+    options?: { key?: string; sticky?: boolean },
+  ) {
+    const notificationId = options?.key ?? `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+
+    setNotifications((current) => {
+      const next = [
+        {
+          id: notificationId,
+          message,
+          tone,
+          sticky: options?.sticky,
+        },
+        ...current.filter((notification) => notification.id !== notificationId),
+      ];
+
+      return next.slice(0, 4);
+    });
+
+    if (!options?.sticky) {
+      window.setTimeout(() => {
+        setNotifications((current) =>
+          current.filter((notification) => notification.id !== notificationId),
+        );
+      }, 4200);
+    }
+  }
+
+  function showWorkspaceSavingNotification() {
+    pushNotification("Saving workspace updates...", "info", {
+      key: "workspace-saving",
+      sticky: true,
+    });
+  }
+
+  function dismissWorkspaceSavingNotification() {
+    dismissNotification("workspace-saving");
+  }
 
   async function saveGroupOrder(nextGroupIds: string[]) {
     const response = await fetch("/api/ops/group-reorder", {
@@ -232,19 +366,6 @@ export function CaseWorkspaceBoard({
     if (!response.ok) {
       const payload = await response.json().catch(() => null);
       throw new Error(payload?.error || "Failed to publish case.");
-    }
-
-    return response.json();
-  }
-
-  async function exportPublicSite() {
-    const response = await fetch("/api/ops/public-export", {
-      method: "POST",
-    });
-
-    if (!response.ok) {
-      const payload = await response.json().catch(() => null);
-      throw new Error(payload?.error || "Failed to export public site.");
     }
 
     return response.json();
@@ -292,30 +413,44 @@ export function CaseWorkspaceBoard({
     );
 
     setGroups(nextGroups);
+    showWorkspaceSavingNotification();
 
     startTransition(() => {
-      setFeedback(null);
-      setFeedbackTone(null);
       void updateGroupVisibility(targetGroup.slug, nextVisibility)
         .then(() => {
-          setFeedback(
+          pushNotification(
             nextVisibility
               ? `Marked ${targetGroup.title} as public. Publish the case to refresh the public bundle.`
               : `Marked ${targetGroup.title} as internal. Publish the case to remove it from the next public bundle.`,
+            "success",
           );
-          setFeedbackTone("success");
           router.refresh();
         })
         .catch((error) => {
           setGroups(previousGroups);
-          setFeedback(
+          pushNotification(
             error instanceof Error ? error.message : "Failed to update group visibility.",
+            "error",
           );
-          setFeedbackTone("error");
+        })
+        .finally(() => {
+          dismissWorkspaceSavingNotification();
         });
     });
   }
 
+  useEffect(() => {
+    if (publicGroupCount === 0) {
+      pushNotification(
+        "This case has no public groups yet. Use the per-group internal/public toggle below before publishing.",
+        "warning",
+        { key: "workspace-no-public-groups", sticky: true },
+      );
+      return;
+    }
+
+    dismissNotification("workspace-no-public-groups");
+  }, [publicGroupCount]);
   return (
     <Stack spacing={{ xs: 2.25, md: 3 }}>
       <Box
@@ -343,7 +478,10 @@ export function CaseWorkspaceBoard({
               <Typography variant="h2" sx={{ lineHeight: 0.98 }}>
                 {data.title}
               </Typography>
-              <Stack direction="row" spacing={0.9} flexWrap="wrap" useFlexGap>
+              <Typography variant="body1" color="text.secondary" sx={{ maxWidth: 820 }}>
+                {data.summary || "No summary yet."}
+              </Typography>
+              <Stack direction="row" spacing={0.9} flexWrap="wrap" useFlexGap sx={{ pt: 0.25 }}>
                 <Chip
                   label={data.status}
                   color={data.status === "published" ? "primary" : "default"}
@@ -360,9 +498,6 @@ export function CaseWorkspaceBoard({
                   sx={{ height: 38, "& .MuiChip-label": { px: 1.55 } }}
                 />
               </Stack>
-              <Typography variant="body1" color="text.secondary" sx={{ maxWidth: 820 }}>
-                {data.summary || "No summary yet."}
-              </Typography>
             </Stack>
             <Stack
               direction="row"
@@ -384,135 +519,78 @@ export function CaseWorkspaceBoard({
                 disabled={isPending || groups.length === 0}
                 onClick={() =>
                   startTransition(() => {
-                    setFeedback(null);
-                    setFeedbackTone(null);
                     void publishCurrentCase()
                       .then(() => {
-                        setFeedback("Published case bundle to the shared published root.");
-                        setFeedbackTone("success");
+                        pushNotification(
+                          "Published case bundle to the shared published root.",
+                          "success",
+                        );
                         router.refresh();
                       })
                       .catch((error) => {
-                        setFeedback(
+                        pushNotification(
                           error instanceof Error ? error.message : "Failed to publish case.",
+                          "error",
                         );
-                        setFeedbackTone("error");
                       });
                   })
                 }
               >
-                Publish case
+                Publish Case
               </Button>
-              <Button
-                variant="outlined"
-                startIcon={<FileUpload />}
-                disabled={isPending || publicSiteAction !== null}
-                onClick={() => {
-                  if (publicSiteAction) {
-                    return;
-                  }
-
-                  setPublicSiteAction("export");
-                  startTransition(() => {
-                    setFeedback(null);
-                    setFeedbackTone(null);
-                    void exportPublicSite()
-                      .then((result) => {
-                        setFeedback(`Exported static public site to ${result.exportDir}.`);
-                        setFeedbackTone("success");
-                      })
-                      .catch((error) => {
-                        setFeedback(
-                          error instanceof Error ? error.message : "Failed to export public site.",
-                        );
-                        setFeedbackTone("error");
-                      })
-                      .finally(() => {
-                        setPublicSiteAction(null);
-                      });
-                  });
-                }}
+              <Tooltip
+                title={
+                  canDeployPublicSite
+                    ? ""
+                    : "Deploy Pages is disabled until Cloudflare Pages env is configured."
+                }
               >
-                Export public site
-              </Button>
-              <Button
-                variant="outlined"
-                startIcon={<CloudUpload />}
-                disabled={isPending || publicSiteAction !== null || !canDeployPublicSite}
-                onClick={() => {
-                  if (publicSiteAction) {
-                    return;
-                  }
+                <span>
+                  <Button
+                    variant="outlined"
+                    startIcon={<CloudUpload />}
+                    disabled={isPending || isDeployingPublicSite || !canDeployPublicSite}
+                    onClick={() => {
+                      if (isDeployingPublicSite) {
+                        return;
+                      }
 
-                  setPublicSiteAction("deploy");
-                  startTransition(() => {
-                    setFeedback(null);
-                    setFeedbackTone(null);
-                    void deployPublicSite()
-                      .then((result) => {
-                        setFeedback(
-                          `Deployed fresh static export to Cloudflare Pages project ${result.projectName}.`,
-                        );
-                        setFeedbackTone("success");
-                      })
-                      .catch((error) => {
-                        setFeedback(
-                          error instanceof Error ? error.message : "Failed to deploy public site.",
-                        );
-                        setFeedbackTone("error");
-                      })
-                      .finally(() => {
-                        setPublicSiteAction(null);
+                      setIsDeployingPublicSite(true);
+                      pushNotification(
+                        "Deploying a fresh public export to Cloudflare Pages...",
+                        "info",
+                        {
+                          key: "workspace-deploying-public-site",
+                          sticky: true,
+                        },
+                      );
+                      startTransition(() => {
+                        void deployPublicSite()
+                          .then((result) => {
+                            pushNotification(
+                              `Deployed fresh static export to Cloudflare Pages project ${result.projectName}.`,
+                              "success",
+                            );
+                          })
+                          .catch((error) => {
+                            pushNotification(
+                              error instanceof Error ? error.message : "Failed to deploy public site.",
+                              "error",
+                            );
+                          })
+                          .finally(() => {
+                            dismissNotification("workspace-deploying-public-site");
+                            setIsDeployingPublicSite(false);
+                          });
                       });
-                  });
-                }}
-              >
-                Deploy to Pages
-              </Button>
+                    }}
+                  >
+                    Deploy Pages
+                  </Button>
+                </span>
+              </Tooltip>
             </Stack>
           </Box>
-          <Stack spacing={0.85}>
-            <Typography variant="body2" color="text.secondary">
-              Export and deploy operate on all published groups. Static export target:{" "}
-              {publicExportDir}
-            </Typography>
-            {publicGroupCount === 0 ? (
-              <Alert
-                severity="warning"
-                icon={<CheckCircleOutline fontSize="inherit" />}
-                sx={{
-                  borderRadius: 3,
-                  bgcolor: "rgba(255,255,255,0.05)",
-                  color: "text.primary",
-                }}
-              >
-                This case has no public groups yet. Use the per-group internal/public toggle below
-                before publishing.
-              </Alert>
-            ) : null}
-            {!canDeployPublicSite ? (
-              <Typography variant="caption" color="warning.main">
-                Deploy to Pages is disabled until Cloudflare Pages env is configured.
-              </Typography>
-            ) : null}
-            <AnimatePresence initial={false}>
-              {feedback ? (
-                <Typography
-                  component={motion.p}
-                  key={feedback}
-                  initial={{ opacity: 0, y: 6 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -4 }}
-                  transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
-                  variant="caption"
-                  color={feedbackTone === "error" ? "error.main" : "primary.main"}
-                  sx={{ m: 0 }}
-                >
-                  {feedback}
-                </Typography>
-              ) : null}
-            </AnimatePresence>
-          </Stack>
         </Stack>
       </Box>
 
@@ -563,11 +641,24 @@ export function CaseWorkspaceBoard({
                   order,
                 }));
 
+                const previousGroups = groups;
                 setGroups(reordered);
+                showWorkspaceSavingNotification();
                 startTransition(() => {
-                  void saveGroupOrder(reordered.map((group) => group.id)).then(() =>
-                    router.refresh(),
-                  );
+                  void saveGroupOrder(reordered.map((group) => group.id))
+                    .then(() => {
+                      router.refresh();
+                    })
+                    .catch((error) => {
+                      setGroups(previousGroups);
+                      pushNotification(
+                        error instanceof Error ? error.message : "Failed to persist group order.",
+                        "error",
+                      );
+                    })
+                    .finally(() => {
+                      dismissWorkspaceSavingNotification();
+                    });
                 });
               }}
             >
@@ -588,13 +679,40 @@ export function CaseWorkspaceBoard({
                 </List>
               </SortableContext>
             </DndContext>
-            {isPending ? (
-              <Typography variant="caption" color="primary.main">
-                Saving workspace updates...
-              </Typography>
-            ) : null}
           </Stack>
         </Paper>
+      </Box>
+
+      <Box
+        sx={{
+          position: "fixed",
+          right: { xs: 12, md: 20 },
+          bottom: { xs: 12, md: 20 },
+          zIndex: 1600,
+          pointerEvents: "none",
+        }}
+      >
+        <Stack
+          direction="column-reverse"
+          spacing={1}
+          sx={{
+            alignItems: "flex-end",
+            "& > *": {
+              pointerEvents: "auto",
+            },
+          }}
+        >
+          <AnimatePresence initial={false}>
+            {notifications.map((notification, index) => (
+              <WorkspaceNotificationCard
+                key={notification.id}
+                notification={notification}
+                index={index}
+                onDismiss={dismissNotification}
+              />
+            ))}
+          </AnimatePresence>
+        </Stack>
       </Box>
     </Stack>
   );

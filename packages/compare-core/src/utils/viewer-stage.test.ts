@@ -3,8 +3,11 @@ import {
   clampViewerPanZoom,
   cycleAbSide,
   getContainedMediaRect,
+  getViewerEffectiveScale,
   getFilmstripScrollbarMetrics,
   getFittedStageSize,
+  getViewerPresetTransformScale,
+  VIEWER_MAX_FINE_SCALE,
 } from "./viewer-stage";
 
 describe("getFittedStageSize", () => {
@@ -29,13 +32,100 @@ describe("getContainedMediaRect", () => {
 
 describe("clampViewerPanZoom", () => {
   it("clamps panning to the zoomed media bounds", () => {
-    expect(clampViewerPanZoom({ scale: 3, x: 600, y: -420 }, { width: 320, height: 180 })).toEqual(
-      {
-        scale: 3,
-        x: 320,
-        y: -180,
-      },
-    );
+    expect(
+      clampViewerPanZoom(
+        {
+          presetScale: 2,
+          fineScale: VIEWER_MAX_FINE_SCALE,
+          x: 600,
+          y: -420,
+        },
+        { width: 320, height: 180 },
+        3,
+      ),
+    ).toEqual({
+      presetScale: 2,
+      fineScale: VIEWER_MAX_FINE_SCALE,
+      x: 320,
+      y: -180,
+    });
+  });
+
+  it("resets pan when the effective scale is at or below 1x", () => {
+    expect(
+      clampViewerPanZoom(
+        {
+          presetScale: 1,
+          fineScale: 1.2,
+          x: 60,
+          y: -30,
+        },
+        { width: 320, height: 180 },
+        0.84,
+      ),
+    ).toEqual({
+      presetScale: 1,
+      fineScale: 1.2,
+      x: 0,
+      y: 0,
+    });
+  });
+});
+
+describe("physical scale helpers", () => {
+  it("derives a pixel-exact preset transform from media size, viewport size and DPR", () => {
+    expect(
+      getViewerPresetTransformScale(1, {
+        devicePixelRatio: 2,
+        media: { width: 1920, height: 1080 },
+        mediaRect: { width: 960, height: 540 },
+      }),
+    ).toBeCloseTo(1, 10);
+
+    expect(
+      getViewerPresetTransformScale(2, {
+        devicePixelRatio: 2,
+        media: { width: 1920, height: 1080 },
+        mediaRect: { width: 960, height: 540 },
+      }),
+    ).toBeCloseTo(2, 10);
+
+    expect(
+      getViewerPresetTransformScale(4, {
+        devicePixelRatio: 2,
+        media: { width: 1920, height: 1080 },
+        mediaRect: { width: 960, height: 540 },
+      }),
+    ).toBeCloseTo(4, 10);
+  });
+
+  it("accounts for rotated stages when resolving pixel-exact transforms", () => {
+    expect(
+      getViewerPresetTransformScale(1, {
+        devicePixelRatio: 3,
+        media: { width: 1600, height: 900 },
+        mediaRect: { width: 180, height: 320 },
+        rotateStage: true,
+      }),
+    ).toBeCloseTo(1.6666666667, 8);
+  });
+
+  it("combines preset and fine scale into the final transform scale", () => {
+    expect(
+      getViewerEffectiveScale(
+        {
+          presetScale: 4,
+          fineScale: 1.25,
+          x: 0,
+          y: 0,
+        },
+        {
+          devicePixelRatio: 2,
+          media: { width: 1920, height: 1080 },
+          mediaRect: { width: 960, height: 540 },
+        },
+      ),
+    ).toBeCloseTo(5, 10);
   });
 });
 

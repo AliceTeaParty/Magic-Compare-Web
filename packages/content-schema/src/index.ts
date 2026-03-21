@@ -34,12 +34,16 @@ const PublicSlugSchema = z
   .regex(/^[a-z0-9]+(?:-+[a-z0-9]+)*$/);
 
 const StringListSchema = z.array(z.string().min(1)).default([]);
+const DeprecatedSubtitleSchema = z
+  .string()
+  .nullish()
+  .transform((value) => value ?? "");
 
 export const CaseSchema = z.object({
   id: z.string().min(1),
   slug: SlugSchema,
   title: z.string().min(1),
-  subtitle: z.string().default(""),
+  subtitle: DeprecatedSubtitleSchema,
   summary: z.string().default(""),
   tags: StringListSchema,
   status: CaseStatusSchema,
@@ -87,7 +91,7 @@ export const AssetSchema = z.object({
 const CaseImportSchema = z.object({
   slug: SlugSchema,
   title: z.string().min(1),
-  subtitle: z.string().default(""),
+  subtitle: DeprecatedSubtitleSchema.default(""),
   summary: z.string().default(""),
   tags: StringListSchema,
   status: CaseStatusSchema.default("draft"),
@@ -200,7 +204,7 @@ export const PublishManifestSchema = z.object({
   case: z.object({
     slug: SlugSchema,
     title: z.string().min(1),
-    subtitle: z.string().default(""),
+    subtitle: DeprecatedSubtitleSchema,
     summary: z.string().default(""),
     tags: StringListSchema,
     publishedAt: z.string().datetime().nullable().default(null),

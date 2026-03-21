@@ -19,10 +19,10 @@ export default async function InternalHomePage() {
           <Box
             sx={{
               display: "grid",
-              gap: { xs: 1.8, lg: 2.4 },
+              gap: { xs: 1.8, lg: 2.2 },
               alignItems: "end",
-              gridTemplateColumns: { xs: "1fr", lg: "minmax(0, 1.1fr) minmax(320px, 0.9fr)" },
-              pb: { xs: 2.8, md: 3.1 },
+              gridTemplateColumns: "1fr",
+              pb: { xs: 3.15, md: 3.55 },
               borderBottom: "1px solid",
               borderColor: "divider",
               animation: "catalogHeaderRise 320ms cubic-bezier(0.22, 1, 0.36, 1)",
@@ -38,25 +38,17 @@ export default async function InternalHomePage() {
               },
             }}
           >
-            <Box sx={{ display: "grid", gap: 1.35, minWidth: 0 }}>
+            <Box sx={{ display: "grid", gap: 1.55, minWidth: 0 }}>
               <Typography variant="h2">Internal catalog</Typography>
-              <Typography variant="body1" color="text.secondary" sx={{ maxWidth: 720 }}>
+              <Typography
+                variant="body1"
+                color="text.secondary"
+                sx={{ maxWidth: 720, lineHeight: 1.7 }}
+              >
                 Browse draft, internal, and published compare cases. Viewer pages stay focused on
                 inspection, while import and publish operations remain explicit.
               </Typography>
             </Box>
-            <Typography
-              variant="body2"
-              color="text.secondary"
-              sx={{
-                justifySelf: { xs: "flex-start", lg: "flex-end" },
-                maxWidth: 420,
-                lineHeight: 1.7,
-              }}
-            >
-              Catalog cards use the same content width as the working area below, so wide screens
-              keep a single consistent reading line.
-            </Typography>
           </Box>
         </Stack>
         <CaseDirectoryGrid items={cases} />

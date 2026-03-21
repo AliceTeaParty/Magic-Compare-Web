@@ -17,7 +17,6 @@ class CaseSearchResult:
     id: str
     slug: str
     title: str
-    subtitle: str
     summary: str
     tags: list[str]
     status: str
@@ -75,7 +74,6 @@ def search_cases(config: UploaderConfig, query: str, limit: int = 8) -> list[Cas
                 id=item["id"],
                 slug=item["slug"],
                 title=item["title"],
-                subtitle=item.get("subtitle", ""),
                 summary=item.get("summary", ""),
                 tags=item.get("tags", []),
                 status=item.get("status", "internal"),

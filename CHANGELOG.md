@@ -8,6 +8,36 @@ Entries before that date are summarized at release level instead of being recons
 
 - No unreleased entries yet.
 
+## v1.0.0 - 2026-03-21
+
+First stable release of Magic Compare Web with a production-ready internal/public split, S3-backed image delivery, and a fully reworked comparison viewer.
+
+### Added
+
+- Pixel-exact A/B inspect mode with staged activation, fine zoom, pan, and `1x` to `4x` scale presets.
+- Configurable global footer with env-driven author, year range, and optional `Join us` link.
+- Persistent `Open details` state across internal and public viewer shells.
+- Bottom-right workspace notification center for publish, deploy, reorder, and visibility feedback.
+- UI improvement records under `docs/ui-improvements/` to preserve viewer and workspace interaction lessons.
+
+### Changed
+
+- Public exports and Cloudflare Pages deploys now publish only static pages and manifest metadata while images are served directly from public S3 URLs.
+- Internal and public viewers now share the same S3-backed image URL resolution model instead of relying on internal dynamic asset serving.
+- Base `docker-compose.yml` now defaults to the published GHCR runtime image, while local development overrides explicitly switch back to a local image build plus bind mounts.
+- The viewer toolbar, filmstrip motion, fit behavior, and sidebar chrome were tightened around serious inspection work instead of preview-style interaction.
+- Catalog and case workspace layouts were rebalanced for wide screens, clearer hierarchy, and a denser but more consistent action rhythm.
+- Case subtitles are now deprecated across importer, app, and publish flows and are no longer used in the frontend.
+- Demo seed content now lands in a published-ready state, making first-run verification and public export validation easier.
+
+### Fixed
+
+- Deploy progress now emits a dedicated toast notification instead of silently starting or piggybacking on generic workspace-saving feedback.
+- Workspace save notifications now only appear for real workspace mutations, and group reorder failures roll back cleanly with error feedback.
+- Group viewer title clipping, sidebar weight hierarchy, control alignment, and several filmstrip interaction regressions were resolved.
+- A/B mode now avoids conflicting with browser zoom and mobile page scroll behavior while preserving inspect-grade image control.
+- Cloudflare Pages deployment runtime no longer keeps a redundant post-command token check after configuration has already been validated.
+
 ## v0.9.0 - 2026-03-21
 
 Promoted the post-`v0.8.0` infrastructure work into a fuller release covering Docker runtime hardening, S3-backed internal asset delivery, and workflow compatibility fixes.

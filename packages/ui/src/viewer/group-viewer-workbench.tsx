@@ -1,7 +1,9 @@
 "use client";
 
 import {
+  ArrowBack,
   FitScreen,
+  OpenInNew,
   PhotoLibrary,
   Tune,
   ViewSidebar,
@@ -33,6 +35,7 @@ import { AnimatePresence, motion } from "motion/react";
 import {
   type CSSProperties,
   type PointerEvent as ReactPointerEvent,
+  type TouchEvent as ReactTouchEvent,
   type RefObject,
   type ReactNode,
   useEffect,
@@ -45,10 +48,13 @@ import {
   clampViewerPanZoom,
   cycleAbSide,
   getContainedMediaRect,
+  getViewerEffectiveScale,
   getFilmstripScrollbarMetrics,
   getFittedStageSize as getViewerFittedStageSize,
+  getViewerPresetTransformScale,
   type ViewerMediaRect,
   type ViewerPanZoomState,
+  VIEWER_MAX_FINE_SCALE,
 } from "@magic-compare/compare-core";
 import { clampNumber, formatUtcDate } from "@magic-compare/shared-utils";
 import { useViewerController } from "@magic-compare/compare-core/use-viewer-controller";
@@ -93,10 +99,52 @@ interface FilmstripScrollState {
 }
 
 const DEFAULT_PAN_ZOOM: ViewerPanZoomState = {
-  scale: 1,
+  presetScale: 1,
+  fineScale: 1,
   x: 0,
   y: 0,
 };
+
+const FILMSTRIP_EDGE_OFFSET_LIMIT = 36;
+const FILMSTRIP_INERTIA_MIN_VELOCITY = 0.018;
+const FILMSTRIP_INERTIA_VELOCITY_GAIN = 1.28;
+const FILMSTRIP_MOUSE_DRAG_GAIN = 1.58;
+const FILMSTRIP_TOUCH_DRAG_GAIN = 1.18;
+const FILMSTRIP_OVERSCROLL_GAIN = 0.36;
+
+const VIEWER_DETAILS_COOKIE_NAME = "magic_compare_open_details";
+
+function readViewerDetailsCookie(): boolean | null {
+  if (typeof document === "undefined") {
+    return null;
+  }
+
+  const entry = document.cookie
+    .split("; ")
+    .find((part) => part.startsWith(`${VIEWER_DETAILS_COOKIE_NAME}=`));
+
+  if (!entry) {
+    return null;
+  }
+
+  const value = entry.split("=")[1];
+  if (value === "1") {
+    return true;
+  }
+  if (value === "0") {
+    return false;
+  }
+
+  return null;
+}
+
+function writeViewerDetailsCookie(open: boolean): void {
+  if (typeof document === "undefined") {
+    return;
+  }
+
+  document.cookie = `${VIEWER_DETAILS_COOKIE_NAME}=${open ? "1" : "0"}; Path=/; Max-Age=31536000; SameSite=Lax`;
+}
 
 function getViewportSize(): ViewportSize {
   if (typeof window === "undefined") {
@@ -107,6 +155,14 @@ function getViewportSize(): ViewportSize {
     width: window.innerWidth,
     height: window.innerHeight,
   };
+}
+
+function getViewerDevicePixelRatio(): number {
+  if (typeof window === "undefined") {
+    return 1;
+  }
+
+  return Math.max(1, window.devicePixelRatio || 1);
 }
 
 function getViewportSignature(viewportSize: ViewportSize): string {
@@ -228,12 +284,13 @@ function ThumbnailButton({ frame, isActive, onClick, buttonRef }: ThumbnailButto
 function buildMediaTransform(
   rotateStage: boolean,
   panZoomState: ViewerPanZoomState,
+  effectiveScale: number,
 ): CSSProperties["transform"] {
   return [
     "translate(-50%, -50%)",
     rotateStage ? "rotate(90deg)" : "",
     `translate3d(${panZoomState.x}px, ${panZoomState.y}px, 0)`,
-    `scale(${panZoomState.scale})`,
+    `scale(${effectiveScale})`,
   ]
     .filter(Boolean)
     .join(" ");
@@ -245,6 +302,8 @@ function PositionedStageMedia({
   mediaRect,
   rotateStage,
   panZoomState = DEFAULT_PAN_ZOOM,
+  effectiveScale = 1,
+  imageRendering,
   opacity = 1,
   clipPath,
 }: {
@@ -253,6 +312,8 @@ function PositionedStageMedia({
   mediaRect: ViewerMediaRect;
   rotateStage: boolean;
   panZoomState?: ViewerPanZoomState;
+  effectiveScale?: number;
+  imageRendering?: CSSProperties["imageRendering"];
   opacity?: number;
   clipPath?: string;
 }) {
@@ -283,10 +344,9 @@ function PositionedStageMedia({
           top: "50%",
           width: `${mediaWidth}px`,
           height: `${mediaHeight}px`,
-          transform: buildMediaTransform(rotateStage, panZoomState),
+          transform: buildMediaTransform(rotateStage, panZoomState, effectiveScale),
           transformOrigin: "center center",
-          transition:
-            "transform 180ms cubic-bezier(0.22, 1, 0.36, 1), opacity 180ms cubic-bezier(0.22, 1, 0.36, 1)",
+          transition: "opacity 180ms cubic-bezier(0.22, 1, 0.36, 1)",
           willChange: "transform",
         }}
       >
@@ -299,6 +359,7 @@ function PositionedStageMedia({
             width: "100%",
             height: "100%",
             objectFit: "fill",
+            imageRendering,
             display: "block",
             opacity,
             pointerEvents: "none",
@@ -313,6 +374,13 @@ function PositionedStageMedia({
 
 function getPointerDistance(first: PointerSample, second: PointerSample): number {
   return Math.hypot(second.x - first.x, second.y - first.y);
+}
+
+function getTouchSample(touch: { clientX: number; clientY: number }): PointerSample {
+  return {
+    x: touch.clientX,
+    y: touch.clientY,
+  };
 }
 
 function SwipeCompareStage({
@@ -466,102 +534,112 @@ function SwipeCompareStage({
 }
 
 function ABCompareStage({
+  active,
   activeAsset,
+  devicePixelRatio,
   mediaRect,
   rotateStage,
   panZoomState,
+  setActive,
   setPanZoomState,
   onCycleSide,
 }: {
+  active: boolean;
   activeAsset: ViewerAsset;
+  devicePixelRatio: number;
   mediaRect: ViewerMediaRect;
   rotateStage: boolean;
   panZoomState: ViewerPanZoomState;
+  setActive: (nextActive: boolean) => void;
   setPanZoomState: (nextState: ViewerPanZoomState) => void;
   onCycleSide: () => void;
 }) {
-  const activePointersRef = useRef<Map<number, PointerSample>>(new Map());
   const panGestureRef = useRef<{
     baseState: ViewerPanZoomState;
     moved: boolean;
     pointerId: number;
     start: PointerSample;
   } | null>(null);
-  const pinchGestureRef = useRef<{
+  const touchGestureRef = useRef<{
+    baseEffectiveScale: number;
+    baseState: ViewerPanZoomState;
     distance: number;
-    startScale: number;
+    center: PointerSample;
   } | null>(null);
   const panZoomStateRef = useRef(panZoomState);
+  const suppressStageClickRef = useRef(false);
+  const clearSuppressedClickTimerRef = useRef<number | null>(null);
+
+  const scaleOptions = useMemo(
+    () => ({
+      devicePixelRatio,
+      media: {
+        width: activeAsset.width,
+        height: activeAsset.height,
+      },
+      mediaRect,
+      rotateStage,
+    }),
+    [activeAsset.height, activeAsset.width, devicePixelRatio, mediaRect, rotateStage],
+  );
+  const presetTransformScale = useMemo(
+    () => getViewerPresetTransformScale(panZoomState.presetScale, scaleOptions),
+    [panZoomState.presetScale, scaleOptions],
+  );
+  const effectiveScale = useMemo(
+    () => getViewerEffectiveScale(panZoomState, scaleOptions),
+    [panZoomState, scaleOptions],
+  );
 
   useEffect(() => {
     panZoomStateRef.current = panZoomState;
   }, [panZoomState]);
 
+  useEffect(() => {
+    if (active) {
+      return;
+    }
+
+    panGestureRef.current = null;
+    touchGestureRef.current = null;
+    suppressStageClickRef.current = false;
+  }, [active]);
+
+  useEffect(() => {
+    setPanZoomState(
+      clampViewerPanZoom(panZoomStateRef.current, mediaRect, getViewerEffectiveScale(panZoomStateRef.current, scaleOptions)),
+    );
+  }, [mediaRect, scaleOptions, setPanZoomState]);
+
+  useEffect(() => {
+    return () => {
+      if (clearSuppressedClickTimerRef.current !== null) {
+        window.clearTimeout(clearSuppressedClickTimerRef.current);
+      }
+    };
+  }, []);
+
   function applyPanZoom(nextState: ViewerPanZoomState) {
-    setPanZoomState(clampViewerPanZoom(nextState, mediaRect));
+    setPanZoomState(
+      clampViewerPanZoom(nextState, mediaRect, getViewerEffectiveScale(nextState, scaleOptions)),
+    );
   }
 
   function handlePointerDown(event: ReactPointerEvent<HTMLDivElement>) {
-    if (event.pointerType === "mouse" && event.button !== 0) {
+    if (event.pointerType !== "mouse" || event.button !== 0 || !active || effectiveScale <= 1) {
       return;
     }
 
     event.currentTarget.setPointerCapture(event.pointerId);
-    activePointersRef.current.set(event.pointerId, {
-      x: event.clientX,
-      y: event.clientY,
-    });
-
-    if (activePointersRef.current.size === 1) {
-      panGestureRef.current = {
-        pointerId: event.pointerId,
-        start: { x: event.clientX, y: event.clientY },
-        moved: false,
-        baseState: panZoomStateRef.current,
-      };
-      pinchGestureRef.current = null;
-      return;
-    }
-
-    const points = [...activePointersRef.current.values()];
-
-    if (points.length === 2) {
-      pinchGestureRef.current = {
-        distance: getPointerDistance(points[0], points[1]),
-        startScale: panZoomStateRef.current.scale,
-      };
-      panGestureRef.current = null;
-    }
+    panGestureRef.current = {
+      pointerId: event.pointerId,
+      start: { x: event.clientX, y: event.clientY },
+      moved: false,
+      baseState: panZoomStateRef.current,
+    };
   }
 
   function handlePointerMove(event: ReactPointerEvent<HTMLDivElement>) {
-    if (!activePointersRef.current.has(event.pointerId)) {
-      return;
-    }
-
-    activePointersRef.current.set(event.pointerId, {
-      x: event.clientX,
-      y: event.clientY,
-    });
-
-    const points = [...activePointersRef.current.values()];
-
-    if (points.length === 2 && pinchGestureRef.current) {
-      const distance = getPointerDistance(points[0], points[1]);
-      const nextScale = clampNumber(
-        pinchGestureRef.current.startScale * (distance / pinchGestureRef.current.distance),
-        1,
-        5,
-      );
-
-      applyPanZoom({
-        scale: nextScale,
-        x: panZoomStateRef.current.x,
-        y: panZoomStateRef.current.y,
-      });
-      return;
-    }
-
     const panGesture = panGestureRef.current;
 
     if (!panGesture || panGesture.pointerId !== event.pointerId) {
@@ -573,53 +651,39 @@ function ABCompareStage({
 
     if (Math.abs(deltaX) + Math.abs(deltaY) > 6) {
       panGesture.moved = true;
+      suppressStageClickRef.current = true;
     }
 
-    if (panGesture.baseState.scale > 1) {
-      applyPanZoom({
-        scale: panGesture.baseState.scale,
-        x: panGesture.baseState.x + deltaX,
-        y: panGesture.baseState.y + deltaY,
-      });
-    }
+    applyPanZoom({
+      presetScale: panGesture.baseState.presetScale,
+      fineScale: panGesture.baseState.fineScale,
+      x: panGesture.baseState.x + deltaX,
+      y: panGesture.baseState.y + deltaY,
+    });
   }
 
   function finishPointerInteraction(event: ReactPointerEvent<HTMLDivElement>) {
-    activePointersRef.current.delete(event.pointerId);
+    const panGesture = panGestureRef.current;
 
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId);
     }
 
-    if (activePointersRef.current.size >= 2) {
-      const points = [...activePointersRef.current.values()];
-      pinchGestureRef.current = {
-        distance: getPointerDistance(points[0], points[1]),
-        startScale: panZoomStateRef.current.scale,
-      };
+    if (!panGesture || panGesture.pointerId !== event.pointerId) {
       return;
     }
 
-    if (activePointersRef.current.size === 0) {
-      const panGesture = panGestureRef.current;
+    panGestureRef.current = null;
 
-      if (panGesture?.pointerId === event.pointerId && !panGesture.moved) {
-        onCycleSide();
+    if (panGesture.moved) {
+      if (clearSuppressedClickTimerRef.current !== null) {
+        window.clearTimeout(clearSuppressedClickTimerRef.current);
       }
 
-      panGestureRef.current = null;
-      pinchGestureRef.current = null;
-      return;
+      clearSuppressedClickTimerRef.current = window.setTimeout(() => {
+        suppressStageClickRef.current = false;
+      }, 0);
     }
-
-    const [remainingPointerId, remainingPoint] = [...activePointersRef.current.entries()][0];
-    panGestureRef.current = {
-      pointerId: remainingPointerId,
-      start: remainingPoint,
-      moved: false,
-      baseState: panZoomStateRef.current,
-    };
-    pinchGestureRef.current = null;
   }
 
   function handleWheel(event: React.WheelEvent<HTMLDivElement>) {
@@ -628,13 +692,124 @@ function ABCompareStage({
     }
 
     event.preventDefault();
-    const nextScale = panZoomStateRef.current.scale * (event.deltaY < 0 ? 1.12 : 0.88);
+    if (!active) {
+      return;
+    }
+
+    const nextFineScale = clampNumber(
+      panZoomStateRef.current.fineScale * (event.deltaY < 0 ? 1.12 : 0.88),
+      1,
+      VIEWER_MAX_FINE_SCALE,
+    );
 
     applyPanZoom({
-      scale: nextScale,
+      presetScale: panZoomStateRef.current.presetScale,
+      fineScale: nextFineScale,
       x: panZoomStateRef.current.x,
       y: panZoomStateRef.current.y,
     });
+  }
+
+  function handleTouchStart(event: ReactTouchEvent<HTMLDivElement>) {
+    if (!active || event.touches.length !== 2) {
+      touchGestureRef.current = null;
+      return;
+    }
+
+    event.preventDefault();
+    const firstTouch = event.touches[0];
+    const secondTouch = event.touches[1];
+    const firstSample = getTouchSample(firstTouch);
+    const secondSample = getTouchSample(secondTouch);
+    const center = {
+      x: (firstSample.x + secondSample.x) / 2,
+      y: (firstSample.y + secondSample.y) / 2,
+    };
+
+    suppressStageClickRef.current = true;
+    touchGestureRef.current = {
+      baseEffectiveScale: effectiveScale,
+      baseState: panZoomStateRef.current,
+      distance: getPointerDistance(firstSample, secondSample),
+      center,
+    };
+  }
+
+  function handleTouchMove(event: ReactTouchEvent<HTMLDivElement>) {
+    if (!active || event.touches.length !== 2) {
+      return;
+    }
+
+    const gesture = touchGestureRef.current;
+
+    if (!gesture) {
+      return;
+    }
+
+    event.preventDefault();
+    const firstTouch = event.touches[0];
+    const secondTouch = event.touches[1];
+    const firstSample = getTouchSample(firstTouch);
+    const secondSample = getTouchSample(secondTouch);
+    const center = {
+      x: (firstSample.x + secondSample.x) / 2,
+      y: (firstSample.y + secondSample.y) / 2,
+    };
+    const nextEffectiveScale =
+      gesture.baseEffectiveScale *
+      (getPointerDistance(firstSample, secondSample) / Math.max(gesture.distance, 1));
+    const nextFineScale = clampNumber(
+      nextEffectiveScale / Math.max(presetTransformScale, 0.01),
+      1,
+      VIEWER_MAX_FINE_SCALE,
+    );
+
+    applyPanZoom({
+      presetScale: gesture.baseState.presetScale,
+      fineScale: nextFineScale,
+      x: gesture.baseState.x + (center.x - gesture.center.x),
+      y: gesture.baseState.y + (center.y - gesture.center.y),
+    });
+  }
+
+  function handleTouchEnd(event: ReactTouchEvent<HTMLDivElement>) {
+    if (event.touches.length >= 2) {
+      const firstTouch = event.touches[0];
+      const secondTouch = event.touches[1];
+      const firstSample = getTouchSample(firstTouch);
+      const secondSample = getTouchSample(secondTouch);
+      touchGestureRef.current = {
+        baseEffectiveScale: effectiveScale,
+        baseState: panZoomStateRef.current,
+        distance: getPointerDistance(firstSample, secondSample),
+        center: {
+          x: (firstSample.x + secondSample.x) / 2,
+          y: (firstSample.y + secondSample.y) / 2,
+        },
+      };
+      return;
+    }
+
+    touchGestureRef.current = null;
+    if (clearSuppressedClickTimerRef.current !== null) {
+      window.clearTimeout(clearSuppressedClickTimerRef.current);
+    }
+    clearSuppressedClickTimerRef.current = window.setTimeout(() => {
+      suppressStageClickRef.current = false;
+    }, 0);
+  }
+
+  function handleClick() {
+    if (suppressStageClickRef.current) {
+      return;
+    }
+
+    if (!active) {
+      setActive(true);
+      return;
+    }
+
+    onCycleSide();
   }
 
   return (
@@ -643,15 +818,25 @@ function ABCompareStage({
       onPointerMove={handlePointerMove}
       onPointerUp={finishPointerInteraction}
       onPointerCancel={finishPointerInteraction}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+      onTouchCancel={handleTouchEnd}
+      onClick={handleClick}
       onWheel={handleWheel}
       sx={{
         position: "relative",
         width: "100%",
         height: "100%",
         overflow: "hidden",
-        touchAction: "none",
-        cursor: panZoomState.scale > 1 ? "grab" : "pointer",
+        touchAction: "pan-y",
+        cursor: active ? (effectiveScale > 1 ? "grab" : "pointer") : "pointer",
         userSelect: "none",
+        borderRadius: 2.25,
+        outline: active ? "1px solid rgba(232, 198, 246, 0.48)" : "1px solid transparent",
+        boxShadow: active ? "0 0 0 1px rgba(232, 198, 246, 0.08), 0 0 22px rgba(228, 194, 242, 0.14)" : "none",
+        transition:
+          "outline-color 180ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 180ms cubic-bezier(0.22, 1, 0.36, 1)",
       }}
     >
       <PositionedStageMedia
@@ -660,6 +845,8 @@ function ABCompareStage({
         mediaRect={mediaRect}
         rotateStage={rotateStage}
         panZoomState={panZoomState}
+        effectiveScale={effectiveScale}
+        imageRendering="pixelated"
       />
     </Box>
   );
@@ -668,10 +855,12 @@ function ABCompareStage({
 function StagePresentationShell({
   children,
   fittedSize,
+  inspectActive,
   rotateStage,
 }: {
   children: ReactNode;
   fittedSize: StageSize | null;
+  inspectActive?: boolean;
   rotateStage: boolean;
 }) {
   const fitActive = Boolean(fittedSize);
@@ -692,10 +881,18 @@ function StagePresentationShell({
         borderRadius: 2.5,
         overflow: "hidden",
         border: "1px solid",
-        borderColor: fitActive ? "rgba(232, 198, 246, 0.36)" : "divider",
+        borderColor: inspectActive
+          ? "rgba(232, 198, 246, 0.42)"
+          : fitActive
+            ? "rgba(232, 198, 246, 0.36)"
+            : "divider",
         background:
           "radial-gradient(circle at top, rgba(232, 198, 246, 0.1), transparent 28%), rgba(13, 24, 54, 0.94)",
-        boxShadow: fitActive ? "0 24px 52px rgba(8, 15, 35, 0.28)" : "none",
+        boxShadow: inspectActive
+          ? "0 0 0 1px rgba(232, 198, 246, 0.08), 0 18px 44px rgba(8, 15, 35, 0.28)"
+          : fitActive
+            ? "0 24px 52px rgba(8, 15, 35, 0.28)"
+            : "none",
         transition:
           "max-width 180ms cubic-bezier(0.22, 1, 0.36, 1), max-height 180ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 180ms cubic-bezier(0.22, 1, 0.36, 1), border-color 180ms cubic-bezier(0.22, 1, 0.36, 1)",
       }}
@@ -721,27 +918,33 @@ function HeatmapNotice() {
 }
 
 function ViewerStageContent({
+  abStageActive,
   beforeAsset,
   afterAsset,
+  devicePixelRatio,
   heatmapAsset,
   mode,
   abSide,
   overlayOpacity,
   rotateStage,
   panZoomState,
+  setAbStageActive,
   setPanZoomState,
   onCycleAbSide,
   swipePosition,
   setSwipePosition,
 }: {
+  abStageActive: boolean;
   beforeAsset: ViewerAsset | undefined;
   afterAsset: ViewerAsset | undefined;
+  devicePixelRatio: number;
   heatmapAsset: ViewerAsset | undefined;
   mode: ViewerMode;
   abSide: "before" | "after";
   overlayOpacity: number;
   rotateStage: boolean;
   panZoomState: ViewerPanZoomState;
+  setAbStageActive: (nextActive: boolean) => void;
   setPanZoomState: (nextState: ViewerPanZoomState) => void;
   onCycleAbSide: () => void;
   swipePosition: number;
@@ -781,10 +984,13 @@ function ViewerStageContent({
     return (
       <Box ref={stageViewportRef} sx={{ width: "100%", height: "100%" }}>
         <ABCompareStage
+          active={abStageActive}
           activeAsset={visibleAsset}
+          devicePixelRatio={devicePixelRatio}
           mediaRect={mediaRect}
           rotateStage={rotateStage}
           panZoomState={panZoomState}
+          setActive={setAbStageActive}
           setPanZoomState={setPanZoomState}
           onCycleSide={onCycleAbSide}
         />
@@ -827,8 +1033,10 @@ function ViewerStageContent({
 }
 
 function ViewerStage({
+  abStageActive,
   beforeAsset,
   afterAsset,
+  devicePixelRatio,
   heatmapAsset,
   mode,
   abSide,
@@ -836,14 +1044,17 @@ function ViewerStage({
   fittedStageSize,
   rotateStage,
   panZoomState,
+  setAbStageActive,
   setPanZoomState,
   onCycleAbSide,
   stageRef,
   swipePosition,
   setSwipePosition,
 }: {
+  abStageActive: boolean;
   beforeAsset: ViewerAsset | undefined;
   afterAsset: ViewerAsset | undefined;
+  devicePixelRatio: number;
   heatmapAsset: ViewerAsset | undefined;
   mode: ViewerMode;
   abSide: "before" | "after";
@@ -851,6 +1062,7 @@ function ViewerStage({
   fittedStageSize: StageSize | null;
   rotateStage: boolean;
   panZoomState: ViewerPanZoomState;
+  setAbStageActive: (nextActive: boolean) => void;
   setPanZoomState: (nextState: ViewerPanZoomState) => void;
   onCycleAbSide: () => void;
   stageRef: (node: HTMLDivElement | null) => void;
@@ -858,27 +1070,33 @@ function ViewerStage({
   setSwipePosition: (value: number) => void;
 }) {
   const contentProps = {
+    abStageActive,
     beforeAsset,
     afterAsset,
+    devicePixelRatio,
     heatmapAsset,
     mode,
     abSide,
     overlayOpacity,
     rotateStage,
     panZoomState,
+    setAbStageActive,
     setPanZoomState,
     onCycleAbSide,
     swipePosition,
     setSwipePosition,
   } satisfies {
+    abStageActive: boolean;
     beforeAsset: ViewerAsset | undefined;
     afterAsset: ViewerAsset | undefined;
+    devicePixelRatio: number;
     heatmapAsset: ViewerAsset | undefined;
     mode: ViewerMode;
     abSide: "before" | "after";
     overlayOpacity: number;
     rotateStage: boolean;
     panZoomState: ViewerPanZoomState;
+    setAbStageActive: (nextActive: boolean) => void;
     setPanZoomState: (nextState: ViewerPanZoomState) => void;
     onCycleAbSide: () => void;
     swipePosition: number;
@@ -895,7 +1113,11 @@ function ViewerStage({
         placeItems: "center",
       }}
     >
-      <StagePresentationShell fittedSize={fittedStageSize} rotateStage={rotateStage}>
+      <StagePresentationShell
+        fittedSize={fittedStageSize}
+        rotateStage={rotateStage}
+        inspectActive={mode === "a-b" && abStageActive}
+      >
         <ViewerStageContent {...contentProps} />
       </StagePresentationShell>
     </Box>
@@ -936,6 +1158,7 @@ function GroupLinks({
 }
 
 function ViewerSidebarContent({
+  caseMeta,
   currentGroup,
   currentFrame,
   groups,
@@ -943,6 +1166,7 @@ function ViewerSidebarContent({
   publishStatus,
   variant,
 }: {
+  caseMeta: ViewerDataset["caseMeta"];
   currentGroup: ViewerGroup;
   currentFrame: ViewerFrame | undefined;
   groups: ViewerDataset["siblingGroups"];
@@ -952,15 +1176,33 @@ function ViewerSidebarContent({
 }) {
   return (
     <Stack spacing={2} sx={{ p: 2.25 }}>
-      <Stack spacing={0.5}>
-        <Typography variant="body2" color="text.secondary">
-          Group navigator
-        </Typography>
-        <GroupLinks currentGroup={currentGroup} groups={groups} />
-      </Stack>
-      <Divider />
+      {variant === "internal" ? (
+        <>
+          <Stack spacing={0.85}>
+            <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 500 }}>
+              Group navigator
+            </Typography>
+            <Button
+              component={Link}
+              href={`/cases/${caseMeta.slug}`}
+              variant="outlined"
+              size="small"
+              startIcon={<ArrowBack fontSize="small" />}
+              sx={{
+                alignSelf: "flex-start",
+                minHeight: 34,
+                px: 1.35,
+              }}
+            >
+              Back to workspace
+            </Button>
+            <GroupLinks currentGroup={currentGroup} groups={groups} />
+          </Stack>
+          <Divider />
+        </>
+      ) : null}
       <Stack spacing={0.75}>
-        <Typography variant="body2" color="text.secondary">
+        <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 500 }}>
           Frame details
         </Typography>
         <Typography variant="subtitle1">{currentFrame?.title}</Typography>
@@ -970,7 +1212,7 @@ function ViewerSidebarContent({
       </Stack>
       <Divider />
       <Stack spacing={0.75}>
-        <Typography variant="body2" color="text.secondary">
+        <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 500 }}>
           Asset metadata
         </Typography>
         <Typography variant="body2">
@@ -997,9 +1239,33 @@ function ViewerSidebarContent({
               size="small"
               sx={{ alignSelf: "flex-start" }}
             />
-            <Typography variant="body2">
-              Public slug: {publishStatus.publicSlug ?? "Pending first publish"}
-            </Typography>
+            <Stack direction="row" spacing={0.6} alignItems="center" useFlexGap>
+              <Typography variant="body2">
+                Public slug: {publishStatus.publicSlug ?? "Pending first publish"}
+              </Typography>
+              {publishStatus.publicUrl ? (
+                <Tooltip title="Open published page in a new tab">
+                  <IconButton
+                    component="a"
+                    href={publishStatus.publicUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    size="small"
+                    sx={{
+                      width: 38,
+                      height: 30,
+                      px: 0.9,
+                      borderRadius: 999,
+                      border: "1px solid",
+                      borderColor: "divider",
+                      backgroundColor: "background.raised",
+                    }}
+                  >
+                    <OpenInNew sx={{ fontSize: 16 }} />
+                  </IconButton>
+                </Tooltip>
+              ) : null}
+            </Stack>
             <Typography variant="body2" color="text.secondary">
               {formatUtcDate(publishStatus.publishedAt ?? null)}
             </Typography>
@@ -1015,6 +1281,8 @@ export function GroupViewerWorkbench({
   variant,
 }: GroupViewerWorkbenchProps) {
   const controller = useViewerController(dataset.group);
+  const sidebarPreferenceLoadedRef = useRef(false);
+  const sidebarPreferencePersistReadyRef = useRef(false);
   const theme = useTheme();
   const showDesktopSidebar = useMediaQuery(theme.breakpoints.up("lg"), { noSsr: true });
   const hideFitControl = useMediaQuery(theme.breakpoints.down("sm"), { noSsr: true });
@@ -1023,9 +1291,11 @@ export function GroupViewerWorkbench({
   });
   const prefersReducedMotion = useMediaQuery("(prefers-reduced-motion: reduce)", { noSsr: true });
   const [viewportSize, setViewportSize] = useState<ViewportSize>(() => getViewportSize());
+  const [devicePixelRatio, setDevicePixelRatio] = useState<number>(() => getViewerDevicePixelRatio());
   const [fitViewViewportSignature, setFitViewViewportSignature] = useState<string | null>(null);
   const [swipePosition, setSwipePosition] = useState(50);
   const [abPanZoomState, setAbPanZoomState] = useState<ViewerPanZoomState>(DEFAULT_PAN_ZOOM);
+  const [abStageActive, setAbStageActive] = useState(false);
   const [filmstripScrollState, setFilmstripScrollState] = useState<FilmstripScrollState>({
     clientWidth: 0,
     scrollLeft: 0,
@@ -1045,7 +1315,10 @@ export function GroupViewerWorkbench({
     startX: number;
   } | null>(null);
   const filmstripInertiaFrameRef = useRef<number | null>(null);
+  const filmstripReboundFrameRef = useRef<number | null>(null);
   const filmstripVelocityRef = useRef(0);
+  const filmstripEdgeOffsetRef = useRef(0);
+  const filmstripEdgeVelocityRef = useRef(0);
   const suppressFilmstripClickRef = useRef(false);
   const stageAspectRatio = rotateStage ? 9 / 16 : 16 / 9;
   const fittedStageSize = useMemo(
@@ -1062,6 +1335,29 @@ export function GroupViewerWorkbench({
       ),
     [filmstripScrollState],
   );
+
+  useEffect(() => {
+    const preferredOpenState = readViewerDetailsCookie();
+
+    if (preferredOpenState !== null) {
+      controller.setSidebarOpen(preferredOpenState);
+    }
+
+    sidebarPreferenceLoadedRef.current = true;
+  }, []);
+
+  useEffect(() => {
+    if (!sidebarPreferenceLoadedRef.current) {
+      return;
+    }
+
+    if (!sidebarPreferencePersistReadyRef.current) {
+      sidebarPreferencePersistReadyRef.current = true;
+      return;
+    }
+
+    writeViewerDetailsCookie(controller.sidebarOpen);
+  }, [controller.sidebarOpen]);
 
   useEffect(() => {
     if (controller.currentFrame) {
@@ -1090,22 +1386,31 @@ export function GroupViewerWorkbench({
   useEffect(() => {
     setSwipePosition(50);
     setAbPanZoomState(DEFAULT_PAN_ZOOM);
+    setAbStageActive(false);
   }, [controller.currentFrame?.id]);
 
   useEffect(() => {
     if (controller.mode !== "a-b") {
       setAbPanZoomState(DEFAULT_PAN_ZOOM);
+      setAbStageActive(false);
     }
   }, [controller.mode]);
 
   useEffect(() => {
-    function syncViewportSize() {
+    function syncViewportMetrics() {
       setViewportSize(getViewportSize());
+      setDevicePixelRatio(getViewerDevicePixelRatio());
     }
 
-    syncViewportSize();
-    window.addEventListener("resize", syncViewportSize);
-    return () => window.removeEventListener("resize", syncViewportSize);
+    syncViewportMetrics();
+    window.addEventListener("resize", syncViewportMetrics);
+    return () => window.removeEventListener("resize", syncViewportMetrics);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      cancelFilmstripMotion();
+    };
   }, []);
 
   useEffect(() => {
@@ -1166,7 +1471,16 @@ export function GroupViewerWorkbench({
         controller.setMode("a-b");
       }
 
-      if ((event.key === "ArrowUp" || event.key === "ArrowDown") && controller.mode === "a-b") {
+      if (event.key === "Escape" && controller.mode === "a-b" && abStageActive) {
+        event.preventDefault();
+        setAbStageActive(false);
+      }
+
+      if (
+        (event.key === "ArrowUp" || event.key === "ArrowDown") &&
+        controller.mode === "a-b" &&
+        abStageActive
+      ) {
         event.preventDefault();
         controller.setAbSide(cycleAbSide(controller.abSide));
       }
@@ -1182,7 +1496,42 @@ export function GroupViewerWorkbench({
 
     window.addEventListener("keydown", handleKeydown);
     return () => window.removeEventListener("keydown", handleKeydown);
-  }, [controller]);
+  }, [abStageActive, controller]);
+
+  useEffect(() => {
+    if (controller.mode !== "a-b" || !abStageActive) {
+      return;
+    }
+
+    function handleOutsidePointerDown(event: PointerEvent) {
+      const stageNode = stageRef.current;
+
+      if (!stageNode || !(event.target instanceof Node) || stageNode.contains(event.target)) {
+        return;
+      }
+
+      setAbStageActive(false);
+    }
+
+    document.addEventListener("pointerdown", handleOutsidePointerDown, true);
+    return () => document.removeEventListener("pointerdown", handleOutsidePointerDown, true);
+  }, [abStageActive, controller.mode]);
+
+  function cycleAbScalePreset() {
+    setAbPanZoomState((previousState) => ({
+      presetScale:
+        previousState.presetScale === 1
+          ? 2
+          : previousState.presetScale === 2
+            ? 3
+            : previousState.presetScale === 3
+              ? 4
+              : 1,
+      fineScale: 1,
+      x: 0,
+      y: 0,
+    }));
+  }
 
   function toggleFittedStageView() {
     const nextViewportSize = getViewportSize();
@@ -1205,6 +1554,20 @@ export function GroupViewerWorkbench({
     };
   }
 
+  function syncFilmstripEdgeOffset(nextOffset: number) {
+    filmstripEdgeOffsetRef.current = nextOffset;
+    setFilmstripEdgeOffset(nextOffset);
+  }
+
+  function cancelFilmstripRebound() {
+    if (filmstripReboundFrameRef.current !== null) {
+      window.cancelAnimationFrame(filmstripReboundFrameRef.current);
+      filmstripReboundFrameRef.current = null;
+    }
+
+    filmstripEdgeVelocityRef.current = 0;
+  }
+
   function cancelFilmstripInertia() {
     if (filmstripInertiaFrameRef.current !== null) {
       window.cancelAnimationFrame(filmstripInertiaFrameRef.current);
@@ -1212,6 +1575,42 @@ export function GroupViewerWorkbench({
     }
 
     filmstripVelocityRef.current = 0;
+  }
+
+  function cancelFilmstripMotion() {
+    cancelFilmstripInertia();
+    cancelFilmstripRebound();
+  }
+
+  function startFilmstripRebound(initialOffset: number) {
+    cancelFilmstripRebound();
+
+    if (prefersReducedMotion || Math.abs(initialOffset) < 0.5) {
+      syncFilmstripEdgeOffset(0);
+      return;
+    }
+
+    syncFilmstripEdgeOffset(initialOffset);
+    filmstripEdgeVelocityRef.current = -initialOffset * 0.16;
+
+    const step = () => {
+      const currentOffset = filmstripEdgeOffsetRef.current;
+      const nextVelocity = (filmstripEdgeVelocityRef.current - currentOffset * 0.14) * 0.82;
+      const nextOffset = currentOffset + nextVelocity;
+
+      if (Math.abs(nextOffset) < 0.35 && Math.abs(nextVelocity) < 0.2) {
+        syncFilmstripEdgeOffset(0);
+        filmstripReboundFrameRef.current = null;
+        filmstripEdgeVelocityRef.current = 0;
+        return;
+      }
+
+      filmstripEdgeVelocityRef.current = nextVelocity;
+      syncFilmstripEdgeOffset(nextOffset);
+      filmstripReboundFrameRef.current = window.requestAnimationFrame(step);
+    };
+
+    filmstripReboundFrameRef.current = window.requestAnimationFrame(step);
   }
 
   function handleFilmstripPointerDown(event: ReactPointerEvent<HTMLDivElement>) {
@@ -1223,7 +1622,7 @@ export function GroupViewerWorkbench({
       return;
     }
 
-    cancelFilmstripInertia();
+    cancelFilmstripMotion();
     filmstripDragStateRef.current = {
       lastClientX: event.clientX,
       lastTimestamp: performance.now(),
@@ -1247,7 +1646,9 @@ export function GroupViewerWorkbench({
       return;
     }
 
-    const travelX = event.clientX - dragState.startX;
+    const dragGain =
+      event.pointerType === "mouse" ? FILMSTRIP_MOUSE_DRAG_GAIN : FILMSTRIP_TOUCH_DRAG_GAIN;
+    const travelX = (event.clientX - dragState.startX) * dragGain;
     const viewport = event.currentTarget;
     const maxScrollLeft = Math.max(0, viewport.scrollWidth - viewport.clientWidth);
     const nextScrollLeft = dragState.startScrollLeft - travelX;
@@ -1262,14 +1663,20 @@ export function GroupViewerWorkbench({
 
     if (nextScrollLeft < 0 || nextScrollLeft > maxScrollLeft) {
       const overscroll = nextScrollLeft < 0 ? nextScrollLeft : nextScrollLeft - maxScrollLeft;
-      setFilmstripEdgeOffset(clampNumber(-overscroll * 0.18, -18, 18));
+      const direction = overscroll < 0 ? 1 : -1;
+      const overscrollMagnitude = Math.abs(overscroll);
+      const visualOffset = direction * Math.min(
+        FILMSTRIP_EDGE_OFFSET_LIMIT,
+        Math.pow(overscrollMagnitude, 0.86) * FILMSTRIP_OVERSCROLL_GAIN,
+      );
+      syncFilmstripEdgeOffset(visualOffset);
       viewport.scrollLeft = clampNumber(nextScrollLeft, 0, maxScrollLeft);
     } else {
-      setFilmstripEdgeOffset(0);
+      syncFilmstripEdgeOffset(0);
       viewport.scrollLeft = nextScrollLeft;
     }
 
-    filmstripVelocityRef.current = deltaScroll / deltaTime;
+    filmstripVelocityRef.current = (deltaScroll / deltaTime) * FILMSTRIP_INERTIA_VELOCITY_GAIN;
     dragState.lastClientX = event.clientX;
     dragState.lastTimestamp = now;
   }
@@ -1286,24 +1693,44 @@ export function GroupViewerWorkbench({
     }
 
     filmstripDragStateRef.current = null;
-    setFilmstripEdgeOffset(0);
+    const releaseEdgeOffset = filmstripEdgeOffsetRef.current;
 
     if (dragState.moved) {
+      if (Math.abs(releaseEdgeOffset) > 0.5) {
+        startFilmstripRebound(releaseEdgeOffset * 1.12);
+      }
+
       if (!prefersReducedMotion) {
         const viewport = event.currentTarget;
         const maxScrollLeft = Math.max(0, viewport.scrollWidth - viewport.clientWidth);
+        let lastFrameTime = performance.now();
 
-        const step = () => {
-          const nextScrollLeft = clampNumber(
-            viewport.scrollLeft + filmstripVelocityRef.current * 16,
-            0,
-            maxScrollLeft,
-          );
+        const step = (timestamp: number) => {
+          const deltaTime = Math.min(28, timestamp - lastFrameTime || 16);
+          lastFrameTime = timestamp;
+          const nextScrollLeft = viewport.scrollLeft + filmstripVelocityRef.current * deltaTime;
+
+          if (nextScrollLeft <= 0 || nextScrollLeft >= maxScrollLeft) {
+            viewport.scrollLeft = clampNumber(nextScrollLeft, 0, maxScrollLeft);
+            startFilmstripRebound(
+              clampNumber(
+                Math.sign(filmstripVelocityRef.current) * -1 * Math.max(
+                  18,
+                  Math.min(FILMSTRIP_EDGE_OFFSET_LIMIT, Math.abs(filmstripVelocityRef.current) * 14),
+                ),
+                -FILMSTRIP_EDGE_OFFSET_LIMIT,
+                FILMSTRIP_EDGE_OFFSET_LIMIT,
+              ),
+            );
+            filmstripVelocityRef.current = 0;
+            filmstripInertiaFrameRef.current = null;
+            return;
+          }
 
           viewport.scrollLeft = nextScrollLeft;
-          filmstripVelocityRef.current *= 0.92;
+          filmstripVelocityRef.current *= Math.pow(0.996, deltaTime);
 
-          if (Math.abs(filmstripVelocityRef.current) < 0.02) {
+          if (Math.abs(filmstripVelocityRef.current) < FILMSTRIP_INERTIA_MIN_VELOCITY) {
             filmstripVelocityRef.current = 0;
             filmstripInertiaFrameRef.current = null;
             return;
@@ -1313,6 +1740,8 @@ export function GroupViewerWorkbench({
         };
 
         filmstripInertiaFrameRef.current = window.requestAnimationFrame(step);
+      } else if (Math.abs(releaseEdgeOffset) > 0.5) {
+        startFilmstripRebound(releaseEdgeOffset);
       }
 
       window.setTimeout(() => {
@@ -1382,7 +1811,7 @@ export function GroupViewerWorkbench({
           }}
         >
           <Stack spacing={0.2} sx={{ minWidth: 0, pr: { md: 2 } }}>
-            <Typography variant="h4" noWrap sx={{ lineHeight: 1.14, pb: 0.08 }}>
+            <Typography variant="h4" noWrap sx={{ lineHeight: 1.18, pb: 0.16 }}>
               {dataset.group.title}
             </Typography>
             <Typography variant="body2" color="text.secondary" noWrap sx={{ mt: "0.25em" }}>
@@ -1397,6 +1826,74 @@ export function GroupViewerWorkbench({
             flexWrap="wrap"
             useFlexGap
           >
+            <Stack direction="row" spacing={1} alignItems="center" sx={{ flexShrink: 0 }}>
+              <Box
+                sx={{
+                  width: 104,
+                  visibility: controller.mode === "a-b" ? "visible" : "hidden",
+                }}
+              >
+                {controller.mode === "a-b" ? (
+                  <FormControl
+                    size="small"
+                    fullWidth
+                    sx={{
+                      "& .MuiOutlinedInput-root": {
+                        height: 34,
+                        minHeight: 34,
+                      },
+                      "& .MuiSelect-select": {
+                        display: "flex",
+                        alignItems: "center",
+                        minHeight: "34px !important",
+                        py: "0 !important",
+                        pl: 1.5,
+                        pr: 3.75,
+                        fontSize: "0.92rem",
+                        fontWeight: 550,
+                      },
+                    }}
+                  >
+                    <Select
+                      value={controller.abSide}
+                      onChange={(event) =>
+                        controller.setAbSide(String(event.target.value) as "before" | "after")
+                      }
+                      inputProps={{ "aria-label": "Choose A/B side" }}
+                    >
+                      <MenuItem value="before">Before</MenuItem>
+                      <MenuItem value="after">After</MenuItem>
+                    </Select>
+                  </FormControl>
+                ) : null}
+              </Box>
+              <Box
+                sx={{
+                  width: 102,
+                  visibility: controller.mode === "a-b" ? "visible" : "hidden",
+                }}
+              >
+                {controller.mode === "a-b" ? (
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    onClick={cycleAbScalePreset}
+                    sx={{
+                      width: "100%",
+                      height: 34,
+                      minHeight: 34,
+                      px: 1.3,
+                      fontSize: "0.9rem",
+                      fontWeight: 550,
+                      borderRadius: 999,
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {abPanZoomState.presetScale}x Scale
+                  </Button>
+                ) : null}
+              </Box>
+            </Stack>
             <ToggleButtonGroup
               exclusive
               size="small"
@@ -1408,7 +1905,7 @@ export function GroupViewerWorkbench({
                   height: 34,
                   minHeight: 34,
                   px: 1.3,
-                  fontWeight: 400,
+                  fontWeight: 550,
                   border: "1px solid",
                   borderColor: "divider",
                   borderRadius: "999px !important",
@@ -1438,38 +1935,6 @@ export function GroupViewerWorkbench({
                 Heatmap
               </ToggleButton>
             </ToggleButtonGroup>
-            {controller.mode === "a-b" ? (
-              <FormControl
-                size="small"
-                sx={{
-                  minWidth: 104,
-                  "& .MuiOutlinedInput-root": {
-                    height: 34,
-                    minHeight: 34,
-                  },
-                  "& .MuiSelect-select": {
-                    display: "flex",
-                    alignItems: "center",
-                    minHeight: "34px !important",
-                    py: "0 !important",
-                    pl: 1.5,
-                    pr: 3.75,
-                    fontSize: "0.92rem",
-                  },
-                }}
-              >
-                <Select
-                  value={controller.abSide}
-                  onChange={(event) =>
-                    controller.setAbSide(String(event.target.value) as "before" | "after")
-                  }
-                  inputProps={{ "aria-label": "Choose A/B side" }}
-                >
-                  <MenuItem value="before">Before</MenuItem>
-                  <MenuItem value="after">After</MenuItem>
-                </Select>
-              </FormControl>
-            ) : null}
             {!hideFitControl ? (
               <Tooltip
                 title={
@@ -1542,8 +2007,10 @@ export function GroupViewerWorkbench({
                 }}
               >
                 <ViewerStage
+                  abStageActive={abStageActive}
                   beforeAsset={controller.beforeAsset}
                   afterAsset={controller.afterAsset}
+                  devicePixelRatio={devicePixelRatio}
                   heatmapAsset={controller.heatmapAsset}
                   mode={controller.mode}
                   abSide={controller.abSide}
@@ -1551,6 +2018,7 @@ export function GroupViewerWorkbench({
                   fittedStageSize={fittedStageSize}
                   rotateStage={rotateStage}
                   panZoomState={abPanZoomState}
+                  setAbStageActive={setAbStageActive}
                   setPanZoomState={setAbPanZoomState}
                   onCycleAbSide={() => controller.setAbSide(cycleAbSide(controller.abSide))}
                   stageRef={(node) => {
@@ -1698,6 +2166,7 @@ export function GroupViewerWorkbench({
               }}
             >
               <ViewerSidebarContent
+                caseMeta={dataset.caseMeta}
                 currentGroup={dataset.group}
                 currentFrame={controller.currentFrame}
                 groups={dataset.siblingGroups}
@@ -1724,6 +2193,7 @@ export function GroupViewerWorkbench({
           }}
         >
           <ViewerSidebarContent
+            caseMeta={dataset.caseMeta}
             currentGroup={dataset.group}
             currentFrame={controller.currentFrame}
             groups={dataset.siblingGroups}

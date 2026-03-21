@@ -50,7 +50,6 @@ export interface ViewerGroup {
 export interface ViewerCaseMeta {
   slug: string;
   title: string;
-  subtitle: string;
   summary: string;
   status?: CaseStatus;
   tags: string[];
@@ -60,6 +59,7 @@ export interface ViewerCaseMeta {
 export interface ViewerPublishStatus {
   status: CaseStatus;
   publicSlug?: string | null;
+  publicUrl?: string | null;
   publishedAt?: string | null;
 }
 
@@ -120,7 +120,6 @@ export function createViewerDatasetFromPublishManifest(
     caseMeta: {
       slug: manifest.case.slug,
       title: manifest.case.title,
-      subtitle: manifest.case.subtitle,
       summary: manifest.case.summary,
       tags: manifest.case.tags,
       publishedAt: manifest.case.publishedAt,
@@ -164,6 +163,7 @@ export function createViewerDatasetFromPublishManifest(
     publishStatus: {
       status: "published",
       publicSlug: manifest.publicSlug,
+      publicUrl: null,
       publishedAt: manifest.case.publishedAt,
     },
   };
