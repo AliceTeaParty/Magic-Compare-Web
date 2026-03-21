@@ -12,6 +12,8 @@
 # next.js
 /.next/
 **/.next/
+/.nuxt/
+**/.nuxt/
 /out/
 
 # production
