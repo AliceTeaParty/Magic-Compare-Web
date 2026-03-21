@@ -152,7 +152,7 @@ function SortableGroupRow({
               <ToggleButton
                 value="internal"
                 disabled={isPending}
-                sx={{ minHeight: 32, px: 1.15, fontSize: "0.84rem" }}
+                sx={{ minHeight: 32, px: "10px", py: "2px", fontSize: "0.84rem" }}
               >
                 <LockOutlined sx={{ mr: 0.55, fontSize: 14.5 }} />
                 Internal
@@ -160,7 +160,7 @@ function SortableGroupRow({
               <ToggleButton
                 value="public"
                 disabled={isPending}
-                sx={{ minHeight: 32, px: 1.15, fontSize: "0.84rem" }}
+                sx={{ minHeight: 32, px: "10px", py: "2px", fontSize: "0.84rem" }}
               >
                 <Public sx={{ mr: 0.55, fontSize: 14.5 }} />
                 Public
@@ -328,7 +328,10 @@ export function CaseWorkspaceBoard({
               <Typography variant="h2" sx={{ lineHeight: 0.98 }}>
                 {data.title}
               </Typography>
-              <Stack direction="row" spacing={0.9} flexWrap="wrap" useFlexGap>
+              <Typography variant="body1" color="text.secondary" sx={{ maxWidth: 820 }}>
+                {data.summary || "No summary yet."}
+              </Typography>
+              <Stack direction="row" spacing={0.9} flexWrap="wrap" useFlexGap sx={{ pt: 0.25 }}>
                 <Chip
                   label={data.status}
                   color={data.status === "published" ? "primary" : "default"}
@@ -345,9 +348,6 @@ export function CaseWorkspaceBoard({
                   sx={{ height: 38, "& .MuiChip-label": { px: 1.55 } }}
                 />
               </Stack>
-              <Typography variant="body1" color="text.secondary" sx={{ maxWidth: 820 }}>
-                {data.summary || "No summary yet."}
-              </Typography>
             </Stack>
             <Stack
               direction="row"
@@ -386,7 +386,7 @@ export function CaseWorkspaceBoard({
                   })
                 }
               >
-                Publish case
+                Publish Case
               </Button>
               <Button
                 variant="outlined"
