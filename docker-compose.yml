@@ -94,7 +94,7 @@ services:
       internal-site-init:
         condition: service_completed_successfully
     ports:
-      - "3000:3000"
+      - "${MAGIC_COMPARE_INTERNAL_SITE_HOST_PORT:-3000}:3000"
     healthcheck:
       test:
         [
