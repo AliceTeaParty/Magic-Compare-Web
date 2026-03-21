@@ -6,7 +6,6 @@ services:
       dockerfile: docker/internal-site.Dockerfile
     volumes:
       - ./docker-data/internal-data:/app/data
-      - ./docker/internal-site-init.sh:/opt/magic-compare/internal-site-init.sh:ro
 
   internal-site:
     image: magic-compare/internal-site:local

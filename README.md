@@ -104,6 +104,10 @@ Demo content:
   - `rustfs` as the S3-compatible object store
   - `rustfs-init`, a lightweight `minio/mc` bootstrapper that ensures the bucket exists on startup
   - `internal-site-init`, a one-off initializer that runs `db:push` and `db:seed` before the app starts
+- server-side Docker deployment now only needs:
+  - `docker-compose.yml`
+  - `.env`
+  - the published runtime image
 - the base Compose file now defaults to the GHCR runtime image via `MAGIC_COMPARE_INTERNAL_SITE_IMAGE`, so servers can `docker compose up` without a local build step
 - the base Compose file now uses Docker named volumes, so a server can run it without depending on repository-relative `docker-data` paths
 - if you want a local image build plus inspectable bind mounts during development, add `-f docker/dev.compose.override.yml`

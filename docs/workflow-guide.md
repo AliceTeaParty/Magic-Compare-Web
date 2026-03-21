@@ -538,8 +538,6 @@ docker build -f docker/internal-site.Dockerfile -t magic-compare/internal-site .
 - `docker-compose.yml`
 - `docker/dev.compose.override.yml`
 - `docker/ci.compose.override.yml`
-- `docker/rustfs-init.sh`
-- `docker/internal-site-init.sh`
 - `docker/internal-site.Dockerfile`
 - `apps/internal-site/lib/server/public-site/runtime.ts`
 - `docs/ci-ghcr-lessons.zh-CN.md`

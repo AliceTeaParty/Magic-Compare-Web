@@ -56,7 +56,26 @@ services:
     image: minio/mc:RELEASE.2025-08-13T08-35-41Z
     entrypoint:
       - /bin/sh
-      - /opt/magic-compare/rustfs-init.sh
+      - -ec
+      - |
+        endpoint="${MAGIC_COMPARE_DOCKER_S3_ENDPOINT:-http://rustfs:9000}"
+        bucket="${MAGIC_COMPARE_S3_BUCKET:-magic-compare-assets}"
+        access_key="${MAGIC_COMPARE_S3_ACCESS_KEY_ID:-rustfsadmin}"
+        secret_key="${MAGIC_COMPARE_S3_SECRET_ACCESS_KEY:-rustfsadmin}"
+
+        echo "Waiting for object storage at $${endpoint}..."
+        until mc alias set rustfs "$$endpoint" "$$access_key" "$$secret_key" --api S3v4 --path on >/dev/null 2>&1 &&
+          mc ls rustfs >/dev/null 2>&1; do
+          sleep 2
+        done
+
+        echo "Ensuring bucket $${bucket} exists..."
+        mc mb "rustfs/$$bucket" --ignore-existing >/dev/null
+
+        echo "Enabling anonymous download for bucket $${bucket}..."
+        mc anonymous set download "rustfs/$$bucket" >/dev/null
+
+        echo "Object storage bucket $${bucket} is ready."
     depends_on:
       rustfs:
         condition: service_healthy
@@ -66,14 +85,11 @@ services:
       MAGIC_COMPARE_S3_ACCESS_KEY_ID: ${MAGIC_COMPARE_S3_ACCESS_KEY_ID:-rustfsadmin}
       MAGIC_COMPARE_S3_SECRET_ACCESS_KEY: ${MAGIC_COMPARE_S3_SECRET_ACCESS_KEY:-rustfsadmin}
       MAGIC_COMPARE_S3_BUCKET: ${MAGIC_COMPARE_S3_BUCKET:-magic-compare-assets}
-    volumes:
-      - ./docker/rustfs-init.sh:/opt/magic-compare/rustfs-init.sh:ro
 
   internal-site-init:
     <<: *internal-site-common
     entrypoint:
-      - /bin/sh
-      - /opt/magic-compare/internal-site-init.sh
+      - /usr/local/bin/internal-site-init
     depends_on:
       rustfs:
         condition: service_healthy
@@ -82,7 +98,6 @@ services:
     restart: "no"
     volumes:
       - internal-data:/app/data
-      - ./docker/internal-site-init.sh:/opt/magic-compare/internal-site-init.sh:ro
 
   internal-site:
     <<: *internal-site-common

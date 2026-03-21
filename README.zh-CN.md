@@ -105,6 +105,10 @@ pnpm dev:public
   - 作为 S3-compatible 后端的 `rustfs`
   - 启动时用轻量 `minio/mc` 确保 bucket 存在的 `rustfs-init`
   - 在应用启动前执行 `db:push` 和 `db:seed` 的一次性 `internal-site-init`
+- 服务器 Docker 部署现在只需要：
+  - `docker-compose.yml`
+  - `.env`
+  - 已发布的运行时镜像
 - 基础 compose 现在默认通过 `MAGIC_COMPARE_INTERNAL_SITE_IMAGE` 拉 GHCR 运行时镜像，服务器可直接 `docker compose up`
 - 基础 compose 现在默认使用 Docker named volumes，服务器可以不依赖仓库内的 `docker-data` 路径直接运行
 - 如果本地开发时想改成“本地 build + 可见 bind mount”，可额外加上 `-f docker/dev.compose.override.yml`

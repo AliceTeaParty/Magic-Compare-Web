@@ -162,8 +162,7 @@ pnpm public:export
 - `.github/workflows/ci.yml`
 - `.github/workflows/ghcr-docker.yml`
 - `docker/ci.compose.override.yml`
-- `docker/rustfs-init.sh`
-- `docker/internal-site-init.sh`
+- `docker/internal-site.Dockerfile`
 - `docs/workflow-guide.md`
 
 如果未来继续改 CI / GHCR：
