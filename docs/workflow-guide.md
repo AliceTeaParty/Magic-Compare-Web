@@ -528,9 +528,10 @@ docker build -f docker/internal-site.Dockerfile -t magic-compare/internal-site .
 
 先看：
 
-- `docs/vseditor-workflow.zh-CN.md`
+- `docs/uploader/README.md`
+- `docs/uploader/vseditor-workflow.zh-CN.md`
 - `docs/demo-vs-real-case-flow.zh-CN.md`
-- `tools/uploader/README.md`
+- `docs/uploader/boundaries-and-env-split.zh-CN.md`
 
 ### 做部署、Docker、Pages、CI
 

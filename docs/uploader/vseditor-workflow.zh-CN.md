@@ -54,7 +54,7 @@ magic-compare-uploader
 ~/Downloads/test-example-case/.env
 ```
 
-它来自仓库根目录的 `.env.example`。最常用的字段是：
+它来自 `tools/uploader/.env.example`。最常用的字段是：
 
 ```text
 MAGIC_COMPARE_SITE_URL=http://localhost:3000
@@ -62,7 +62,6 @@ MAGIC_COMPARE_API_URL=
 MAGIC_COMPARE_S3_BUCKET=magic-compare-assets
 MAGIC_COMPARE_S3_REGION=us-east-1
 MAGIC_COMPARE_S3_ENDPOINT=http://localhost:9000
-MAGIC_COMPARE_S3_PUBLIC_BASE_URL=http://127.0.0.1:9000/magic-compare-assets
 MAGIC_COMPARE_S3_ACCESS_KEY_ID=rustfsadmin
 MAGIC_COMPARE_S3_SECRET_ACCESS_KEY=rustfsadmin
 MAGIC_COMPARE_S3_FORCE_PATH_STYLE=true
@@ -73,6 +72,7 @@ MAGIC_COMPARE_CF_ACCESS_TOKEN=
 说明：
 
 - 本地开发时，`MAGIC_COMPARE_SITE_URL=http://localhost:3000` 就够了
+- uploader 的工作目录只保留 Python 导入链路需要的字段，不再混入网站发布或 Pages 部署变量
 - uploader 现在会把原图、缩略图和自动 heatmap 直接上传到 S3-compatible 存储，不再写入仓库内的 runtime 目录
 - 如果本地用 `docker compose up -d rustfs rustfs-init`，上面这组 S3 默认值可以直接使用
 - 如果内部站放在 Cloudflare Zero Trust 后面，把它改成真实内部域名，例如 `https://compare-internal.example.com`

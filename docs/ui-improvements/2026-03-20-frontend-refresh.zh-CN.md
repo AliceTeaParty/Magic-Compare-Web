@@ -4,7 +4,7 @@
 
 ## 当前 docs 列表
 
-- `docs/vseditor-workflow.zh-CN.md`
+- `docs/uploader/vseditor-workflow.zh-CN.md`
 - `docs/demo-vs-real-case-flow.zh-CN.md`
 - `docs/mcp-usage-guide.md`
 - `docs/project-overview-guide.md`

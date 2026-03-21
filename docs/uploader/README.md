@@ -1,8 +1,10 @@
 # Magic Compare Uploader
 
-This document covers the Python uploader in `tools/uploader`.
+This document covers the Python-only uploader in `tools/uploader`.
+Its runtime config and docs are intentionally split from the Next.js site so uploader changes stay inside the Python boundary.
 
-For a concrete Chinese walkthrough that starts with a flat VSEditor export folder and ends with a successful `sync`, see `docs/vseditor-workflow.zh-CN.md`.
+For a concrete Chinese walkthrough that starts with a flat VSEditor export folder and ends with a successful `sync`, see `docs/uploader/vseditor-workflow.zh-CN.md`.
+For the rationale behind splitting uploader docs and env files away from the website, see `docs/uploader/boundaries-and-env-split.zh-CN.md`.
 
 The uploader is intentionally local-first. It is designed for the current v1 workflow where images already live on disk and the web app should not implement a complex browser upload experience.
 
@@ -40,7 +42,7 @@ Current default sync endpoint derived from the site URL:
 http://localhost:3000/api/ops/import-sync
 ```
 
-The uploader now reads configuration from a work-directory `.env` file and ships with a repository-level `.env.example` template:
+The uploader now reads configuration from a work-directory `.env` file and ships with a tool-local template at `tools/uploader/.env.example`:
 
 ```text
 MAGIC_COMPARE_SITE_URL=http://localhost:3000
@@ -89,7 +91,7 @@ When the wizard creates or reuses a work directory, it also creates:
 <work-dir>/.env
 ```
 
-If no `.env` exists yet, the CLI copies the repository `.env.example` into that work directory.
+If no `.env` exists yet, the CLI copies `tools/uploader/.env.example` into that work directory.
 
 Default meanings:
 
@@ -139,7 +141,7 @@ It will:
 4. search existing cases from the internal site
 5. default to the current year case if you don't choose another one
 6. generate or reuse a structured work directory next to the source folder
-7. create `<work-dir>/.env` from `.env.example` when needed
+7. create `<work-dir>/.env` from `tools/uploader/.env.example` when needed
 8. authenticate against Cloudflare Access when needed
 9. generate `case.yaml`, `group.yaml`, `frame.yaml`, and `assets.yaml`
 10. open metadata in the system editor for confirmation

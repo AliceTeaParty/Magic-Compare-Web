@@ -11,7 +11,7 @@
 <p align="center">
   <a href="#quick-start">快速开始</a> ·
   <a href="#workflow-overview">查看流程</a> ·
-  <a href="./tools/uploader/README.md">Uploader 文档</a> ·
+  <a href="./docs/uploader/README.md">Uploader 文档</a> ·
   <a href="./docs/ui-improvements/2026-03-20-viewer-stage-and-filmstrip-notes.zh-CN.md">Viewer 复盘</a> ·
   <a href="./docs/uploader-frontend-roadmap-2026-03-21.zh-CN.md">Uploader/前端路线图</a>
 </p>
@@ -82,6 +82,8 @@ pnpm dev:internal
 pnpm dev:public
 ```
 
+根目录 `.env.example` 只服务于网站 / 运行时。Python uploader 使用自己独立的 `tools/uploader/.env.example`。
+
 本地访问入口：
 
 - internal-site：`http://localhost:3000`
@@ -135,7 +137,7 @@ pnpm dev:public
 
 - 导入后的 review 数据可直接在 internal-site 工作区查看
 - 内部素材真实对象落在 S3-compatible 存储；数据库保留逻辑路径 `/internal-assets/...`，浏览器实际访问地址由 `MAGIC_COMPARE_S3_PUBLIC_BASE_URL` 解析
-- uploader 的详细使用方式见 `tools/uploader/README.md`
+- uploader 的详细使用方式见 `docs/uploader/README.md`
 - demo 与真实内容处理流程的区别见 `docs/demo-vs-real-case-flow.zh-CN.md`
 
 ### 📦 发布流程
@@ -280,11 +282,11 @@ Python CLI，负责：
 - 构造导入用的 `ImportManifest`
 - 把 manifest 提交到 `POST /api/ops/import-sync`
 
-上传工具另有独立文档：`tools/uploader/README.md`。
+上传工具另有独立文档：`docs/uploader/README.md`。
 
 如果你要从 VSEditor 已保存的平铺导图目录开始整理并导入，可直接参考：
 
-- `docs/vseditor-workflow.zh-CN.md`
+- `docs/uploader/vseditor-workflow.zh-CN.md`
 - `docs/demo-vs-real-case-flow.zh-CN.md`
 
 </details>
@@ -557,8 +559,8 @@ pnpm typecheck
 
 ## 🔗 相关文档
 
-- [Uploader README](./tools/uploader/README.md)
-- [VSEditor 平铺导图工作流](./docs/vseditor-workflow.zh-CN.md)
+- [Uploader README](./docs/uploader/README.md)
+- [VSEditor 平铺导图工作流](./docs/uploader/vseditor-workflow.zh-CN.md)
 - [Demo 与真实 Case / Group 流程差异](./docs/demo-vs-real-case-flow.zh-CN.md)
 - [CI / GHCR 接入复盘](./docs/ci-ghcr-lessons.zh-CN.md)
 - [English root README](./README.md)
