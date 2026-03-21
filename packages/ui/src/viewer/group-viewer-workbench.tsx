@@ -303,6 +303,7 @@ function PositionedStageMedia({
   rotateStage,
   panZoomState = DEFAULT_PAN_ZOOM,
   effectiveScale = 1,
+  imageRendering,
   opacity = 1,
   clipPath,
 }: {
@@ -312,6 +313,7 @@ function PositionedStageMedia({
   rotateStage: boolean;
   panZoomState?: ViewerPanZoomState;
   effectiveScale?: number;
+  imageRendering?: CSSProperties["imageRendering"];
   opacity?: number;
   clipPath?: string;
 }) {
@@ -357,6 +359,7 @@ function PositionedStageMedia({
             width: "100%",
             height: "100%",
             objectFit: "fill",
+            imageRendering,
             display: "block",
             opacity,
             pointerEvents: "none",
@@ -843,6 +846,7 @@ function ABCompareStage({
         rotateStage={rotateStage}
         panZoomState={panZoomState}
         effectiveScale={effectiveScale}
+        imageRendering="pixelated"
       />
     </Box>
   );
@@ -1520,7 +1524,9 @@ export function GroupViewerWorkbench({
           ? 2
           : previousState.presetScale === 2
             ? 3
-            : 1,
+            : previousState.presetScale === 3
+              ? 4
+              : 1,
       fineScale: 1,
       x: 0,
       y: 0,
@@ -1863,7 +1869,7 @@ export function GroupViewerWorkbench({
               </Box>
               <Box
                 sx={{
-                  width: 96,
+                  width: 102,
                   visibility: controller.mode === "a-b" ? "visible" : "hidden",
                 }}
               >

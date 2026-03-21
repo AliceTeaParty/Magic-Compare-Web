@@ -89,6 +89,14 @@ describe("physical scale helpers", () => {
         mediaRect: { width: 960, height: 540 },
       }),
     ).toBeCloseTo(2, 10);
+
+    expect(
+      getViewerPresetTransformScale(4, {
+        devicePixelRatio: 2,
+        media: { width: 1920, height: 1080 },
+        mediaRect: { width: 960, height: 540 },
+      }),
+    ).toBeCloseTo(4, 10);
   });
 
   it("accounts for rotated stages when resolving pixel-exact transforms", () => {
@@ -106,7 +114,7 @@ describe("physical scale helpers", () => {
     expect(
       getViewerEffectiveScale(
         {
-          presetScale: 3,
+          presetScale: 4,
           fineScale: 1.25,
           x: 0,
           y: 0,
@@ -117,7 +125,7 @@ describe("physical scale helpers", () => {
           mediaRect: { width: 960, height: 540 },
         },
       ),
-    ).toBeCloseTo(3.75, 10);
+    ).toBeCloseTo(5, 10);
   });
 });
 

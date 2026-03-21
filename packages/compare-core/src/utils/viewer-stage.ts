@@ -9,7 +9,7 @@ export interface ViewerMediaRect extends ViewerStageSize {
 }
 
 export interface ViewerPanZoomState {
-  presetScale: 1 | 2 | 3;
+  presetScale: 1 | 2 | 3 | 4;
   fineScale: number;
   x: number;
   y: number;
@@ -87,7 +87,7 @@ export function clampViewerPanZoom(
   mediaRect: ViewerStageSize,
   effectiveScale: number,
 ): ViewerPanZoomState {
-  const presetScale = state.presetScale < 2 ? 1 : state.presetScale > 2 ? 3 : 2;
+  const presetScale = Math.min(4, Math.max(1, state.presetScale)) as 1 | 2 | 3 | 4;
   const fineScale = Math.min(VIEWER_MAX_FINE_SCALE, Math.max(1, state.fineScale));
   const scale = Math.max(0.01, effectiveScale);
 
@@ -112,7 +112,7 @@ export function clampViewerPanZoom(
 }
 
 export function getViewerPresetTransformScale(
-  presetScale: 1 | 2 | 3,
+  presetScale: 1 | 2 | 3 | 4,
   options: ViewerPhysicalScaleOptions,
 ): number {
   const normalizedDpr = Math.max(1, options.devicePixelRatio || 1);
