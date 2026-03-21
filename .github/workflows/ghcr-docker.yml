@@ -47,6 +47,7 @@ jobs:
     env:
       MAGIC_COMPARE_HIDE_DEMO: "false"
       MAGIC_COMPARE_S3_BUCKET: magic-compare-assets
+      MAGIC_COMPARE_S3_PUBLIC_BASE_URL: http://127.0.0.1:9000/magic-compare-assets
 
     steps:
       - name: Checkout repository
