@@ -1,0 +1,18 @@
+# Build outputs
+.next/
+out/
+dist/
+build/
+
+# Dependencies
+node_modules/
+
+# Generated files
+pnpm-lock.yaml
+prisma/migrations/
+
+# Python tool
+tools/uploader/
+
+# Docker
+docker/
