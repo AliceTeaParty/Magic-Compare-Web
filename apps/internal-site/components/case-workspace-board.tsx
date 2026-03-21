@@ -5,7 +5,6 @@ import {
   CheckCircleOutline,
   CloudUpload,
   DragIndicator,
-  FileUpload,
   LockOutlined,
   OpenInNew,
   Public,
@@ -197,7 +196,7 @@ export function CaseWorkspaceBoard({
   const [isPending, startTransition] = useTransition();
   const [feedback, setFeedback] = useState<string | null>(null);
   const [feedbackTone, setFeedbackTone] = useState<"error" | "success" | null>(null);
-  const [publicSiteAction, setPublicSiteAction] = useState<"export" | "deploy" | null>(null);
+  const [isDeployingPublicSite, setIsDeployingPublicSite] = useState(false);
   const publicGroupCount = groups.filter((group) => group.isPublic).length;
 
   async function saveGroupOrder(nextGroupIds: string[]) {
@@ -231,19 +230,6 @@ export function CaseWorkspaceBoard({
     if (!response.ok) {
       const payload = await response.json().catch(() => null);
       throw new Error(payload?.error || "Failed to publish case.");
-    }
-
-    return response.json();
-  }
-
-  async function exportPublicSite() {
-    const response = await fetch("/api/ops/public-export", {
-      method: "POST",
-    });
-
-    if (!response.ok) {
-      const payload = await response.json().catch(() => null);
-      throw new Error(payload?.error || "Failed to export public site.");
     }
 
     return response.json();
@@ -404,46 +390,14 @@ export function CaseWorkspaceBoard({
               </Button>
               <Button
                 variant="outlined"
-                startIcon={<FileUpload />}
-                disabled={isPending || publicSiteAction !== null}
-                onClick={() => {
-                  if (publicSiteAction) {
-                    return;
-                  }
-
-                  setPublicSiteAction("export");
-                  startTransition(() => {
-                    setFeedback(null);
-                    setFeedbackTone(null);
-                    void exportPublicSite()
-                      .then((result) => {
-                        setFeedback(`Exported static public site to ${result.exportDir}.`);
-                        setFeedbackTone("success");
-                      })
-                      .catch((error) => {
-                        setFeedback(
-                          error instanceof Error ? error.message : "Failed to export public site.",
-                        );
-                        setFeedbackTone("error");
-                      })
-                      .finally(() => {
-                        setPublicSiteAction(null);
-                      });
-                  });
-                }}
-              >
-                Export public site
-              </Button>
-              <Button
-                variant="outlined"
                 startIcon={<CloudUpload />}
-                disabled={isPending || publicSiteAction !== null || !canDeployPublicSite}
+                disabled={isPending || isDeployingPublicSite || !canDeployPublicSite}
                 onClick={() => {
-                  if (publicSiteAction) {
+                  if (isDeployingPublicSite) {
                     return;
                   }
 
-                  setPublicSiteAction("deploy");
+                  setIsDeployingPublicSite(true);
                   startTransition(() => {
                     setFeedback(null);
                     setFeedbackTone(null);
@@ -461,12 +415,12 @@ export function CaseWorkspaceBoard({
                         setFeedbackTone("error");
                       })
                       .finally(() => {
-                        setPublicSiteAction(null);
+                        setIsDeployingPublicSite(false);
                       });
                   });
                 }}
               >
-                Deploy to Pages
+                Deploy Pages
               </Button>
             </Stack>
           </Box>
