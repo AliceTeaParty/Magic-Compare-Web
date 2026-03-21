@@ -6,6 +6,7 @@ import {
   getViewerEffectiveScale,
   getFilmstripScrollbarMetrics,
   getFittedStageSize,
+  VIEWER_MAX_PRESET_SCALE,
   getViewerPresetTransformScale,
   VIEWER_MAX_FINE_SCALE,
 } from "./viewer-stage";
@@ -97,6 +98,14 @@ describe("physical scale helpers", () => {
         mediaRect: { width: 960, height: 540 },
       }),
     ).toBeCloseTo(4, 10);
+
+    expect(
+      getViewerPresetTransformScale(VIEWER_MAX_PRESET_SCALE, {
+        devicePixelRatio: 2,
+        media: { width: 1920, height: 1080 },
+        mediaRect: { width: 960, height: 540 },
+      }),
+    ).toBeCloseTo(8, 10);
   });
 
   it("accounts for rotated stages when resolving pixel-exact transforms", () => {
@@ -114,7 +123,7 @@ describe("physical scale helpers", () => {
     expect(
       getViewerEffectiveScale(
         {
-          presetScale: 4,
+          presetScale: VIEWER_MAX_PRESET_SCALE,
           fineScale: 1.25,
           x: 0,
           y: 0,
@@ -125,7 +134,7 @@ describe("physical scale helpers", () => {
           mediaRect: { width: 960, height: 540 },
         },
       ),
-    ).toBeCloseTo(5, 10);
+    ).toBeCloseTo(10, 10);
   });
 });
 

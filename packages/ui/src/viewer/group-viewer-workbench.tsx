@@ -1,10 +1,12 @@
 "use client";
 
 import {
+  Add,
   ArrowBack,
   FitScreen,
   OpenInNew,
   PhotoLibrary,
+  Remove,
   Tune,
   ViewSidebar,
 } from "@mui/icons-material";
@@ -52,9 +54,11 @@ import {
   getFilmstripScrollbarMetrics,
   getFittedStageSize as getViewerFittedStageSize,
   getViewerPresetTransformScale,
+  VIEWER_MAX_PRESET_SCALE,
   type ViewerMediaRect,
   type ViewerPanZoomState,
   VIEWER_MAX_FINE_SCALE,
+  VIEWER_MIN_PRESET_SCALE,
 } from "@magic-compare/compare-core";
 import { clampNumber, formatUtcDate } from "@magic-compare/shared-utils";
 import { useViewerController } from "@magic-compare/compare-core/use-viewer-controller";
@@ -1517,16 +1521,13 @@ export function GroupViewerWorkbench({
     return () => document.removeEventListener("pointerdown", handleOutsidePointerDown, true);
   }, [abStageActive, controller.mode]);
 
-  function cycleAbScalePreset() {
+  function setAbScalePreset(nextPresetScale: number) {
     setAbPanZoomState((previousState) => ({
-      presetScale:
-        previousState.presetScale === 1
-          ? 2
-          : previousState.presetScale === 2
-            ? 3
-            : previousState.presetScale === 3
-              ? 4
-              : 1,
+      presetScale: clampNumber(
+        nextPresetScale,
+        VIEWER_MIN_PRESET_SCALE,
+        VIEWER_MAX_PRESET_SCALE,
+      ) as typeof previousState.presetScale,
       fineScale: 1,
       x: 0,
       y: 0,
@@ -1869,28 +1870,67 @@ export function GroupViewerWorkbench({
               </Box>
               <Box
                 sx={{
-                  width: 102,
+                  width: 168,
                   visibility: controller.mode === "a-b" ? "visible" : "hidden",
                 }}
               >
                 {controller.mode === "a-b" ? (
-                  <Button
-                    variant="outlined"
-                    size="small"
-                    onClick={cycleAbScalePreset}
+                  <Stack
+                    direction="row"
+                    spacing={0.65}
+                    alignItems="center"
                     sx={{
                       width: "100%",
-                      height: 34,
-                      minHeight: 34,
-                      px: 1.3,
-                      fontSize: "0.9rem",
-                      fontWeight: 550,
-                      borderRadius: 999,
-                      whiteSpace: "nowrap",
                     }}
                   >
-                    {abPanZoomState.presetScale}x Scale
-                  </Button>
+                    <IconButton
+                      size="small"
+                      aria-label="Decrease A/B scale"
+                      disabled={abPanZoomState.presetScale <= VIEWER_MIN_PRESET_SCALE}
+                      onClick={() => setAbScalePreset(abPanZoomState.presetScale - 1)}
+                      sx={{
+                        width: 34,
+                        height: 34,
+                        border: "1px solid",
+                        borderColor: "divider",
+                        borderRadius: 999,
+                      }}
+                    >
+                      <Remove sx={{ fontSize: 16 }} />
+                    </IconButton>
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      disableRipple
+                      sx={{
+                        flex: 1,
+                        height: 34,
+                        minHeight: 34,
+                        px: 1.1,
+                        fontSize: "0.9rem",
+                        fontWeight: 550,
+                        borderRadius: 999,
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {abPanZoomState.presetScale}x Scale
+                    </Button>
+                    <IconButton
+                      size="small"
+                      aria-label="Increase A/B scale"
+                      disabled={abPanZoomState.presetScale >= VIEWER_MAX_PRESET_SCALE}
+                      onClick={() => setAbScalePreset(abPanZoomState.presetScale + 1)}
+                      sx={{
+                        width: 34,
+                        height: 34,
+                        border: "1px solid",
+                        borderColor: "divider",
+                        borderRadius: 999,
+                      }}
+                    >
+                      <Add sx={{ fontSize: 16 }} />
+                    </IconButton>
+                  </Stack>
                 ) : null}
               </Box>
             </Stack>
