@@ -6,7 +6,9 @@ Entries before that date are summarized at release level instead of being recons
 
 ## Unreleased
 
-- No unreleased entries yet.
+### Fixed
+
+- `docker/ci.compose.override.yml` now explicitly switches `internal-site` and `internal-site-init` back to a local CI image build, preventing the GHCR smoke workflow from trying to pull the published `:main` image before the publish job runs.
 
 ## v1.0.0 - 2026-03-21
 

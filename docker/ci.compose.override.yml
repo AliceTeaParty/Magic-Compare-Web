@@ -1,11 +1,21 @@
 services:
+  internal-site-init:
+    image: magic-compare/internal-site:ci
+    build:
+      context: .
+      dockerfile: docker/internal-site.Dockerfile
+
+  internal-site:
+    image: magic-compare/internal-site:ci
+    build:
+      context: .
+      dockerfile: docker/internal-site.Dockerfile
+    volumes:
+      - internal-data:/app/data
+
   rustfs:
     volumes:
       - rustfs-data:/data
-
-  internal-site:
-    volumes:
-      - internal-data:/app/data
 
 volumes:
   rustfs-data:
