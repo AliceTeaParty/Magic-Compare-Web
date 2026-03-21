@@ -29,6 +29,7 @@ Refactor and stability release focused on breaking apart viewer/workspace hotspo
 - Viewer and workspace regressions around `Open`, `Internal/Public`, mode switching, sidebar/details toggles, and optimistic local state synchronization were stabilized after the large viewer/workspace split.
 - A/B wheel zoom and local dev bootstrap behavior were hardened so local Docker/runtime debugging is less likely to land on a false app state.
 - Mobile rotated viewer behavior now keeps drag and swipe directions aligned with the screen, and misleading scale-only motion affordances were removed.
+- Public export now pins nested `tsx` maintenance scripts to the workspace base tsconfig so `pnpm public:export` keeps working under CI and other nested runtime entry points.
 
 ## v1.2.1 - 2026-03-21
 

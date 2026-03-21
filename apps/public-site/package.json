@@ -3,8 +3,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "tsx ../../scripts/sync-published.ts && next dev",
-    "build": "tsx ../../scripts/sync-published.ts && next build && tsx ../../scripts/write-public-route-aliases.ts",
+    "dev": "tsx --tsconfig ../../tsconfig.base.json ../../scripts/sync-published.ts && next dev",
+    "build": "tsx --tsconfig ../../tsconfig.base.json ../../scripts/sync-published.ts && next build && tsx --tsconfig ../../tsconfig.base.json ../../scripts/write-public-route-aliases.ts",
     "start": "serve out --listen 3001",
     "typecheck": "next build",
     "test": "vitest run --passWithNoTests"
