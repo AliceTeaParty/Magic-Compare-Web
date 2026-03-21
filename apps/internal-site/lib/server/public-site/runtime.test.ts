@@ -33,4 +33,19 @@ describe("public site runtime helpers", () => {
       "main",
     ]);
   });
+
+  it("builds wrangler deploy args without a branch", () => {
+    process.env.MAGIC_COMPARE_CF_PAGES_PROJECT_NAME = "magic-compare-public";
+    delete process.env.MAGIC_COMPARE_CF_PAGES_BRANCH;
+
+    expect(getWranglerPagesDeployArgs("/tmp/public-export")).toEqual([
+      "exec",
+      "wrangler",
+      "pages",
+      "deploy",
+      "/tmp/public-export",
+      "--project-name",
+      "magic-compare-public",
+    ]);
+  });
 });

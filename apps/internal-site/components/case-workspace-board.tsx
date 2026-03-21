@@ -374,6 +374,12 @@ export function CaseWorkspaceBoard({
   async function deployPublicSite() {
     const response = await fetch("/api/ops/public-deploy", {
       method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        caseId: data.id,
+      }),
     });
 
     if (!response.ok) {
@@ -557,7 +563,7 @@ export function CaseWorkspaceBoard({
 
                       setIsDeployingPublicSite(true);
                       pushNotification(
-                        "Deploying a fresh public export to Cloudflare Pages...",
+                        "Republishing this case and deploying a fresh public export to Cloudflare Pages...",
                         "info",
                         {
                           key: "workspace-deploying-public-site",

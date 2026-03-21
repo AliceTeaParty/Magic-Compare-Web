@@ -9,6 +9,7 @@ import {
   getPublicExportDir,
   isCloudflarePagesDeployConfigured,
 } from "../runtime-config";
+import { publishCase } from "../publish/publish-case";
 
 interface CommandResult {
   stdout: string;
@@ -191,7 +192,7 @@ export async function exportPublicSite(): Promise<PublicExportResult> {
   return withPublicSiteOperationLock("export", performPublicExport);
 }
 
-export async function deployPublicSite(): Promise<PublicDeployResult> {
+export async function deployPublicSite(caseId?: string): Promise<PublicDeployResult> {
   if (!isCloudflarePagesDeployConfigured()) {
     throw new Error(
       `Cloudflare Pages deploy is not configured. Missing ${CF_PAGES_PROJECT_NAME_ENV_NAME} or CLOUDFLARE credentials.`,
@@ -199,6 +200,10 @@ export async function deployPublicSite(): Promise<PublicDeployResult> {
   }
 
   return withPublicSiteOperationLock("deploy", async () => {
+    if (caseId) {
+      await publishCase(caseId);
+    }
+
     const exportResult = await performPublicExport();
     const projectName = process.env[CF_PAGES_PROJECT_NAME_ENV_NAME]?.trim() || "";
     const branch = process.env[CF_PAGES_BRANCH_ENV_NAME]?.trim() || null;
