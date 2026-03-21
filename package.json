@@ -23,9 +23,11 @@
     "postinstall": "pnpm db:generate"
   },
   "devDependencies": {
+    "@playwright/test": "^1.58.2",
     "@types/node": "^24.0.0",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
+    "playwright": "^1.58.2",
     "tsx": "^4.20.5",
     "typescript": "^5.8.3",
     "vitest": "^3.2.4",
