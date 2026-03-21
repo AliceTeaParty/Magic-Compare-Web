@@ -15,4 +15,7 @@ done
 echo "Ensuring bucket ${bucket} exists..."
 mc mb "rustfs/${bucket}" --ignore-existing >/dev/null
 
+echo "Enabling anonymous download for bucket ${bucket}..."
+mc anonymous set download "rustfs/${bucket}" >/dev/null
+
 echo "RustFS bucket ${bucket} is ready."

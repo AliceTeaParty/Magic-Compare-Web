@@ -129,7 +129,7 @@ pnpm dev:public
 结果：
 
 - 导入后的 review 数据可直接在 internal-site 工作区查看
-- 内部素材通过 `/internal-assets/...` 动态读取，真实对象落在 S3-compatible 存储
+- 内部素材真实对象落在 S3-compatible 存储；数据库保留逻辑路径 `/internal-assets/...`，浏览器实际访问地址由 `MAGIC_COMPARE_S3_PUBLIC_BASE_URL` 解析
 - uploader 的详细使用方式见 `tools/uploader/README.md`
 - demo 与真实内容处理流程的区别见 `docs/demo-vs-real-case-flow.zh-CN.md`
 
@@ -138,8 +138,7 @@ pnpm dev:public
 1. 在内部站触发 `POST /api/ops/case-publish`。
 2. 按 `group.isPublic`、`frame.isPublic`、`asset.isPublic` 过滤 case 中可公开内容。
 3. 为每个公开 group 复用或生成稳定的 `publicSlug`。
-4. 将公开资产复制到 `content/published/groups/[publicSlug]/assets`。
-5. 为每个公开 group 写出带 `schemaVersion` 的 `manifest.json`。
+4. 为每个公开 group 写出带 `schemaVersion` 和公网 S3 图片绝对地址的 `manifest.json`。
 6. 在需要时触发 `pnpm public:export` 或 `POST /api/ops/public-export`，生成新的静态公开站点。
 7. 在需要时触发 `pnpm public:deploy` 或 `POST /api/ops/public-deploy`，直传到 Cloudflare Pages。
 
@@ -440,8 +439,7 @@ Asset 是挂在某个 frame 下的一个具体图片变体。
 1. 内部站调用 `POST /api/ops/case-publish`。
 2. 发布流程加载完整 case，并过滤 `group.isPublic`、`frame.isPublic` 与 `asset.isPublic`。
 3. 每个公开 group 都会获得稳定的 `publicSlug`。若此前不存在，则由 `caseSlug--groupSlug` 推导；若冲突则追加短后缀。
-4. 公开资产会从内部 S3 资产复制到 `content/published/groups/[publicSlug]/assets`。
-5. 系统会为每个公开 group 写出带 `schemaVersion` 的 `manifest.json`。
+4. 系统会为每个公开 group 写出带 `schemaVersion` 和公网 S3 图片绝对地址的 `manifest.json`。
 6. `pnpm public:export` 会生成新的公开静态站点，并镜像到 `MAGIC_COMPARE_PUBLIC_EXPORT_DIR`。
 7. `pnpm public:deploy` 会通过 Wrangler 把这份静态站点直传到 Cloudflare Pages。
 

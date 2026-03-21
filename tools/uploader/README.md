@@ -408,7 +408,7 @@ Instead it performs an S3 upload step:
 
 1. upload original assets into `MAGIC_COMPARE_S3_BUCKET` under `internal-assets/[caseSlug]/[groupSlug]/[frameOrder]/`
 2. generate thumbnails in a temporary directory with `thumb-` prefix
-3. compute `imageUrl` and `thumbUrl` as `/internal-assets/...` URLs served by the internal site's dynamic asset route
+3. compute `imageUrl` and `thumbUrl` as logical `/internal-assets/...` paths stored in metadata
 4. upload both originals and thumbnails into the configured S3 bucket/prefix
 5. construct the import manifest
 6. optionally send the manifest JSON to the internal site

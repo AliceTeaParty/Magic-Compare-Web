@@ -128,7 +128,7 @@ Demo content:
 Result:
 
 - imported review data is available in the internal site workspace
-- internal assets live in S3-compatible storage behind `/internal-assets/...`
+- internal assets live in S3-compatible storage; the database keeps logical `/internal-assets/...` paths while browser-facing URLs resolve from `MAGIC_COMPARE_S3_PUBLIC_BASE_URL`
 - detailed uploader usage lives in `tools/uploader/README.md`
 - a Chinese note about the difference between built-in demo content and real case/group flows lives in `docs/demo-vs-real-case-flow.zh-CN.md`
 
@@ -137,8 +137,7 @@ Result:
 1. Trigger `POST /api/ops/case-publish` from the internal site.
 2. Filter `group.isPublic`, `frame.isPublic`, and `asset.isPublic` for the selected case.
 3. Derive or reuse a stable `publicSlug` for each public group.
-4. Copy public assets into `content/published/groups/[publicSlug]/assets`.
-5. Write a `manifest.json` with `schemaVersion` for each published group.
+4. Write a `manifest.json` with `schemaVersion` and absolute public S3 image URLs for each published group.
 6. Trigger `pnpm public:export` or `POST /api/ops/public-export` when you want a fresh static public bundle.
 7. Trigger `pnpm public:deploy` or `POST /api/ops/public-deploy` when you want a direct Cloudflare Pages upload.
 
@@ -434,8 +433,7 @@ The current publish flow is explicit and case-scoped.
 1. Internal site calls `POST /api/ops/case-publish`.
 2. The publish pipeline loads the full case and filters `group.isPublic`, `frame.isPublic`, and `asset.isPublic`.
 3. Each public group gets a stable `publicSlug`. If it does not exist yet, it is derived from `caseSlug--groupSlug`. Collisions add a short suffix.
-4. Public assets are copied from internal S3-backed assets into `content/published/groups/[publicSlug]/assets`.
-5. A `manifest.json` with `schemaVersion` is written for each published group.
+4. A `manifest.json` with `schemaVersion` and absolute public S3 image URLs is written for each published group.
 6. `pnpm public:export` builds a fresh static public bundle and mirrors it into `MAGIC_COMPARE_PUBLIC_EXPORT_DIR`.
 7. `pnpm public:deploy` optionally uploads that bundle to Cloudflare Pages through Wrangler.
 

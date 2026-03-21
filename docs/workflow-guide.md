@@ -77,6 +77,7 @@
 
 - bucket 由 `MAGIC_COMPARE_S3_BUCKET` 指定
 - endpoint 由 `MAGIC_COMPARE_S3_ENDPOINT` 指定
+- 浏览器访问图片时使用 `MAGIC_COMPARE_S3_PUBLIC_BASE_URL`
 - key 前缀默认是 `internal-assets`
 
 重要约束：
@@ -290,7 +291,8 @@ Docker 用：
 
 - uploader 现在不再把图先落到 internal-site 本地目录
 - 内部图片 URL 仍然保留逻辑路径 `/internal-assets/...`
-- internal-site 的动态路由会从 S3 读取对象并返回
+- 浏览器实际访问图片时，会由 internal/public 站点将逻辑路径解析成 `MAGIC_COMPARE_S3_PUBLIC_BASE_URL` 下的公网绝对 URL
+- public-export/public-deploy 不再打包图片，Pages 只发布静态页面和 manifest
 
 ## 发布、导出、部署三件事要分清
 

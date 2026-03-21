@@ -9,6 +9,7 @@ import {
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+// legacy-compat route aliases for existing /cases/[caseSlug]/groups/[groupSlug] links
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const workspaceRoot = path.resolve(scriptDir, "..");
 const exportRoot = path.join(workspaceRoot, "apps", "public-site", "out");
