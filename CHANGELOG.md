@@ -6,6 +6,28 @@ Entries before that date are summarized at release level instead of being recons
 
 ## Unreleased
 
+## v1.2.0 - 2026-03-21
+
+Deployment and runtime release focused on making Docker self-contained, preserving runtime branding config, and improving inspection fidelity for generated heatmaps.
+
+### Added
+
+- Uploader-generated heatmaps now use a thermal diffusion palette with softer spread, making large changes read as red-hot regions and subtle changes stay greener.
+- `docker-compose.yml` now passes footer branding env and custom public-site base URL through to `internal-site`, so Docker deployments honor runtime footer and published-link configuration without extra file editing.
+- Internal-site host port mapping is now configurable through `MAGIC_COMPARE_INTERNAL_SITE_HOST_PORT`, making port conflicts on deployment hosts easier to avoid.
+
+### Changed
+
+- Base Docker deployment has been simplified so deployment hosts only need `.env`, `docker-compose.yml`, and the published runtime image; compose no longer depends on checked-out `./docker/*.sh` helper mounts.
+- `rustfs-init` and `internal-site-init` now run from inline compose entrypoints instead of external shell script mounts, reducing deployment-specific moving parts.
+- Root public export/deploy scripts now run with the internal-site TypeScript config, keeping path alias resolution consistent between local and CI execution.
+
+### Fixed
+
+- Footer and public runtime env loading now explicitly reads workspace-level `.env` files in the monorepo, preventing branding/footer settings from silently falling back to defaults.
+- Docker runtime now propagates footer config and custom public site URL correctly into `next start`, fixing cases where deployed pages still rendered `Magic Compare` instead of env-configured branding.
+- Compose-based server deployments no longer require repository-side init scripts to exist on the host filesystem.
+
 ## v1.0.1 - 2026-03-21
 
 First post-`v1.0.0` maintenance release focused on deployment correctness, public-link behavior, and A/B inspection polish.
