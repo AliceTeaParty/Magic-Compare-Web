@@ -13,6 +13,16 @@
 - **context7**：查询最新第三方库文档。用于 React、MUI、Prisma、Zod、Embla、dnd-kit、Motion 等实现细节。
 - **mcp-vector-search**：搜索当前代码库。先查现有目录、组件、命名、已有模式，再决定新增或修改方案。（结果为空/error 时尝试 `mcp-vector-search index`）
 
+## 根脚本快捷方式
+
+- `pnpm mcp:doctor`：先检查 CLI 依赖和本地环境是否正常。
+- `pnpm mcp:status`：查看当前索引、统计和健康状态。
+- `pnpm mcp:index`：重跑索引主入口；结果异常或索引缺失时先用它。
+- `pnpm mcp:index:kg`：只补知识图谱阶段。
+- `pnpm mcp:search -- "<query>"`：走语义搜索，适合先找现有实现。
+- `pnpm mcp:complexity`：快速看当前热点文件/函数。
+- `pnpm mcp:dead-code`：做一轮死代码候选排查。
+
 ## 使用原则
 
 1. **先搜代码，再写代码**。先用 `mcp-vector-search` 确认仓库已有结构、命名和复用点。
