@@ -100,6 +100,13 @@ const DEFAULT_PAN_ZOOM: ViewerPanZoomState = {
   y: 0,
 };
 
+const FILMSTRIP_EDGE_OFFSET_LIMIT = 36;
+const FILMSTRIP_INERTIA_MIN_VELOCITY = 0.018;
+const FILMSTRIP_INERTIA_VELOCITY_GAIN = 1.28;
+const FILMSTRIP_MOUSE_DRAG_GAIN = 1.58;
+const FILMSTRIP_TOUCH_DRAG_GAIN = 1.18;
+const FILMSTRIP_OVERSCROLL_GAIN = 0.36;
+
 const VIEWER_DETAILS_COOKIE_NAME = "magic_compare_open_details";
 
 function readViewerDetailsCookie(): boolean | null {
@@ -1119,7 +1126,10 @@ export function GroupViewerWorkbench({
     startX: number;
   } | null>(null);
   const filmstripInertiaFrameRef = useRef<number | null>(null);
+  const filmstripReboundFrameRef = useRef<number | null>(null);
   const filmstripVelocityRef = useRef(0);
+  const filmstripEdgeOffsetRef = useRef(0);
+  const filmstripEdgeVelocityRef = useRef(0);
   const suppressFilmstripClickRef = useRef(false);
   const stageAspectRatio = rotateStage ? 9 / 16 : 16 / 9;
   const fittedStageSize = useMemo(
@@ -1203,6 +1213,12 @@ export function GroupViewerWorkbench({
     syncViewportSize();
     window.addEventListener("resize", syncViewportSize);
     return () => window.removeEventListener("resize", syncViewportSize);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      cancelFilmstripMotion();
+    };
   }, []);
 
   useEffect(() => {
@@ -1302,6 +1318,20 @@ export function GroupViewerWorkbench({
     };
   }
 
+  function syncFilmstripEdgeOffset(nextOffset: number) {
+    filmstripEdgeOffsetRef.current = nextOffset;
+    setFilmstripEdgeOffset(nextOffset);
+  }
+
+  function cancelFilmstripRebound() {
+    if (filmstripReboundFrameRef.current !== null) {
+      window.cancelAnimationFrame(filmstripReboundFrameRef.current);
+      filmstripReboundFrameRef.current = null;
+    }
+
+    filmstripEdgeVelocityRef.current = 0;
+  }
+
   function cancelFilmstripInertia() {
     if (filmstripInertiaFrameRef.current !== null) {
       window.cancelAnimationFrame(filmstripInertiaFrameRef.current);
@@ -1309,6 +1339,42 @@ export function GroupViewerWorkbench({
     }
 
     filmstripVelocityRef.current = 0;
+  }
+
+  function cancelFilmstripMotion() {
+    cancelFilmstripInertia();
+    cancelFilmstripRebound();
+  }
+
+  function startFilmstripRebound(initialOffset: number) {
+    cancelFilmstripRebound();
+
+    if (prefersReducedMotion || Math.abs(initialOffset) < 0.5) {
+      syncFilmstripEdgeOffset(0);
+      return;
+    }
+
+    syncFilmstripEdgeOffset(initialOffset);
+    filmstripEdgeVelocityRef.current = -initialOffset * 0.16;
+
+    const step = () => {
+      const currentOffset = filmstripEdgeOffsetRef.current;
+      const nextVelocity = (filmstripEdgeVelocityRef.current - currentOffset * 0.14) * 0.82;
+      const nextOffset = currentOffset + nextVelocity;
+
+      if (Math.abs(nextOffset) < 0.35 && Math.abs(nextVelocity) < 0.2) {
+        syncFilmstripEdgeOffset(0);
+        filmstripReboundFrameRef.current = null;
+        filmstripEdgeVelocityRef.current = 0;
+        return;
+      }
+
+      filmstripEdgeVelocityRef.current = nextVelocity;
+      syncFilmstripEdgeOffset(nextOffset);
+      filmstripReboundFrameRef.current = window.requestAnimationFrame(step);
+    };
+
+    filmstripReboundFrameRef.current = window.requestAnimationFrame(step);
   }
 
   function handleFilmstripPointerDown(event: ReactPointerEvent<HTMLDivElement>) {
@@ -1320,7 +1386,7 @@ export function GroupViewerWorkbench({
       return;
     }
 
-    cancelFilmstripInertia();
+    cancelFilmstripMotion();
     filmstripDragStateRef.current = {
       lastClientX: event.clientX,
       lastTimestamp: performance.now(),
@@ -1344,7 +1410,9 @@ export function GroupViewerWorkbench({
       return;
     }
 
-    const travelX = event.clientX - dragState.startX;
+    const dragGain =
+      event.pointerType === "mouse" ? FILMSTRIP_MOUSE_DRAG_GAIN : FILMSTRIP_TOUCH_DRAG_GAIN;
+    const travelX = (event.clientX - dragState.startX) * dragGain;
     const viewport = event.currentTarget;
     const maxScrollLeft = Math.max(0, viewport.scrollWidth - viewport.clientWidth);
     const nextScrollLeft = dragState.startScrollLeft - travelX;
@@ -1359,14 +1427,20 @@ export function GroupViewerWorkbench({
 
     if (nextScrollLeft < 0 || nextScrollLeft > maxScrollLeft) {
       const overscroll = nextScrollLeft < 0 ? nextScrollLeft : nextScrollLeft - maxScrollLeft;
-      setFilmstripEdgeOffset(clampNumber(-overscroll * 0.18, -18, 18));
+      const direction = overscroll < 0 ? 1 : -1;
+      const overscrollMagnitude = Math.abs(overscroll);
+      const visualOffset = direction * Math.min(
+        FILMSTRIP_EDGE_OFFSET_LIMIT,
+        Math.pow(overscrollMagnitude, 0.86) * FILMSTRIP_OVERSCROLL_GAIN,
+      );
+      syncFilmstripEdgeOffset(visualOffset);
       viewport.scrollLeft = clampNumber(nextScrollLeft, 0, maxScrollLeft);
     } else {
-      setFilmstripEdgeOffset(0);
+      syncFilmstripEdgeOffset(0);
       viewport.scrollLeft = nextScrollLeft;
     }
 
-    filmstripVelocityRef.current = deltaScroll / deltaTime;
+    filmstripVelocityRef.current = (deltaScroll / deltaTime) * FILMSTRIP_INERTIA_VELOCITY_GAIN;
     dragState.lastClientX = event.clientX;
     dragState.lastTimestamp = now;
   }
@@ -1383,24 +1457,44 @@ export function GroupViewerWorkbench({
     }
 
     filmstripDragStateRef.current = null;
-    setFilmstripEdgeOffset(0);
+    const releaseEdgeOffset = filmstripEdgeOffsetRef.current;
 
     if (dragState.moved) {
+      if (Math.abs(releaseEdgeOffset) > 0.5) {
+        startFilmstripRebound(releaseEdgeOffset * 1.12);
+      }
+
       if (!prefersReducedMotion) {
         const viewport = event.currentTarget;
         const maxScrollLeft = Math.max(0, viewport.scrollWidth - viewport.clientWidth);
+        let lastFrameTime = performance.now();
 
-        const step = () => {
-          const nextScrollLeft = clampNumber(
-            viewport.scrollLeft + filmstripVelocityRef.current * 16,
-            0,
-            maxScrollLeft,
-          );
+        const step = (timestamp: number) => {
+          const deltaTime = Math.min(28, timestamp - lastFrameTime || 16);
+          lastFrameTime = timestamp;
+          const nextScrollLeft = viewport.scrollLeft + filmstripVelocityRef.current * deltaTime;
+
+          if (nextScrollLeft <= 0 || nextScrollLeft >= maxScrollLeft) {
+            viewport.scrollLeft = clampNumber(nextScrollLeft, 0, maxScrollLeft);
+            startFilmstripRebound(
+              clampNumber(
+                Math.sign(filmstripVelocityRef.current) * -1 * Math.max(
+                  18,
+                  Math.min(FILMSTRIP_EDGE_OFFSET_LIMIT, Math.abs(filmstripVelocityRef.current) * 14),
+                ),
+                -FILMSTRIP_EDGE_OFFSET_LIMIT,
+                FILMSTRIP_EDGE_OFFSET_LIMIT,
+              ),
+            );
+            filmstripVelocityRef.current = 0;
+            filmstripInertiaFrameRef.current = null;
+            return;
+          }
 
           viewport.scrollLeft = nextScrollLeft;
-          filmstripVelocityRef.current *= 0.92;
+          filmstripVelocityRef.current *= Math.pow(0.996, deltaTime);
 
-          if (Math.abs(filmstripVelocityRef.current) < 0.02) {
+          if (Math.abs(filmstripVelocityRef.current) < FILMSTRIP_INERTIA_MIN_VELOCITY) {
             filmstripVelocityRef.current = 0;
             filmstripInertiaFrameRef.current = null;
             return;
@@ -1410,6 +1504,8 @@ export function GroupViewerWorkbench({
         };
 
         filmstripInertiaFrameRef.current = window.requestAnimationFrame(step);
+      } else if (Math.abs(releaseEdgeOffset) > 0.5) {
+        startFilmstripRebound(releaseEdgeOffset);
       }
 
       window.setTimeout(() => {
