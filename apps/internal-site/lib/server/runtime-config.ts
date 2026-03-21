@@ -14,6 +14,7 @@ export const S3_ACCESS_KEY_ID_ENV_NAME = "MAGIC_COMPARE_S3_ACCESS_KEY_ID";
 export const S3_SECRET_ACCESS_KEY_ENV_NAME = "MAGIC_COMPARE_S3_SECRET_ACCESS_KEY";
 export const S3_FORCE_PATH_STYLE_ENV_NAME = "MAGIC_COMPARE_S3_FORCE_PATH_STYLE";
 export const S3_INTERNAL_PREFIX_ENV_NAME = "MAGIC_COMPARE_S3_INTERNAL_PREFIX";
+export const PUBLIC_SITE_BASE_URL_ENV_NAME = "MAGIC_COMPARE_PUBLIC_SITE_BASE_URL";
 export const CF_PAGES_PROJECT_NAME_ENV_NAME = "MAGIC_COMPARE_CF_PAGES_PROJECT_NAME";
 export const CF_PAGES_BRANCH_ENV_NAME = "MAGIC_COMPARE_CF_PAGES_BRANCH";
 export const CF_ACCOUNT_ID_ENV_NAME = "CLOUDFLARE_ACCOUNT_ID";
@@ -50,6 +51,20 @@ function requireAbsoluteUrlEnv(name: string): string {
   try {
     const normalized = new URL(value).toString();
     return normalized.replace(/\/+$/, "");
+  } catch {
+    throw new Error(`Environment variable ${name} must be an absolute URL.`);
+  }
+}
+
+export function getOptionalAbsoluteUrlEnv(name: string): string | null {
+  loadWorkspaceEnv();
+  const value = process.env[name]?.trim();
+  if (!value) {
+    return null;
+  }
+
+  try {
+    return new URL(value).toString().replace(/\/+$/, "");
   } catch {
     throw new Error(`Environment variable ${name} must be an absolute URL.`);
   }
