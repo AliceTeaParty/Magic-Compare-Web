@@ -102,7 +102,7 @@ Demo content:
 - `docker-compose.yml` wires together:
   - `internal-site`
   - `rustfs` as the S3-compatible object store
-  - `rustfs-init` to create the bucket on startup
+  - `rustfs-init`, a lightweight `minio/mc` bootstrapper that ensures the bucket exists on startup
 - `rustfs` now starts in a lower-overhead mode by default: console disabled, `warn` log level, and a default `512m` memory cap
 - if you need the RustFS Web UI, explicitly set `MAGIC_COMPARE_RUSTFS_CONSOLE_ENABLE=true` in `.env`
 - internal assets now live in S3-compatible storage configured by `MAGIC_COMPARE_S3_*`

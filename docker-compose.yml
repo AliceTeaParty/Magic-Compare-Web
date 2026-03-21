@@ -35,24 +35,21 @@ services:
       - ./docker-data/rustfs:/data
 
   rustfs-init:
-    image: amazon/aws-cli:2.31.18
+    image: minio/mc:RELEASE.2025-08-13T08-35-41Z
     entrypoint:
       - /bin/sh
-      - -lc
+      - /opt/magic-compare/rustfs-init.sh
     depends_on:
       rustfs:
-        condition: service_started
+        condition: service_healthy
     restart: "no"
     environment:
-      AWS_ACCESS_KEY_ID: ${MAGIC_COMPARE_S3_ACCESS_KEY_ID:-rustfsadmin}
-      AWS_SECRET_ACCESS_KEY: ${MAGIC_COMPARE_S3_SECRET_ACCESS_KEY:-rustfsadmin}
-      AWS_DEFAULT_REGION: ${MAGIC_COMPARE_S3_REGION:-us-east-1}
+      MAGIC_COMPARE_DOCKER_S3_ENDPOINT: ${MAGIC_COMPARE_DOCKER_S3_ENDPOINT:-http://rustfs:9000}
+      MAGIC_COMPARE_S3_ACCESS_KEY_ID: ${MAGIC_COMPARE_S3_ACCESS_KEY_ID:-rustfsadmin}
+      MAGIC_COMPARE_S3_SECRET_ACCESS_KEY: ${MAGIC_COMPARE_S3_SECRET_ACCESS_KEY:-rustfsadmin}
       MAGIC_COMPARE_S3_BUCKET: ${MAGIC_COMPARE_S3_BUCKET:-magic-compare-assets}
-    command:
-      - >
-        until aws --endpoint-url http://rustfs:9000 s3api list-buckets >/dev/null 2>&1; do sleep 2; done;
-        aws --endpoint-url http://rustfs:9000 s3api head-bucket --bucket "$$MAGIC_COMPARE_S3_BUCKET" >/dev/null 2>&1 ||
-        aws --endpoint-url http://rustfs:9000 s3api create-bucket --bucket "$$MAGIC_COMPARE_S3_BUCKET"
+    volumes:
+      - ./docker/rustfs-init.sh:/opt/magic-compare/rustfs-init.sh:ro
 
   internal-site:
     build:

@@ -207,7 +207,7 @@ docker compose up -d --build rustfs rustfs-init internal-site
 compose 当前会做这些事：
 
 - 启动 `rustfs`
-- 用 `rustfs-init` 自动创建 bucket
+- 用轻量 `rustfs-init` sidecar 自动确保 bucket 存在
 - 启动 `internal-site`
 - internal-site 容器内执行：
 
@@ -513,6 +513,7 @@ docker build -f docker/internal-site.Dockerfile -t magic-compare/internal-site .
 - `.env.example`
 - `docker-compose.yml`
 - `docker/ci.compose.override.yml`
+- `docker/rustfs-init.sh`
 - `docker/internal-site.Dockerfile`
 - `apps/internal-site/lib/server/public-site/runtime.ts`
 - `docs/ci-ghcr-lessons.zh-CN.md`

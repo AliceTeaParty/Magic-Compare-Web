@@ -134,14 +134,14 @@ pnpm public:export
 
 ### 7. `rustfs-init` 脚本要尽量显式
 
-在 CI 中，过于紧凑的一行 shell 命令不利于排错，也容易被 pager、返回码或折叠字符串细节影响。
+在 CI 和 Docker 里，把一整段对象存储初始化逻辑直接塞进 compose 的单行命令，不利于排错，也容易让本地和 CI 出现两套行为。
 
 经验教训：
 
-- `rustfs-init` 更适合写成多行脚本
-- 显式 `set -euo pipefail`
-- 显式关闭 AWS pager
-- 在 CI 里优先走单独的 override 配置，而不是把本地 compose 命令硬塞进 workflow
+- `rustfs-init` 更适合收敛到仓库内的独立脚本
+- compose 只负责把 endpoint、bucket、credentials 接进去
+- CI override 应尽量只覆盖 volume，而不是重复覆盖初始化逻辑
+- 对 S3-compatible bucket 初始化这类场景，轻量 `minio/mc` 比通用 `aws-cli` 更贴近用途
 
 ### 8. GitHub Actions JavaScript actions 版本也会成为噪音源
 
@@ -161,6 +161,7 @@ pnpm public:export
 - `.github/workflows/ci.yml`
 - `.github/workflows/ghcr-docker.yml`
 - `docker/ci.compose.override.yml`
+- `docker/rustfs-init.sh`
 - `docs/workflow-guide.md`
 
 如果未来继续改 CI / GHCR：
