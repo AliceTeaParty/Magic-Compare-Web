@@ -22,7 +22,7 @@ x-internal-site-common: &internal-site-common
 
 services:
   rustfs:
-    image: rustfs/rustfs:1.0.0-alpha.89
+    image: quay.io/minio/minio:RELEASE.2025-04-22T22-12-26Z
     container_name: magic-compare-rustfs
     init: true
     restart: unless-stopped
@@ -30,14 +30,18 @@ services:
       - "${MAGIC_COMPARE_RUSTFS_S3_PORT:-9000}:9000"
 #      - "${MAGIC_COMPARE_RUSTFS_CONSOLE_PORT:-9001}:9001"
     environment:
-      RUSTFS_ADDRESS: ${MAGIC_COMPARE_RUSTFS_ADDRESS:-0.0.0.0:9000}
-      RUSTFS_CONSOLE_ADDRESS: ${MAGIC_COMPARE_RUSTFS_CONSOLE_ADDRESS:-0.0.0.0:9001}
-      RUSTFS_ACCESS_KEY: ${MAGIC_COMPARE_S3_ACCESS_KEY_ID:-rustfsadmin}
-      RUSTFS_SECRET_KEY: ${MAGIC_COMPARE_S3_SECRET_ACCESS_KEY:-rustfsadmin}
-      RUSTFS_CONSOLE_ENABLE: ${MAGIC_COMPARE_RUSTFS_CONSOLE_ENABLE:-false}
-      RUSTFS_LOG_LEVEL: ${MAGIC_COMPARE_RUSTFS_LOG_LEVEL:-warn}
+      MINIO_ROOT_USER: ${MAGIC_COMPARE_S3_ACCESS_KEY_ID:-rustfsadmin}
+      MINIO_ROOT_PASSWORD: ${MAGIC_COMPARE_S3_SECRET_ACCESS_KEY:-rustfsadmin}
       MALLOC_ARENA_MAX: ${MAGIC_COMPARE_RUSTFS_MALLOC_ARENA_MAX:-2}
-    command: ["/data"]
+    command:
+      [
+        "server",
+        "/data",
+        "--address",
+        "${MAGIC_COMPARE_RUSTFS_ADDRESS:-:9000}",
+        "--console-address",
+        "${MAGIC_COMPARE_RUSTFS_CONSOLE_ADDRESS:-:9001}",
+      ]
     mem_limit: ${MAGIC_COMPARE_RUSTFS_MEM_LIMIT:-512m}
     cpus: ${MAGIC_COMPARE_RUSTFS_CPUS:-1.0}
     tmpfs:
@@ -48,7 +52,7 @@ services:
         max-size: ${MAGIC_COMPARE_RUSTFS_LOG_MAX_SIZE:-10m}
         max-file: "${MAGIC_COMPARE_RUSTFS_LOG_MAX_FILE:-3}"
     healthcheck:
-      test: ["CMD", "sh", "-c", "curl -fsS http://127.0.0.1:9000/health >/dev/null"]
+      test: ["CMD", "sh", "-c", "curl -fsS http://127.0.0.1:9000/minio/health/live >/dev/null"]
       interval: 30s
       timeout: 5s
       retries: 5
