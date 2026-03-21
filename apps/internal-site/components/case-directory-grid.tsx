@@ -94,11 +94,6 @@ export function CaseDirectoryGrid({ items }: { items: DirectoryItem[] }) {
                 <Typography variant="h6" sx={{ lineHeight: 1.05 }}>
                   {item.title}
                 </Typography>
-                {item.subtitle ? (
-                  <Typography variant="body2" color="text.secondary" sx={{ mt: 0.45 }}>
-                    {item.subtitle}
-                  </Typography>
-                ) : null}
               </Box>
               <Chip
                 label={item.status}

@@ -35,7 +35,6 @@ def build_case_payload(existing_case: CaseSearchResult | None, current_year: str
         return {
             "slug": existing_case.slug,
             "title": existing_case.title,
-            "subtitle": existing_case.subtitle,
             "summary": existing_case.summary,
             "tags": existing_case.tags,
             "status": existing_case.status,
@@ -45,7 +44,6 @@ def build_case_payload(existing_case: CaseSearchResult | None, current_year: str
     return {
         "slug": current_year,
         "title": current_year,
-        "subtitle": "",
         "summary": random_acg_quote(),
         "tags": [],
         "status": "internal",

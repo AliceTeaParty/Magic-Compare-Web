@@ -50,7 +50,6 @@ export interface ViewerGroup {
 export interface ViewerCaseMeta {
   slug: string;
   title: string;
-  subtitle: string;
   summary: string;
   status?: CaseStatus;
   tags: string[];
@@ -121,7 +120,6 @@ export function createViewerDatasetFromPublishManifest(
     caseMeta: {
       slug: manifest.case.slug,
       title: manifest.case.title,
-      subtitle: manifest.case.subtitle,
       summary: manifest.case.summary,
       tags: manifest.case.tags,
       publishedAt: manifest.case.publishedAt,

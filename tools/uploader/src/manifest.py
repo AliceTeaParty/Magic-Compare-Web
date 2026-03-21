@@ -95,7 +95,6 @@ def build_import_manifest(case_root: Path, config: UploaderConfig) -> dict:
         "case": {
             "slug": case_slug,
             "title": str(scanned_case.metadata.get("title", case_slug.replace("-", " ").title())),
-            "subtitle": str(scanned_case.metadata.get("subtitle", "")),
             "summary": str(scanned_case.metadata.get("summary", "")),
             "tags": scanned_case.metadata.get("tags", []),
             "status": str(scanned_case.metadata.get("status", "draft")),

@@ -39,7 +39,7 @@ const demoManifest: ImportManifest = {
   case: {
     slug: DEMO_CASE_SLUG,
     title: "Demo Grain Study",
-    subtitle: "Banding and texture recovery",
+    subtitle: "",
     summary: "Seeded case that mirrors the published demo bundle.",
     tags: ["grain", "banding", "deband"],
     status: "published",

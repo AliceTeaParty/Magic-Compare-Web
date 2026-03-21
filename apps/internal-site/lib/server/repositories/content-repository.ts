@@ -20,7 +20,6 @@ interface CaseRowSummary {
   id: string;
   slug: string;
   title: string;
-  subtitle: string;
   summary: string;
   tags: string[];
   status: CaseStatus;
@@ -36,6 +35,7 @@ export interface CaseSearchGroupSummary {
 }
 
 export interface CaseSearchResult extends CaseRowSummary {
+  subtitle: string;
   groups: CaseSearchGroupSummary[];
 }
 
@@ -55,7 +55,6 @@ export interface CaseWorkspaceData {
   id: string;
   slug: string;
   title: string;
-  subtitle: string;
   summary: string;
   status: CaseStatus;
   publishedAt: string | null;
@@ -74,6 +73,10 @@ function parseTags(tagsJson: string): string[] {
 
 function stringifyTags(tags: string[]): string {
   return JSON.stringify(tags);
+}
+
+function normalizeDeprecatedSubtitle(value: string | null | undefined): string {
+  return value ?? "";
 }
 
 function asViewerMode(input: string): ViewerMode {
@@ -137,7 +140,6 @@ export async function listCases(): Promise<CaseRowSummary[]> {
     id: caseRow.id,
     slug: caseRow.slug,
     title: caseRow.title,
-    subtitle: caseRow.subtitle,
     summary: caseRow.summary,
     tags: parseTags(caseRow.tagsJson),
     status: asCaseStatus(caseRow.status),
@@ -219,7 +221,7 @@ export async function searchCases(query: string, limit = 8): Promise<CaseSearchR
     id: caseRow.id,
     slug: caseRow.slug,
     title: caseRow.title,
-    subtitle: caseRow.subtitle,
+    subtitle: normalizeDeprecatedSubtitle(caseRow.subtitle),
     summary: caseRow.summary,
     tags: parseTags(caseRow.tagsJson),
     status: asCaseStatus(caseRow.status),
@@ -263,7 +265,6 @@ export async function getCaseWorkspace(caseSlug: string): Promise<CaseWorkspaceD
     id: caseRow.id,
     slug: caseRow.slug,
     title: caseRow.title,
-    subtitle: caseRow.subtitle,
     summary: caseRow.summary,
     status: asCaseStatus(caseRow.status),
     publishedAt: caseRow.publishedAt?.toISOString() ?? null,
@@ -318,7 +319,6 @@ export async function getViewerDataset(caseSlug: string, groupSlug: string): Pro
     caseMeta: {
       slug: caseRow.slug,
       title: caseRow.title,
-      subtitle: caseRow.subtitle,
       summary: caseRow.summary,
       status: asCaseStatus(caseRow.status),
       tags: parseTags(caseRow.tagsJson),
@@ -416,7 +416,7 @@ export async function applyImportManifest(rawManifest: unknown) {
     },
     update: {
       title: manifest.case.title,
-      subtitle: manifest.case.subtitle,
+      subtitle: manifest.case.subtitle || null,
       summary: manifest.case.summary,
       status: manifest.case.status,
       tagsJson: stringifyTags(manifest.case.tags),
@@ -424,7 +424,7 @@ export async function applyImportManifest(rawManifest: unknown) {
     create: {
       slug: manifest.case.slug,
       title: manifest.case.title,
-      subtitle: manifest.case.subtitle,
+      subtitle: manifest.case.subtitle || null,
       summary: manifest.case.summary,
       status: manifest.case.status,
       tagsJson: stringifyTags(manifest.case.tags),

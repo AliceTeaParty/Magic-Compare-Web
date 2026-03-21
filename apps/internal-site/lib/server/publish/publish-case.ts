@@ -128,7 +128,7 @@ export async function publishCase(caseId: string) {
       case: {
         slug: caseRow.slug,
         title: caseRow.title,
-        subtitle: caseRow.subtitle,
+        subtitle: caseRow.subtitle ?? "",
         summary: caseRow.summary,
         tags: JSON.parse(caseRow.tagsJson),
         publishedAt: publishedAt.toISOString(),

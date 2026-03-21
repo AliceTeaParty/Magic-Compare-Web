@@ -14,7 +14,7 @@ CREATE TABLE IF NOT EXISTS "Case" (
   "id" TEXT NOT NULL PRIMARY KEY,
   "slug" TEXT NOT NULL,
   "title" TEXT NOT NULL,
-  "subtitle" TEXT NOT NULL DEFAULT '',
+  "subtitle" TEXT DEFAULT '',
   "summary" TEXT NOT NULL DEFAULT '',
   "tagsJson" TEXT NOT NULL DEFAULT '[]',
   "status" TEXT NOT NULL,
