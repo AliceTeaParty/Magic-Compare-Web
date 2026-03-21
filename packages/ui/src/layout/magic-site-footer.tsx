@@ -15,6 +15,8 @@ export function MagicSiteFooter({
   yearEnd,
   yearStart,
 }: MagicSiteFooterProps) {
+  const yearLabel = yearStart === yearEnd ? `${yearEnd}` : `${yearStart}-${yearEnd}`;
+
   return (
     <Box
       component="footer"
@@ -49,7 +51,7 @@ export function MagicSiteFooter({
               letterSpacing: "0.01em",
             }}
           >
-            © {yearStart}-{yearEnd} {author}. All Rights Reserved.
+            © {yearLabel} {author}. All Rights Reserved.
           </Typography>
           {joinUsUrl && joinUsLabel ? (
             <MuiLink

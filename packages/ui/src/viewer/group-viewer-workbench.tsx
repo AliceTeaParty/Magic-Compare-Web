@@ -1815,7 +1815,12 @@ export function GroupViewerWorkbench({
             <Typography variant="h4" noWrap sx={{ lineHeight: 1.18, pb: 0.16 }}>
               {dataset.group.title}
             </Typography>
-            <Typography variant="body2" color="text.secondary" noWrap sx={{ mt: "0.25em" }}>
+            <Typography
+              variant="body2"
+              color="text.secondary"
+              noWrap
+              sx={{ mt: "0.25em", pl: "0.08em" }}
+            >
               {dataset.caseMeta.title}
             </Typography>
           </Stack>
