@@ -46,7 +46,9 @@ export async function publishCase(caseId: string) {
 
   for (const group of publishableGroups) {
     // Once a group is public we keep its slug stable; only first-time publishes mint one.
-    const publicSlug = group.publicSlug ?? (await ensurePublicSlug(caseRow.slug, group.slug, group.id));
+    const publicSlug =
+      group.publicSlug ??
+      (await ensurePublicSlug(caseRow.slug, group.slug, group.id));
 
     if (publicSlug !== group.publicSlug) {
       await prisma.group.update({

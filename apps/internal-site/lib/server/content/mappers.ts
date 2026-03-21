@@ -18,7 +18,12 @@ type AssetKind = "before" | "after" | "heatmap" | "crop" | "misc";
  * experimental assets without widening every downstream union immediately.
  */
 function asAssetKind(kind: string): AssetKind {
-  if (kind === "before" || kind === "after" || kind === "heatmap" || kind === "crop") {
+  if (
+    kind === "before" ||
+    kind === "after" ||
+    kind === "heatmap" ||
+    kind === "crop"
+  ) {
     return kind;
   }
 
@@ -32,7 +37,9 @@ function asAssetKind(kind: string): AssetKind {
 export function parseTags(tagsJson: string): string[] {
   try {
     const parsed = JSON.parse(tagsJson);
-    return Array.isArray(parsed) ? parsed.filter((tag): tag is string => typeof tag === "string") : [];
+    return Array.isArray(parsed)
+      ? parsed.filter((tag): tag is string => typeof tag === "string")
+      : [];
   } catch {
     return [];
   }
@@ -62,7 +69,12 @@ export function asViewerMode(input: string): ViewerMode {
  * appear published in the UI.
  */
 export function asCaseStatus(input: string): CaseStatus {
-  if (input === "draft" || input === "internal" || input === "published" || input === "archived") {
+  if (
+    input === "draft" ||
+    input === "internal" ||
+    input === "published" ||
+    input === "archived"
+  ) {
     return input;
   }
 
@@ -137,7 +149,12 @@ export function mapCaseSearchResult(caseRow: {
   status: string;
   publishedAt: Date | null;
   updatedAt: Date;
-  groups: Array<{ slug: string; title: string; isPublic: boolean; order: number }>;
+  groups: Array<{
+    slug: string;
+    title: string;
+    isPublic: boolean;
+    order: number;
+  }>;
 }): CaseSearchResult {
   const summary = mapCaseCatalogItem(caseRow);
 
@@ -200,14 +217,34 @@ export function mapCaseWorkspaceData(caseRow: {
  * Builds the full viewer dataset in one place so route handlers can enforce visibility rules first
  * and UI code receives a ready-to-render compare model afterward.
  */
-export function buildViewerDataset(caseRow: {
-  slug: string;
-  title: string;
-  summary: string;
-  status: string;
-  tagsJson: string;
-  publishedAt: Date | null;
-  groups: Array<{
+export function buildViewerDataset(
+  caseRow: {
+    slug: string;
+    title: string;
+    summary: string;
+    status: string;
+    tagsJson: string;
+    publishedAt: Date | null;
+    groups: Array<{
+      id: string;
+      slug: string;
+      publicSlug: string | null;
+      title: string;
+      description: string;
+      defaultMode: string;
+      tagsJson: string;
+      isPublic: boolean;
+      order: number;
+      frames: Array<{
+        id: string;
+        title: string;
+        caption: string;
+        order: number;
+        assets: Asset[];
+      }>;
+    }>;
+  },
+  currentGroup: {
     id: string;
     slug: string;
     publicSlug: string | null;
@@ -216,7 +253,6 @@ export function buildViewerDataset(caseRow: {
     defaultMode: string;
     tagsJson: string;
     isPublic: boolean;
-    order: number;
     frames: Array<{
       id: string;
       title: string;
@@ -224,24 +260,8 @@ export function buildViewerDataset(caseRow: {
       order: number;
       assets: Asset[];
     }>;
-  }>;
-}, currentGroup: {
-  id: string;
-  slug: string;
-  publicSlug: string | null;
-  title: string;
-  description: string;
-  defaultMode: string;
-  tagsJson: string;
-  isPublic: boolean;
-  frames: Array<{
-    id: string;
-    title: string;
-    caption: string;
-    order: number;
-    assets: Asset[];
-  }>;
-}): ViewerDataset {
+  },
+): ViewerDataset {
   return {
     caseMeta: {
       slug: caseRow.slug,

@@ -39,7 +39,13 @@ export function useStagePanZoomState({
       mediaRect,
       rotateStage,
     }),
-    [activeAsset.height, activeAsset.width, devicePixelRatio, mediaRect, rotateStage],
+    [
+      activeAsset.height,
+      activeAsset.width,
+      devicePixelRatio,
+      mediaRect,
+      rotateStage,
+    ],
   );
   const presetTransformScale = useMemo(
     () => getViewerPresetTransformScale(panZoomState.presetScale, scaleOptions),
@@ -63,11 +69,18 @@ export function useStagePanZoomState({
   /**
    * Reapplies the shared clamp rules so every gesture path respects the same pan bounds.
    */
-  const applyPanZoom = useCallback((nextState: ViewerPanZoomState) => {
-    setPanZoomState(
-      clampViewerPanZoom(nextState, mediaRect, getViewerEffectiveScale(nextState, scaleOptions)),
-    );
-  }, [mediaRect, scaleOptions, setPanZoomState]);
+  const applyPanZoom = useCallback(
+    (nextState: ViewerPanZoomState) => {
+      setPanZoomState(
+        clampViewerPanZoom(
+          nextState,
+          mediaRect,
+          getViewerEffectiveScale(nextState, scaleOptions),
+        ),
+      );
+    },
+    [mediaRect, scaleOptions, setPanZoomState],
+  );
 
   return {
     effectiveScale,

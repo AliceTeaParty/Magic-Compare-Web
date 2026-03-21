@@ -2,7 +2,8 @@ import { describe, expect, it, vi } from "vitest";
 import { buildPublishManifest } from "./build-publish-manifest";
 
 vi.mock("@/lib/server/storage/internal-assets", () => ({
-  resolvePublicInternalAssetUrl: (assetUrl: string) => `https://assets.example.com${assetUrl}`,
+  resolvePublicInternalAssetUrl: (assetUrl: string) =>
+    `https://assets.example.com${assetUrl}`,
   internalAssetPublicGroupBaseUrl: (caseSlug: string, groupSlug: string) =>
     `https://assets.example.com/internal-assets/${caseSlug}/${groupSlug}`,
 }));
@@ -62,7 +63,8 @@ describe("buildPublishManifest", () => {
                 kind: "before",
                 label: "Before",
                 imageUrl: "/internal-assets/2026/group-1/frame-1-before.png",
-                thumbUrl: "/internal-assets/2026/group-1/frame-1-before-thumb.png",
+                thumbUrl:
+                  "/internal-assets/2026/group-1/frame-1-before-thumb.png",
                 width: 1920,
                 height: 1080,
                 note: "",
@@ -74,7 +76,8 @@ describe("buildPublishManifest", () => {
                 kind: "after",
                 label: "After",
                 imageUrl: "/internal-assets/2026/group-1/frame-1-after.png",
-                thumbUrl: "/internal-assets/2026/group-1/frame-1-after-thumb.png",
+                thumbUrl:
+                  "/internal-assets/2026/group-1/frame-1-after-thumb.png",
                 width: 1920,
                 height: 1080,
                 note: "",
@@ -86,7 +89,8 @@ describe("buildPublishManifest", () => {
                 kind: "other",
                 label: "Debug",
                 imageUrl: "/internal-assets/2026/group-1/frame-1-debug.png",
-                thumbUrl: "/internal-assets/2026/group-1/frame-1-debug-thumb.png",
+                thumbUrl:
+                  "/internal-assets/2026/group-1/frame-1-debug-thumb.png",
                 width: 640,
                 height: 360,
                 note: "",
@@ -104,7 +108,8 @@ describe("buildPublishManifest", () => {
     expect(manifest).toEqual(
       expect.objectContaining({
         publicSlug: "2026--group-1",
-        assetBasePath: "https://assets.example.com/internal-assets/2026/group-1",
+        assetBasePath:
+          "https://assets.example.com/internal-assets/2026/group-1",
         case: expect.objectContaining({
           tags: ["grain"],
         }),
@@ -117,15 +122,18 @@ describe("buildPublishManifest", () => {
             assets: [
               expect.objectContaining({
                 kind: "before",
-                imageUrl: "https://assets.example.com/internal-assets/2026/group-1/frame-1-before.png",
+                imageUrl:
+                  "https://assets.example.com/internal-assets/2026/group-1/frame-1-before.png",
               }),
               expect.objectContaining({
                 kind: "after",
-                imageUrl: "https://assets.example.com/internal-assets/2026/group-1/frame-1-after.png",
+                imageUrl:
+                  "https://assets.example.com/internal-assets/2026/group-1/frame-1-after.png",
               }),
               expect.objectContaining({
                 kind: "misc",
-                imageUrl: "https://assets.example.com/internal-assets/2026/group-1/frame-1-debug.png",
+                imageUrl:
+                  "https://assets.example.com/internal-assets/2026/group-1/frame-1-debug.png",
               }),
             ],
           }),

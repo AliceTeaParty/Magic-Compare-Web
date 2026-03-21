@@ -184,7 +184,11 @@ function PositionedStageMedia({
           top: "50%",
           width: `${mediaWidth}px`,
           height: `${mediaHeight}px`,
-          transform: buildMediaTransform(rotateStage, panZoomState, effectiveScale),
+          transform: buildMediaTransform(
+            rotateStage,
+            panZoomState,
+            effectiveScale,
+          ),
           transformOrigin: "center center",
           transition: "opacity 180ms cubic-bezier(0.22, 1, 0.36, 1)",
           willChange: "transform",
@@ -447,8 +451,12 @@ function ABCompareStage({
   setPanZoomState: (nextState: ViewerPanZoomState) => void;
 }) {
   const stageSurfaceRef = useRef<HTMLDivElement | null>(null);
-  const { consumeStageClick, effectiveScale, handleNonPassiveWheel, stageHandlers } =
-    useStagePanZoom({
+  const {
+    consumeStageClick,
+    effectiveScale,
+    handleNonPassiveWheel,
+    stageHandlers,
+  } = useStagePanZoom({
     active,
     activeAsset,
     devicePixelRatio,
@@ -510,7 +518,9 @@ function ABCompareStage({
         cursor: active ? (effectiveScale > 1 ? "grab" : "pointer") : "pointer",
         userSelect: "none",
         borderRadius: 2.25,
-        outline: active ? "1px solid rgba(232, 198, 246, 0.48)" : "1px solid transparent",
+        outline: active
+          ? "1px solid rgba(232, 198, 246, 0.48)"
+          : "1px solid transparent",
         boxShadow: active
           ? "0 0 0 1px rgba(232, 198, 246, 0.08), 0 0 22px rgba(228, 194, 242, 0.14)"
           : "none",
@@ -558,7 +568,11 @@ function StagePresentationShell({
         maxWidth: fittedSize ? `${fittedSize.width}px` : "100%",
         minWidth: 0,
         aspectRatio: rotateStage ? "9 / 16" : "16 / 9",
-        minHeight: fitActive ? 0 : rotateStage ? { xs: 420, md: 520 } : { xs: 220, md: 340 },
+        minHeight: fitActive
+          ? 0
+          : rotateStage
+            ? { xs: 420, md: 520 }
+            : { xs: 220, md: 340 },
         maxHeight: fittedSize ? `${fittedSize.height}px` : "none",
         marginInline: "auto",
         borderRadius: 2.5,
@@ -599,7 +613,8 @@ export function HeatmapNotice() {
         color: "text.primary",
       }}
     >
-      No heatmap for this frame. Viewer has fallen back to a primary compare mode.
+      No heatmap for this frame. Viewer has fallen back to a primary compare
+      mode.
     </Alert>
   );
 }
@@ -665,7 +680,9 @@ function ViewerStageContent({
     return (
       <Stack spacing={1.5} alignItems="center">
         <PhotoLibrary sx={{ color: "text.secondary" }} />
-        <Typography variant="body1">This frame is missing its before/after pair.</Typography>
+        <Typography variant="body1">
+          This frame is missing its before/after pair.
+        </Typography>
       </Stack>
     );
   }
@@ -691,7 +708,10 @@ function ViewerStageContent({
 
   if (mode === "heatmap" && heatmapAsset) {
     return (
-      <Box ref={stageViewportRef} sx={{ width: "100%", height: "100%", position: "relative" }}>
+      <Box
+        ref={stageViewportRef}
+        sx={{ width: "100%", height: "100%", position: "relative" }}
+      >
         <PositionedStageMedia
           asset={afterAsset}
           alt={`${afterAsset.label} base`}

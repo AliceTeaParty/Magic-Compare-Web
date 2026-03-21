@@ -7,7 +7,10 @@ import { stringifyTags } from "./mappers";
  * Reuses the group row when an import is repeated so stable slugs/public settings survive, but
  * replaces frames/assets wholesale because the uploader manifest is the source of truth.
  */
-export async function upsertGroup(groupEntry: ImportManifest["groups"][number], caseId: string) {
+export async function upsertGroup(
+  groupEntry: ImportManifest["groups"][number],
+  caseId: string,
+) {
   const existingGroup = await prisma.group.findUnique({
     where: {
       caseId_slug: {
@@ -120,13 +123,21 @@ export async function applyImportManifest(rawManifest: unknown) {
 
         // Prefer an explicit manifest label so uploader-defined covers remain stable even if the
         // primary display heuristics later change.
-        if (!coverAssetId && manifest.case.coverAssetLabel && assetEntry.label === manifest.case.coverAssetLabel) {
+        if (
+          !coverAssetId &&
+          manifest.case.coverAssetLabel &&
+          assetEntry.label === manifest.case.coverAssetLabel
+        ) {
           coverAssetId = assetRow.id;
         }
 
         // Fall back to the primary after frame because that is the least surprising cover when the
         // manifest omitted an explicit label.
-        if (!coverAssetId && assetEntry.kind === "after" && assetEntry.isPrimaryDisplay) {
+        if (
+          !coverAssetId &&
+          assetEntry.kind === "after" &&
+          assetEntry.isPrimaryDisplay
+        ) {
           coverAssetId = assetRow.id;
         }
       }

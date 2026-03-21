@@ -73,30 +73,50 @@ export function GroupViewerWorkbench({
   const modePreferencePersistReadyRef = useRef(false);
   const stageRef = useRef<HTMLDivElement | null>(null);
   const theme = useTheme();
-  const showDesktopSidebar = useMediaQuery(theme.breakpoints.up("lg"), { noSsr: true });
-  const hideFitControl = useMediaQuery(theme.breakpoints.down("sm"), { noSsr: true });
-  const rotateStage = useMediaQuery("(max-width: 760px) and (orientation: portrait)", {
+  const showDesktopSidebar = useMediaQuery(theme.breakpoints.up("lg"), {
     noSsr: true,
   });
-  const prefersReducedMotion = useMediaQuery("(prefers-reduced-motion: reduce)", { noSsr: true });
+  const hideFitControl = useMediaQuery(theme.breakpoints.down("sm"), {
+    noSsr: true,
+  });
+  const rotateStage = useMediaQuery(
+    "(max-width: 760px) and (orientation: portrait)",
+    {
+      noSsr: true,
+    },
+  );
+  const prefersReducedMotion = useMediaQuery(
+    "(prefers-reduced-motion: reduce)",
+    { noSsr: true },
+  );
   const [mediaPreferencesReady, setMediaPreferencesReady] = useState(false);
   const [viewportSize, setViewportSize] = useState(() => getViewportSize());
-  const [devicePixelRatio, setDevicePixelRatio] = useState(() => getViewerDevicePixelRatio());
-  const [fitViewViewportSignature, setFitViewViewportSignature] = useState<string | null>(null);
+  const [devicePixelRatio, setDevicePixelRatio] = useState(() =>
+    getViewerDevicePixelRatio(),
+  );
+  const [fitViewViewportSignature, setFitViewViewportSignature] = useState<
+    string | null
+  >(null);
   const [swipePosition, setSwipePosition] = useState(50);
   const [abPanZoomState, setAbPanZoomState] = useState(DEFAULT_PAN_ZOOM);
   const [abStageActive, setAbStageActive] = useState(false);
   const resolvedHideFitControl = mediaPreferencesReady ? hideFitControl : false;
-  const resolvedPrefersReducedMotion = mediaPreferencesReady ? prefersReducedMotion : false;
+  const resolvedPrefersReducedMotion = mediaPreferencesReady
+    ? prefersReducedMotion
+    : false;
   const resolvedRotateStage = mediaPreferencesReady ? rotateStage : false;
-  const resolvedShowDesktopSidebar = mediaPreferencesReady ? showDesktopSidebar : false;
+  const resolvedShowDesktopSidebar = mediaPreferencesReady
+    ? showDesktopSidebar
+    : false;
   const abSideRef = useRef(abSide);
   const abStageActiveRef = useRef(abStageActive);
   const modeRef = useRef(mode);
   const stageAspectRatio = resolvedRotateStage ? 9 / 16 : 16 / 9;
   const fittedStageSize = useMemo(
     () =>
-      fitViewViewportSignature ? getViewerFittedStageSize(viewportSize, stageAspectRatio) : null,
+      fitViewViewportSignature
+        ? getViewerFittedStageSize(viewportSize, stageAspectRatio)
+        : null,
     [fitViewViewportSignature, stageAspectRatio, viewportSize],
   );
 
@@ -265,7 +285,11 @@ export function GroupViewerWorkbench({
     function handleOutsidePointerDown(event: PointerEvent) {
       const stageNode = stageRef.current;
 
-      if (!stageNode || !(event.target instanceof Node) || stageNode.contains(event.target)) {
+      if (
+        !stageNode ||
+        !(event.target instanceof Node) ||
+        stageNode.contains(event.target)
+      ) {
         return;
       }
 
@@ -273,7 +297,12 @@ export function GroupViewerWorkbench({
     }
 
     document.addEventListener("pointerdown", handleOutsidePointerDown, true);
-    return () => document.removeEventListener("pointerdown", handleOutsidePointerDown, true);
+    return () =>
+      document.removeEventListener(
+        "pointerdown",
+        handleOutsidePointerDown,
+        true,
+      );
   }, [abStageActive, mode]);
 
   /**
@@ -302,7 +331,9 @@ export function GroupViewerWorkbench({
 
     setViewportSize(nextViewportSize);
     setFitViewViewportSignature((previousSignature) =>
-      previousSignature && previousSignature === nextSignature ? null : nextSignature,
+      previousSignature && previousSignature === nextSignature
+        ? null
+        : nextSignature,
     );
   }
 
@@ -323,7 +354,9 @@ export function GroupViewerWorkbench({
           maxWidth: "100%",
           display: "grid",
           gridTemplateColumns:
-            sidebarOpen && resolvedShowDesktopSidebar ? "minmax(0, 1fr) 320px" : "1fr",
+            sidebarOpen && resolvedShowDesktopSidebar
+              ? "minmax(0, 1fr) 320px"
+              : "1fr",
           gridTemplateRows: "auto minmax(0, 1fr)",
           minHeight: "calc(100svh - 16px)",
           overflow: "hidden",
@@ -366,7 +399,9 @@ export function GroupViewerWorkbench({
                 width: "100%",
                 minWidth: 0,
                 height: "100%",
-                minHeight: resolvedRotateStage ? { xs: 520, md: 560 } : { xs: 340, md: 460 },
+                minHeight: resolvedRotateStage
+                  ? { xs: 520, md: 560 }
+                  : { xs: 340, md: 460 },
               }}
             >
               {mode === "heatmap" && !heatmapAsset ? <HeatmapNotice /> : null}
@@ -375,7 +410,9 @@ export function GroupViewerWorkbench({
                 sx={{
                   flex: 1,
                   minWidth: 0,
-                  minHeight: fittedStageSize ? `${fittedStageSize.height}px` : 0,
+                  minHeight: fittedStageSize
+                    ? `${fittedStageSize.height}px`
+                    : 0,
                 }}
               >
                 <ViewerStage
@@ -400,7 +437,11 @@ export function GroupViewerWorkbench({
               </Box>
 
               {mode === "heatmap" && heatmapAsset ? (
-                <Stack direction={{ xs: "column", md: "row" }} spacing={2} alignItems="center">
+                <Stack
+                  direction={{ xs: "column", md: "row" }}
+                  spacing={2}
+                  alignItems="center"
+                >
                   <Stack direction="row" spacing={1} alignItems="center">
                     <Tune fontSize="small" />
                     <Typography variant="body2">Opacity</Typography>
@@ -411,7 +452,11 @@ export function GroupViewerWorkbench({
                     value={overlayOpacity}
                     onChange={(_, value) =>
                       setOverlayOpacity(
-                        clampNumber(Array.isArray(value) ? value[0] : value, 20, 95),
+                        clampNumber(
+                          Array.isArray(value) ? value[0] : value,
+                          20,
+                          95,
+                        ),
                       )
                     }
                     valueLabelDisplay="auto"

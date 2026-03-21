@@ -1,6 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type PointerEvent as ReactPointerEvent,
+} from "react";
 import {
   applyFilmstripPointerMove,
   cancelFilmstripMotion,
@@ -78,7 +83,8 @@ export function useFilmstripGestureSession({
       moved: false,
       originFrameId:
         event.target instanceof Element
-          ? event.target.closest<HTMLElement>("[data-frame-id]")?.dataset.frameId ?? null
+          ? (event.target.closest<HTMLElement>("[data-frame-id]")?.dataset
+              .frameId ?? null)
           : null,
       pointerId: event.pointerId,
       startScrollLeft: event.currentTarget.scrollLeft,

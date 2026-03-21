@@ -17,11 +17,12 @@ export function useFilmstripScrollState({
   frameCount: number;
   viewportRef: RefObject<HTMLDivElement | null>;
 }): FilmstripScrollState {
-  const [filmstripScrollState, setFilmstripScrollState] = useState<FilmstripScrollState>({
-    clientWidth: 0,
-    scrollLeft: 0,
-    scrollWidth: 0,
-  });
+  const [filmstripScrollState, setFilmstripScrollState] =
+    useState<FilmstripScrollState>({
+      clientWidth: 0,
+      scrollLeft: 0,
+      scrollWidth: 0,
+    });
 
   useEffect(() => {
     const viewport = viewportRef.current;

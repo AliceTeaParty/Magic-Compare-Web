@@ -18,7 +18,10 @@ import {
   publishedGroupsDirectory,
   resolvePublicExportDirectory,
 } from "./paths";
-import { PublicSiteOperationConflictError, withPublicSiteOperationLock } from "./operation-lock";
+import {
+  PublicSiteOperationConflictError,
+  withPublicSiteOperationLock,
+} from "./operation-lock";
 
 export interface PublicExportResult extends CommandResult {
   buildOutputDir: string;
@@ -34,7 +37,10 @@ export interface PublicDeployResult extends PublicExportResult {
  * Mirrors the Next.js export into the configured publish directory so local exports and deploys can
  * target an arbitrary output root without teaching Next.js about that environment-specific path.
  */
-async function mirrorExportDirectory(sourceDir: string, targetDir: string): Promise<void> {
+async function mirrorExportDirectory(
+  sourceDir: string,
+  targetDir: string,
+): Promise<void> {
   if (sourceDir === targetDir) {
     return;
   }
@@ -42,8 +48,12 @@ async function mirrorExportDirectory(sourceDir: string, targetDir: string): Prom
   await rm(targetDir, { recursive: true, force: true });
   // Create the parent explicitly because deploy targets may point outside the app tree and `cp`
   // will not materialize missing ancestors for us.
-  await mkdir(new URL(`file://${targetDir}`).pathname.replace(/\/[^/]*$/, ""), { recursive: true }).catch(
-    async () => mkdir(targetDir.substring(0, targetDir.lastIndexOf("/")), { recursive: true }),
+  await mkdir(new URL(`file://${targetDir}`).pathname.replace(/\/[^/]*$/, ""), {
+    recursive: true,
+  }).catch(async () =>
+    mkdir(targetDir.substring(0, targetDir.lastIndexOf("/")), {
+      recursive: true,
+    }),
   );
   await cp(sourceDir, targetDir, { recursive: true });
 }
@@ -54,7 +64,9 @@ async function mirrorExportDirectory(sourceDir: string, targetDir: string): Prom
  */
 async function ensurePublishedGroupsExist(): Promise<void> {
   try {
-    const entries = await readdir(publishedGroupsDirectory(), { withFileTypes: true });
+    const entries = await readdir(publishedGroupsDirectory(), {
+      withFileTypes: true,
+    });
     if (entries.some((entry) => entry.isDirectory())) {
       return;
     }
@@ -79,7 +91,11 @@ async function performPublicExport(): Promise<PublicExportResult> {
   await rm(`${publicSiteDirectory()}/.next`, { recursive: true, force: true });
   await rm(buildOutputDir, { recursive: true, force: true });
 
-  const commandResult = await runCommand("pnpm", getPublicSiteBuildArgs(), getWorkspaceRoot());
+  const commandResult = await runCommand(
+    "pnpm",
+    getPublicSiteBuildArgs(),
+    getWorkspaceRoot(),
+  );
   await mirrorExportDirectory(buildOutputDir, exportDir);
 
   return {
@@ -109,7 +125,9 @@ export async function exportPublicSite(): Promise<PublicExportResult> {
  * Optionally republishes one case before exporting so the deploy path can produce a fresh public
  * site in one operator action without requiring a separate manual publish step.
  */
-export async function deployPublicSite(caseId?: string): Promise<PublicDeployResult> {
+export async function deployPublicSite(
+  caseId?: string,
+): Promise<PublicDeployResult> {
   if (!isCloudflarePagesDeployConfigured()) {
     throw new Error(
       `Cloudflare Pages deploy is not configured. Missing ${CF_PAGES_PROJECT_NAME_ENV_NAME} or CLOUDFLARE credentials.`,
@@ -122,7 +140,8 @@ export async function deployPublicSite(caseId?: string): Promise<PublicDeployRes
     }
 
     const exportResult = await performPublicExport();
-    const projectName = process.env[CF_PAGES_PROJECT_NAME_ENV_NAME]?.trim() || "";
+    const projectName =
+      process.env[CF_PAGES_PROJECT_NAME_ENV_NAME]?.trim() || "";
     const branch = process.env[CF_PAGES_BRANCH_ENV_NAME]?.trim() || null;
     const deployResult = await runCommand(
       "pnpm",
@@ -132,8 +151,12 @@ export async function deployPublicSite(caseId?: string): Promise<PublicDeployRes
 
     return {
       ...exportResult,
-      stdout: [exportResult.stdout.trim(), deployResult.stdout.trim()].filter(Boolean).join("\n"),
-      stderr: [exportResult.stderr.trim(), deployResult.stderr.trim()].filter(Boolean).join("\n"),
+      stdout: [exportResult.stdout.trim(), deployResult.stdout.trim()]
+        .filter(Boolean)
+        .join("\n"),
+      stderr: [exportResult.stderr.trim(), deployResult.stderr.trim()]
+        .filter(Boolean)
+        .join("\n"),
       projectName,
       branch,
     };

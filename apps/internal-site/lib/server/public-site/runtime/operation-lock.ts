@@ -1,11 +1,9 @@
 export class PublicSiteOperationConflictError extends Error {}
 
-let activePublicSiteOperation:
-  | {
-      label: "export" | "deploy";
-      promise: Promise<unknown>;
-    }
-  | null = null;
+let activePublicSiteOperation: {
+  label: "export" | "deploy";
+  promise: Promise<unknown>;
+} | null = null;
 
 /**
  * Serializes export/deploy operations inside the process so concurrent button clicks cannot race on

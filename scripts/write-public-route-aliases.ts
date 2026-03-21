@@ -69,7 +69,7 @@ function readAliases(): PublishedAlias[] {
       }
 
       return [{ caseSlug, groupSlug, publicSlug }];
-  });
+    });
 }
 
 /**
@@ -124,11 +124,20 @@ function main(): void {
   }
 
   rmSync(aliasRoot, { recursive: true, force: true });
-  rmSync(path.join(exportRoot, "g", `${emptyPlaceholderSlug}.html`), { force: true });
-  rmSync(path.join(exportRoot, "g", `${emptyPlaceholderSlug}.txt`), { force: true });
+  rmSync(path.join(exportRoot, "g", `${emptyPlaceholderSlug}.html`), {
+    force: true,
+  });
+  rmSync(path.join(exportRoot, "g", `${emptyPlaceholderSlug}.txt`), {
+    force: true,
+  });
 
   for (const alias of readAliases()) {
-    const aliasDir = path.join(aliasRoot, alias.caseSlug, "groups", alias.groupSlug);
+    const aliasDir = path.join(
+      aliasRoot,
+      alias.caseSlug,
+      "groups",
+      alias.groupSlug,
+    );
     mkdirSync(aliasDir, { recursive: true });
     writeFileSync(
       path.join(aliasDir, "index.html"),

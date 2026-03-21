@@ -2,9 +2,7 @@
 
 import { useMemo, useRef } from "react";
 import { getFilmstripScrollbarMetrics } from "@magic-compare/compare-core";
-import {
-  type FilmstripScrollState,
-} from "./filmstrip-drag-physics";
+import { type FilmstripScrollState } from "./filmstrip-drag-physics";
 import { useFilmstripGestureSession } from "./use-filmstrip-gesture-session";
 import { useFilmstripScrollState } from "./use-filmstrip-scroll-state";
 
@@ -26,16 +24,12 @@ export function useFilmstripDrag({
     frameCount,
     viewportRef,
   });
-  const {
-    edgeOffset,
-    isDragging,
-    handleFrameSelection,
-    viewportHandlers,
-  } = useFilmstripGestureSession({
-    frameCount,
-    onSelectFrame,
-    prefersReducedMotion,
-  });
+  const { edgeOffset, isDragging, handleFrameSelection, viewportHandlers } =
+    useFilmstripGestureSession({
+      frameCount,
+      onSelectFrame,
+      prefersReducedMotion,
+    });
 
   const scrollbarMetrics = useMemo(
     () =>

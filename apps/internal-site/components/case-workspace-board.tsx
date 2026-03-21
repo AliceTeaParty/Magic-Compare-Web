@@ -2,8 +2,23 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { CloudUpload, Publish } from "@mui/icons-material";
-import { Box, Button, Chip, List, Paper, Stack, Tooltip, Typography } from "@mui/material";
-import { DndContext, PointerSensor, closestCenter, useSensor, useSensors } from "@dnd-kit/core";
+import {
+  Box,
+  Button,
+  Chip,
+  List,
+  Paper,
+  Stack,
+  Tooltip,
+  Typography,
+} from "@mui/material";
+import {
+  DndContext,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
 import { SortableContext, rectSortingStrategy } from "@dnd-kit/sortable";
 import { useRouter } from "next/navigation";
 import { motion } from "motion/react";
@@ -25,15 +40,14 @@ export function CaseWorkspaceBoard({
   canDeployPublicSite: boolean;
 }) {
   const router = useRouter();
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+  );
   const [groups, setGroups] = useState(data.groups);
   const [isPending, startTransition] = useTransition();
   const workspaceNotifications = useWorkspaceNotifications();
-  const {
-    dismissNotification,
-    notifications,
-    pushNotification,
-  } = workspaceNotifications;
+  const { dismissNotification, notifications, pushNotification } =
+    workspaceNotifications;
   const {
     publicGroupCount,
     isDeployingPublicSite,
@@ -104,10 +118,20 @@ export function CaseWorkspaceBoard({
               <Typography variant="h2" sx={{ lineHeight: 0.98 }}>
                 {data.title}
               </Typography>
-              <Typography variant="body1" color="text.secondary" sx={{ maxWidth: 820 }}>
+              <Typography
+                variant="body1"
+                color="text.secondary"
+                sx={{ maxWidth: 820 }}
+              >
                 {data.summary || "No summary yet."}
               </Typography>
-              <Stack direction="row" spacing={0.9} flexWrap="wrap" useFlexGap sx={{ pt: 0.25 }}>
+              <Stack
+                direction="row"
+                spacing={0.9}
+                flexWrap="wrap"
+                useFlexGap
+                sx={{ pt: 0.25 }}
+              >
                 <Chip
                   label={data.status}
                   color={data.status === "published" ? "primary" : "default"}
@@ -158,7 +182,9 @@ export function CaseWorkspaceBoard({
                   <Button
                     variant="outlined"
                     startIcon={<CloudUpload />}
-                    disabled={isPending || isDeployingPublicSite || !canDeployPublicSite}
+                    disabled={
+                      isPending || isDeployingPublicSite || !canDeployPublicSite
+                    }
                     onClick={deployPublicSite}
                   >
                     Deploy Pages
@@ -191,7 +217,8 @@ export function CaseWorkspaceBoard({
             <Stack spacing={0.6}>
               <Typography variant="h6">Groups</Typography>
               <Typography variant="body2" color="text.secondary">
-                Drag to define case order. Group pages open in the viewer workbench.
+                Drag to define case order. Group pages open in the viewer
+                workbench.
               </Typography>
             </Stack>
             <DndContext

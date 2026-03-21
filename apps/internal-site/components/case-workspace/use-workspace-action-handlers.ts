@@ -32,7 +32,9 @@ export function useWorkspaceActionHandlers({
   isDeployingPublicSite: boolean;
   notifications: NotificationApi;
   refresh: () => void;
-  setGroups: (updater: GroupItem[] | ((current: GroupItem[]) => GroupItem[])) => void;
+  setGroups: (
+    updater: GroupItem[] | ((current: GroupItem[]) => GroupItem[]),
+  ) => void;
   setIsDeployingPublicSite: (nextState: boolean) => void;
   startTransition: TransitionStartFunction;
 }) {

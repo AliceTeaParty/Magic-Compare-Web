@@ -1,6 +1,10 @@
 import { useCallback, useRef, useState } from "react";
 
-export type WorkspaceNotificationTone = "error" | "info" | "success" | "warning";
+export type WorkspaceNotificationTone =
+  | "error"
+  | "info"
+  | "success"
+  | "warning";
 
 export interface WorkspaceNotification {
   id: string;
@@ -14,7 +18,9 @@ export interface WorkspaceNotification {
  * without each component needing its own timer bookkeeping.
  */
 export function useWorkspaceNotifications() {
-  const [notifications, setNotifications] = useState<WorkspaceNotification[]>([]);
+  const [notifications, setNotifications] = useState<WorkspaceNotification[]>(
+    [],
+  );
   const timeoutIdsRef = useRef(new Map<string, number>());
 
   /**
@@ -28,7 +34,9 @@ export function useWorkspaceNotifications() {
       timeoutIdsRef.current.delete(notificationId);
     }
 
-    setNotifications((current) => current.filter((notification) => notification.id !== notificationId));
+    setNotifications((current) =>
+      current.filter((notification) => notification.id !== notificationId),
+    );
   }, []);
 
   /**
@@ -41,7 +49,8 @@ export function useWorkspaceNotifications() {
       tone: WorkspaceNotificationTone,
       options?: { key?: string; sticky?: boolean },
     ) => {
-      const notificationId = options?.key ?? `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+      const notificationId =
+        options?.key ?? `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 
       setNotifications((current) => {
         const next = [
@@ -51,7 +60,9 @@ export function useWorkspaceNotifications() {
             tone,
             sticky: options?.sticky,
           },
-          ...current.filter((notification) => notification.id !== notificationId),
+          ...current.filter(
+            (notification) => notification.id !== notificationId,
+          ),
         ];
 
         // Cap the stack to four items so fixed-position toasts do not cover the entire workspace on

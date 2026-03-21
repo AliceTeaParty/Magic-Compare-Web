@@ -23,9 +23,12 @@ export interface WorkspaceMutationContext {
   startTransition: TransitionStartFunction;
 }
 
-export interface WorkspaceGroupMutationContext extends WorkspaceMutationContext {
+export interface WorkspaceGroupMutationContext
+  extends WorkspaceMutationContext {
   groupsRef: MutableRefObject<GroupItem[]>;
-  setGroups: (updater: GroupItem[] | ((current: GroupItem[]) => GroupItem[])) => void;
+  setGroups: (
+    updater: GroupItem[] | ((current: GroupItem[]) => GroupItem[]),
+  ) => void;
 }
 
 /**
@@ -55,7 +58,9 @@ export async function postJson(url: string, body: unknown) {
  */
 function replaceWorkspaceGroups(
   groupsRef: MutableRefObject<GroupItem[]>,
-  setGroups: (updater: GroupItem[] | ((current: GroupItem[]) => GroupItem[])) => void,
+  setGroups: (
+    updater: GroupItem[] | ((current: GroupItem[]) => GroupItem[]),
+  ) => void,
   nextGroups: GroupItem[],
 ) {
   groupsRef.current = nextGroups;
@@ -68,10 +73,19 @@ function replaceWorkspaceGroups(
  */
 export function toggleWorkspaceGroupVisibility(
   targetGroup: GroupItem,
-  { data, groupsRef, notifications, refresh, setGroups, startTransition }: WorkspaceGroupMutationContext,
+  {
+    data,
+    groupsRef,
+    notifications,
+    refresh,
+    setGroups,
+    startTransition,
+  }: WorkspaceGroupMutationContext,
 ) {
   const previousGroups = groupsRef.current;
-  const liveTargetGroup = previousGroups.find((group) => group.id === targetGroup.id);
+  const liveTargetGroup = previousGroups.find(
+    (group) => group.id === targetGroup.id,
+  );
 
   if (!liveTargetGroup) {
     return;
@@ -79,7 +93,9 @@ export function toggleWorkspaceGroupVisibility(
 
   const nextVisibility = !liveTargetGroup.isPublic;
   const nextGroups = previousGroups.map((group) =>
-    group.id === targetGroup.id ? { ...group, isPublic: nextVisibility } : group,
+    group.id === targetGroup.id
+      ? { ...group, isPublic: nextVisibility }
+      : group,
   );
 
   replaceWorkspaceGroups(groupsRef, setGroups, nextGroups);
@@ -103,7 +119,9 @@ export function toggleWorkspaceGroupVisibility(
       .catch((error) => {
         replaceWorkspaceGroups(groupsRef, setGroups, previousGroups);
         notifications.pushNotification(
-          error instanceof Error ? error.message : "Failed to update group visibility.",
+          error instanceof Error
+            ? error.message
+            : "Failed to update group visibility.",
           "error",
         );
       })
@@ -181,7 +199,9 @@ export function deployWorkspacePublicSite({
       })
       .catch((error) => {
         notifications.pushNotification(
-          error instanceof Error ? error.message : "Failed to deploy public site.",
+          error instanceof Error
+            ? error.message
+            : "Failed to deploy public site.",
           "error",
         );
       })
@@ -199,7 +219,14 @@ export function deployWorkspacePublicSite({
 export function reorderWorkspaceGroups(
   activeId: string,
   overId: string | null,
-  { data, groupsRef, notifications, refresh, setGroups, startTransition }: WorkspaceGroupMutationContext,
+  {
+    data,
+    groupsRef,
+    notifications,
+    refresh,
+    setGroups,
+    startTransition,
+  }: WorkspaceGroupMutationContext,
 ) {
   if (!overId || activeId === overId) {
     return;
@@ -213,10 +240,12 @@ export function reorderWorkspaceGroups(
     return;
   }
 
-  const reordered = arrayMove(previousGroups, oldIndex, newIndex).map((group, order) => ({
-    ...group,
-    order,
-  }));
+  const reordered = arrayMove(previousGroups, oldIndex, newIndex).map(
+    (group, order) => ({
+      ...group,
+      order,
+    }),
+  );
 
   replaceWorkspaceGroups(groupsRef, setGroups, reordered);
   notifications.showWorkspaceSavingNotification();
@@ -232,7 +261,9 @@ export function reorderWorkspaceGroups(
       .catch((error) => {
         replaceWorkspaceGroups(groupsRef, setGroups, previousGroups);
         notifications.pushNotification(
-          error instanceof Error ? error.message : "Failed to persist group order.",
+          error instanceof Error
+            ? error.message
+            : "Failed to persist group order.",
           "error",
         );
       })

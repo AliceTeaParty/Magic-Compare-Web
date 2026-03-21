@@ -13,7 +13,10 @@ import {
   Tooltip,
 } from "@mui/material";
 import type { ViewerMode } from "@magic-compare/content-schema";
-import { VIEWER_MAX_PRESET_SCALE, VIEWER_MIN_PRESET_SCALE } from "@magic-compare/compare-core";
+import {
+  VIEWER_MAX_PRESET_SCALE,
+  VIEWER_MIN_PRESET_SCALE,
+} from "@magic-compare/compare-core";
 
 interface ViewerToolbarProps {
   abPresetScale: number;
@@ -82,7 +85,12 @@ export function ViewerToolbar({
       flexWrap="wrap"
       useFlexGap
     >
-      <Stack direction="row" spacing={1} alignItems="center" sx={{ flexShrink: 0 }}>
+      <Stack
+        direction="row"
+        spacing={1}
+        alignItems="center"
+        sx={{ flexShrink: 0 }}
+      >
         <Box
           sx={{
             width: 104,
@@ -113,7 +121,9 @@ export function ViewerToolbar({
               <Select
                 value={abSide}
                 onChange={(event) =>
-                  handleAbSideChange(String(event.target.value) as "before" | "after")
+                  handleAbSideChange(
+                    String(event.target.value) as "before" | "after",
+                  )
                 }
                 inputProps={{ "aria-label": "Choose A/B side" }}
               >
@@ -232,7 +242,9 @@ export function ViewerToolbar({
       {!hideFitControl ? (
         <Tooltip
           title={
-            isStageFitted ? "Restore compare scale" : "Fit the compare stage to the current viewport"
+            isStageFitted
+              ? "Restore compare scale"
+              : "Fit the compare stage to the current viewport"
           }
         >
           <IconButton
@@ -241,7 +253,9 @@ export function ViewerToolbar({
             sx={{
               width: 34,
               height: 34,
-              borderColor: isStageFitted ? "rgba(232, 198, 246, 0.4)" : "divider",
+              borderColor: isStageFitted
+                ? "rgba(232, 198, 246, 0.4)"
+                : "divider",
               backgroundColor: isStageFitted
                 ? "rgba(232, 198, 246, 0.12)"
                 : "rgba(255,255,255,0.035)",

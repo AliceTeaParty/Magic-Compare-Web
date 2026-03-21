@@ -6,13 +6,16 @@ import { deleteInternalAssetGroupObjects } from "@/lib/server/storage/internal-a
  * Centralizes the "case must exist before mutating one of its groups" guard so write paths fail
  * with the same message instead of each route inventing its own not-found handling.
  */
-async function requireCaseWithGroups(caseSlug: string, select: {
-  id: true;
-  slug: true;
-  title?: true;
-  isPublic?: true;
-  publicSlug?: true;
-}): Promise<{
+async function requireCaseWithGroups(
+  caseSlug: string,
+  select: {
+    id: true;
+    slug: true;
+    title?: true;
+    isPublic?: true;
+    publicSlug?: true;
+  },
+): Promise<{
   id: string;
   slug: string;
   status?: string;
@@ -44,7 +47,10 @@ async function requireCaseWithGroups(caseSlug: string, select: {
  * Keeps group lookup errors uniform across reorder/visibility/delete flows so API responses stay
  * predictable when the client works on stale workspace state.
  */
-function requireTargetGroup<T extends { slug: string }>(groups: T[], groupSlug: string): T {
+function requireTargetGroup<T extends { slug: string }>(
+  groups: T[],
+  groupSlug: string,
+): T {
   const targetGroup = groups.find((group) => group.slug === groupSlug);
 
   if (!targetGroup) {
@@ -58,7 +64,10 @@ function requireTargetGroup<T extends { slug: string }>(groups: T[], groupSlug: 
  * Persists the exact ordering emitted by the drag-and-drop client, because the workspace already
  * resolved ordering semantics and the server should not second-guess that sequence.
  */
-export async function reorderGroups(caseId: string, groupIds: string[]): Promise<void> {
+export async function reorderGroups(
+  caseId: string,
+  groupIds: string[],
+): Promise<void> {
   await prisma.$transaction(
     groupIds.map((groupId, order) =>
       prisma.group.updateMany({
@@ -76,7 +85,10 @@ export async function reorderGroups(caseId: string, groupIds: string[]): Promise
  * Mirrors frame reorder state from the client as-is so group viewers and import/publish pipelines
  * continue to agree on frame order.
  */
-export async function reorderFrames(groupId: string, frameIds: string[]): Promise<void> {
+export async function reorderFrames(
+  groupId: string,
+  frameIds: string[],
+): Promise<void> {
   await prisma.$transaction(
     frameIds.map((frameId, order) =>
       prisma.frame.updateMany({
@@ -94,7 +106,11 @@ export async function reorderFrames(groupId: string, frameIds: string[]): Promis
  * Toggles a group's public eligibility without publishing immediately, so workspace edits can stay
  * batched and the operator decides when the public bundle should refresh.
  */
-export async function setGroupVisibility(caseSlug: string, groupSlug: string, isPublic: boolean) {
+export async function setGroupVisibility(
+  caseSlug: string,
+  groupSlug: string,
+  isPublic: boolean,
+) {
   const caseRow = await requireCaseWithGroups(caseSlug, {
     id: true,
     slug: true,

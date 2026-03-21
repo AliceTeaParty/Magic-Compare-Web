@@ -2,14 +2,21 @@ import { Prisma } from "@prisma/client";
 import type { ViewerDataset } from "@magic-compare/compare-core/viewer-data";
 import { DEMO_CASE_SLUG } from "@magic-compare/shared-utils";
 import { prisma } from "@/lib/server/db/client";
-import { isHiddenDemoCaseSlug, shouldHideDemoContent } from "@/lib/server/runtime-config";
+import {
+  isHiddenDemoCaseSlug,
+  shouldHideDemoContent,
+} from "@/lib/server/runtime-config";
 import {
   buildViewerDataset,
   mapCaseCatalogItem,
   mapCaseSearchResult,
   mapCaseWorkspaceData,
 } from "./mappers";
-import type { CaseCatalogItem, CaseSearchResult, CaseWorkspaceData } from "./types";
+import type {
+  CaseCatalogItem,
+  CaseSearchResult,
+  CaseWorkspaceData,
+} from "./types";
 
 /**
  * Centralizes demo hiding so list and search flows cannot drift on whether the sample case should
@@ -27,7 +34,10 @@ function buildDemoFilter() {
  * Keeps the search route consistent with the runtime demo visibility flag so hidden demo content
  * never leaks back in through partial slug/title matches.
  */
-function buildCaseSearchWhere(query: string, hideDemo: boolean): Prisma.CaseWhereInput | undefined {
+function buildCaseSearchWhere(
+  query: string,
+  hideDemo: boolean,
+): Prisma.CaseWhereInput | undefined {
   const normalizedQuery = query.trim();
 
   if (!normalizedQuery) {
@@ -82,7 +92,10 @@ export async function listCases(): Promise<CaseCatalogItem[]> {
  * Drives the internal search palette and intentionally omits deprecated `subtitle` propagation so
  * the app layer can stop depending on legacy fields while schema compatibility remains elsewhere.
  */
-export async function searchCases(query: string, limit = 8): Promise<CaseSearchResult[]> {
+export async function searchCases(
+  query: string,
+  limit = 8,
+): Promise<CaseSearchResult[]> {
   const cases = await prisma.case.findMany({
     where: buildCaseSearchWhere(query, shouldHideDemoContent()),
     include: {
@@ -109,7 +122,9 @@ export async function searchCases(query: string, limit = 8): Promise<CaseSearchR
  * Hides demo workspace state behind the same runtime gate used elsewhere so the internal site does
  * not accidentally expose hidden sample content through direct links.
  */
-export async function getCaseWorkspace(caseSlug: string): Promise<CaseWorkspaceData | null> {
+export async function getCaseWorkspace(
+  caseSlug: string,
+): Promise<CaseWorkspaceData | null> {
   if (isHiddenDemoCaseSlug(caseSlug)) {
     return null;
   }
@@ -137,7 +152,10 @@ export async function getCaseWorkspace(caseSlug: string): Promise<CaseWorkspaceD
  * Loads the full viewer payload for the internal route and rejects hidden demo slugs early so the
  * caller gets a clean `null` instead of learning about filtered data through group lookups.
  */
-export async function getViewerDataset(caseSlug: string, groupSlug: string): Promise<ViewerDataset | null> {
+export async function getViewerDataset(
+  caseSlug: string,
+  groupSlug: string,
+): Promise<ViewerDataset | null> {
   if (isHiddenDemoCaseSlug(caseSlug)) {
     return null;
   }

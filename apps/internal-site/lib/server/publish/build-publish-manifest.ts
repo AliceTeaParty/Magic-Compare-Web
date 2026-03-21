@@ -1,4 +1,7 @@
-import { PUBLISH_SCHEMA_VERSION, type PublishManifest } from "@magic-compare/content-schema";
+import {
+  PUBLISH_SCHEMA_VERSION,
+  type PublishManifest,
+} from "@magic-compare/content-schema";
 import { asViewerMode, parseTags } from "@/lib/server/content/mappers";
 import {
   internalAssetPublicGroupBaseUrl,
@@ -52,8 +55,15 @@ type PublishManifestAsset = PublishManifest["frames"][number]["assets"][number];
  * Collapses unknown asset kinds to `misc` so publishing stays forward-compatible with importer
  * experiments instead of hard-failing on metadata the public schema does not understand yet.
  */
-function asPublishManifestAssetKind(kind: string): PublishManifestAsset["kind"] {
-  if (kind === "before" || kind === "after" || kind === "heatmap" || kind === "crop") {
+function asPublishManifestAssetKind(
+  kind: string,
+): PublishManifestAsset["kind"] {
+  if (
+    kind === "before" ||
+    kind === "after" ||
+    kind === "heatmap" ||
+    kind === "crop"
+  ) {
     return kind;
   }
 

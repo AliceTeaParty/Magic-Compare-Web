@@ -16,9 +16,13 @@ export function CaseDirectoryEmptyState() {
       <Stack spacing={1.5}>
         <Typography variant="h5">No cases yet</Typography>
         <Typography color="text.secondary">
-          Initialize the SQLite schema, then import a local case with the Python uploader.
+          Initialize the SQLite schema, then import a local case with the Python
+          uploader.
         </Typography>
-        <Typography component="pre" sx={{ fontSize: 13, color: "text.secondary", m: 0 }}>
+        <Typography
+          component="pre"
+          sx={{ fontSize: 13, color: "text.secondary", m: 0 }}
+        >
           pnpm db:push
           {"\n"}pnpm db:seed
         </Typography>

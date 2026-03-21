@@ -86,7 +86,11 @@ function ViewerSidebarContent({
       {variant === "internal" ? (
         <>
           <Stack spacing={0.85}>
-            <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 500 }}>
+            <Typography
+              variant="body2"
+              color="text.secondary"
+              sx={{ fontWeight: 500 }}
+            >
               Group navigator
             </Typography>
             <Button
@@ -110,7 +114,11 @@ function ViewerSidebarContent({
       ) : null}
 
       <Stack spacing={0.75}>
-        <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 500 }}>
+        <Typography
+          variant="body2"
+          color="text.secondary"
+          sx={{ fontWeight: 500 }}
+        >
           Frame details
         </Typography>
         <Typography variant="subtitle1">{currentFrame?.title}</Typography>
@@ -122,7 +130,11 @@ function ViewerSidebarContent({
       <Divider />
 
       <Stack spacing={0.75}>
-        <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 500 }}>
+        <Typography
+          variant="body2"
+          color="text.secondary"
+          sx={{ fontWeight: 500 }}
+        >
           Asset metadata
         </Typography>
         <Typography variant="body2">
@@ -132,7 +144,9 @@ function ViewerSidebarContent({
             .map((asset) => asset.label)
             .join(", ") || "None"}
         </Typography>
-        <Typography variant="body2">Heatmap: {heatmapAsset ? "Available" : "Unavailable"}</Typography>
+        <Typography variant="body2">
+          Heatmap: {heatmapAsset ? "Available" : "Unavailable"}
+        </Typography>
       </Stack>
 
       {variant === "internal" && publishStatus ? (
@@ -144,13 +158,16 @@ function ViewerSidebarContent({
             </Typography>
             <Chip
               label={publishStatus.status}
-              color={publishStatus.status === "published" ? "primary" : "default"}
+              color={
+                publishStatus.status === "published" ? "primary" : "default"
+              }
               size="small"
               sx={{ alignSelf: "flex-start" }}
             />
             <Stack direction="row" spacing={0.6} alignItems="center" useFlexGap>
               <Typography variant="body2">
-                Public slug: {publishStatus.publicSlug ?? "Pending first publish"}
+                Public slug:{" "}
+                {publishStatus.publicSlug ?? "Pending first publish"}
               </Typography>
               {publishStatus.publicUrl ? (
                 <Tooltip title="Open published page in a new tab">

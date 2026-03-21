@@ -6,7 +6,11 @@ import { prisma } from "@/lib/server/db/client";
  * Keeps published URLs stable when possible but falls back to a short random suffix when another
  * group already owns the human-readable slug candidate.
  */
-export async function ensurePublicSlug(caseSlug: string, groupSlug: string, groupId: string): Promise<string> {
+export async function ensurePublicSlug(
+  caseSlug: string,
+  groupSlug: string,
+  groupId: string,
+): Promise<string> {
   const baseSlug = buildPublicGroupSlug(caseSlug, groupSlug);
   let candidate = baseSlug;
 

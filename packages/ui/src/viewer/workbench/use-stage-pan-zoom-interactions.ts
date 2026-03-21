@@ -112,14 +112,17 @@ export function useStagePanZoomInteractions({
    * Trackpad zoom uses wheel events on desktop, but the handler itself must stay stable so the
    * stage can attach one non-passive DOM listener instead of resubscribing on every render.
    */
-  const handleWheel = useCallback((event: WheelLikeEvent) => {
-    applyWheelZoom({
-      active,
-      applyPanZoom,
-      event,
-      panZoomStateRef,
-    });
-  }, [active, applyPanZoom]);
+  const handleWheel = useCallback(
+    (event: WheelLikeEvent) => {
+      applyWheelZoom({
+        active,
+        applyPanZoom,
+        event,
+        panZoomStateRef,
+      });
+    },
+    [active, applyPanZoom],
+  );
 
   /**
    * Captures the starting distance and center point for a two-finger pinch gesture.

@@ -1,9 +1,7 @@
 import type { TransitionStartFunction } from "react";
 import { useState } from "react";
 import type { CaseWorkspaceData } from "@/lib/server/repositories/content-repository";
-import {
-  type NotificationApi,
-} from "./workspace-action-helpers";
+import { type NotificationApi } from "./workspace-action-helpers";
 import { useWorkspaceActionHandlers } from "./use-workspace-action-handlers";
 
 type GroupItem = CaseWorkspaceData["groups"][number];
@@ -22,7 +20,9 @@ export function useCaseWorkspaceActions({
 }: {
   data: CaseWorkspaceData;
   groups: GroupItem[];
-  setGroups: (updater: GroupItem[] | ((current: GroupItem[]) => GroupItem[])) => void;
+  setGroups: (
+    updater: GroupItem[] | ((current: GroupItem[]) => GroupItem[]),
+  ) => void;
   refresh: () => void;
   notifications: NotificationApi;
   startTransition: TransitionStartFunction;

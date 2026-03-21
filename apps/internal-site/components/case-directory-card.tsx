@@ -50,8 +50,16 @@ export function CaseDirectoryCard({
         },
       }}
     >
-      <Stack spacing={2.15} sx={{ height: "100%", position: "relative", zIndex: 1 }}>
-        <Stack direction="row" justifyContent="space-between" alignItems="flex-start" spacing={1.6}>
+      <Stack
+        spacing={2.15}
+        sx={{ height: "100%", position: "relative", zIndex: 1 }}
+      >
+        <Stack
+          direction="row"
+          justifyContent="space-between"
+          alignItems="flex-start"
+          spacing={1.6}
+        >
           <Box sx={{ minWidth: 0 }}>
             <Typography variant="h6" sx={{ lineHeight: 1.05 }}>
               {item.title}
@@ -64,7 +72,11 @@ export function CaseDirectoryCard({
             sx={{ height: 34, "& .MuiChip-label": { px: 1.45 } }}
           />
         </Stack>
-        <Typography variant="body2" color="text.secondary" sx={{ minHeight: 52 }}>
+        <Typography
+          variant="body2"
+          color="text.secondary"
+          sx={{ minHeight: 52 }}
+        >
           {item.summary || "No summary yet."}
         </Typography>
         <Box
@@ -77,7 +89,13 @@ export function CaseDirectoryCard({
         >
           &nbsp;
         </Box>
-        <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ pt: 0.1 }}>
+        <Stack
+          direction="row"
+          spacing={1}
+          flexWrap="wrap"
+          useFlexGap
+          sx={{ pt: 0.1 }}
+        >
           <Chip
             size="small"
             icon={<Collections fontSize="small" />}

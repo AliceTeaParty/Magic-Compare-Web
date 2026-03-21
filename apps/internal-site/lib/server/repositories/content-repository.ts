@@ -5,10 +5,7 @@ export type {
   CaseWorkspaceData,
   CaseWorkspaceGroup,
 } from "../content/types";
-export {
-  applyImportManifest,
-  upsertGroup,
-} from "../content/import-service";
+export { applyImportManifest, upsertGroup } from "../content/import-service";
 export {
   deleteGroup,
   reorderFrames,

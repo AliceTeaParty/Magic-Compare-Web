@@ -12,8 +12,10 @@ function readCookieValue(name: string): string | null {
     return null;
   }
 
-  const entry = document.cookie.split("; ").find((part) => part.startsWith(`${name}=`));
-  return entry ? entry.split("=")[1] ?? null : null;
+  const entry = document.cookie
+    .split("; ")
+    .find((part) => part.startsWith(`${name}=`));
+  return entry ? (entry.split("=")[1] ?? null) : null;
 }
 
 /**
@@ -67,7 +69,11 @@ export function readViewerModeCookie(): ViewerMode | null {
   }
 
   const decodedValue = decodeURIComponent(value);
-  if (decodedValue === "before-after" || decodedValue === "a-b" || decodedValue === "heatmap") {
+  if (
+    decodedValue === "before-after" ||
+    decodedValue === "a-b" ||
+    decodedValue === "heatmap"
+  ) {
     return decodedValue;
   }
 

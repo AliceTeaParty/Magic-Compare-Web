@@ -30,9 +30,14 @@ export function InternalCatalogHeader() {
       >
         <Box sx={{ display: "grid", gap: 1.55, minWidth: 0 }}>
           <Typography variant="h2">Internal catalog</Typography>
-          <Typography variant="body1" color="text.secondary" sx={{ maxWidth: 720, lineHeight: 1.7 }}>
-            Browse draft, internal, and published compare cases. Viewer pages stay focused on
-            inspection, while import and publish operations remain explicit.
+          <Typography
+            variant="body1"
+            color="text.secondary"
+            sx={{ maxWidth: 720, lineHeight: 1.7 }}
+          >
+            Browse draft, internal, and published compare cases. Viewer pages
+            stay focused on inspection, while import and publish operations
+            remain explicit.
           </Typography>
         </Box>
       </Box>

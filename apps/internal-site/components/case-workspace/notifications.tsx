@@ -65,7 +65,12 @@ function WorkspaceNotificationCard({
         boxShadow: "0 18px 42px rgba(0,0,0,0.28)",
       }}
     >
-      <Stack direction="row" spacing={1.1} alignItems="flex-start" sx={{ px: 1.5, py: 1.2 }}>
+      <Stack
+        direction="row"
+        spacing={1.1}
+        alignItems="flex-start"
+        sx={{ px: 1.5, py: 1.2 }}
+      >
         <Box sx={{ color: "text.primary", pt: 0.1 }}>{icon}</Box>
         <Box sx={{ flex: 1, minWidth: 0 }}>
           <Box

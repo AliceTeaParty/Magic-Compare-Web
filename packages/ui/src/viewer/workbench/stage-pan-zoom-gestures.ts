@@ -41,14 +41,20 @@ export interface StageTouchGesture {
  * Gesture distance must be measured in screen space because the stage may be rotated before the
  * image is painted.
  */
-function getPointerDistance(first: PointerSample, second: PointerSample): number {
+function getPointerDistance(
+  first: PointerSample,
+  second: PointerSample,
+): number {
   return Math.hypot(second.x - first.x, second.y - first.y);
 }
 
 /**
  * Normalizes DOM touch objects into the lightweight sample shape used by the gesture refs.
  */
-function getTouchSample(touch: { clientX: number; clientY: number }): PointerSample {
+function getTouchSample(touch: {
+  clientX: number;
+  clientY: number;
+}): PointerSample {
   return {
     x: touch.clientX,
     y: touch.clientY,
@@ -59,7 +65,10 @@ function getTouchSample(touch: { clientX: number; clientY: number }): PointerSam
  * Pinch math needs a shared center point helper so touch start, move, and rebase after finger
  * changes all stay aligned on the same screen-space anchor.
  */
-function getGestureCenter(first: PointerSample, second: PointerSample): PointerSample {
+function getGestureCenter(
+  first: PointerSample,
+  second: PointerSample,
+): PointerSample {
   return {
     x: (first.x + second.x) / 2,
     y: (first.y + second.y) / 2,
@@ -100,7 +109,12 @@ export function beginPointerPan({
   panGestureRef: MutableRefObject<StagePanGesture | null>;
   panZoomStateRef: MutableRefObject<ViewerPanZoomState>;
 }) {
-  if (event.pointerType !== "mouse" || event.button !== 0 || !active || effectiveScale <= 1) {
+  if (
+    event.pointerType !== "mouse" ||
+    event.button !== 0 ||
+    !active ||
+    effectiveScale <= 1
+  ) {
     return;
   }
 
@@ -178,7 +192,10 @@ export function finishPointerPan({
   panGestureRef.current = null;
 
   if (panGesture.moved) {
-    scheduleSuppressedStageClickReset(clearSuppressedClickTimerRef, suppressStageClickRef);
+    scheduleSuppressedStageClickReset(
+      clearSuppressedClickTimerRef,
+      suppressStageClickRef,
+    );
   }
 }
 
@@ -291,7 +308,8 @@ export function moveTouchPinch({
   const center = getGestureCenter(firstSample, secondSample);
   const nextEffectiveScale =
     gesture.baseEffectiveScale *
-    (getPointerDistance(firstSample, secondSample) / Math.max(gesture.distance, 1));
+    (getPointerDistance(firstSample, secondSample) /
+      Math.max(gesture.distance, 1));
   const nextFineScale = clampNumber(
     nextEffectiveScale / Math.max(presetTransformScale, 0.01),
     1,
@@ -338,5 +356,8 @@ export function finishTouchPinch({
   }
 
   touchGestureRef.current = null;
-  scheduleSuppressedStageClickReset(clearSuppressedClickTimerRef, suppressStageClickRef);
+  scheduleSuppressedStageClickReset(
+    clearSuppressedClickTimerRef,
+    suppressStageClickRef,
+  );
 }

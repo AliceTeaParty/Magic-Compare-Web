@@ -53,7 +53,11 @@ export function getWranglerPagesDeployArgs(exportDir: string): string[] {
  * Captures stdout/stderr so deploy failures surface enough context in API responses instead of
  * forcing operators to rerun the command manually to see the real error.
  */
-export async function runCommand(command: string, args: string[], cwd: string): Promise<CommandResult> {
+export async function runCommand(
+  command: string,
+  args: string[],
+  cwd: string,
+): Promise<CommandResult> {
   return new Promise((resolve, reject) => {
     const child = spawn(commandName(command), args, {
       cwd,
@@ -81,7 +85,11 @@ export async function runCommand(command: string, args: string[], cwd: string): 
 
       reject(
         new Error(
-          [`Command failed: ${command} ${args.join(" ")}`, stderr.trim(), stdout.trim()]
+          [
+            `Command failed: ${command} ${args.join(" ")}`,
+            stderr.trim(),
+            stdout.trim(),
+          ]
             .filter(Boolean)
             .join("\n"),
         ),

@@ -20,7 +20,10 @@ import {
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import Link from "next/link";
-import type { MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from "react";
+import type {
+  MouseEvent as ReactMouseEvent,
+  PointerEvent as ReactPointerEvent,
+} from "react";
 import type { CaseWorkspaceData } from "@/lib/server/repositories/content-repository";
 
 /**
@@ -38,13 +41,17 @@ export function SortableGroupRow({
   isPending: boolean;
   onToggleVisibility: (group: CaseWorkspaceData["groups"][number]) => void;
 }) {
-  const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: group.id });
+  const { attributes, listeners, setNodeRef, transform, transition } =
+    useSortable({ id: group.id });
 
   /**
    * Ignores the ToggleButtonGroup "clear selection" null case because a group must always be either
    * internal or public; allowing deselection would only create a transient impossible state.
    */
-  function handleVisibilityChange(_event: unknown, nextValue: "public" | "internal" | null) {
+  function handleVisibilityChange(
+    _event: unknown,
+    nextValue: "public" | "internal" | null,
+  ) {
     if (!nextValue) {
       return;
     }
@@ -111,7 +118,10 @@ export function SortableGroupRow({
             </IconButton>
           </Tooltip>
           <Box sx={{ flex: 1, minWidth: 0, pr: { xl: 1 } }}>
-            <Typography variant="subtitle1" sx={{ fontWeight: 600, lineHeight: 1.15 }}>
+            <Typography
+              variant="subtitle1"
+              sx={{ fontWeight: 600, lineHeight: 1.15 }}
+            >
               {group.title}
             </Typography>
             <Typography
@@ -164,7 +174,12 @@ export function SortableGroupRow({
               <ToggleButton
                 value="internal"
                 disabled={isPending}
-                sx={{ minHeight: 32, px: "10px", py: "2px", fontSize: "0.84rem" }}
+                sx={{
+                  minHeight: 32,
+                  px: "10px",
+                  py: "2px",
+                  fontSize: "0.84rem",
+                }}
               >
                 <LockOutlined sx={{ mr: 0.55, fontSize: 14.5 }} />
                 Internal
@@ -172,7 +187,12 @@ export function SortableGroupRow({
               <ToggleButton
                 value="public"
                 disabled={isPending}
-                sx={{ minHeight: 32, px: "10px", py: "2px", fontSize: "0.84rem" }}
+                sx={{
+                  minHeight: 32,
+                  px: "10px",
+                  py: "2px",
+                  fontSize: "0.84rem",
+                }}
               >
                 <Public sx={{ mr: 0.55, fontSize: 14.5 }} />
                 Public
