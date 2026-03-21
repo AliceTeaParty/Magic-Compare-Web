@@ -8,9 +8,9 @@ Entries before that date are summarized at release level instead of being recons
 
 - No unreleased entries yet.
 
-## v0.8.1 - 2026-03-21
+## v0.9.0 - 2026-03-21
 
-Stabilized the Docker runtime path after `v0.8.0` and split container initialization into clearer service boundaries.
+Promoted the post-`v0.8.0` infrastructure work into a fuller release covering Docker runtime hardening, S3-backed internal asset delivery, and workflow compatibility fixes.
 
 ### Added
 
@@ -24,11 +24,15 @@ Stabilized the Docker runtime path after `v0.8.0` and split container initializa
 - `rustfs-init` now uses a lighter `minio/mc`-based bucket initialization flow.
 - `internal-site` now starts the app only, instead of bundling database initialization into the main container command.
 - RustFS is pinned to `rustfs/rustfs:1.0.0-alpha.89` for more predictable local and deployment behavior.
+- Internal asset delivery now resolves to browser-facing public S3 URLs instead of relying on internal logical paths alone.
+- Deployment and environment documentation now reflects the public S3 asset model and the required runtime variables.
 
 ### Fixed
 
 - Workflow waiting logic now handles exited one-shot compose tasks correctly instead of timing out on successful init containers.
 - Docker startup behavior is more resilient through separated init responsibilities and explicit restart and healthcheck handling for `internal-site`.
+- Demo seed output is now marked as published so CI and export validation follow the same published-content path as runtime.
+- CI and GHCR workflows now explicitly provide `MAGIC_COMPARE_S3_PUBLIC_BASE_URL`, keeping seeded asset uploads compatible with the current runtime config.
 
 ## v0.8.0 - 2026-03-21
 
