@@ -1,10 +1,14 @@
 name: GHCR Docker
 
+run-name: GHCR Docker • ${{ github.event_name }} • ${{ github.ref_name }}
+
 on:
   workflow_dispatch:
   push:
     branches:
       - main
+    tags:
+      - "v*"
     paths:
       - "apps/**"
       - "packages/**"
@@ -26,11 +30,20 @@ concurrency:
 
 permissions:
   contents: read
-  packages: write
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  CI_COMPOSE_ARGS: -f docker-compose.yml -f docker/ci.compose.override.yml
+  IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/magic-compare-web
 
 jobs:
   smoke:
+    name: Smoke Test Runtime Image Path
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     env:
       MAGIC_COMPARE_HIDE_DEMO: "false"
       MAGIC_COMPARE_S3_BUCKET: magic-compare-assets
@@ -40,13 +53,38 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Start compose stack
-        run: docker compose -f docker-compose.yml -f docker/ci.compose.override.yml up -d --build rustfs rustfs-init internal-site
+        run: docker compose $CI_COMPOSE_ARGS up -d --build rustfs rustfs-init internal-site
 
-      - name: Wait for internal-site
-        shell: bash
+      - name: Wait for runtime readiness
         run: |
           set -euo pipefail
           for _ in {1..90}; do
+            rustfs_init_container_id="$(docker compose $CI_COMPOSE_ARGS ps -q rustfs-init)"
+            if [[ -n "$rustfs_init_container_id" ]]; then
+              rustfs_init_status="$(docker inspect -f '{{.State.Status}}' "$rustfs_init_container_id")"
+              if [[ "$rustfs_init_status" == "exited" ]]; then
+                rustfs_init_exit_code="$(docker inspect -f '{{.State.ExitCode}}' "$rustfs_init_container_id")"
+                if [[ "$rustfs_init_exit_code" != "0" ]]; then
+                  echo "rustfs-init exited with code $rustfs_init_exit_code."
+                  docker compose $CI_COMPOSE_ARGS ps
+                  docker compose $CI_COMPOSE_ARGS logs rustfs rustfs-init internal-site
+                  exit 1
+                fi
+              fi
+            fi
+
+            internal_site_container_id="$(docker compose $CI_COMPOSE_ARGS ps -q internal-site)"
+            if [[ -n "$internal_site_container_id" ]]; then
+              internal_site_status="$(docker inspect -f '{{.State.Status}}' "$internal_site_container_id")"
+              if [[ "$internal_site_status" == "exited" || "$internal_site_status" == "dead" ]]; then
+                internal_site_exit_code="$(docker inspect -f '{{.State.ExitCode}}' "$internal_site_container_id")"
+                echo "internal-site exited with code $internal_site_exit_code before readiness."
+                docker compose $CI_COMPOSE_ARGS ps
+                docker compose $CI_COMPOSE_ARGS logs rustfs rustfs-init internal-site
+                exit 1
+              fi
+            fi
+
             if curl -fsS http://127.0.0.1:3000 >/dev/null; then
               exit 0
             fi
@@ -54,21 +92,52 @@ jobs:
           done
 
           echo "Timed out waiting for internal-site to become ready."
-          docker compose -f docker-compose.yml -f docker/ci.compose.override.yml ps
-          docker compose -f docker-compose.yml -f docker/ci.compose.override.yml logs rustfs rustfs-init internal-site
+          docker compose $CI_COMPOSE_ARGS ps
+          docker compose $CI_COMPOSE_ARGS logs rustfs rustfs-init internal-site
           exit 1
 
-      - name: Print compose logs on failure
-        if: failure()
-        run: docker compose -f docker-compose.yml -f docker/ci.compose.override.yml logs rustfs rustfs-init internal-site
+      - name: Capture compose logs
+        if: always()
+        run: |
+          {
+            docker compose $CI_COMPOSE_ARGS ps || true
+            echo
+            docker compose $CI_COMPOSE_ARGS logs rustfs rustfs-init internal-site || true
+          } > ghcr-smoke.compose.log
+
+      - name: Write smoke summary
+        if: always()
+        run: |
+          {
+            echo "## GHCR Smoke Summary"
+            echo
+            echo "- Compose files: \`docker-compose.yml\` + \`docker/ci.compose.override.yml\`"
+            echo "- Runtime image target: \`${IMAGE_NAME}\`"
+            echo "- Readiness probe: \`http://127.0.0.1:3000\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload smoke logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ghcr-smoke-logs-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ghcr-smoke.compose.log
+          if-no-files-found: ignore
+          retention-days: 7
 
       - name: Stop compose stack
         if: always()
-        run: docker compose -f docker-compose.yml -f docker/ci.compose.override.yml down --volumes --remove-orphans
+        run: docker compose $CI_COMPOSE_ARGS down --volumes --remove-orphans
 
   publish:
+    name: Publish GHCR Image
     needs: smoke
+    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
 
     steps:
       - name: Checkout repository
@@ -91,10 +160,11 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/${{ github.repository_owner }}/magic-compare-web
+          images: ${{ env.IMAGE_NAME }}
           tags: |
-            type=raw,value=main
+            type=raw,value=main,enable=${{ github.ref == 'refs/heads/main' }}
             type=sha,prefix=sha-
+            type=ref,event=tag,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
           labels: |
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
@@ -102,11 +172,28 @@ jobs:
             org.opencontainers.image.description=Magic Compare internal-site runtime image
 
       - name: Build and push image
+        id: build
         uses: docker/build-push-action@v6
         with:
           context: .
           file: docker/internal-site.Dockerfile
           push: true
+          pull: true
           platforms: linux/amd64,linux/arm64
+          cache-from: type=gha,scope=ghcr-docker
+          cache-to: type=gha,mode=max,scope=ghcr-docker
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+
+      - name: Write publish summary
+        run: |
+          {
+            echo "## GHCR Publish Summary"
+            echo
+            echo "- Image: \`${IMAGE_NAME}\`"
+            echo "- Tags:"
+            while IFS= read -r tag; do
+              [[ -n "$tag" ]] && echo "  - \`$tag\`"
+            done <<< "${{ steps.meta.outputs.tags }}"
+            echo "- Digest: \`${{ steps.build.outputs.digest }}\`"
+          } >> "$GITHUB_STEP_SUMMARY"

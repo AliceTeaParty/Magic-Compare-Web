@@ -410,7 +410,7 @@ Docker 用：
 
 ## 给 CI / Docker 发布线程的建议
 
-如果另一条线程要写 `ci.yml` 和 `docker-publish.yml`，建议遵守这些边界：
+如果另一条线程要维护 `.github/workflows/ci.yml` 和 `.github/workflows/ghcr-docker.yml`，建议遵守这些边界：
 
 补充复盘文档：
 
@@ -418,7 +418,9 @@ Docker 用：
 
 ### CI 验证优先级
 
-优先验证：
+`ci.yml` 当前分成两个 job。
+
+第一段 `verify` 优先验证：
 
 ```bash
 pnpm install --frozen-lockfile
@@ -426,18 +428,23 @@ pnpm test
 pnpm build
 ```
 
-如果 CI 还需要覆盖静态导出，可额外跑：
+第二段 `public-export-demo` 负责补上 demo 导出闭环：
 
 ```bash
+docker compose -f docker-compose.yml -f docker/ci.compose.override.yml up -d rustfs rustfs-init
+pnpm db:push
+pnpm db:seed
 pnpm public:export
 ```
 
-但前提是：
+关键约束：
 
-- CI 环境里已经有至少一个 published group
-- 或先准备 demo/published 样本
+- CI 不应假设 checkout 后已经有 published group
+- 应从临时 SQLite 和运行时 seed 出来的 demo 数据开始验证
+- `MAGIC_COMPARE_HIDE_DEMO=false` 应显式写入 CI 环境
+- 导出成功后最好保留日志和导出产物，便于排错
 
-### Docker 镜像构建入口
+### Docker 镜像构建与发布入口
 
 当前标准入口：
 
@@ -450,6 +457,20 @@ pnpm docker:build:internal
 ```bash
 docker build -f docker/internal-site.Dockerfile -t magic-compare/internal-site .
 ```
+
+`ghcr-docker.yml` 当前建议分成两段：
+
+1. `smoke`
+
+- 先用 `docker compose` 跑通 `rustfs -> rustfs-init -> internal-site`
+- 只验证运行路径和健康探活，不替代 `public:export`
+- 失败时保留 compose 日志
+
+2. `publish`
+
+- 只有 `smoke` 成功后才推 GHCR
+- `main` 标签只允许从 `main` 分支发布
+- 手动触发如果不在 `main`，也不应覆盖 `main` 镜像标签
 
 ### 不要在 CI 里假设这些目录永远存在
 

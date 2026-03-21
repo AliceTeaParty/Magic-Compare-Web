@@ -1,7 +1,14 @@
 name: CI
 
+run-name: CI • ${{ github.event_name }} • ${{ github.ref_name }}
+
 on:
   pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
     paths:
       - "apps/**"
       - "packages/**"
@@ -37,12 +44,21 @@ concurrency:
 permissions:
   contents: read
 
+defaults:
+  run:
+    shell: bash
+
 env:
+  NODE_VERSION: "22"
+  PNPM_VERSION: "10.32.1"
+  CI_COMPOSE_ARGS: -f docker-compose.yml -f docker/ci.compose.override.yml
   MAGIC_COMPARE_HIDE_DEMO: "false"
 
 jobs:
   verify:
+    name: Verify Workspace
     runs-on: ubuntu-latest
+    timeout-minutes: 20
 
     steps:
       - name: Checkout repository
@@ -51,12 +67,12 @@ jobs:
       - name: Set up pnpm
         uses: pnpm/action-setup@v4
         with:
-          version: 10.32.1
+          version: ${{ env.PNPM_VERSION }}
 
       - name: Set up Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: 22
+          node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
 
       - name: Install dependencies
@@ -69,8 +85,10 @@ jobs:
         run: pnpm build
 
   public-export-demo:
+    name: Verify Demo Public Export
     needs: verify
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     env:
       DATABASE_URL: file:./dev.db
       MAGIC_COMPARE_S3_BUCKET: magic-compare-assets
@@ -88,26 +106,25 @@ jobs:
       - name: Set up pnpm
         uses: pnpm/action-setup@v4
         with:
-          version: 10.32.1
+          version: ${{ env.PNPM_VERSION }}
 
       - name: Set up Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: 22
+          node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
       - name: Start RustFS services
-        run: docker compose -f docker-compose.yml -f docker/ci.compose.override.yml up -d rustfs rustfs-init
+        run: docker compose $CI_COMPOSE_ARGS up -d rustfs rustfs-init
 
       - name: Wait for RustFS bucket initialization
-        shell: bash
         run: |
           set -euo pipefail
           for _ in {1..60}; do
-            container_id="$(docker compose ps -q rustfs-init)"
+            container_id="$(docker compose $CI_COMPOSE_ARGS ps -q rustfs-init)"
             if [[ -z "$container_id" ]]; then
               sleep 2
               continue
@@ -120,7 +137,7 @@ jobs:
                 exit 0
               fi
 
-              docker compose -f docker-compose.yml -f docker/ci.compose.override.yml logs rustfs rustfs-init
+              docker compose $CI_COMPOSE_ARGS logs rustfs rustfs-init
               exit 1
             fi
 
@@ -128,7 +145,7 @@ jobs:
           done
 
           echo "Timed out waiting for rustfs-init to finish."
-          docker compose -f docker-compose.yml -f docker/ci.compose.override.yml logs rustfs rustfs-init
+          docker compose $CI_COMPOSE_ARGS logs rustfs rustfs-init
           exit 1
 
       - name: Reset demo workspace state
@@ -142,13 +159,70 @@ jobs:
       - name: Seed demo data
         run: pnpm db:seed
 
+      - name: Verify published demo bundle
+        run: |
+          set -euo pipefail
+          manifest_path="content/published/groups/demo-grain-study--banding-check/manifest.json"
+          if [[ ! -f "$manifest_path" ]]; then
+            echo "Expected published demo manifest at $manifest_path."
+            find content -maxdepth 4 -type f | sort || true
+            exit 1
+          fi
+
       - name: Export public demo site
         run: pnpm public:export
 
-      - name: Print RustFS logs on failure
-        if: failure()
-        run: docker compose -f docker-compose.yml -f docker/ci.compose.override.yml logs rustfs rustfs-init
+      - name: Verify exported public files
+        run: |
+          set -euo pipefail
+          test -d dist/public-site
+          test -d apps/public-site/out
+          if ! find dist/public-site \( -path '*/g/demo-grain-study--banding-check/index.html' -o -path '*/g/demo-grain-study--banding-check.html' \) | grep -q .; then
+            echo "Expected an exported page for /g/demo-grain-study--banding-check."
+            find dist/public-site -maxdepth 4 -type f | sort | sed -n '1,160p'
+            exit 1
+          fi
+
+      - name: Capture compose logs
+        if: always()
+        run: |
+          {
+            docker compose $CI_COMPOSE_ARGS ps || true
+            echo
+            docker compose $CI_COMPOSE_ARGS logs rustfs rustfs-init || true
+          } > ci-public-export-demo.compose.log
+
+      - name: Write job summary
+        if: always()
+        run: |
+          {
+            echo "## CI Demo Export Summary"
+            echo
+            echo "- Published manifest: \`content/published/groups/demo-grain-study--banding-check/manifest.json\`"
+            echo "- Static export mirror: \`dist/public-site\`"
+            echo "- Next export output: \`apps/public-site/out\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload public export artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: public-export-demo-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            dist/public-site
+            apps/public-site/out
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Upload compose logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: public-export-demo-logs-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ci-public-export-demo.compose.log
+          if-no-files-found: ignore
+          retention-days: 7
 
       - name: Stop RustFS services
         if: always()
-        run: docker compose -f docker-compose.yml -f docker/ci.compose.override.yml down --volumes --remove-orphans
+        run: docker compose $CI_COMPOSE_ARGS down --volumes --remove-orphans
