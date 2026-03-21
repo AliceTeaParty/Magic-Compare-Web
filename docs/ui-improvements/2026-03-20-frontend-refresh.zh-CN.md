@@ -4,16 +4,16 @@
 
 ## 当前 docs 列表
 
-- `docs/VSEDITOR-WORKFLOW.zh-CN.md`
+- `docs/vseditor-workflow.zh-CN.md`
 - `docs/demo-vs-real-case-flow.zh-CN.md`
-- `docs/mcp-guide.md`
-- `docs/project-guide.md`
-- `docs/viewer-stage-and-filmstrip-notes.zh-CN.md`
+- `docs/mcp-usage-guide.md`
+- `docs/project-overview-guide.md`
+- `docs/ui-improvements/2026-03-20-viewer-stage-and-filmstrip-notes.zh-CN.md`
 
 ## 本轮已读取并作为约束的文档
 
-- `docs/project-guide.md`
-- `docs/viewer-stage-and-filmstrip-notes.zh-CN.md`
+- `docs/project-overview-guide.md`
+- `docs/ui-improvements/2026-03-20-viewer-stage-and-filmstrip-notes.zh-CN.md`
 - `docs/demo-vs-real-case-flow.zh-CN.md`
 
 ## 当前前端状态

@@ -6,6 +6,25 @@ Entries before that date are summarized at release level instead of being recons
 
 ## Unreleased
 
+## v1.2.1 - 2026-03-21
+
+Maintenance release focused on consolidating shared runtime wiring, simplifying release build targets, and documenting the current repo workflow more clearly.
+
+### Added
+
+- A new project overview guide, refreshed MCP usage notes, and two `mcp-vector-search` reference documents were added under `docs/` to capture the current codebase structure and tool usage boundaries.
+
+### Changed
+
+- Internal-site and public-site now share a common root layout shell, reducing duplicated font, theme, and footer wiring across the two Next.js apps.
+- Workspace-level `.env` loading is now centralized for app runtime helpers and root scripts, reducing duplicated parsing logic across the monorepo.
+- GHCR image publishing now targets `linux/amd64` only, matching the current server fleet and avoiding unnecessary `arm64` build overhead.
+- Repository docs were reorganized and renamed for more consistent paths, including the VSEditor workflow guide, UI improvement notes, workflow documentation, uploader references, and top-level README links.
+
+### Fixed
+
+- Node-only workspace env helpers are now exposed through a dedicated shared-utils subpath instead of the browser-safe root export, preventing public-site builds from pulling `node:*` modules into the client graph.
+
 ## v1.2.0 - 2026-03-21
 
 Deployment and runtime release focused on making Docker self-contained, preserving runtime branding config, and improving inspection fidelity for generated heatmaps.

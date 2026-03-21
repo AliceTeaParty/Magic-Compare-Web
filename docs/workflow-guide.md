@@ -8,10 +8,10 @@
 
 本轮整理前已阅读：
 
-- `docs/project-guide.md`
+- `docs/project-overview-guide.md`
 - `docs/demo-vs-real-case-flow.zh-CN.md`
-- `docs/viewer-stage-and-filmstrip-notes.zh-CN.md`
-- `docs/frontend-refresh-2026-03-20.zh-CN.md`
+- `docs/ui-improvements/2026-03-20-viewer-stage-and-filmstrip-notes.zh-CN.md`
+- `docs/ui-improvements/2026-03-20-frontend-refresh.zh-CN.md`
 - `README.zh-CN.md`
 
 另外还核对了当前仓库中的运行入口与部署文件：
@@ -429,8 +429,8 @@ Docker 用：
 
 更详细说明见：
 
-- `docs/viewer-stage-and-filmstrip-notes.zh-CN.md`
-- `docs/frontend-refresh-2026-03-20.zh-CN.md`
+- `docs/ui-improvements/2026-03-20-viewer-stage-and-filmstrip-notes.zh-CN.md`
+- `docs/ui-improvements/2026-03-20-frontend-refresh.zh-CN.md`
 
 ## 给 CI / Docker 发布线程的建议
 
@@ -517,15 +517,15 @@ docker build -f docker/internal-site.Dockerfile -t magic-compare/internal-site .
 
 先看：
 
-- `docs/project-guide.md`
-- `docs/viewer-stage-and-filmstrip-notes.zh-CN.md`
-- `docs/frontend-refresh-2026-03-20.zh-CN.md`
+- `docs/project-overview-guide.md`
+- `docs/ui-improvements/2026-03-20-viewer-stage-and-filmstrip-notes.zh-CN.md`
+- `docs/ui-improvements/2026-03-20-frontend-refresh.zh-CN.md`
 
 ### 做 uploader 或导入链路
 
 先看：
 
-- `docs/VSEDITOR-WORKFLOW.zh-CN.md`
+- `docs/vseditor-workflow.zh-CN.md`
 - `docs/demo-vs-real-case-flow.zh-CN.md`
 - `tools/uploader/README.md`
 

@@ -1,12 +1,7 @@
 # 从 VSEditor 导图到上传成功
 
-本文档说明，如何在**已经激活好 Python 环境**之后，只输入一次：
-
-```bash
-magic-compare-uploader
-```
-
-就把一组 VSEditor 已保存到磁盘的图片，从原始平铺目录整理、生成 metadata、自动生成 heatmap，并上传到 Magic Compare Web 内部站。
+本文档提供从 VSEditor 平铺导图目录到内部站上传成功的最短操作路径。
+前提是已激活 uploader 的 Python 环境，按本文步骤执行即可完成整理、metadata 生成与 heatmap 生成。
 
 ## 1. 示例目录现状
 

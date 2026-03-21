@@ -551,7 +551,7 @@ This is used for:
 ## 🔗 Related Docs
 
 - [Uploader README](./tools/uploader/README.md)
-- [VSEditor workflow guide (Simplified Chinese)](./docs/VSEDITOR-WORKFLOW.zh-CN.md)
+- [VSEditor workflow guide (Simplified Chinese)](./docs/vseditor-workflow.zh-CN.md)
 - [Demo vs real case/group flow (Simplified Chinese)](./docs/demo-vs-real-case-flow.zh-CN.md)
 - [Chinese root README](./README.zh-CN.md)
 
