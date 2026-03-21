@@ -13,6 +13,10 @@ type OrderedItem = { order: number };
 
 type AssetKind = "before" | "after" | "heatmap" | "crop" | "misc";
 
+/**
+ * Buckets unexpected asset kinds under `misc` so the viewer can keep rendering legacy or
+ * experimental assets without widening every downstream union immediately.
+ */
 function asAssetKind(kind: string): AssetKind {
   if (kind === "before" || kind === "after" || kind === "heatmap" || kind === "crop") {
     return kind;
@@ -21,6 +25,10 @@ function asAssetKind(kind: string): AssetKind {
   return "misc";
 }
 
+/**
+ * Treats malformed tag JSON as empty metadata because imported content should stay browsable even
+ * if a legacy row contains bad tag serialization.
+ */
 export function parseTags(tagsJson: string): string[] {
   try {
     const parsed = JSON.parse(tagsJson);
@@ -30,10 +38,17 @@ export function parseTags(tagsJson: string): string[] {
   }
 }
 
+/**
+ * Serializes tags in one place so import, edit, and publish paths keep the same storage shape.
+ */
 export function stringifyTags(tags: string[]): string {
   return JSON.stringify(tags);
 }
 
+/**
+ * Falls back to swipe mode because it is the safest viewer default when stored data contains an
+ * outdated mode string.
+ */
 export function asViewerMode(input: string): ViewerMode {
   if (input === "a-b" || input === "heatmap" || input === "before-after") {
     return input;
@@ -42,6 +57,10 @@ export function asViewerMode(input: string): ViewerMode {
   return "before-after";
 }
 
+/**
+ * Falls back to draft so unexpected status values fail closed instead of making internal content
+ * appear published in the UI.
+ */
 export function asCaseStatus(input: string): CaseStatus {
   if (input === "draft" || input === "internal" || input === "published" || input === "archived") {
     return input;
@@ -50,10 +69,18 @@ export function asCaseStatus(input: string): CaseStatus {
   return "draft";
 }
 
+/**
+ * Re-sorts copies instead of mutating the caller's array so Prisma payloads can be reused by other
+ * mappers without hidden ordering side effects.
+ */
 export function sortByOrder<T extends OrderedItem>(items: T[]): T[] {
   return [...items].sort((left, right) => left.order - right.order);
 }
 
+/**
+ * Converts storage-layer assets into viewer-ready URLs once so every consumer gets the same public
+ * URL rewriting and asset kind normalization.
+ */
 export function mapFrameAssets(assets: Asset[]) {
   return assets.map((asset) => ({
     id: asset.id,
@@ -68,6 +95,10 @@ export function mapFrameAssets(assets: Asset[]) {
   }));
 }
 
+/**
+ * Produces the catalog card shape directly from the database row so list and search results share a
+ * stable summary model instead of duplicating status/tag counting logic in multiple places.
+ */
 export function mapCaseCatalogItem(caseRow: {
   id: string;
   slug: string;
@@ -93,6 +124,10 @@ export function mapCaseCatalogItem(caseRow: {
   };
 }
 
+/**
+ * Reuses the catalog summary mapper so search results stay structurally aligned with the main case
+ * listing while adding only the extra group matches the search UI needs.
+ */
 export function mapCaseSearchResult(caseRow: {
   id: string;
   slug: string;
@@ -115,6 +150,10 @@ export function mapCaseSearchResult(caseRow: {
   };
 }
 
+/**
+ * Shapes the internal workspace payload so the board gets explicit publish and frame counts without
+ * leaking raw Prisma fields into the component tree.
+ */
 export function mapCaseWorkspaceData(caseRow: {
   id: string;
   slug: string;
@@ -157,6 +196,10 @@ export function mapCaseWorkspaceData(caseRow: {
   };
 }
 
+/**
+ * Builds the full viewer dataset in one place so route handlers can enforce visibility rules first
+ * and UI code receives a ready-to-render compare model afterward.
+ */
 export function buildViewerDataset(caseRow: {
   slug: string;
   title: string;

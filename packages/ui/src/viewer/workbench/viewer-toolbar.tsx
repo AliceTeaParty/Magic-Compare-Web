@@ -30,6 +30,10 @@ interface ViewerToolbarProps {
   sidebarOpen: boolean;
 }
 
+/**
+ * Keeps viewer controls in one small surface so mode switching and A/B inspection affordances stay
+ * consistent between the internal and public shells.
+ */
 export function ViewerToolbar({
   abPresetScale,
   abSide,
@@ -44,6 +48,31 @@ export function ViewerToolbar({
   onToggleSidebar,
   sidebarOpen,
 }: ViewerToolbarProps) {
+  /**
+   * Routes side selection through the parent controller so A/B state stays in sync with keyboard
+   * shortcuts and stage tap cycling.
+   */
+  function handleAbSideChange(nextSide: "before" | "after") {
+    onAbSideChange(nextSide);
+  }
+
+  /**
+   * Clamps preset changes through the shared controller entry point so toolbar buttons and keyboard
+   * shortcuts cannot diverge from stage zoom bounds.
+   */
+  function handleScalePresetChange(nextPresetScale: number) {
+    onScalePresetChange(nextPresetScale);
+  }
+
+  /**
+   * Ignores MUI's null deselect event because the viewer must always stay in one compare mode.
+   */
+  function handleModeChange(_event: unknown, nextMode: ViewerMode | null) {
+    if (nextMode) {
+      onModeChange(nextMode);
+    }
+  }
+
   return (
     <Stack
       direction="row"
@@ -83,7 +112,9 @@ export function ViewerToolbar({
             >
               <Select
                 value={abSide}
-                onChange={(event) => onAbSideChange(String(event.target.value) as "before" | "after")}
+                onChange={(event) =>
+                  handleAbSideChange(String(event.target.value) as "before" | "after")
+                }
                 inputProps={{ "aria-label": "Choose A/B side" }}
               >
                 <MenuItem value="before">Before</MenuItem>
@@ -111,7 +142,7 @@ export function ViewerToolbar({
                 size="small"
                 aria-label="Decrease A/B scale"
                 disabled={abPresetScale <= VIEWER_MIN_PRESET_SCALE}
-                onClick={() => onScalePresetChange(abPresetScale - 1)}
+                onClick={() => handleScalePresetChange(abPresetScale - 1)}
                 sx={{
                   width: 34,
                   height: 34,
@@ -144,7 +175,7 @@ export function ViewerToolbar({
                 size="small"
                 aria-label="Increase A/B scale"
                 disabled={abPresetScale >= VIEWER_MAX_PRESET_SCALE}
-                onClick={() => onScalePresetChange(abPresetScale + 1)}
+                onClick={() => handleScalePresetChange(abPresetScale + 1)}
                 sx={{
                   width: 34,
                   height: 34,
@@ -189,11 +220,7 @@ export function ViewerToolbar({
             borderColor: "divider",
           },
         }}
-        onChange={(_, nextMode: ViewerMode | null) => {
-          if (nextMode) {
-            onModeChange(nextMode);
-          }
-        }}
+        onChange={handleModeChange}
       >
         <ToggleButton value="before-after">Swipe</ToggleButton>
         <ToggleButton value="a-b">A / B</ToggleButton>

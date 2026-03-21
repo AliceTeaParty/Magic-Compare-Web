@@ -23,6 +23,10 @@ import type {
   ViewerGroup,
 } from "@magic-compare/compare-core/viewer-data";
 
+/**
+ * Uses the sibling-group list from the dataset so navigation order stays aligned with workspace
+ * ordering instead of rebuilding links from route params in the sidebar.
+ */
 function GroupLinks({
   currentGroup,
   groups,
@@ -56,6 +60,10 @@ function GroupLinks({
   );
 }
 
+/**
+ * Concentrates metadata, publish status, and internal navigation in one place so desktop and mobile
+ * sidebars render the same information surface.
+ */
 function ViewerSidebarContent({
   caseMeta,
   currentGroup,
@@ -190,6 +198,10 @@ interface ViewerSidebarProps {
   variant: "public" | "internal";
 }
 
+/**
+ * Switches between inline and drawer sidebars without changing the metadata payload, which keeps
+ * viewer state independent from the current responsive layout.
+ */
 export function ViewerSidebar({
   caseMeta,
   currentFrame,

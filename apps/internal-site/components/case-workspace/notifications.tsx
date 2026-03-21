@@ -9,6 +9,10 @@ import { Box, IconButton, Paper, Stack } from "@mui/material";
 import { AnimatePresence, motion } from "motion/react";
 import type { WorkspaceNotification } from "./use-workspace-notifications";
 
+/**
+ * Renders a single workspace toast with tone-specific chrome so action feedback remains readable
+ * even when several long-running operations are active.
+ */
 function WorkspaceNotificationCard({
   notification,
   index,
@@ -90,6 +94,10 @@ function WorkspaceNotificationCard({
   );
 }
 
+/**
+ * Keeps toast stacking fixed to the viewport edge so workspace actions can report progress without
+ * shifting the underlying board layout.
+ */
 export function WorkspaceNotifications({
   notifications,
   onDismiss,

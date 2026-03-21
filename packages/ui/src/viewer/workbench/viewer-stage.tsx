@@ -40,6 +40,10 @@ export const DEFAULT_PAN_ZOOM: ViewerPanZoomState = {
   y: 0,
 };
 
+/**
+ * Reads the live viewport instead of relying on CSS breakpoints because fit-to-screen math needs
+ * pixel dimensions that exactly match the current browser window.
+ */
 export function getViewportSize(): ViewportSize {
   if (typeof window === "undefined") {
     return { width: 0, height: 0 };
@@ -51,6 +55,10 @@ export function getViewportSize(): ViewportSize {
   };
 }
 
+/**
+ * Normalizes device pixel ratio so pan/zoom math never drops below 1 on browsers that momentarily
+ * report falsy DPR values during resize.
+ */
 export function getViewerDevicePixelRatio(): number {
   if (typeof window === "undefined") {
     return 1;
@@ -59,10 +67,18 @@ export function getViewerDevicePixelRatio(): number {
   return Math.max(1, window.devicePixelRatio || 1);
 }
 
+/**
+ * Uses a deterministic string key so fit mode can tell the difference between "same viewport,
+ * toggle off" and "new viewport, recompute fit".
+ */
 export function getViewportSignature(viewportSize: ViewportSize): string {
   return `${viewportSize.width}x${viewportSize.height}`;
 }
 
+/**
+ * Tracks the rendered stage box rather than the viewport because contained-media math must follow
+ * the actual component size after responsive layout and sidebar changes.
+ */
 function useElementSize(targetRef: RefObject<HTMLElement | null>): StageSize {
   const [size, setSize] = useState<StageSize>({ width: 0, height: 0 });
 
@@ -72,6 +88,10 @@ function useElementSize(targetRef: RefObject<HTMLElement | null>): StageSize {
       return;
     }
 
+    /**
+     * Re-reads from the ref on each callback so ResizeObserver and late ref swaps always measure
+     * the current stage node instead of a stale element snapshot.
+     */
     function syncSize() {
       const element = targetRef.current;
       if (!element) {
@@ -93,6 +113,10 @@ function useElementSize(targetRef: RefObject<HTMLElement | null>): StageSize {
   return size;
 }
 
+/**
+ * Orders transforms so auto-rotated portrait mode still pans in screen coordinates; otherwise a
+ * horizontal drag would become vertical movement after the 90-degree rotation is applied.
+ */
 function buildMediaTransform(
   rotateStage: boolean,
   panZoomState: ViewerPanZoomState,
@@ -108,6 +132,10 @@ function buildMediaTransform(
     .join(" ");
 }
 
+/**
+ * Renders a single asset into the contained media rect while keeping pan/zoom and rotated portrait
+ * layout consistent across swipe, A/B, and heatmap modes.
+ */
 function PositionedStageMedia({
   asset,
   alt,
@@ -184,6 +212,10 @@ function PositionedStageMedia({
   );
 }
 
+/**
+ * Keeps swipe compare aligned with the visible split direction, including the rotated mobile stage
+ * where the divider becomes top/bottom instead of left/right.
+ */
 function SwipeCompareStage({
   beforeAsset,
   afterAsset,
@@ -202,6 +234,10 @@ function SwipeCompareStage({
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const activePointerIdRef = useRef<number | null>(null);
 
+  /**
+   * Uses the rotated axis when portrait auto-rotation is active so the handle follows the divider
+   * users actually see on screen instead of preserving the old horizontal math.
+   */
   function updateSwipePosition(clientX: number, clientY: number) {
     const viewport = viewportRef.current;
     if (!viewport) {
@@ -215,6 +251,7 @@ function SwipeCompareStage({
         return;
       }
 
+      // Rotated portrait mode presents the compare split vertically stacked, so swipe must follow Y.
       const localY = clientY - rect.top - mediaRect.y;
       setSwipePosition(clampNumber((localY / mediaRect.height) * 100, 0, 100));
       return;
@@ -228,6 +265,10 @@ function SwipeCompareStage({
     setSwipePosition(clampNumber((localX / mediaRect.width) * 100, 0, 100));
   }
 
+  /**
+   * Captures the pointer so the divider continues tracking a drag even when the finger leaves the
+   * visual handle.
+   */
   function handlePointerDown(event: ReactPointerEvent<HTMLDivElement>) {
     if (event.pointerType === "mouse" && event.button !== 0) {
       return;
@@ -238,6 +279,9 @@ function SwipeCompareStage({
     updateSwipePosition(event.clientX, event.clientY);
   }
 
+  /**
+   * Ignores unrelated pointers so multitouch or stray hover events cannot move the active divider.
+   */
   function handlePointerMove(event: ReactPointerEvent<HTMLDivElement>) {
     if (activePointerIdRef.current !== event.pointerId) {
       return;
@@ -246,6 +290,10 @@ function SwipeCompareStage({
     updateSwipePosition(event.clientX, event.clientY);
   }
 
+  /**
+   * Releases capture on end/cancel so later gestures can start cleanly without inheriting a stale
+   * active pointer id.
+   */
   function finishPointerDrag(event: ReactPointerEvent<HTMLDivElement>) {
     if (activePointerIdRef.current !== event.pointerId) {
       return;
@@ -373,6 +421,10 @@ function SwipeCompareStage({
   );
 }
 
+/**
+ * Wraps A/B inspect mode so activation, side cycling, and pan/zoom all stay tied to the same stage
+ * surface.
+ */
 function ABCompareStage({
   active,
   activeAsset,
@@ -404,6 +456,10 @@ function ABCompareStage({
     setPanZoomState,
   });
 
+  /**
+   * Uses a single click target for both entry and side cycling so A/B mode stays compact on mobile
+   * without adding extra controls over the image.
+   */
   function handleClick() {
     if (!consumeStageClick()) {
       return;
@@ -451,6 +507,10 @@ function ABCompareStage({
   );
 }
 
+/**
+ * Keeps the visual frame around the compare stage responsible only for sizing and chrome so each
+ * mode can focus on its own interaction rules.
+ */
 function StagePresentationShell({
   children,
   fittedSize,
@@ -501,6 +561,10 @@ function StagePresentationShell({
   );
 }
 
+/**
+ * Explains the forced mode fallback when a frame lacks heatmap assets, which would otherwise look
+ * like a broken blank panel.
+ */
 export function HeatmapNotice() {
   return (
     <Alert
@@ -516,6 +580,10 @@ export function HeatmapNotice() {
   );
 }
 
+/**
+ * Chooses the active stage implementation and computes the contained media rect from the currently
+ * visible asset so all compare modes share the same fitted geometry.
+ */
 function ViewerStageContent({
   abSide,
   abStageActive,
@@ -651,6 +719,10 @@ interface ViewerStageProps {
   swipePosition: number;
 }
 
+/**
+ * Exposes one stable viewer-stage entry point so the workbench can swap modes without caring about
+ * the layout and sizing details of the underlying interaction components.
+ */
 export function ViewerStage({
   abSide,
   abStageActive,

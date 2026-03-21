@@ -24,10 +24,17 @@ interface PointerSample {
   y: number;
 }
 
+/**
+ * Gesture distance must be measured in screen space because the stage may be rotated before the
+ * image is painted.
+ */
 function getPointerDistance(first: PointerSample, second: PointerSample): number {
   return Math.hypot(second.x - first.x, second.y - first.y);
 }
 
+/**
+ * Normalizes DOM touch objects into the lightweight sample shape used by the gesture refs.
+ */
 function getTouchSample(touch: { clientX: number; clientY: number }): PointerSample {
   return {
     x: touch.clientX,
@@ -35,6 +42,10 @@ function getTouchSample(touch: { clientX: number; clientY: number }): PointerSam
   };
 }
 
+/**
+ * Manages A/B stage pan and pinch behavior so rotated portrait mode and desktop mode share the
+ * same gesture rules.
+ */
 export function useStagePanZoom({
   active,
   activeAsset,
@@ -89,6 +100,8 @@ export function useStagePanZoom({
     [panZoomState, scaleOptions],
   );
 
+  // Gesture handlers outlive a single render, so they read the latest pan/zoom state from refs
+  // instead of closing over stale React values mid-interaction.
   useEffect(() => {
     panZoomStateRef.current = panZoomState;
   }, [panZoomState]);
@@ -121,12 +134,19 @@ export function useStagePanZoom({
     };
   }, []);
 
+  /**
+   * Reapplies the shared clamp rules so every gesture path respects the same pan bounds.
+   */
   function applyPanZoom(nextState: ViewerPanZoomState) {
     setPanZoomState(
       clampViewerPanZoom(nextState, mediaRect, getViewerEffectiveScale(nextState, scaleOptions)),
     );
   }
 
+  /**
+   * Mouse dragging only starts once the image is actually zoomed in; otherwise dragging would fight
+   * with the tap-to-switch-side behavior.
+   */
   function handlePointerDown(event: ReactPointerEvent<HTMLDivElement>) {
     if (event.pointerType !== "mouse" || event.button !== 0 || !active || effectiveScale <= 1) {
       return;
@@ -141,6 +161,9 @@ export function useStagePanZoom({
     };
   }
 
+  /**
+   * Uses screen-space deltas so portrait auto-rotate still follows the user's finger direction.
+   */
   function handlePointerMove(event: ReactPointerEvent<HTMLDivElement>) {
     const panGesture = panGestureRef.current;
 
@@ -151,6 +174,7 @@ export function useStagePanZoom({
     const deltaX = event.clientX - panGesture.start.x;
     const deltaY = event.clientY - panGesture.start.y;
 
+    // Ignore tiny jitter so a tap does not turn into a drag.
     if (Math.abs(deltaX) + Math.abs(deltaY) > 6) {
       panGesture.moved = true;
       suppressStageClickRef.current = true;
@@ -164,6 +188,10 @@ export function useStagePanZoom({
     });
   }
 
+  /**
+   * Clears pointer capture and suppresses the next click after a real drag so panning does not also
+   * toggle the A/B side.
+   */
   function finishPointerInteraction(event: ReactPointerEvent<HTMLDivElement>) {
     const panGesture = panGestureRef.current;
 
@@ -188,6 +216,9 @@ export function useStagePanZoom({
     }
   }
 
+  /**
+   * Allows pinch-to-zoom trackpad gestures without hijacking ordinary wheel scrolling.
+   */
   function handleWheel(event: ReactWheelEvent<HTMLDivElement>) {
     if (!event.ctrlKey) {
       return;
@@ -212,6 +243,9 @@ export function useStagePanZoom({
     });
   }
 
+  /**
+   * Captures the starting distance and center point for a two-finger pinch gesture.
+   */
   function handleTouchStart(event: ReactTouchEvent<HTMLDivElement>) {
     if (!active || event.touches.length !== 2) {
       touchGestureRef.current = null;
@@ -235,6 +269,10 @@ export function useStagePanZoom({
     };
   }
 
+  /**
+   * Keeps pinch zoom anchored under the user's fingers by updating both scale and translation from
+   * the gesture center.
+   */
   function handleTouchMove(event: ReactTouchEvent<HTMLDivElement>) {
     if (!active || event.touches.length !== 2) {
       return;

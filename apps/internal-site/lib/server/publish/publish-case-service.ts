@@ -6,6 +6,10 @@ import {
 import { buildPublishManifest } from "./build-publish-manifest";
 import { ensurePublicSlug } from "./resolve-public-slug";
 
+/**
+ * Publishes every public group in a case as a fresh manifest snapshot and updates case metadata
+ * only after at least one group produced a valid public bundle.
+ */
 export async function publishCase(caseId: string) {
   const caseRow = await prisma.case.findUnique({
     where: { id: caseId },
@@ -41,6 +45,7 @@ export async function publishCase(caseId: string) {
   const results: Array<{ groupId: string; publicSlug: string }> = [];
 
   for (const group of publishableGroups) {
+    // Once a group is public we keep its slug stable; only first-time publishes mint one.
     const publicSlug = group.publicSlug ?? (await ensurePublicSlug(caseRow.slug, group.slug, group.id));
 
     if (publicSlug !== group.publicSlug) {
@@ -61,6 +66,8 @@ export async function publishCase(caseId: string) {
       continue;
     }
 
+    // Reset first so removed frames/assets disappear from the published bundle instead of lingering
+    // after subsequent publishes.
     await resetPublishedGroup(publicSlug);
     await writePublishedManifest(publicSlug, manifest);
     results.push({ groupId: group.id, publicSlug });

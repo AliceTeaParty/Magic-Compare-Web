@@ -30,18 +30,28 @@ export interface PublicDeployResult extends PublicExportResult {
   branch: string | null;
 }
 
+/**
+ * Mirrors the Next.js export into the configured publish directory so local exports and deploys can
+ * target an arbitrary output root without teaching Next.js about that environment-specific path.
+ */
 async function mirrorExportDirectory(sourceDir: string, targetDir: string): Promise<void> {
   if (sourceDir === targetDir) {
     return;
   }
 
   await rm(targetDir, { recursive: true, force: true });
+  // Create the parent explicitly because deploy targets may point outside the app tree and `cp`
+  // will not materialize missing ancestors for us.
   await mkdir(new URL(`file://${targetDir}`).pathname.replace(/\/[^/]*$/, ""), { recursive: true }).catch(
     async () => mkdir(targetDir.substring(0, targetDir.lastIndexOf("/")), { recursive: true }),
   );
   await cp(sourceDir, targetDir, { recursive: true });
 }
 
+/**
+ * Fails early when nothing has been published yet so export/deploy errors stay actionable instead
+ * of surfacing as an opaque empty-site build.
+ */
 async function ensurePublishedGroupsExist(): Promise<void> {
   try {
     const entries = await readdir(publishedGroupsDirectory(), { withFileTypes: true });
@@ -57,6 +67,10 @@ async function ensurePublishedGroupsExist(): Promise<void> {
   );
 }
 
+/**
+ * Builds the public app against the current published bundle and copies the static output into the
+ * runtime export directory expected by local preview or deploy flows.
+ */
 async function performPublicExport(): Promise<PublicExportResult> {
   const buildOutputDir = publicBuildOutputDirectory();
   const exportDir = resolvePublicExportDirectory();
@@ -75,14 +89,26 @@ async function performPublicExport(): Promise<PublicExportResult> {
   };
 }
 
+/**
+ * Maps the runtime lock error to HTTP status so route handlers can distinguish "already running"
+ * from ordinary operator errors.
+ */
 export function getPublicSiteOperationErrorStatus(error: unknown): number {
   return error instanceof PublicSiteOperationConflictError ? 409 : 400;
 }
 
+/**
+ * Serializes export runs through the shared lock because build output directories are mutable and
+ * concurrent writes would corrupt the generated site.
+ */
 export async function exportPublicSite(): Promise<PublicExportResult> {
   return withPublicSiteOperationLock("export", performPublicExport);
 }
 
+/**
+ * Optionally republishes one case before exporting so the deploy path can produce a fresh public
+ * site in one operator action without requiring a separate manual publish step.
+ */
 export async function deployPublicSite(caseId?: string): Promise<PublicDeployResult> {
   if (!isCloudflarePagesDeployConfigured()) {
     throw new Error(

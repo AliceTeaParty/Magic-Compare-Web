@@ -6,6 +6,10 @@ import type { ViewerFrame } from "@magic-compare/compare-core/viewer-data";
 import type { DragEvent as ReactDragEvent } from "react";
 import { useFilmstripDrag } from "./use-filmstrip-drag";
 
+/**
+ * Follows the same "after first, then before" thumbnail preference as the main viewer so the
+ * selected frame strip matches the image users expect to inspect.
+ */
 function resolveThumbnailAsset(frame: ViewerFrame) {
   return (
     frame.assets.find((asset) => asset.kind === "after" && asset.isPrimaryDisplay) ??
@@ -14,6 +18,10 @@ function resolveThumbnailAsset(frame: ViewerFrame) {
   );
 }
 
+/**
+ * Keeps each thumbnail button focused on presentation so drag/scroll physics stay in the hook and
+ * selection visuals stay local to the card.
+ */
 function ThumbnailButton({
   frame,
   isActive,
@@ -100,6 +108,10 @@ interface ViewerFilmstripProps {
   onSelectFrame: (frameId: string) => void;
 }
 
+/**
+ * Presents frame navigation as a draggable strip so long cases remain usable on touch devices
+ * without exposing the lower-level drag physics to the workbench shell.
+ */
 export function ViewerFilmstrip({
   currentFrameId,
   frames,
@@ -112,6 +124,14 @@ export function ViewerFilmstrip({
       onSelectFrame,
       prefersReducedMotion,
     });
+
+  /**
+   * Prevents the browser's native drag image from hijacking horizontal scrolling when users start a
+   * gesture on top of a thumbnail.
+   */
+  function handleViewportDragStart(event: ReactDragEvent<HTMLDivElement>) {
+    event.preventDefault();
+  }
 
   return (
     <Box
@@ -129,7 +149,7 @@ export function ViewerFilmstrip({
       <Box
         ref={viewportRef}
         {...viewportHandlers}
-        onDragStart={(event: ReactDragEvent<HTMLDivElement>) => event.preventDefault()}
+        onDragStart={handleViewportDragStart}
         sx={{
           width: "100%",
           minWidth: 0,

@@ -48,6 +48,10 @@ type PublishableCase = {
 
 type PublishManifestAsset = PublishManifest["frames"][number]["assets"][number];
 
+/**
+ * Collapses unknown asset kinds to `misc` so publishing stays forward-compatible with importer
+ * experiments instead of hard-failing on metadata the public schema does not understand yet.
+ */
 function asPublishManifestAssetKind(kind: string): PublishManifestAsset["kind"] {
   if (kind === "before" || kind === "after" || kind === "heatmap" || kind === "crop") {
     return kind;
@@ -56,6 +60,10 @@ function asPublishManifestAssetKind(kind: string): PublishManifestAsset["kind"] 
   return "misc";
 }
 
+/**
+ * Resolves internal asset URLs into their public equivalents at publish time so the generated
+ * manifest is self-contained and safe to serve from the static site.
+ */
 function mapManifestAssets(assets: PublishableAsset[]): PublishManifestAsset[] {
   return assets.map((asset) => ({
     id: asset.id,
@@ -70,6 +78,10 @@ function mapManifestAssets(assets: PublishableAsset[]): PublishManifestAsset[] {
   }));
 }
 
+/**
+ * Builds the public manifest only from explicitly public frames so export/deploy cannot leak
+ * internal-only comparisons into the static site.
+ */
 export function buildPublishManifest(params: {
   caseRow: PublishableCase;
   group: PublishableGroup;
@@ -80,6 +92,7 @@ export function buildPublishManifest(params: {
   const publicFrames = group.frames.filter((frame) => frame.isPublic);
 
   if (publicFrames.length === 0) {
+    // Empty published groups are skipped entirely so the public site never renders placeholder pages.
     return null;
   }
 
@@ -91,6 +104,8 @@ export function buildPublishManifest(params: {
     case: {
       slug: caseRow.slug,
       title: caseRow.title,
+      // The public manifest contract still carries subtitle, so we preserve it even though the
+      // internal app no longer uses subtitle in its own view models.
       subtitle: caseRow.subtitle ?? "",
       summary: caseRow.summary,
       tags: parseTags(caseRow.tagsJson),

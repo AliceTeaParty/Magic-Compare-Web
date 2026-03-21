@@ -22,6 +22,10 @@ import { CSS } from "@dnd-kit/utilities";
 import Link from "next/link";
 import type { CaseWorkspaceData } from "@/lib/server/repositories/content-repository";
 
+/**
+ * Keeps each workspace row self-contained so drag handles, visibility controls, and the internal
+ * viewer link can evolve without bloating the board container again.
+ */
 export function SortableGroupRow({
   group,
   caseSlug,
@@ -34,6 +38,20 @@ export function SortableGroupRow({
   onToggleVisibility: (group: CaseWorkspaceData["groups"][number]) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: group.id });
+
+  /**
+   * Ignores the ToggleButtonGroup "clear selection" null case because a group must always be either
+   * internal or public; allowing deselection would only create a transient impossible state.
+   */
+  function handleVisibilityChange(_event: unknown, nextValue: "public" | "internal" | null) {
+    if (!nextValue) {
+      return;
+    }
+
+    if ((group.isPublic ? "public" : "internal") !== nextValue) {
+      onToggleVisibility(group);
+    }
+  }
 
   return (
     <ListItem
@@ -122,15 +140,7 @@ export function SortableGroupRow({
                 backgroundColor: "rgba(255,255,255,0.04)",
               }}
               value={group.isPublic ? "public" : "internal"}
-              onChange={(_, nextValue: "public" | "internal" | null) => {
-                if (!nextValue) {
-                  return;
-                }
-
-                if ((group.isPublic ? "public" : "internal") !== nextValue) {
-                  onToggleVisibility(group);
-                }
-              }}
+              onChange={handleVisibilityChange}
             >
               <ToggleButton
                 value="internal"

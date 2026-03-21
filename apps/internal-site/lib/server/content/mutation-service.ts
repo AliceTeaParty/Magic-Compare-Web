@@ -2,6 +2,10 @@ import { prisma } from "@/lib/server/db/client";
 import { deletePublishedGroup } from "@/lib/server/storage/published-content";
 import { deleteInternalAssetGroupObjects } from "@/lib/server/storage/internal-assets";
 
+/**
+ * Centralizes the "case must exist before mutating one of its groups" guard so write paths fail
+ * with the same message instead of each route inventing its own not-found handling.
+ */
 async function requireCaseWithGroups(caseSlug: string, select: {
   id: true;
   slug: true;
@@ -36,6 +40,10 @@ async function requireCaseWithGroups(caseSlug: string, select: {
   return caseRow;
 }
 
+/**
+ * Keeps group lookup errors uniform across reorder/visibility/delete flows so API responses stay
+ * predictable when the client works on stale workspace state.
+ */
 function requireTargetGroup<T extends { slug: string }>(groups: T[], groupSlug: string): T {
   const targetGroup = groups.find((group) => group.slug === groupSlug);
 
@@ -46,6 +54,10 @@ function requireTargetGroup<T extends { slug: string }>(groups: T[], groupSlug: 
   return targetGroup;
 }
 
+/**
+ * Persists the exact ordering emitted by the drag-and-drop client, because the workspace already
+ * resolved ordering semantics and the server should not second-guess that sequence.
+ */
 export async function reorderGroups(caseId: string, groupIds: string[]): Promise<void> {
   await prisma.$transaction(
     groupIds.map((groupId, order) =>
@@ -60,6 +72,10 @@ export async function reorderGroups(caseId: string, groupIds: string[]): Promise
   );
 }
 
+/**
+ * Mirrors frame reorder state from the client as-is so group viewers and import/publish pipelines
+ * continue to agree on frame order.
+ */
 export async function reorderFrames(groupId: string, frameIds: string[]): Promise<void> {
   await prisma.$transaction(
     frameIds.map((frameId, order) =>
@@ -74,6 +90,10 @@ export async function reorderFrames(groupId: string, frameIds: string[]): Promis
   );
 }
 
+/**
+ * Toggles a group's public eligibility without publishing immediately, so workspace edits can stay
+ * batched and the operator decides when the public bundle should refresh.
+ */
 export async function setGroupVisibility(caseSlug: string, groupSlug: string, isPublic: boolean) {
   const caseRow = await requireCaseWithGroups(caseSlug, {
     id: true,
@@ -97,6 +117,10 @@ export async function setGroupVisibility(caseSlug: string, groupSlug: string, is
   };
 }
 
+/**
+ * Deletes the group from both internal storage and published output, and downgrades the case back
+ * to `internal` when that deletion removed the last public group.
+ */
 export async function deleteGroup(caseSlug: string, groupSlug: string) {
   const caseRow = await prisma.case.findUnique({
     where: { slug: caseSlug },
@@ -133,6 +157,8 @@ export async function deleteGroup(caseSlug: string, groupSlug: string) {
     (group) => group.id !== targetGroup.id && group.isPublic,
   ).length;
 
+  // A published case with no public groups left is semantically no longer published, even if old
+  // metadata still exists on the case row.
   if (caseRow.status === "published" && remainingPublicGroups === 0) {
     await prisma.case.update({
       where: { id: caseRow.id },

@@ -3,6 +3,10 @@ import { validateImportManifest } from "@/lib/server/validators/import-manifest"
 import { prisma } from "@/lib/server/db/client";
 import { stringifyTags } from "./mappers";
 
+/**
+ * Reuses the group row when an import is repeated so stable slugs/public settings survive, but
+ * replaces frames/assets wholesale because the uploader manifest is the source of truth.
+ */
 export async function upsertGroup(groupEntry: ImportManifest["groups"][number], caseId: string) {
   const existingGroup = await prisma.group.findUnique({
     where: {
@@ -54,6 +58,10 @@ export async function upsertGroup(groupEntry: ImportManifest["groups"][number], 
   });
 }
 
+/**
+ * Applies the uploader manifest as an authoritative snapshot and keeps deprecated case fields like
+ * `subtitle` populated for schema/publish compatibility even though the internal app no longer uses them.
+ */
 export async function applyImportManifest(rawManifest: unknown) {
   const manifest = validateImportManifest(rawManifest);
 
@@ -110,10 +118,14 @@ export async function applyImportManifest(rawManifest: unknown) {
           },
         });
 
+        // Prefer an explicit manifest label so uploader-defined covers remain stable even if the
+        // primary display heuristics later change.
         if (!coverAssetId && manifest.case.coverAssetLabel && assetEntry.label === manifest.case.coverAssetLabel) {
           coverAssetId = assetRow.id;
         }
 
+        // Fall back to the primary after frame because that is the least surprising cover when the
+        // manifest omitted an explicit label.
         if (!coverAssetId && assetEntry.kind === "after" && assetEntry.isPrimaryDisplay) {
           coverAssetId = assetRow.id;
         }

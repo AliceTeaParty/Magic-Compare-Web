@@ -36,6 +36,10 @@ export interface ViewerController {
   heatmapAsset: ViewerAsset | undefined;
 }
 
+/**
+ * Owns the viewer's interaction state so the workbench can stay declarative and the fallback rules
+ * for frame/mode selection remain consistent across internal and public viewers.
+ */
 export function useViewerController(group: ViewerGroup): ViewerController {
   const frames = useMemo(() => getOrderedFrames(group), [group]);
   const [currentFrameId, setCurrentFrameId] = useState<string | undefined>(frames[0]?.id);
@@ -44,6 +48,8 @@ export function useViewerController(group: ViewerGroup): ViewerController {
   const [abSide, setAbSide] = useState<"before" | "after">("after");
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
+  // Import/publish changes can remove frames out from under the viewer, so selection repair has to
+  // happen here instead of assuming the saved id is always still valid.
   useEffect(() => {
     const nextFrameId = resolveFrameId(frames, currentFrameId);
     if (nextFrameId !== currentFrameId) {
@@ -60,6 +66,8 @@ export function useViewerController(group: ViewerGroup): ViewerController {
     [currentFrame],
   );
 
+  // The saved mode is advisory only; it must be revalidated whenever the active frame changes
+  // because not every frame exposes heatmap or A/B assets.
   useEffect(() => {
     setModeState((previousMode) =>
       resolveViewerMode(previousMode, currentFrame, group.defaultMode),
@@ -70,6 +78,9 @@ export function useViewerController(group: ViewerGroup): ViewerController {
     setCurrentFrameId(frameId);
   }
 
+  /**
+   * Wraps frame stepping so keyboard navigation and UI controls both respect cyclic navigation.
+   */
   function stepFrame(delta: number): void {
     if (frames.length === 0 || currentFrameIndex === -1) {
       return;
@@ -79,10 +90,18 @@ export function useViewerController(group: ViewerGroup): ViewerController {
     setCurrentFrameId(frames[nextIndex]?.id);
   }
 
+  /**
+   * Resolves the requested mode through frame capabilities instead of trusting the caller, because
+   * some modes disappear on a per-frame basis.
+   */
   function setMode(nextMode: ViewerMode): void {
     setModeState(resolveViewerMode(nextMode, currentFrame, group.defaultMode));
   }
 
+  /**
+   * Keeps the sidebar toggle local to the controller so both keyboard shortcuts and buttons mutate
+   * the same state path.
+   */
   function toggleSidebar(): void {
     setSidebarOpen((previous) => !previous);
   }

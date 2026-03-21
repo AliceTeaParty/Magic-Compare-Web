@@ -24,6 +24,10 @@ interface PublishedAlias {
   publicSlug: string;
 }
 
+/**
+ * Reads the published bundle root from env so the alias generator follows the same data source
+ * as export/deploy, regardless of whether the repo is using the default local content path.
+ */
 function publishedGroupsDir(): string {
   const publishedRoot = process.env.MAGIC_COMPARE_PUBLISHED_ROOT?.trim()
     ? path.resolve(process.env.MAGIC_COMPARE_PUBLISHED_ROOT.trim())
@@ -32,6 +36,10 @@ function publishedGroupsDir(): string {
   return path.join(publishedRoot, "groups");
 }
 
+/**
+ * Reconstructs legacy case/group aliases from published manifests instead of hard-coding any
+ * slug mapping, so compatibility keeps following the actual published output.
+ */
 function readAliases(): PublishedAlias[] {
   const groupsDir = publishedGroupsDir();
   if (!existsSync(groupsDir)) {
@@ -61,9 +69,13 @@ function readAliases(): PublishedAlias[] {
       }
 
       return [{ caseSlug, groupSlug, publicSlug }];
-    });
+  });
 }
 
+/**
+ * Uses a tiny HTML redirect rather than framework routing so the exported static site can keep
+ * serving old `/cases/.../groups/...` links after the public route model moved to `/g/[slug]`.
+ */
 function renderRedirectHtml(targetHref: string): string {
   return `<!doctype html>
 <html lang="en">
@@ -100,6 +112,10 @@ function renderRedirectHtml(targetHref: string): string {
 `;
 }
 
+/**
+ * Rebuilds only the legacy alias tree after static export so the generated output stays
+ * compatible with historical links without affecting the canonical `/g/[publicSlug]` pages.
+ */
 function main(): void {
   loadWorkspaceEnvFromModule(import.meta.url, 1);
 

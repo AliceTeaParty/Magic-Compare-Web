@@ -21,6 +21,10 @@ interface ViewerHeaderProps {
   sidebarOpen: boolean;
 }
 
+/**
+ * Keeps page identity and viewer controls together so the workbench header can stay stable even as
+ * the stage and sidebar swap between internal and public variants.
+ */
 export function ViewerHeader({
   abPresetScale,
   abSide,

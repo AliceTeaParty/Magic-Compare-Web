@@ -17,6 +17,10 @@ interface NotificationApi {
   dismissWorkspaceSavingNotification: () => void;
 }
 
+/**
+ * Normalizes JSON POST handling so workspace actions surface API errors with the same message
+ * shape regardless of which operation triggered them.
+ */
 async function postJson(url: string, body: unknown) {
   const response = await fetch(url, {
     method: "POST",
@@ -34,6 +38,10 @@ async function postJson(url: string, body: unknown) {
   return response.json().catch(() => null);
 }
 
+/**
+ * Keeps all workspace mutations in one hook so optimistic UI, notifications, and refresh timing
+ * stay aligned across reorder/publish/deploy/visibility flows.
+ */
 export function useCaseWorkspaceActions({
   data,
   groups,
@@ -56,6 +64,10 @@ export function useCaseWorkspaceActions({
     [groups],
   );
 
+  /**
+   * Uses optimistic visibility updates because the control is binary and easy to roll back, which
+   * makes workspace editing feel immediate without hiding persistence failures.
+   */
   function toggleGroupVisibility(targetGroup: GroupItem) {
     const previousGroups = groups;
     const nextVisibility = !targetGroup.isPublic;
@@ -94,6 +106,10 @@ export function useCaseWorkspaceActions({
     });
   }
 
+  /**
+   * Publishes the case explicitly instead of tying it to every toggle/reorder so operators can
+   * batch workspace edits before refreshing the public bundle.
+   */
   function publishCaseBundle() {
     startTransition(() => {
       void postJson("/api/ops/case-publish", { caseId: data.id })
@@ -113,6 +129,10 @@ export function useCaseWorkspaceActions({
     });
   }
 
+  /**
+   * Keeps deploy single-flight on the client as well as the server lock so repeated taps do not
+   * spam Cloudflare deploys before the first request has even left the browser.
+   */
   function deployPublicSite() {
     if (isDeployingPublicSite) {
       return;
@@ -123,6 +143,8 @@ export function useCaseWorkspaceActions({
       "Republishing this case and deploying a fresh public export to Cloudflare Pages...",
       "info",
       {
+        // Reuse a stable key so repeated deploy attempts update one sticky notification instead of
+        // stacking transient duplicates.
         key: "workspace-deploying-public-site",
         sticky: true,
       },
@@ -149,6 +171,10 @@ export function useCaseWorkspaceActions({
     });
   }
 
+  /**
+   * Mirrors drag-and-drop order optimistically and rolls back on failure so the workspace stays
+   * responsive while still preserving the server as the source of truth.
+   */
   function reorderCaseGroups(activeId: string, overId: string | null) {
     if (!overId || activeId === overId) {
       return;

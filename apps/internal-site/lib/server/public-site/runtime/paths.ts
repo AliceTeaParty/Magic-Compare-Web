@@ -2,17 +2,19 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { getPublishedRoot, getPublicExportDir } from "../../runtime-config";
 
-function workspaceRoot(): string {
-  const currentDir = path.dirname(fileURLToPath(import.meta.url));
-  return path.resolve(currentDir, "../../../../../..");
-}
+// Runtime helpers may execute from app code, scripts, or tests, so derive the repo root from this
+// module location instead of trusting the caller's current working directory.
+const WORKSPACE_ROOT = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "../../../../../..",
+);
 
 export function getWorkspaceRoot(): string {
-  return workspaceRoot();
+  return WORKSPACE_ROOT;
 }
 
 export function publicSiteDirectory(): string {
-  return path.join(workspaceRoot(), "apps", "public-site");
+  return path.join(WORKSPACE_ROOT, "apps", "public-site");
 }
 
 export function publicBuildOutputDirectory(): string {

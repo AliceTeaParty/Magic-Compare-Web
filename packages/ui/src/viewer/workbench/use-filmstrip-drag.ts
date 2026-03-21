@@ -4,6 +4,8 @@ import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointer
 import { getFilmstripScrollbarMetrics } from "@magic-compare/compare-core";
 import { clampNumber } from "@magic-compare/shared-utils";
 
+// These constants are tuned so the strip still feels responsive on touch devices without letting
+// inertia fling the active frame far off screen.
 const FILMSTRIP_EDGE_OFFSET_LIMIT = 36;
 const FILMSTRIP_INERTIA_MIN_VELOCITY = 0.018;
 const FILMSTRIP_INERTIA_VELOCITY_GAIN = 1.28;
@@ -17,6 +19,10 @@ interface FilmstripScrollState {
   scrollWidth: number;
 }
 
+/**
+ * Encapsulates filmstrip drag physics so the workbench component can focus on viewer state instead
+ * of pointer bookkeeping and overscroll math.
+ */
 export function useFilmstripDrag({
   frameCount,
   onSelectFrame,
@@ -60,6 +66,8 @@ export function useFilmstripDrag({
     [filmstripScrollState],
   );
 
+  // Scrollbar geometry depends on both viewport width and rendered content width, so a ResizeObserver
+  // is more reliable here than trying to infer changes from React props alone.
   useEffect(() => {
     const viewport = viewportRef.current;
     if (!viewport) {
@@ -89,6 +97,8 @@ export function useFilmstripDrag({
     };
   }, [frameCount]);
 
+  // Animation frames must be cancelled manually because inertia can outlive the component tree that
+  // started it.
   useEffect(() => {
     return () => {
       cancelMotion();
@@ -100,6 +110,9 @@ export function useFilmstripDrag({
     setEdgeOffset(nextOffset);
   }
 
+  /**
+   * Stops the spring-back animation that runs after overscrolling either edge.
+   */
   function cancelRebound() {
     if (reboundFrameRef.current !== null) {
       window.cancelAnimationFrame(reboundFrameRef.current);
@@ -123,6 +136,9 @@ export function useFilmstripDrag({
     cancelRebound();
   }
 
+  /**
+   * Adds a short elastic rebound so overscroll feels intentional instead of snapping abruptly.
+   */
   function startRebound(initialOffset: number) {
     cancelRebound();
 
@@ -154,6 +170,9 @@ export function useFilmstripDrag({
     reboundFrameRef.current = window.requestAnimationFrame(step);
   }
 
+  /**
+   * Records the gesture origin so click-to-select and drag-to-scroll can share one surface.
+   */
   function handlePointerDown(event: ReactPointerEvent<HTMLDivElement>) {
     if (frameCount <= 1) {
       return;
@@ -181,6 +200,10 @@ export function useFilmstripDrag({
     event.currentTarget.setPointerCapture(event.pointerId);
   }
 
+  /**
+   * Applies overscroll resistance and velocity tracking so mouse and touch drags both land on the
+   * same inertial behavior.
+   */
   function handlePointerMove(event: ReactPointerEvent<HTMLDivElement>) {
     const dragState = dragStateRef.current;
     if (!dragState || dragState.pointerId !== event.pointerId) {
@@ -197,6 +220,7 @@ export function useFilmstripDrag({
     const deltaTime = Math.max(now - dragState.lastTimestamp, 1);
     const deltaScroll = dragState.lastClientX - event.clientX;
 
+    // Ignore tiny movement so a light tap on a thumbnail does not get reclassified as a drag.
     if (!dragState.moved && Math.abs(travelX) > 4) {
       dragState.moved = true;
       suppressClickRef.current = true;
@@ -222,6 +246,10 @@ export function useFilmstripDrag({
     dragState.lastTimestamp = now;
   }
 
+  /**
+   * Resolves the gesture as either a drag release with inertia or a plain click release that
+   * should select the frame under the pointer.
+   */
   function finishPointerDrag(event: ReactPointerEvent<HTMLDivElement>) {
     const dragState = dragStateRef.current;
     if (!dragState || dragState.pointerId !== event.pointerId) {
@@ -297,6 +325,10 @@ export function useFilmstripDrag({
     }
   }
 
+  /**
+   * Ignores clicks that were produced by a drag gesture so scrolling the strip does not also
+   * switch frames accidentally.
+   */
   function handleFrameSelection(frameId: string) {
     if (suppressClickRef.current) {
       return;

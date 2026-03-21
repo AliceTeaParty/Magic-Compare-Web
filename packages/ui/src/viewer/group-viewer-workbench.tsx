@@ -4,7 +4,12 @@ import { Tune } from "@mui/icons-material";
 import { Box, Paper, Slider, Stack, Typography } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import useMediaQuery from "@mui/material/useMediaQuery";
-import { cycleAbSide, getFittedStageSize as getViewerFittedStageSize } from "@magic-compare/compare-core";
+import {
+  VIEWER_MAX_PRESET_SCALE,
+  VIEWER_MIN_PRESET_SCALE,
+  cycleAbSide,
+  getFittedStageSize as getViewerFittedStageSize,
+} from "@magic-compare/compare-core";
 import { useViewerController } from "@magic-compare/compare-core/use-viewer-controller";
 import type { ViewerDataset } from "@magic-compare/compare-core/viewer-data";
 import { clampNumber } from "@magic-compare/shared-utils";
@@ -33,6 +38,10 @@ interface GroupViewerWorkbenchProps {
   variant: "public" | "internal";
 }
 
+/**
+ * Composes the viewer shell around smaller workbench modules so layout, persistence, and keyboard
+ * behavior stay centralized while rendering details live in focused subcomponents.
+ */
 export function GroupViewerWorkbench({
   dataset,
   variant,
@@ -63,6 +72,8 @@ export function GroupViewerWorkbench({
     [fitViewViewportSignature, stageAspectRatio, viewportSize],
   );
 
+  // Cookies are enough for these preferences; introducing server-backed settings would add more
+  // machinery than the internal/public viewers currently need.
   useEffect(() => {
     const preferredOpenState = readViewerDetailsCookie();
     const preferredMode = readViewerModeCookie();
@@ -79,6 +90,7 @@ export function GroupViewerWorkbench({
     modePreferenceLoadedRef.current = true;
   }, [controller]);
 
+  // Delay the first cookie write until after hydration so the existing preference can be read first.
   useEffect(() => {
     if (!sidebarPreferenceLoadedRef.current) {
       return;
@@ -92,6 +104,7 @@ export function GroupViewerWorkbench({
     writeViewerDetailsCookie(controller.sidebarOpen);
   }, [controller.sidebarOpen]);
 
+  // Mode persistence follows the same delayed-write rule as sidebar state for the same reason.
   useEffect(() => {
     if (!modePreferenceLoadedRef.current) {
       return;
@@ -105,12 +118,14 @@ export function GroupViewerWorkbench({
     writeViewerModeCookie(controller.mode);
   }, [controller.mode]);
 
+  // Pan/swipe state belongs to a single frame; carrying it over to another frame feels broken.
   useEffect(() => {
     setSwipePosition(50);
     setAbPanZoomState(DEFAULT_PAN_ZOOM);
     setAbStageActive(false);
   }, [controller.currentFrame?.id]);
 
+  // Leaving A/B mode should reset inspect state so returning to it starts from a predictable baseline.
   useEffect(() => {
     if (controller.mode !== "a-b") {
       setAbPanZoomState(DEFAULT_PAN_ZOOM);
@@ -118,6 +133,7 @@ export function GroupViewerWorkbench({
     }
   }, [controller.mode]);
 
+  // Fit calculations depend on live viewport geometry and device pixel ratio, not just CSS breakpoints.
   useEffect(() => {
     function syncViewportMetrics() {
       setViewportSize(getViewportSize());
@@ -129,6 +145,7 @@ export function GroupViewerWorkbench({
     return () => window.removeEventListener("resize", syncViewportMetrics);
   }, []);
 
+  // Keyboard shortcuts stay here so they remain consistent regardless of which compare mode is mounted.
   useEffect(() => {
     function handleKeydown(event: KeyboardEvent) {
       if (
@@ -183,6 +200,7 @@ export function GroupViewerWorkbench({
     return () => window.removeEventListener("keydown", handleKeydown);
   }, [abStageActive, controller]);
 
+  // Tapping outside the A/B stage exits inspect mode without requiring extra on-screen chrome.
   useEffect(() => {
     if (controller.mode !== "a-b" || !abStageActive) {
       return;
@@ -202,15 +220,26 @@ export function GroupViewerWorkbench({
     return () => document.removeEventListener("pointerdown", handleOutsidePointerDown, true);
   }, [abStageActive, controller.mode]);
 
+  /**
+   * Snaps preset zoom to the compare-core bounds so toolbar controls cannot drift from stage math.
+   */
   function setAbScalePreset(nextPresetScale: number) {
     setAbPanZoomState(() => ({
-      presetScale: clampNumber(nextPresetScale, 1, 4) as 1 | 2 | 3 | 4,
+      presetScale: clampNumber(
+        nextPresetScale,
+        VIEWER_MIN_PRESET_SCALE,
+        VIEWER_MAX_PRESET_SCALE,
+      ) as typeof DEFAULT_PAN_ZOOM.presetScale,
       fineScale: 1,
       x: 0,
       y: 0,
     }));
   }
 
+  /**
+   * Uses a viewport signature instead of a boolean so repeated clicks toggle fit off only for the
+   * same viewport, while real viewport changes recompute the fitted size.
+   */
   function toggleFittedStageView() {
     const nextViewportSize = getViewportSize();
     const nextSignature = getViewportSignature(nextViewportSize);
