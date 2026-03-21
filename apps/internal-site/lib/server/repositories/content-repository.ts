@@ -9,7 +9,10 @@ import { DEMO_CASE_SLUG } from "@magic-compare/shared-utils";
 import { validateImportManifest } from "@/lib/server/validators/import-manifest";
 import { prisma } from "@/lib/server/db/client";
 import { deletePublishedGroup } from "@/lib/server/storage/published-content";
-import { deleteInternalAssetGroupObjects } from "@/lib/server/storage/internal-assets";
+import {
+  deleteInternalAssetGroupObjects,
+  resolvePublicInternalAssetUrl,
+} from "@/lib/server/storage/internal-assets";
 import { isHiddenDemoCaseSlug, shouldHideDemoContent } from "@/lib/server/runtime-config";
 
 interface CaseRowSummary {
@@ -93,8 +96,8 @@ function mapFrameAssets(assets: Asset[]) {
     id: asset.id,
     kind: asset.kind as "before" | "after" | "heatmap" | "crop" | "misc",
     label: asset.label,
-    imageUrl: asset.imageUrl,
-    thumbUrl: asset.thumbUrl,
+    imageUrl: resolvePublicInternalAssetUrl(asset.imageUrl),
+    thumbUrl: resolvePublicInternalAssetUrl(asset.thumbUrl),
     width: asset.width,
     height: asset.height,
     note: asset.note,

@@ -2,7 +2,6 @@ import { extname } from "node:path";
 import { readFile } from "node:fs/promises";
 import {
   DeleteObjectsCommand,
-  GetObjectCommand,
   ListObjectsV2Command,
   PutObjectCommand,
   S3Client,
@@ -17,13 +16,6 @@ const MIME_TYPES: Record<string, string> = {
   ".avif": "image/avif",
   ".svg": "image/svg+xml",
 };
-
-export interface InternalAssetObject {
-  body: Uint8Array;
-  contentType: string;
-  contentLength: number;
-  lastModified: Date | null;
-}
 
 let cachedClient: S3Client | null = null;
 let cachedSignature: string | null = null;
@@ -78,27 +70,19 @@ export function internalAssetObjectKey(assetUrl: string): string {
   return objectPrefix ? `${objectPrefix}/${relativePath}` : relativePath;
 }
 
-export async function readInternalAsset(assetUrl: string): Promise<InternalAssetObject> {
-  const client = buildS3Client();
-  const config = getInternalAssetStorageConfig();
-  const response = await client.send(
-    new GetObjectCommand({
-      Bucket: config.bucket,
-      Key: internalAssetObjectKey(assetUrl),
-    }),
-  );
+export function resolvePublicInternalAssetUrl(assetUrl: string): string {
+  const { publicBaseUrl } = getInternalAssetStorageConfig();
+  return `${publicBaseUrl}/${internalAssetObjectKey(assetUrl)}`;
+}
 
-  const body = response.Body ? await response.Body.transformToByteArray() : null;
-  if (!body) {
-    throw new Error(`Internal asset body missing: ${assetUrl}`);
+export function internalAssetPublicGroupBaseUrl(caseSlug: string, groupSlug: string): string {
+  const { objectPrefix, publicBaseUrl } = getInternalAssetStorageConfig();
+  const normalizedPath = [objectPrefix, caseSlug, groupSlug].join("/");
+  if (hasTraversal(normalizedPath)) {
+    throw new Error(`Invalid internal asset group path: ${caseSlug}/${groupSlug}`);
   }
 
-  return {
-    body: new Uint8Array(body),
-    contentType: response.ContentType || guessMimeType(assetUrl),
-    contentLength: Number(response.ContentLength ?? body.byteLength),
-    lastModified: response.LastModified ?? null,
-  };
+  return `${publicBaseUrl}/${normalizedPath}`;
 }
 
 export async function uploadLocalFileToInternalAsset(localFilePath: string, assetUrl: string): Promise<void> {

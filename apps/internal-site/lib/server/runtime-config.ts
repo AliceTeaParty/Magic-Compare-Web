@@ -9,6 +9,7 @@ export const PUBLIC_EXPORT_DIR_ENV_NAME = "MAGIC_COMPARE_PUBLIC_EXPORT_DIR";
 export const S3_BUCKET_ENV_NAME = "MAGIC_COMPARE_S3_BUCKET";
 export const S3_REGION_ENV_NAME = "MAGIC_COMPARE_S3_REGION";
 export const S3_ENDPOINT_ENV_NAME = "MAGIC_COMPARE_S3_ENDPOINT";
+export const S3_PUBLIC_BASE_URL_ENV_NAME = "MAGIC_COMPARE_S3_PUBLIC_BASE_URL";
 export const S3_ACCESS_KEY_ID_ENV_NAME = "MAGIC_COMPARE_S3_ACCESS_KEY_ID";
 export const S3_SECRET_ACCESS_KEY_ENV_NAME = "MAGIC_COMPARE_S3_SECRET_ACCESS_KEY";
 export const S3_FORCE_PATH_STYLE_ENV_NAME = "MAGIC_COMPARE_S3_FORCE_PATH_STYLE";
@@ -22,6 +23,7 @@ export interface InternalAssetStorageConfig {
   bucket: string;
   region: string;
   endpoint: string | undefined;
+  publicBaseUrl: string;
   accessKeyId: string;
   secretAccessKey: string;
   forcePathStyle: boolean;
@@ -40,6 +42,17 @@ function requireEnv(name: string): string {
     throw new Error(`Missing required environment variable: ${name}`);
   }
   return value;
+}
+
+function requireAbsoluteUrlEnv(name: string): string {
+  const value = requireEnv(name);
+
+  try {
+    const normalized = new URL(value).toString();
+    return normalized.replace(/\/+$/, "");
+  } catch {
+    throw new Error(`Environment variable ${name} must be an absolute URL.`);
+  }
 }
 
 export function shouldHideDemoContent(): boolean {
@@ -73,6 +86,7 @@ export function getInternalAssetStorageConfig(): InternalAssetStorageConfig {
     bucket: requireEnv(S3_BUCKET_ENV_NAME),
     region: process.env[S3_REGION_ENV_NAME]?.trim() || "us-east-1",
     endpoint: process.env[S3_ENDPOINT_ENV_NAME]?.trim() || undefined,
+    publicBaseUrl: requireAbsoluteUrlEnv(S3_PUBLIC_BASE_URL_ENV_NAME),
     accessKeyId: requireEnv(S3_ACCESS_KEY_ID_ENV_NAME),
     secretAccessKey: requireEnv(S3_SECRET_ACCESS_KEY_ENV_NAME),
     forcePathStyle: parseEnvFlag(process.env[S3_FORCE_PATH_STYLE_ENV_NAME]),

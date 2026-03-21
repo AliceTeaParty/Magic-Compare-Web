@@ -1,18 +1,15 @@
-import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { PUBLISH_SCHEMA_VERSION, type PublishManifest } from "@magic-compare/content-schema";
 import { buildPublicGroupSlug } from "@magic-compare/shared-utils";
 import { prisma } from "@/lib/server/db/client";
 import {
-  copyInternalAssetToPublished,
+  internalAssetPublicGroupBaseUrl,
+  resolvePublicInternalAssetUrl,
+} from "@/lib/server/storage/internal-assets";
+import {
   resetPublishedGroup,
   writePublishedManifest,
 } from "@/lib/server/storage/published-content";
-
-function withFileExtension(url: string, fallback: string): string {
-  const extension = path.extname(url);
-  return extension || fallback;
-}
 
 async function ensurePublicSlug(caseSlug: string, groupSlug: string, groupId: string): Promise<string> {
   const baseSlug = buildPublicGroupSlug(caseSlug, groupSlug);
@@ -101,20 +98,12 @@ export async function publishCase(caseId: string) {
 
       const manifestAssets = [];
       for (const asset of publicAssets) {
-        const extension = withFileExtension(asset.imageUrl, ".bin");
-        const thumbExtension = withFileExtension(asset.thumbUrl, extension);
-        const imageFileName = `${String(frame.order).padStart(3, "0")}-${asset.kind}-${asset.id}${extension}`;
-        const thumbFileName = `${String(frame.order).padStart(3, "0")}-${asset.kind}-${asset.id}-thumb${thumbExtension}`;
-
-        await copyInternalAssetToPublished(asset.imageUrl, publicSlug, imageFileName);
-        await copyInternalAssetToPublished(asset.thumbUrl, publicSlug, thumbFileName);
-
         manifestAssets.push({
           id: asset.id,
           kind: asset.kind as "before" | "after" | "heatmap" | "crop" | "misc",
           label: asset.label,
-          imageUrl: `/published/groups/${publicSlug}/assets/${imageFileName}`,
-          thumbUrl: `/published/groups/${publicSlug}/assets/${thumbFileName}`,
+          imageUrl: resolvePublicInternalAssetUrl(asset.imageUrl),
+          thumbUrl: resolvePublicInternalAssetUrl(asset.thumbUrl),
           width: asset.width,
           height: asset.height,
           note: asset.note,
@@ -135,7 +124,7 @@ export async function publishCase(caseId: string) {
       schemaVersion: PUBLISH_SCHEMA_VERSION,
       publicSlug,
       generatedAt: publishedAt.toISOString(),
-      assetBasePath: `/published/groups/${publicSlug}/assets`,
+      assetBasePath: internalAssetPublicGroupBaseUrl(caseRow.slug, group.slug),
       case: {
         slug: caseRow.slug,
         title: caseRow.title,

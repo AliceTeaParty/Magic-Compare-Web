@@ -44,7 +44,7 @@ describe("createViewerDatasetFromPublishManifest", () => {
       schemaVersion: 1,
       publicSlug: "demo-case--banding-check",
       generatedAt: "2026-03-18T04:00:00.000Z",
-      assetBasePath: "/published/groups/demo-case--banding-check/assets",
+      assetBasePath: "https://assets.example.com/magic-compare-assets/internal-assets/demo-case/banding-check",
       case: {
         slug: "demo-case",
         title: "Demo Case",
