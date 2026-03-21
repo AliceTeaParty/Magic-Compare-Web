@@ -47,6 +47,26 @@ export function GroupViewerWorkbench({
   variant,
 }: GroupViewerWorkbenchProps) {
   const controller = useViewerController(dataset.group);
+  const {
+    abSide,
+    afterAsset,
+    availableModes,
+    beforeAsset,
+    closeSidebar,
+    currentFrame,
+    frames,
+    heatmapAsset,
+    mode,
+    overlayOpacity,
+    selectFrame,
+    setAbSide,
+    setMode,
+    setOverlayOpacity,
+    setSidebarOpen,
+    sidebarOpen,
+    stepFrame,
+    toggleSidebar,
+  } = controller;
   const sidebarPreferenceLoadedRef = useRef(false);
   const sidebarPreferencePersistReadyRef = useRef(false);
   const modePreferenceLoadedRef = useRef(false);
@@ -59,18 +79,32 @@ export function GroupViewerWorkbench({
     noSsr: true,
   });
   const prefersReducedMotion = useMediaQuery("(prefers-reduced-motion: reduce)", { noSsr: true });
+  const [mediaPreferencesReady, setMediaPreferencesReady] = useState(false);
   const [viewportSize, setViewportSize] = useState(() => getViewportSize());
   const [devicePixelRatio, setDevicePixelRatio] = useState(() => getViewerDevicePixelRatio());
   const [fitViewViewportSignature, setFitViewViewportSignature] = useState<string | null>(null);
   const [swipePosition, setSwipePosition] = useState(50);
   const [abPanZoomState, setAbPanZoomState] = useState(DEFAULT_PAN_ZOOM);
   const [abStageActive, setAbStageActive] = useState(false);
-  const stageAspectRatio = rotateStage ? 9 / 16 : 16 / 9;
+  const resolvedHideFitControl = mediaPreferencesReady ? hideFitControl : false;
+  const resolvedPrefersReducedMotion = mediaPreferencesReady ? prefersReducedMotion : false;
+  const resolvedRotateStage = mediaPreferencesReady ? rotateStage : false;
+  const resolvedShowDesktopSidebar = mediaPreferencesReady ? showDesktopSidebar : false;
+  const abSideRef = useRef(abSide);
+  const abStageActiveRef = useRef(abStageActive);
+  const modeRef = useRef(mode);
+  const stageAspectRatio = resolvedRotateStage ? 9 / 16 : 16 / 9;
   const fittedStageSize = useMemo(
     () =>
       fitViewViewportSignature ? getViewerFittedStageSize(viewportSize, stageAspectRatio) : null,
     [fitViewViewportSignature, stageAspectRatio, viewportSize],
   );
+
+  // Long-lived DOM listeners below must see fresh mode/inspect state without being torn down for
+  // every render, because repeated resubscription was the source of the recent toggle regressions.
+  abSideRef.current = abSide;
+  abStageActiveRef.current = abStageActive;
+  modeRef.current = mode;
 
   // Cookies are enough for these preferences; introducing server-backed settings would add more
   // machinery than the internal/public viewers currently need.
@@ -79,16 +113,22 @@ export function GroupViewerWorkbench({
     const preferredMode = readViewerModeCookie();
 
     if (preferredOpenState !== null) {
-      controller.setSidebarOpen(preferredOpenState);
+      setSidebarOpen(preferredOpenState);
     }
 
     if (preferredMode) {
-      controller.setMode(preferredMode);
+      setMode(preferredMode);
     }
 
     sidebarPreferenceLoadedRef.current = true;
     modePreferenceLoadedRef.current = true;
-  }, [controller]);
+  }, [setMode, setSidebarOpen]);
+
+  // Server-rendered viewer pages need one hydration-stable pass before client media queries can
+  // hide controls or rotate the stage, otherwise mobile first paint mismatches the static HTML.
+  useEffect(() => {
+    setMediaPreferencesReady(true);
+  }, []);
 
   // Delay the first cookie write until after hydration so the existing preference can be read first.
   useEffect(() => {
@@ -101,8 +141,8 @@ export function GroupViewerWorkbench({
       return;
     }
 
-    writeViewerDetailsCookie(controller.sidebarOpen);
-  }, [controller.sidebarOpen]);
+    writeViewerDetailsCookie(sidebarOpen);
+  }, [sidebarOpen]);
 
   // Mode persistence follows the same delayed-write rule as sidebar state for the same reason.
   useEffect(() => {
@@ -115,26 +155,30 @@ export function GroupViewerWorkbench({
       return;
     }
 
-    writeViewerModeCookie(controller.mode);
-  }, [controller.mode]);
+    writeViewerModeCookie(mode);
+  }, [mode]);
 
   // Pan/swipe state belongs to a single frame; carrying it over to another frame feels broken.
   useEffect(() => {
     setSwipePosition(50);
     setAbPanZoomState(DEFAULT_PAN_ZOOM);
     setAbStageActive(false);
-  }, [controller.currentFrame?.id]);
+  }, [currentFrame?.id]);
 
   // Leaving A/B mode should reset inspect state so returning to it starts from a predictable baseline.
   useEffect(() => {
-    if (controller.mode !== "a-b") {
+    if (mode !== "a-b") {
       setAbPanZoomState(DEFAULT_PAN_ZOOM);
       setAbStageActive(false);
     }
-  }, [controller.mode]);
+  }, [mode]);
 
   // Fit calculations depend on live viewport geometry and device pixel ratio, not just CSS breakpoints.
   useEffect(() => {
+    /**
+     * Fit mode uses pixel-accurate stage math, so resize handling must refresh both CSS viewport
+     * dimensions and device pixel ratio instead of trusting breakpoint-only changes.
+     */
     function syncViewportMetrics() {
       setViewportSize(getViewportSize());
       setDevicePixelRatio(getViewerDevicePixelRatio());
@@ -145,8 +189,12 @@ export function GroupViewerWorkbench({
     return () => window.removeEventListener("resize", syncViewportMetrics);
   }, []);
 
-  // Keyboard shortcuts stay here so they remain consistent regardless of which compare mode is mounted.
+  // The DOM listener itself stays stable; refs provide fresh viewer state without reattaching it.
   useEffect(() => {
+    /**
+     * Keyboard shortcuts are attached once so rapid mode switching cannot accumulate duplicate
+     * handlers, while refs keep the latest inspect state visible to the listener.
+     */
     function handleKeydown(event: KeyboardEvent) {
       if (
         event.target instanceof HTMLElement &&
@@ -157,55 +205,63 @@ export function GroupViewerWorkbench({
 
       if (event.key === "ArrowRight") {
         event.preventDefault();
-        controller.stepFrame(1);
+        stepFrame(1);
       }
 
       if (event.key === "ArrowLeft") {
         event.preventDefault();
-        controller.stepFrame(-1);
+        stepFrame(-1);
       }
 
       if (event.key === "1") {
-        controller.setMode("before-after");
+        setMode("before-after");
       }
 
       if (event.key === "2") {
-        controller.setMode("a-b");
+        setMode("a-b");
       }
 
       if (event.key === "3") {
-        controller.setMode("heatmap");
+        setMode("heatmap");
       }
 
-      if (event.key === "Escape" && controller.mode === "a-b" && abStageActive) {
+      if (
+        event.key === "Escape" &&
+        modeRef.current === "a-b" &&
+        abStageActiveRef.current
+      ) {
         event.preventDefault();
         setAbStageActive(false);
       }
 
       if (
         (event.key === "ArrowUp" || event.key === "ArrowDown") &&
-        controller.mode === "a-b" &&
-        abStageActive
+        modeRef.current === "a-b" &&
+        abStageActiveRef.current
       ) {
         event.preventDefault();
-        controller.setAbSide(cycleAbSide(controller.abSide));
+        setAbSide(cycleAbSide(abSideRef.current));
       }
 
       if (event.key.toLowerCase() === "i") {
-        controller.toggleSidebar();
+        toggleSidebar();
       }
     }
 
     window.addEventListener("keydown", handleKeydown);
     return () => window.removeEventListener("keydown", handleKeydown);
-  }, [abStageActive, controller]);
+  }, [setAbSide, setMode, stepFrame, toggleSidebar]);
 
-  // Tapping outside the A/B stage exits inspect mode without requiring extra on-screen chrome.
+  // Only the active A/B state gates the listener; the callback already sees fresh controller state.
   useEffect(() => {
-    if (controller.mode !== "a-b" || !abStageActive) {
+    if (mode !== "a-b" || !abStageActive) {
       return;
     }
 
+    /**
+     * Inspect mode exits only when the pointer lands outside the stage, which keeps taps inside
+     * the canvas from collapsing A/B state on touch devices.
+     */
     function handleOutsidePointerDown(event: PointerEvent) {
       const stageNode = stageRef.current;
 
@@ -218,7 +274,7 @@ export function GroupViewerWorkbench({
 
     document.addEventListener("pointerdown", handleOutsidePointerDown, true);
     return () => document.removeEventListener("pointerdown", handleOutsidePointerDown, true);
-  }, [abStageActive, controller.mode]);
+  }, [abStageActive, mode]);
 
   /**
    * Snaps preset zoom to the compare-core bounds so toolbar controls cannot drift from stage math.
@@ -267,7 +323,7 @@ export function GroupViewerWorkbench({
           maxWidth: "100%",
           display: "grid",
           gridTemplateColumns:
-            controller.sidebarOpen && showDesktopSidebar ? "minmax(0, 1fr) 320px" : "1fr",
+            sidebarOpen && resolvedShowDesktopSidebar ? "minmax(0, 1fr) 320px" : "1fr",
           gridTemplateRows: "auto minmax(0, 1fr)",
           minHeight: "calc(100svh - 16px)",
           overflow: "hidden",
@@ -280,19 +336,19 @@ export function GroupViewerWorkbench({
       >
         <ViewerHeader
           abPresetScale={abPanZoomState.presetScale}
-          abSide={controller.abSide}
-          canUseHeatmap={controller.availableModes.includes("heatmap")}
+          abSide={abSide}
+          canUseHeatmap={availableModes.includes("heatmap")}
           caseTitle={dataset.caseMeta.title}
           groupTitle={dataset.group.title}
-          hideFitControl={hideFitControl}
+          hideFitControl={resolvedHideFitControl}
           isStageFitted={Boolean(fittedStageSize)}
-          mode={controller.mode}
-          onAbSideChange={controller.setAbSide}
-          onModeChange={controller.setMode}
+          mode={mode}
+          onAbSideChange={setAbSide}
+          onModeChange={setMode}
           onScalePresetChange={setAbScalePreset}
           onToggleFit={toggleFittedStageView}
-          onToggleSidebar={controller.toggleSidebar}
-          sidebarOpen={controller.sidebarOpen}
+          onToggleSidebar={toggleSidebar}
+          sidebarOpen={sidebarOpen}
         />
 
         <Box
@@ -310,10 +366,10 @@ export function GroupViewerWorkbench({
                 width: "100%",
                 minWidth: 0,
                 height: "100%",
-                minHeight: rotateStage ? { xs: 520, md: 560 } : { xs: 340, md: 460 },
+                minHeight: resolvedRotateStage ? { xs: 520, md: 560 } : { xs: 340, md: 460 },
               }}
             >
-              {controller.mode === "heatmap" && !controller.heatmapAsset ? <HeatmapNotice /> : null}
+              {mode === "heatmap" && !heatmapAsset ? <HeatmapNotice /> : null}
 
               <Box
                 sx={{
@@ -323,18 +379,18 @@ export function GroupViewerWorkbench({
                 }}
               >
                 <ViewerStage
-                  abSide={controller.abSide}
+                  abSide={abSide}
                   abStageActive={abStageActive}
-                  afterAsset={controller.afterAsset}
-                  beforeAsset={controller.beforeAsset}
+                  afterAsset={afterAsset}
+                  beforeAsset={beforeAsset}
                   devicePixelRatio={devicePixelRatio}
                   fittedStageSize={fittedStageSize}
-                  heatmapAsset={controller.heatmapAsset}
-                  mode={controller.mode}
-                  onCycleAbSide={() => controller.setAbSide(cycleAbSide(controller.abSide))}
-                  overlayOpacity={controller.overlayOpacity}
+                  heatmapAsset={heatmapAsset}
+                  mode={mode}
+                  onCycleAbSide={() => setAbSide(cycleAbSide(abSide))}
+                  overlayOpacity={overlayOpacity}
                   panZoomState={abPanZoomState}
-                  rotateStage={rotateStage}
+                  rotateStage={resolvedRotateStage}
                   setAbStageActive={setAbStageActive}
                   setPanZoomState={setAbPanZoomState}
                   setSwipePosition={setSwipePosition}
@@ -343,7 +399,7 @@ export function GroupViewerWorkbench({
                 />
               </Box>
 
-              {controller.mode === "heatmap" && controller.heatmapAsset ? (
+              {mode === "heatmap" && heatmapAsset ? (
                 <Stack direction={{ xs: "column", md: "row" }} spacing={2} alignItems="center">
                   <Stack direction="row" spacing={1} alignItems="center">
                     <Tune fontSize="small" />
@@ -352,9 +408,9 @@ export function GroupViewerWorkbench({
                   <Slider
                     min={20}
                     max={95}
-                    value={controller.overlayOpacity}
+                    value={overlayOpacity}
                     onChange={(_, value) =>
-                      controller.setOverlayOpacity(
+                      setOverlayOpacity(
                         clampNumber(Array.isArray(value) ? value[0] : value, 20, 95),
                       )
                     }
@@ -367,23 +423,23 @@ export function GroupViewerWorkbench({
           </Box>
 
           <ViewerFilmstrip
-            currentFrameId={controller.currentFrame?.id}
-            frames={controller.frames}
-            prefersReducedMotion={prefersReducedMotion}
-            onSelectFrame={controller.selectFrame}
+            currentFrameId={currentFrame?.id}
+            frames={frames}
+            prefersReducedMotion={resolvedPrefersReducedMotion}
+            onSelectFrame={selectFrame}
           />
         </Box>
 
         <ViewerSidebar
           caseMeta={dataset.caseMeta}
-          currentFrame={controller.currentFrame}
+          currentFrame={currentFrame}
           currentGroup={dataset.group}
           groups={dataset.siblingGroups}
-          heatmapAsset={controller.heatmapAsset}
+          heatmapAsset={heatmapAsset}
           publishStatus={dataset.publishStatus}
-          showDesktopSidebar={showDesktopSidebar}
-          sidebarOpen={controller.sidebarOpen}
-          toggleSidebar={controller.toggleSidebar}
+          showDesktopSidebar={resolvedShowDesktopSidebar}
+          sidebarOpen={sidebarOpen}
+          closeSidebar={closeSidebar}
           variant={variant}
         />
       </Paper>

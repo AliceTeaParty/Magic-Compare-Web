@@ -1,5 +1,5 @@
 import type { TransitionStartFunction } from "react";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { arrayMove } from "@dnd-kit/sortable";
 import type { CaseWorkspaceData } from "@/lib/server/repositories/content-repository";
 import type { WorkspaceNotificationTone } from "./use-workspace-notifications";
@@ -58,6 +58,11 @@ export function useCaseWorkspaceActions({
   startTransition: TransitionStartFunction;
 }) {
   const [isDeployingPublicSite, setIsDeployingPublicSite] = useState(false);
+  const groupsRef = useRef(groups);
+
+  // Async mutation handlers can outlive the render that scheduled them, so they need access to the
+  // latest optimistic group list instead of whatever array the closure captured initially.
+  groupsRef.current = groups;
 
   const publicGroupCount = useMemo(
     () => groups.filter((group) => group.isPublic).length,
@@ -65,17 +70,41 @@ export function useCaseWorkspaceActions({
   );
 
   /**
+   * Keeps the ref and React state aligned so later optimistic mutations read the same latest
+   * collection that the UI is currently rendering.
+   */
+  function replaceGroups(nextGroups: GroupItem[]) {
+    groupsRef.current = nextGroups;
+    setGroups(() => nextGroups);
+  }
+
+  /**
+   * Restores the last confirmed snapshot after a failed mutation so drag/visibility rollbacks do
+   * not reapply whichever optimistic array another in-flight request captured earlier.
+   */
+  function restoreGroups(previousGroups: GroupItem[]) {
+    groupsRef.current = previousGroups;
+    setGroups(() => previousGroups);
+  }
+
+  /**
    * Uses optimistic visibility updates because the control is binary and easy to roll back, which
    * makes workspace editing feel immediate without hiding persistence failures.
    */
   function toggleGroupVisibility(targetGroup: GroupItem) {
-    const previousGroups = groups;
-    const nextVisibility = !targetGroup.isPublic;
-    const nextGroups = groups.map((group) =>
+    const previousGroups = groupsRef.current;
+    const liveTargetGroup = previousGroups.find((group) => group.id === targetGroup.id);
+
+    if (!liveTargetGroup) {
+      return;
+    }
+
+    const nextVisibility = !liveTargetGroup.isPublic;
+    const nextGroups = previousGroups.map((group) =>
       group.id === targetGroup.id ? { ...group, isPublic: nextVisibility } : group,
     );
 
-    setGroups(nextGroups);
+    replaceGroups(nextGroups);
     notifications.showWorkspaceSavingNotification();
 
     startTransition(() => {
@@ -94,7 +123,7 @@ export function useCaseWorkspaceActions({
           refresh();
         })
         .catch((error) => {
-          setGroups(previousGroups);
+          restoreGroups(previousGroups);
           notifications.pushNotification(
             error instanceof Error ? error.message : "Failed to update group visibility.",
             "error",
@@ -180,20 +209,20 @@ export function useCaseWorkspaceActions({
       return;
     }
 
-    const oldIndex = groups.findIndex((group) => group.id === activeId);
-    const newIndex = groups.findIndex((group) => group.id === overId);
+    const previousGroups = groupsRef.current;
+    const oldIndex = previousGroups.findIndex((group) => group.id === activeId);
+    const newIndex = previousGroups.findIndex((group) => group.id === overId);
 
     if (oldIndex === -1 || newIndex === -1) {
       return;
     }
 
-    const reordered = arrayMove(groups, oldIndex, newIndex).map((group, order) => ({
+    const reordered = arrayMove(previousGroups, oldIndex, newIndex).map((group, order) => ({
       ...group,
       order,
     }));
 
-    const previousGroups = groups;
-    setGroups(reordered);
+    replaceGroups(reordered);
     notifications.showWorkspaceSavingNotification();
 
     startTransition(() => {
@@ -205,7 +234,7 @@ export function useCaseWorkspaceActions({
           refresh();
         })
         .catch((error) => {
-          setGroups(previousGroups);
+          restoreGroups(previousGroups);
           notifications.pushNotification(
             error instanceof Error ? error.message : "Failed to persist group order.",
             "error",

@@ -194,7 +194,7 @@ interface ViewerSidebarProps {
   publishStatus: ViewerDataset["publishStatus"];
   showDesktopSidebar: boolean;
   sidebarOpen: boolean;
-  toggleSidebar: () => void;
+  closeSidebar: () => void;
   variant: "public" | "internal";
 }
 
@@ -211,7 +211,7 @@ export function ViewerSidebar({
   publishStatus,
   showDesktopSidebar,
   sidebarOpen,
-  toggleSidebar,
+  closeSidebar,
   variant,
 }: ViewerSidebarProps) {
   const contentProps = {
@@ -248,7 +248,7 @@ export function ViewerSidebar({
       <Drawer
         anchor="right"
         open={sidebarOpen && !showDesktopSidebar}
-        onClose={toggleSidebar}
+        onClose={closeSidebar}
         ModalProps={{ keepMounted: true }}
         PaperProps={{
           sx: {

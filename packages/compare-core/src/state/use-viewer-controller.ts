@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ViewerMode } from "@magic-compare/content-schema";
 import {
   type ViewerAsset,
@@ -31,6 +31,7 @@ export interface ViewerController {
   setOverlayOpacity: (value: number) => void;
   setAbSide: (side: "before" | "after") => void;
   toggleSidebar: () => void;
+  closeSidebar: () => void;
   beforeAsset: ViewerAsset | undefined;
   afterAsset: ViewerAsset | undefined;
   heatmapAsset: ViewerAsset | undefined;
@@ -44,9 +45,9 @@ export function useViewerController(group: ViewerGroup): ViewerController {
   const frames = useMemo(() => getOrderedFrames(group), [group]);
   const [currentFrameId, setCurrentFrameId] = useState<string | undefined>(frames[0]?.id);
   const [mode, setModeState] = useState<ViewerMode>(group.defaultMode);
-  const [overlayOpacity, setOverlayOpacity] = useState<number>(58);
-  const [abSide, setAbSide] = useState<"before" | "after">("after");
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [overlayOpacity, setOverlayOpacityState] = useState<number>(58);
+  const [abSide, setAbSideState] = useState<"before" | "after">("after");
+  const [sidebarOpen, setSidebarOpenState] = useState(false);
 
   // Import/publish changes can remove frames out from under the viewer, so selection repair has to
   // happen here instead of assuming the saved id is always still valid.
@@ -65,6 +66,17 @@ export function useViewerController(group: ViewerGroup): ViewerController {
     () => buildFrameAssets(currentFrame),
     [currentFrame],
   );
+  const framesRef = useRef(frames);
+  const currentFrameRef = useRef(currentFrame);
+  const currentFrameIndexRef = useRef(currentFrameIndex);
+  const defaultModeRef = useRef(group.defaultMode);
+
+  // Event handlers need the latest frame and mode information without paying for new callback
+  // identities every render, because the workbench now mounts long-lived DOM listeners around them.
+  framesRef.current = frames;
+  currentFrameRef.current = currentFrame;
+  currentFrameIndexRef.current = currentFrameIndex;
+  defaultModeRef.current = group.defaultMode;
 
   // The saved mode is advisory only; it must be revalidated whenever the active frame changes
   // because not every frame exposes heatmap or A/B assets.
@@ -74,56 +86,119 @@ export function useViewerController(group: ViewerGroup): ViewerController {
     );
   }, [currentFrame, group.defaultMode]);
 
-  function selectFrame(frameId: string): void {
+  /**
+   * Keeps frame selection callback identity stable so viewer effects can subscribe once and still
+   * drive the latest selected frame.
+   */
+  const selectFrame = useCallback((frameId: string): void => {
     setCurrentFrameId(frameId);
-  }
+  }, []);
 
   /**
-   * Wraps frame stepping so keyboard navigation and UI controls both respect cyclic navigation.
+   * Wraps frame stepping so keyboard navigation and UI controls both respect cyclic navigation
+   * without rebuilding the callback on every render.
    */
-  function stepFrame(delta: number): void {
-    if (frames.length === 0 || currentFrameIndex === -1) {
+  const stepFrame = useCallback((delta: number): void => {
+    const currentFrames = framesRef.current;
+    const currentIndex = currentFrameIndexRef.current;
+
+    if (currentFrames.length === 0 || currentIndex === -1) {
       return;
     }
 
-    const nextIndex = (currentFrameIndex + delta + frames.length) % frames.length;
-    setCurrentFrameId(frames[nextIndex]?.id);
-  }
+    const nextIndex = (currentIndex + delta + currentFrames.length) % currentFrames.length;
+    setCurrentFrameId(currentFrames[nextIndex]?.id);
+  }, []);
 
   /**
    * Resolves the requested mode through frame capabilities instead of trusting the caller, because
-   * some modes disappear on a per-frame basis.
+   * some modes disappear on a per-frame basis and mode buttons must not churn callback identity.
    */
-  function setMode(nextMode: ViewerMode): void {
-    setModeState(resolveViewerMode(nextMode, currentFrame, group.defaultMode));
-  }
+  const setMode = useCallback((nextMode: ViewerMode): void => {
+    setModeState(resolveViewerMode(nextMode, currentFrameRef.current, defaultModeRef.current));
+  }, []);
+
+  /**
+   * Exposes overlay updates as a stable callback so slider interactions do not force unrelated
+   * listener effects in the workbench to resubscribe.
+   */
+  const setOverlayOpacity = useCallback((value: number): void => {
+    setOverlayOpacityState(value);
+  }, []);
+
+  /**
+   * Keeps A/B side changes stable for both toolbar controls and keyboard shortcuts.
+   */
+  const setAbSide = useCallback((side: "before" | "after"): void => {
+    setAbSideState(side);
+  }, []);
+
+  /**
+   * Allows callers to explicitly synchronize sidebar state from persisted preferences without
+   * depending on the raw React state setter.
+   */
+  const setSidebarOpen = useCallback((open: boolean): void => {
+    setSidebarOpenState(open);
+  }, []);
 
   /**
    * Keeps the sidebar toggle local to the controller so both keyboard shortcuts and buttons mutate
-   * the same state path.
+   * the same state path without changing callback identity on every render.
    */
-  function toggleSidebar(): void {
-    setSidebarOpen((previous) => !previous);
-  }
+  const toggleSidebar = useCallback((): void => {
+    setSidebarOpenState((previous) => !previous);
+  }, []);
 
-  return {
-    frames,
-    currentFrame,
-    currentFrameIndex,
-    mode,
-    availableModes,
-    overlayOpacity,
-    abSide,
-    sidebarOpen,
-    setSidebarOpen,
-    selectFrame,
-    stepFrame,
-    setMode,
-    setOverlayOpacity,
-    setAbSide,
-    toggleSidebar,
-    beforeAsset,
-    afterAsset,
-    heatmapAsset,
-  };
+  /**
+   * Gives drawers and dismissal paths an explicit close operation so "close" events cannot reopen
+   * the sidebar by accidentally routing through toggle logic.
+   */
+  const closeSidebar = useCallback((): void => {
+    setSidebarOpenState(false);
+  }, []);
+
+  return useMemo(
+    () => ({
+      frames,
+      currentFrame,
+      currentFrameIndex,
+      mode,
+      availableModes,
+      overlayOpacity,
+      abSide,
+      sidebarOpen,
+      setSidebarOpen,
+      selectFrame,
+      stepFrame,
+      setMode,
+      setOverlayOpacity,
+      setAbSide,
+      toggleSidebar,
+      closeSidebar,
+      beforeAsset,
+      afterAsset,
+      heatmapAsset,
+    }),
+    [
+      abSide,
+      afterAsset,
+      availableModes,
+      beforeAsset,
+      closeSidebar,
+      currentFrame,
+      currentFrameIndex,
+      frames,
+      heatmapAsset,
+      mode,
+      overlayOpacity,
+      selectFrame,
+      setAbSide,
+      setMode,
+      setOverlayOpacity,
+      setSidebarOpen,
+      sidebarOpen,
+      stepFrame,
+      toggleSidebar,
+    ],
+  );
 }

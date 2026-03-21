@@ -13,6 +13,10 @@ import { SortableGroupRow } from "./case-workspace/sortable-group-row";
 import { useCaseWorkspaceActions } from "./case-workspace/use-case-workspace-actions";
 import { useWorkspaceNotifications } from "./case-workspace/use-workspace-notifications";
 
+/**
+ * Keeps workspace-level publish/deploy controls alongside sortable group rows so operators can
+ * reorder and publish from one surface without desynchronizing local optimistic state.
+ */
 export function CaseWorkspaceBoard({
   data,
   canDeployPublicSite,
@@ -24,7 +28,12 @@ export function CaseWorkspaceBoard({
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
   const [groups, setGroups] = useState(data.groups);
   const [isPending, startTransition] = useTransition();
-  const notifications = useWorkspaceNotifications();
+  const workspaceNotifications = useWorkspaceNotifications();
+  const {
+    dismissNotification,
+    notifications,
+    pushNotification,
+  } = workspaceNotifications;
   const {
     publicGroupCount,
     isDeployingPublicSite,
@@ -37,13 +46,19 @@ export function CaseWorkspaceBoard({
     groups,
     setGroups,
     refresh: () => router.refresh(),
-    notifications,
+    notifications: workspaceNotifications,
     startTransition,
   });
 
+  // Router refreshes can replace the canonical server ordering/visibility, so optimistic local
+  // state has to realign when the loader payload changes.
+  useEffect(() => {
+    setGroups(data.groups);
+  }, [data.groups]);
+
   useEffect(() => {
     if (publicGroupCount === 0) {
-      notifications.pushNotification(
+      pushNotification(
         "This case has no public groups yet. Use the per-group internal/public toggle below before publishing.",
         "warning",
         { key: "workspace-no-public-groups", sticky: true },
@@ -51,8 +66,16 @@ export function CaseWorkspaceBoard({
       return;
     }
 
-    notifications.dismissNotification("workspace-no-public-groups");
-  }, [notifications, publicGroupCount]);
+    dismissNotification("workspace-no-public-groups");
+  }, [dismissNotification, publicGroupCount, pushNotification]);
+
+  /**
+   * Drag-end is normalized here so the DnD library stays at the board boundary while reorder rules
+   * continue to live in the dedicated workspace actions hook.
+   */
+  function handleGroupDragEnd(activeId: string, overId: string | null) {
+    reorderCaseGroups(activeId, overId);
+  }
 
   return (
     <Stack spacing={{ xs: 2.25, md: 3 }}>
@@ -175,7 +198,7 @@ export function CaseWorkspaceBoard({
               sensors={sensors}
               collisionDetection={closestCenter}
               onDragEnd={(event) => {
-                reorderCaseGroups(
+                handleGroupDragEnd(
                   String(event.active.id),
                   event.over ? String(event.over.id) : null,
                 );
@@ -203,8 +226,8 @@ export function CaseWorkspaceBoard({
       </Box>
 
       <WorkspaceNotifications
-        notifications={notifications.notifications}
-        onDismiss={notifications.dismissNotification}
+        notifications={notifications}
+        onDismiss={dismissNotification}
       />
     </Stack>
   );

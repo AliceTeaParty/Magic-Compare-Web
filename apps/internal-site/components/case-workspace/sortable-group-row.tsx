@@ -20,6 +20,7 @@ import {
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import Link from "next/link";
+import type { MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from "react";
 import type { CaseWorkspaceData } from "@/lib/server/repositories/content-repository";
 
 /**
@@ -51,6 +52,22 @@ export function SortableGroupRow({
     if ((group.isPublic ? "public" : "internal") !== nextValue) {
       onToggleVisibility(group);
     }
+  }
+
+  /**
+   * Row controls sit inside a sortable container, so pointerdown has to stop at the control edge or
+   * DnD will treat a simple visibility/open tap as the start of a drag gesture.
+   */
+  function stopPointerPropagation(event: ReactPointerEvent<HTMLElement>) {
+    event.stopPropagation();
+  }
+
+  /**
+   * Click bubbling is blocked for the same reason as pointerdown: the row should only drag from
+   * the explicit handle, while buttons keep their own single-purpose interaction semantics.
+   */
+  function stopClickPropagation(event: ReactMouseEvent<HTMLElement>) {
+    event.stopPropagation();
   }
 
   return (
@@ -130,6 +147,8 @@ export function SortableGroupRow({
             <ToggleButtonGroup
               exclusive
               size="small"
+              onPointerDown={stopPointerPropagation}
+              onClick={stopClickPropagation}
               sx={{
                 minHeight: 32,
                 px: 0.25,
@@ -165,6 +184,8 @@ export function SortableGroupRow({
               variant="text"
               size="small"
               endIcon={<OpenInNew />}
+              onPointerDown={stopPointerPropagation}
+              onClick={stopClickPropagation}
               sx={{ minHeight: 36, px: 1.45 }}
             >
               Open
