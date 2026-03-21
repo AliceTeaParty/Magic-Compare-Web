@@ -11,7 +11,7 @@
 
 * **next-js_docs**：查询 Next.js 官方文档。凡是路由、App Router、静态生成、Server Actions、构建、部署、缓存等问题，优先查这里。
 * **context7**：查询最新第三方库文档。用于 React、MUI、Prisma、Zod、Embla、dnd-kit、Motion 等实现细节。
-* **mcp-vector-search**：搜索当前代码库。先查现有目录、组件、命名、已有模式，再决定新增或修改方案。
+* **mcp-vector-search**：搜索当前代码库。先查现有目录、组件、命名、已有模式，再决定新增或修改方案。（结果为空/error 时尝试 `mcp-vector-search index`）
 
 ## 使用原则
 
