@@ -42,7 +42,7 @@ const demoManifest: ImportManifest = {
     subtitle: "Banding and texture recovery",
     summary: "Seeded case that mirrors the published demo bundle.",
     tags: ["grain", "banding", "deband"],
-    status: "internal",
+    status: "published",
     coverAssetLabel: "After",
   },
   groups: [
