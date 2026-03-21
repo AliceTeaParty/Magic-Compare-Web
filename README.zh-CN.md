@@ -12,7 +12,8 @@
   <a href="#quick-start">快速开始</a> ·
   <a href="#workflow-overview">查看流程</a> ·
   <a href="./tools/uploader/README.md">Uploader 文档</a> ·
-  <a href="./docs/ui-improvements/2026-03-20-viewer-stage-and-filmstrip-notes.zh-CN.md">Viewer 复盘</a>
+  <a href="./docs/ui-improvements/2026-03-20-viewer-stage-and-filmstrip-notes.zh-CN.md">Viewer 复盘</a> ·
+  <a href="./docs/uploader-frontend-roadmap-2026-03-21.zh-CN.md">Uploader/前端路线图</a>
 </p>
 
 <table>
