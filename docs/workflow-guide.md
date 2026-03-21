@@ -202,7 +202,7 @@ pnpm dev:internal
 ### 推荐入口
 
 ```bash
-docker compose up -d --build rustfs rustfs-init internal-site
+docker compose up -d rustfs rustfs-init internal-site
 ```
 
 如果是本地开发，并且你需要直接查看宿主机里的持久化目录，可改用：
@@ -223,6 +223,11 @@ compose 当前会做这些事：
 - 用轻量 `rustfs-init` sidecar 自动确保 bucket 存在
 - 运行一次性的 `internal-site-init`，完成 `db:push` 和 `db:seed`
 - 启动 `internal-site`
+
+说明：
+
+- 基础 `docker-compose.yml` 默认通过 `MAGIC_COMPARE_INTERNAL_SITE_IMAGE` 拉取 GHCR 运行时镜像
+- `docker/dev.compose.override.yml` 才会把 `internal-site` / `internal-site-init` 切换成本地 `build`
 - `internal-site` 容器本身只负责：
 
 ```bash

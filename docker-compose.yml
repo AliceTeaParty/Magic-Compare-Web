@@ -1,8 +1,5 @@
 x-internal-site-common: &internal-site-common
-  image: magic-compare/internal-site:local
-  build:
-    context: .
-    dockerfile: docker/internal-site.Dockerfile
+  image: ${MAGIC_COMPARE_INTERNAL_SITE_IMAGE:-ghcr.io/aliceteaparty/magic-compare-web:main}
   environment: &internal-site-environment
     DATABASE_URL: ${MAGIC_COMPARE_DOCKER_DATABASE_URL:-file:/app/data/sqlite/internal-site.db}
     MAGIC_COMPARE_HIDE_DEMO: ${MAGIC_COMPARE_HIDE_DEMO:-true}
