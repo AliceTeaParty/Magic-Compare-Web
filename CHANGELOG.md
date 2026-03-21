@@ -8,6 +8,28 @@ Entries before that date are summarized at release level instead of being recons
 
 - No unreleased entries yet.
 
+## v0.8.1 - 2026-03-21
+
+Stabilized the Docker runtime path after `v0.8.0` and split container initialization into clearer service boundaries.
+
+### Added
+
+- Dedicated `internal-site-init` container step for database push and demo seed before app startup.
+- Local development Docker scripts in the root workspace package for common compose actions.
+- `docker/dev.compose.override.yml` for local bind-mount development on top of the base compose stack.
+
+### Changed
+
+- Base `docker-compose.yml` now defaults to named volumes, making server-side runtime less dependent on repository-local directories.
+- `rustfs-init` now uses a lighter `minio/mc`-based bucket initialization flow.
+- `internal-site` now starts the app only, instead of bundling database initialization into the main container command.
+- RustFS is pinned to `rustfs/rustfs:1.0.0-alpha.89` for more predictable local and deployment behavior.
+
+### Fixed
+
+- Workflow waiting logic now handles exited one-shot compose tasks correctly instead of timing out on successful init containers.
+- Docker startup behavior is more resilient through separated init responsibilities and explicit restart and healthcheck handling for `internal-site`.
+
 ## v0.8.0 - 2026-03-21
 
 First formal release checkpoint for the current multi-branch, CI/CD-backed workflow.
