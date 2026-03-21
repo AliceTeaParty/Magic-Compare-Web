@@ -6,6 +6,30 @@ Entries before that date are summarized at release level instead of being recons
 
 ## Unreleased
 
+## v1.3.0 - 2026-03-21
+
+Refactor and stability release focused on breaking apart viewer/workspace hotspots, hardening browser-level verification, and making local runtime debugging more trustworthy.
+
+### Added
+
+- Playwright and Playwright Test were added as workspace dev dependencies to support local browser debugging and future browser-smoke CI coverage.
+- A dedicated browser smoke and CI preparation guide was added under `docs/`, including explicit guidance to verify real image decode instead of trusting `HTTP 200` alone.
+- Viewer and workspace hot paths now expose focused helper modules for filmstrip drag physics, stage pan/zoom interactions, and workspace action handling, keeping the exported hooks thin and easier to audit.
+
+### Changed
+
+- Root published-sync and legacy public-route alias scripts now run through TypeScript + `tsx`, removing the old mixed MJS script path for release-related maintenance tasks.
+- Internal content queries, mutations, import handling, publish flow, public runtime wiring, viewer workbench, and workspace board were split into smaller modules to reduce God files and hotspot concentration.
+- Internal catalog/workspace/viewer application types no longer propagate deprecated `subtitle` fields, while schema, import, publish, and public manifest compatibility remain intact.
+- Workflow and MCP usage docs were refreshed to reflect the current release path, browser-smoke lessons, and the updated `mcp-vector-search` usage model.
+- Generated app build outputs are now ignored by Git so local analysis and browser debugging do not pollute the worktree.
+
+### Fixed
+
+- Viewer and workspace regressions around `Open`, `Internal/Public`, mode switching, sidebar/details toggles, and optimistic local state synchronization were stabilized after the large viewer/workspace split.
+- A/B wheel zoom and local dev bootstrap behavior were hardened so local Docker/runtime debugging is less likely to land on a false app state.
+- Mobile rotated viewer behavior now keeps drag and swipe directions aligned with the screen, and misleading scale-only motion affordances were removed.
+
 ## v1.2.1 - 2026-03-21
 
 Maintenance release focused on consolidating shared runtime wiring, simplifying release build targets, and documenting the current repo workflow more clearly.
