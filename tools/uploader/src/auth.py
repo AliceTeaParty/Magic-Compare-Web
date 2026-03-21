@@ -71,8 +71,8 @@ class UploaderConfig:
         )
 
 
-def _repo_root(current_file: Path) -> Path:
-    return current_file.resolve().parents[3]
+def _uploader_root(current_file: Path) -> Path:
+    return current_file.resolve().parents[1]
 
 
 def _normalize_url(value: str) -> str:
@@ -80,6 +80,7 @@ def _normalize_url(value: str) -> str:
 
 
 def _default_env_example_text() -> str:
+    """Keep a built-in uploader template so the CLI still works outside the repo checkout."""
     return "\n".join(
         [
             "# Magic Compare uploader local configuration",
@@ -105,17 +106,18 @@ def _default_env_example_text() -> str:
     )
 
 
-def repo_env_example_path() -> Path:
-    return _repo_root(Path(__file__)) / ".env.example"
+def uploader_env_example_path() -> Path:
+    return _uploader_root(Path(__file__)) / ".env.example"
 
 
 def ensure_work_dir_env(work_dir: Path) -> Path:
+    """Seed the uploader work dir from the uploader-local template instead of the website runtime env."""
     work_dir.mkdir(parents=True, exist_ok=True)
     env_path = work_dir / ".env"
     if env_path.exists():
         return env_path
 
-    template_path = repo_env_example_path()
+    template_path = uploader_env_example_path()
     if template_path.exists():
         content = template_path.read_text(encoding="utf-8")
     else:
@@ -154,6 +156,7 @@ def resolve_uploader_config(
     api_url_override: str | None = None,
     site_url_override: str | None = None,
 ) -> UploaderConfig:
+    """Resolve uploader config with a self-contained work-dir env while still allowing explicit host overrides."""
     cwd_dotenv = find_dotenv(usecwd=True)
     cwd_env_path = Path(cwd_dotenv) if cwd_dotenv else None
     work_env_path = ensure_work_dir_env(work_dir) if work_dir else None
@@ -162,6 +165,7 @@ def resolve_uploader_config(
     if cwd_env_path and cwd_env_path.exists():
         merged_values.update(_clean_env_values(dotenv_values(cwd_env_path)))
     if work_env_path and work_env_path.exists():
+        # The work-dir .env is uploader-owned and should override any generic repo root .env.
         merged_values.update(_clean_env_values(dotenv_values(work_env_path)))
 
     for key in (

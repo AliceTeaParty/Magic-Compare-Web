@@ -11,9 +11,11 @@ from src.auth import (
     UploaderConfig,
     build_request_headers,
     ensure_cloudflared_installed,
+    ensure_work_dir_env,
     fetch_access_token_via_cloudflared,
     persist_config_overrides,
     resolve_uploader_config,
+    uploader_env_example_path,
 )
 
 
@@ -29,6 +31,12 @@ class UploaderAuthTests(unittest.TestCase):
         self.assertTrue((self.work_dir / ".env").exists())
         self.assertEqual(config.site_url, "https://compare.example.com")
         self.assertEqual(config.api_url, "https://compare.example.com/api/ops/import-sync")
+
+    def test_creates_work_dir_env_from_uploader_template(self) -> None:
+        env_path = ensure_work_dir_env(self.work_dir)
+
+        self.assertEqual(env_path.read_text(encoding="utf-8"), uploader_env_example_path().read_text(encoding="utf-8"))
+        self.assertNotIn("MAGIC_COMPARE_PUBLIC_EXPORT_DIR", env_path.read_text(encoding="utf-8"))
 
     def test_prefers_service_token_headers_over_user_token(self) -> None:
         config = UploaderConfig(
