@@ -2,15 +2,18 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { ViewerMode } from "@magic-compare/content-schema";
-import { orderByNumericOrder } from "@magic-compare/shared-utils";
 import {
-  findAsset,
-  getAvailableModes,
   type ViewerAsset,
   type ViewerFrame,
   type ViewerGroup,
   resolveViewerMode,
 } from "../utils/viewer-data";
+import {
+  buildFrameAssets,
+  buildFrameState,
+  getOrderedFrames,
+  resolveFrameId,
+} from "./viewer-controller-helpers";
 
 export interface ViewerController {
   frames: ViewerFrame[];
@@ -34,7 +37,7 @@ export interface ViewerController {
 }
 
 export function useViewerController(group: ViewerGroup): ViewerController {
-  const frames = useMemo(() => orderByNumericOrder(group.frames), [group.frames]);
+  const frames = useMemo(() => getOrderedFrames(group), [group]);
   const [currentFrameId, setCurrentFrameId] = useState<string | undefined>(frames[0]?.id);
   const [mode, setModeState] = useState<ViewerMode>(group.defaultMode);
   const [overlayOpacity, setOverlayOpacity] = useState<number>(58);
@@ -42,18 +45,20 @@ export function useViewerController(group: ViewerGroup): ViewerController {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
-    if (!currentFrameId || !frames.some((frame) => frame.id === currentFrameId)) {
-      setCurrentFrameId(frames[0]?.id);
+    const nextFrameId = resolveFrameId(frames, currentFrameId);
+    if (nextFrameId !== currentFrameId) {
+      setCurrentFrameId(nextFrameId);
     }
   }, [currentFrameId, frames]);
 
-  const currentFrame = frames.find((frame) => frame.id === currentFrameId) ?? frames[0];
-  const currentFrameIndex = currentFrame
-    ? frames.findIndex((frame) => frame.id === currentFrame.id)
-    : -1;
-  const availableModes: ViewerMode[] = currentFrame
-    ? getAvailableModes(currentFrame)
-    : ["before-after"];
+  const { currentFrame, currentFrameIndex, availableModes } = useMemo(
+    () => buildFrameState(frames, currentFrameId),
+    [currentFrameId, frames],
+  );
+  const { afterAsset, beforeAsset, heatmapAsset } = useMemo(
+    () => buildFrameAssets(currentFrame),
+    [currentFrame],
+  );
 
   useEffect(() => {
     setModeState((previousMode) =>
@@ -98,8 +103,8 @@ export function useViewerController(group: ViewerGroup): ViewerController {
     setOverlayOpacity,
     setAbSide,
     toggleSidebar,
-    beforeAsset: currentFrame ? findAsset(currentFrame, "before") : undefined,
-    afterAsset: currentFrame ? findAsset(currentFrame, "after") : undefined,
-    heatmapAsset: currentFrame ? findAsset(currentFrame, "heatmap") : undefined,
+    beforeAsset,
+    afterAsset,
+    heatmapAsset,
   };
 }

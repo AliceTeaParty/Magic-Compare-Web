@@ -1,0 +1,88 @@
+"use client";
+
+import { Box, Stack, Typography } from "@mui/material";
+import type { ViewerMode } from "@magic-compare/content-schema";
+import { ViewerToolbar } from "./viewer-toolbar";
+
+interface ViewerHeaderProps {
+  abPresetScale: number;
+  abSide: "before" | "after";
+  canUseHeatmap: boolean;
+  caseTitle: string;
+  groupTitle: string;
+  hideFitControl: boolean;
+  isStageFitted: boolean;
+  mode: ViewerMode;
+  onAbSideChange: (side: "before" | "after") => void;
+  onModeChange: (mode: ViewerMode) => void;
+  onScalePresetChange: (presetScale: number) => void;
+  onToggleFit: () => void;
+  onToggleSidebar: () => void;
+  sidebarOpen: boolean;
+}
+
+export function ViewerHeader({
+  abPresetScale,
+  abSide,
+  canUseHeatmap,
+  caseTitle,
+  groupTitle,
+  hideFitControl,
+  isStageFitted,
+  mode,
+  onAbSideChange,
+  onModeChange,
+  onScalePresetChange,
+  onToggleFit,
+  onToggleSidebar,
+  sidebarOpen,
+}: ViewerHeaderProps) {
+  return (
+    <Box
+      sx={{
+        gridColumn: "1 / -1",
+        position: "relative",
+        zIndex: 2,
+        display: "flex",
+        flexDirection: { xs: "column", md: "row" },
+        alignItems: { xs: "stretch", md: "center" },
+        justifyContent: "space-between",
+        gap: 1.5,
+        p: { xs: 2.25, md: 3 },
+        borderBottom: "1px solid",
+        borderColor: "divider",
+        background:
+          "linear-gradient(180deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.018) 100%)",
+      }}
+    >
+      <Stack spacing={0.2} sx={{ minWidth: 0, pr: { md: 2 } }}>
+        <Typography variant="h4" noWrap sx={{ lineHeight: 1.18, pb: 0.16 }}>
+          {groupTitle}
+        </Typography>
+        <Typography
+          variant="body2"
+          color="text.secondary"
+          noWrap
+          sx={{ mt: "0.25em", pl: "0.08em" }}
+        >
+          {caseTitle}
+        </Typography>
+      </Stack>
+
+      <ViewerToolbar
+        abPresetScale={abPresetScale}
+        abSide={abSide}
+        canUseHeatmap={canUseHeatmap}
+        hideFitControl={hideFitControl}
+        isStageFitted={isStageFitted}
+        mode={mode}
+        onAbSideChange={onAbSideChange}
+        onModeChange={onModeChange}
+        onScalePresetChange={onScalePresetChange}
+        onToggleFit={onToggleFit}
+        onToggleSidebar={onToggleSidebar}
+        sidebarOpen={sidebarOpen}
+      />
+    </Box>
+  );
+}
