@@ -416,7 +416,7 @@ export async function applyImportManifest(rawManifest: unknown) {
     },
     update: {
       title: manifest.case.title,
-      subtitle: manifest.case.subtitle || null,
+      subtitle: manifest.case.subtitle || "",
       summary: manifest.case.summary,
       status: manifest.case.status,
       tagsJson: stringifyTags(manifest.case.tags),
@@ -424,7 +424,7 @@ export async function applyImportManifest(rawManifest: unknown) {
     create: {
       slug: manifest.case.slug,
       title: manifest.case.title,
-      subtitle: manifest.case.subtitle || null,
+      subtitle: manifest.case.subtitle || "",
       summary: manifest.case.summary,
       status: manifest.case.status,
       tagsJson: stringifyTags(manifest.case.tags),
