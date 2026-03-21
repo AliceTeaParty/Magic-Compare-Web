@@ -3,6 +3,7 @@ import { Box } from "@mui/material";
 import { IBM_Plex_Sans, Noto_Serif_JP, Noto_Serif_SC } from "next/font/google";
 import { resolveFooterConfig } from "@magic-compare/shared-utils";
 import { MagicSiteFooter, MagicThemeProvider } from "@magic-compare/ui";
+import { loadWorkspaceEnv } from "@/lib/server/env/load-workspace-env";
 import "./globals.css";
 
 const displayFontSc = Noto_Serif_SC({
@@ -29,6 +30,7 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
+  loadWorkspaceEnv();
   const footerConfig = resolveFooterConfig(process.env);
 
   return (
