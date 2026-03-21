@@ -109,8 +109,7 @@ pnpm dev:public
 - 基础 compose 现在默认使用 Docker named volumes，服务器可以不依赖仓库内的 `docker-data` 路径直接运行
 - 如果本地开发时想改成“本地 build + 可见 bind mount”，可额外加上 `-f docker/dev.compose.override.yml`
 - 本地开发更推荐直接用根脚本：`pnpm docker:dev:up`、`pnpm docker:dev:down`、`pnpm docker:dev:logs`
-- `rustfs` 现在默认以低占用模式启动：console 默认关闭、日志级别默认为 `warn`、默认内存上限为 `512m`
-- 如需启用 RustFS WebUI，可在 `.env` 中显式设置 `MAGIC_COMPARE_RUSTFS_CONSOLE_ENABLE=true`
+- 内置本地对象存储容器现在使用固定运行参数；如果你确实要改端口或运行参数，直接编辑 `docker-compose.yml`
 - 内部原图、缩略图和 heatmap 统一由 `MAGIC_COMPARE_S3_*` 配置的对象存储承载
 - 发布产物继续写到 `MAGIC_COMPARE_PUBLISHED_ROOT`
 - 公开静态导出目录由 `MAGIC_COMPARE_PUBLIC_EXPORT_DIR` 控制

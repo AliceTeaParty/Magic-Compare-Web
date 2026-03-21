@@ -108,8 +108,7 @@ Demo content:
 - the base Compose file now uses Docker named volumes, so a server can run it without depending on repository-relative `docker-data` paths
 - if you want a local image build plus inspectable bind mounts during development, add `-f docker/dev.compose.override.yml`
 - for local development, prefer the root scripts: `pnpm docker:dev:up`, `pnpm docker:dev:down`, `pnpm docker:dev:logs`
-- `rustfs` now starts in a lower-overhead mode by default: console disabled, `warn` log level, and a default `512m` memory cap
-- if you need the RustFS Web UI, explicitly set `MAGIC_COMPARE_RUSTFS_CONSOLE_ENABLE=true` in `.env`
+- the bundled local object-storage container now uses fixed runtime defaults; if you need to change its ports or runtime flags, edit `docker-compose.yml` directly
 - internal assets now live in S3-compatible storage configured by `MAGIC_COMPARE_S3_*`
 - published bundles still live under `MAGIC_COMPARE_PUBLISHED_ROOT`
 - static public exports are mirrored into `MAGIC_COMPARE_PUBLIC_EXPORT_DIR`
