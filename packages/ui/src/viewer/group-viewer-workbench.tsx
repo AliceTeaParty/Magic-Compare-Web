@@ -951,16 +951,16 @@ function ViewerSidebarContent({
   variant: "public" | "internal";
 }) {
   return (
-    <Stack spacing={2} sx={{ p: 2.25 }}>
+      <Stack spacing={2} sx={{ p: 2.25 }}>
       <Stack spacing={0.5}>
-        <Typography variant="body2" color="text.secondary">
+        <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 500 }}>
           Group navigator
         </Typography>
         <GroupLinks currentGroup={currentGroup} groups={groups} />
       </Stack>
       <Divider />
       <Stack spacing={0.75}>
-        <Typography variant="body2" color="text.secondary">
+        <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 500 }}>
           Frame details
         </Typography>
         <Typography variant="subtitle1">{currentFrame?.title}</Typography>
@@ -970,7 +970,7 @@ function ViewerSidebarContent({
       </Stack>
       <Divider />
       <Stack spacing={0.75}>
-        <Typography variant="body2" color="text.secondary">
+        <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 500 }}>
           Asset metadata
         </Typography>
         <Typography variant="body2">
@@ -1382,7 +1382,7 @@ export function GroupViewerWorkbench({
           }}
         >
           <Stack spacing={0.2} sx={{ minWidth: 0, pr: { md: 2 } }}>
-            <Typography variant="h4" noWrap sx={{ lineHeight: 1.14, pb: 0.08 }}>
+            <Typography variant="h4" noWrap sx={{ lineHeight: 1.18, pb: 0.16 }}>
               {dataset.group.title}
             </Typography>
             <Typography variant="body2" color="text.secondary" noWrap sx={{ mt: "0.25em" }}>
@@ -1408,7 +1408,7 @@ export function GroupViewerWorkbench({
                   height: 34,
                   minHeight: 34,
                   px: 1.3,
-                  fontWeight: 400,
+                  fontWeight: 550,
                   border: "1px solid",
                   borderColor: "divider",
                   borderRadius: "999px !important",
@@ -1455,6 +1455,7 @@ export function GroupViewerWorkbench({
                     pl: 1.5,
                     pr: 3.75,
                     fontSize: "0.92rem",
+                    fontWeight: 550,
                   },
                 }}
               >
