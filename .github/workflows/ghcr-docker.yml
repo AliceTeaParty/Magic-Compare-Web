@@ -59,7 +59,7 @@ jobs:
         run: |
           set -euo pipefail
           for _ in {1..90}; do
-            rustfs_init_container_id="$(docker compose $CI_COMPOSE_ARGS ps -q rustfs-init)"
+            rustfs_init_container_id="$(docker compose $CI_COMPOSE_ARGS ps -a -q rustfs-init)"
             if [[ -n "$rustfs_init_container_id" ]]; then
               rustfs_init_status="$(docker inspect -f '{{.State.Status}}' "$rustfs_init_container_id")"
               if [[ "$rustfs_init_status" == "exited" ]]; then
@@ -73,7 +73,7 @@ jobs:
               fi
             fi
 
-            internal_site_container_id="$(docker compose $CI_COMPOSE_ARGS ps -q internal-site)"
+            internal_site_container_id="$(docker compose $CI_COMPOSE_ARGS ps -a -q internal-site)"
             if [[ -n "$internal_site_container_id" ]]; then
               internal_site_status="$(docker inspect -f '{{.State.Status}}' "$internal_site_container_id")"
               if [[ "$internal_site_status" == "exited" || "$internal_site_status" == "dead" ]]; then

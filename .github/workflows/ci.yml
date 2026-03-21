@@ -124,7 +124,7 @@ jobs:
         run: |
           set -euo pipefail
           for _ in {1..60}; do
-            container_id="$(docker compose $CI_COMPOSE_ARGS ps -q rustfs-init)"
+            container_id="$(docker compose $CI_COMPOSE_ARGS ps -a -q rustfs-init)"
             if [[ -z "$container_id" ]]; then
               sleep 2
               continue
