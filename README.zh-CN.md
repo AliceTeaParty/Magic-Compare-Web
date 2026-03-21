@@ -104,8 +104,10 @@ pnpm dev:public
   - `internal-site`
   - 作为 S3-compatible 后端的 `rustfs`
   - 启动时用轻量 `minio/mc` 确保 bucket 存在的 `rustfs-init`
+  - 在应用启动前执行 `db:push` 和 `db:seed` 的一次性 `internal-site-init`
 - 基础 compose 现在默认使用 Docker named volumes，服务器可以不依赖仓库内的 `docker-data` 路径直接运行
 - 如果本地开发时仍想保留可见的 bind mount，可额外加上 `-f docker/dev.compose.override.yml`
+- 本地开发更推荐直接用根脚本：`pnpm docker:dev:up`、`pnpm docker:dev:down`、`pnpm docker:dev:logs`
 - `rustfs` 现在默认以低占用模式启动：console 默认关闭、日志级别默认为 `warn`、默认内存上限为 `512m`
 - 如需启用 RustFS WebUI，可在 `.env` 中显式设置 `MAGIC_COMPARE_RUSTFS_CONSOLE_ENABLE=true`
 - 内部原图、缩略图和 heatmap 统一由 `MAGIC_COMPARE_S3_*` 配置的对象存储承载

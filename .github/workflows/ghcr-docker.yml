@@ -73,6 +73,20 @@ jobs:
               fi
             fi
 
+            internal_site_init_container_id="$(docker compose $CI_COMPOSE_ARGS ps -a -q internal-site-init)"
+            if [[ -n "$internal_site_init_container_id" ]]; then
+              internal_site_init_status="$(docker inspect -f '{{.State.Status}}' "$internal_site_init_container_id")"
+              if [[ "$internal_site_init_status" == "exited" ]]; then
+                internal_site_init_exit_code="$(docker inspect -f '{{.State.ExitCode}}' "$internal_site_init_container_id")"
+                if [[ "$internal_site_init_exit_code" != "0" ]]; then
+                  echo "internal-site-init exited with code $internal_site_init_exit_code."
+                  docker compose $CI_COMPOSE_ARGS ps
+                  docker compose $CI_COMPOSE_ARGS logs rustfs rustfs-init internal-site-init internal-site
+                  exit 1
+                fi
+              fi
+            fi
+
             internal_site_container_id="$(docker compose $CI_COMPOSE_ARGS ps -a -q internal-site)"
             if [[ -n "$internal_site_container_id" ]]; then
               internal_site_status="$(docker inspect -f '{{.State.Status}}' "$internal_site_container_id")"
@@ -80,7 +94,7 @@ jobs:
                 internal_site_exit_code="$(docker inspect -f '{{.State.ExitCode}}' "$internal_site_container_id")"
                 echo "internal-site exited with code $internal_site_exit_code before readiness."
                 docker compose $CI_COMPOSE_ARGS ps
-                docker compose $CI_COMPOSE_ARGS logs rustfs rustfs-init internal-site
+                docker compose $CI_COMPOSE_ARGS logs rustfs rustfs-init internal-site-init internal-site
                 exit 1
               fi
             fi
@@ -93,7 +107,7 @@ jobs:
 
           echo "Timed out waiting for internal-site to become ready."
           docker compose $CI_COMPOSE_ARGS ps
-          docker compose $CI_COMPOSE_ARGS logs rustfs rustfs-init internal-site
+          docker compose $CI_COMPOSE_ARGS logs rustfs rustfs-init internal-site-init internal-site
           exit 1
 
       - name: Capture compose logs
@@ -102,7 +116,7 @@ jobs:
           {
             docker compose $CI_COMPOSE_ARGS ps || true
             echo
-            docker compose $CI_COMPOSE_ARGS logs rustfs rustfs-init internal-site || true
+            docker compose $CI_COMPOSE_ARGS logs rustfs rustfs-init internal-site-init internal-site || true
           } > ghcr-smoke.compose.log
 
       - name: Write smoke summary

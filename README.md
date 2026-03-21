@@ -103,8 +103,10 @@ Demo content:
   - `internal-site`
   - `rustfs` as the S3-compatible object store
   - `rustfs-init`, a lightweight `minio/mc` bootstrapper that ensures the bucket exists on startup
+  - `internal-site-init`, a one-off initializer that runs `db:push` and `db:seed` before the app starts
 - the base Compose file now uses Docker named volumes, so a server can run it without depending on repository-relative `docker-data` paths
 - if you want inspectable local bind mounts during development, add `-f docker/dev.compose.override.yml`
+- for local development, prefer the root scripts: `pnpm docker:dev:up`, `pnpm docker:dev:down`, `pnpm docker:dev:logs`
 - `rustfs` now starts in a lower-overhead mode by default: console disabled, `warn` log level, and a default `512m` memory cap
 - if you need the RustFS Web UI, explicitly set `MAGIC_COMPARE_RUSTFS_CONSOLE_ENABLE=true` in `.env`
 - internal assets now live in S3-compatible storage configured by `MAGIC_COMPARE_S3_*`

@@ -1,6 +1,30 @@
+x-internal-site-common: &internal-site-common
+  image: magic-compare/internal-site:local
+  build:
+    context: .
+    dockerfile: docker/internal-site.Dockerfile
+  environment: &internal-site-environment
+    DATABASE_URL: ${MAGIC_COMPARE_DOCKER_DATABASE_URL:-file:/app/data/sqlite/internal-site.db}
+    MAGIC_COMPARE_HIDE_DEMO: ${MAGIC_COMPARE_HIDE_DEMO:-true}
+    MAGIC_COMPARE_PUBLISHED_ROOT: ${MAGIC_COMPARE_PUBLISHED_ROOT:-/app/data/published}
+    MAGIC_COMPARE_PUBLIC_EXPORT_DIR: ${MAGIC_COMPARE_PUBLIC_EXPORT_DIR:-/app/data/public-export}
+    MAGIC_COMPARE_S3_BUCKET: ${MAGIC_COMPARE_S3_BUCKET:-magic-compare-assets}
+    MAGIC_COMPARE_S3_REGION: ${MAGIC_COMPARE_S3_REGION:-us-east-1}
+    MAGIC_COMPARE_S3_ENDPOINT: ${MAGIC_COMPARE_DOCKER_S3_ENDPOINT:-http://rustfs:9000}
+    MAGIC_COMPARE_S3_ACCESS_KEY_ID: ${MAGIC_COMPARE_S3_ACCESS_KEY_ID:-rustfsadmin}
+    MAGIC_COMPARE_S3_SECRET_ACCESS_KEY: ${MAGIC_COMPARE_S3_SECRET_ACCESS_KEY:-rustfsadmin}
+    MAGIC_COMPARE_S3_FORCE_PATH_STYLE: ${MAGIC_COMPARE_S3_FORCE_PATH_STYLE:-true}
+    MAGIC_COMPARE_S3_INTERNAL_PREFIX: ${MAGIC_COMPARE_S3_INTERNAL_PREFIX:-internal-assets}
+    MAGIC_COMPARE_CF_PAGES_PROJECT_NAME: ${MAGIC_COMPARE_CF_PAGES_PROJECT_NAME:-}
+    MAGIC_COMPARE_CF_PAGES_BRANCH: ${MAGIC_COMPARE_CF_PAGES_BRANCH:-}
+    CLOUDFLARE_ACCOUNT_ID: ${CLOUDFLARE_ACCOUNT_ID:-}
+    CLOUDFLARE_API_TOKEN: ${CLOUDFLARE_API_TOKEN:-}
+  volumes:
+    - internal-data:/app/data
+
 services:
   rustfs:
-    image: rustfs/rustfs:latest-glibc@sha256:e8f7bb66203aea0dc63f299e3720a86e0a2a02641ba1ed8b28e11472a0ab4bf0
+    image: rustfs/rustfs:1.0.0-alpha.89
     container_name: magic-compare-rustfs
     init: true
     restart: unless-stopped
@@ -51,35 +75,32 @@ services:
     volumes:
       - ./docker/rustfs-init.sh:/opt/magic-compare/rustfs-init.sh:ro
 
-  internal-site:
-    build:
-      context: .
-      dockerfile: docker/internal-site.Dockerfile
-    container_name: magic-compare-internal-site
-    restart: unless-stopped
+  internal-site-init:
+    <<: *internal-site-common
+    entrypoint:
+      - /bin/sh
+      - /opt/magic-compare/internal-site-init.sh
     depends_on:
       rustfs:
         condition: service_healthy
       rustfs-init:
         condition: service_completed_successfully
+    restart: "no"
+    volumes:
+      - internal-data:/app/data
+      - ./docker/internal-site-init.sh:/opt/magic-compare/internal-site-init.sh:ro
+
+  internal-site:
+    <<: *internal-site-common
+    container_name: magic-compare-internal-site
+    restart: unless-stopped
+    depends_on:
+      rustfs:
+        condition: service_healthy
+      internal-site-init:
+        condition: service_completed_successfully
     ports:
       - "3000:3000"
-    environment:
-      DATABASE_URL: ${MAGIC_COMPARE_DOCKER_DATABASE_URL:-file:/app/data/sqlite/internal-site.db}
-      MAGIC_COMPARE_HIDE_DEMO: ${MAGIC_COMPARE_HIDE_DEMO:-true}
-      MAGIC_COMPARE_PUBLISHED_ROOT: ${MAGIC_COMPARE_PUBLISHED_ROOT:-/app/data/published}
-      MAGIC_COMPARE_PUBLIC_EXPORT_DIR: ${MAGIC_COMPARE_PUBLIC_EXPORT_DIR:-/app/data/public-export}
-      MAGIC_COMPARE_S3_BUCKET: ${MAGIC_COMPARE_S3_BUCKET:-magic-compare-assets}
-      MAGIC_COMPARE_S3_REGION: ${MAGIC_COMPARE_S3_REGION:-us-east-1}
-      MAGIC_COMPARE_S3_ENDPOINT: ${MAGIC_COMPARE_DOCKER_S3_ENDPOINT:-http://rustfs:9000}
-      MAGIC_COMPARE_S3_ACCESS_KEY_ID: ${MAGIC_COMPARE_S3_ACCESS_KEY_ID:-rustfsadmin}
-      MAGIC_COMPARE_S3_SECRET_ACCESS_KEY: ${MAGIC_COMPARE_S3_SECRET_ACCESS_KEY:-rustfsadmin}
-      MAGIC_COMPARE_S3_FORCE_PATH_STYLE: ${MAGIC_COMPARE_S3_FORCE_PATH_STYLE:-true}
-      MAGIC_COMPARE_S3_INTERNAL_PREFIX: ${MAGIC_COMPARE_S3_INTERNAL_PREFIX:-internal-assets}
-      MAGIC_COMPARE_CF_PAGES_PROJECT_NAME: ${MAGIC_COMPARE_CF_PAGES_PROJECT_NAME:-}
-      MAGIC_COMPARE_CF_PAGES_BRANCH: ${MAGIC_COMPARE_CF_PAGES_BRANCH:-}
-      CLOUDFLARE_ACCOUNT_ID: ${CLOUDFLARE_ACCOUNT_ID:-}
-      CLOUDFLARE_API_TOKEN: ${CLOUDFLARE_API_TOKEN:-}
     healthcheck:
       test:
         [
@@ -92,8 +113,6 @@ services:
       timeout: 10s
       retries: 5
       start_period: 90s
-    volumes:
-      - internal-data:/app/data
 
 volumes:
   rustfs-data:

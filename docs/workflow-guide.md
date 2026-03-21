@@ -210,15 +210,22 @@ docker compose up -d --build rustfs rustfs-init internal-site
 docker compose -f docker-compose.yml -f docker/dev.compose.override.yml up -d --build rustfs rustfs-init internal-site
 ```
 
+或者直接使用根脚本：
+
+```bash
+pnpm docker:dev:up
+```
+
 compose 当前会做这些事：
 
 - 启动 `rustfs`
 - 用轻量 `rustfs-init` sidecar 自动确保 bucket 存在
+- 运行一次性的 `internal-site-init`，完成 `db:push` 和 `db:seed`
 - 启动 `internal-site`
-- internal-site 容器内执行：
+- `internal-site` 容器本身只负责：
 
 ```bash
-pnpm db:push && pnpm db:seed && pnpm --filter @magic-compare/internal-site start
+pnpm --filter @magic-compare/internal-site start
 ```
 
 ### 当前 Docker 里的持久化目录
@@ -525,6 +532,7 @@ docker build -f docker/internal-site.Dockerfile -t magic-compare/internal-site .
 - `docker/dev.compose.override.yml`
 - `docker/ci.compose.override.yml`
 - `docker/rustfs-init.sh`
+- `docker/internal-site-init.sh`
 - `docker/internal-site.Dockerfile`
 - `apps/internal-site/lib/server/public-site/runtime.ts`
 - `docs/ci-ghcr-lessons.zh-CN.md`
