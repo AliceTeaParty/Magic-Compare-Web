@@ -126,7 +126,8 @@ pnpm public:export
 经验教训：
 
 - CI / smoke 不要直接复用本地开发 bind mount。
-- 应使用独立的 compose override，把数据目录切到 Docker named volumes。
+- 基础 compose 更适合直接使用 Docker named volumes。
+- 本地如果需要可见的宿主机目录，再通过开发专用 override 显式切回 bind mount。
 
 当前 CI 专用入口是：
 

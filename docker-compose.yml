@@ -1,6 +1,6 @@
 services:
   rustfs:
-    image: rustfs/rustfs:latest
+    image: rustfs/rustfs:latest-glibc@sha256:e8f7bb66203aea0dc63f299e3720a86e0a2a02641ba1ed8b28e11472a0ab4bf0
     container_name: magic-compare-rustfs
     init: true
     restart: unless-stopped
@@ -32,7 +32,7 @@ services:
       retries: 5
       start_period: 20s
     volumes:
-      - ./docker-data/rustfs:/data
+      - rustfs-data:/data
 
   rustfs-init:
     image: minio/mc:RELEASE.2025-08-13T08-35-41Z
@@ -56,6 +56,7 @@ services:
       context: .
       dockerfile: docker/internal-site.Dockerfile
     container_name: magic-compare-internal-site
+    restart: unless-stopped
     depends_on:
       rustfs:
         condition: service_healthy
@@ -79,5 +80,21 @@ services:
       MAGIC_COMPARE_CF_PAGES_BRANCH: ${MAGIC_COMPARE_CF_PAGES_BRANCH:-}
       CLOUDFLARE_ACCOUNT_ID: ${CLOUDFLARE_ACCOUNT_ID:-}
       CLOUDFLARE_API_TOKEN: ${CLOUDFLARE_API_TOKEN:-}
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000').then((response) => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))",
+        ]
+      interval: 45s
+      timeout: 10s
+      retries: 5
+      start_period: 90s
     volumes:
-      - ./docker-data/internal-data:/app/data
+      - internal-data:/app/data
+
+volumes:
+  rustfs-data:
+  internal-data:

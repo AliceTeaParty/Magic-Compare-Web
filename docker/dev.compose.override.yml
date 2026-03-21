@@ -1,0 +1,8 @@
+services:
+  rustfs:
+    volumes:
+      - ./docker-data/rustfs:/data
+
+  internal-site:
+    volumes:
+      - ./docker-data/internal-data:/app/data

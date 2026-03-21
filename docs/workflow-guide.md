@@ -204,6 +204,12 @@ pnpm dev:internal
 docker compose up -d --build rustfs rustfs-init internal-site
 ```
 
+如果是本地开发，并且你需要直接查看宿主机里的持久化目录，可改用：
+
+```bash
+docker compose -f docker-compose.yml -f docker/dev.compose.override.yml up -d --build rustfs rustfs-init internal-site
+```
+
 compose 当前会做这些事：
 
 - 启动 `rustfs`
@@ -217,8 +223,12 @@ pnpm db:push && pnpm db:seed && pnpm --filter @magic-compare/internal-site start
 
 ### 当前 Docker 里的持久化目录
 
-- `./docker-data/rustfs:/data`
-- `./docker-data/internal-data:/app/data`
+- 默认 compose：Docker named volumes
+  - `rustfs-data:/data`
+  - `internal-data:/app/data`
+- 本地开发可选：
+  - `docker/dev.compose.override.yml`
+  - 该 override 会把数据重新映射回 `./docker-data/**`
 
 所以这些内容不会因为容器重启而丢失：
 
@@ -485,7 +495,7 @@ docker build -f docker/internal-site.Dockerfile -t magic-compare/internal-site .
 - `publish case` 和 `public deploy` 应拆开
 - Pages 部署 job 不要并发
 - 优先把 export 结果作为可观察产物保留下来，便于排错
-- CI 中不要直接复用本地 `docker-data` bind mount；优先走单独的 compose override 和 named volumes
+- CI 中不要直接复用本地 `docker-data` bind mount；优先走基础 compose 的 named volumes，必要时再叠加专用 override
 
 ## 推荐的协作顺序
 
@@ -512,6 +522,7 @@ docker build -f docker/internal-site.Dockerfile -t magic-compare/internal-site .
 - `README.zh-CN.md`
 - `.env.example`
 - `docker-compose.yml`
+- `docker/dev.compose.override.yml`
 - `docker/ci.compose.override.yml`
 - `docker/rustfs-init.sh`
 - `docker/internal-site.Dockerfile`
