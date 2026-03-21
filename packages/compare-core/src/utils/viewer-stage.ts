@@ -9,7 +9,8 @@ export interface ViewerMediaRect extends ViewerStageSize {
 }
 
 export interface ViewerPanZoomState {
-  scale: number;
+  presetScale: 1 | 2 | 3;
+  fineScale: number;
   x: number;
   y: number;
 }
@@ -19,6 +20,15 @@ export interface FilmstripScrollbarMetrics {
   thumbWidth: number;
   thumbOffset: number;
 }
+
+export interface ViewerPhysicalScaleOptions {
+  devicePixelRatio: number;
+  media: ViewerStageSize;
+  mediaRect: ViewerStageSize;
+  rotateStage?: boolean;
+}
+
+export const VIEWER_MAX_FINE_SCALE = 5 / 3;
 
 export function getFittedStageSize(
   viewport: ViewerStageSize,
@@ -75,12 +85,16 @@ export function getContainedMediaRect(
 export function clampViewerPanZoom(
   state: ViewerPanZoomState,
   mediaRect: ViewerStageSize,
+  effectiveScale: number,
 ): ViewerPanZoomState {
-  const scale = Math.min(5, Math.max(1, state.scale));
+  const presetScale = state.presetScale < 2 ? 1 : state.presetScale > 2 ? 3 : 2;
+  const fineScale = Math.min(VIEWER_MAX_FINE_SCALE, Math.max(1, state.fineScale));
+  const scale = Math.max(0.01, effectiveScale);
 
-  if (mediaRect.width <= 0 || mediaRect.height <= 0 || scale === 1) {
+  if (mediaRect.width <= 0 || mediaRect.height <= 0 || scale <= 1) {
     return {
-      scale,
+      presetScale,
+      fineScale,
       x: 0,
       y: 0,
     };
@@ -90,10 +104,48 @@ export function clampViewerPanZoom(
   const maxY = Math.max(0, (mediaRect.height * scale - mediaRect.height) / 2);
 
   return {
-    scale,
+    presetScale,
+    fineScale,
     x: Math.min(maxX, Math.max(-maxX, state.x)),
     y: Math.min(maxY, Math.max(-maxY, state.y)),
   };
+}
+
+export function getViewerPresetTransformScale(
+  presetScale: 1 | 2 | 3,
+  options: ViewerPhysicalScaleOptions,
+): number {
+  const normalizedDpr = Math.max(1, options.devicePixelRatio || 1);
+  const renderedWidth = options.rotateStage ? options.mediaRect.height : options.mediaRect.width;
+  const renderedHeight = options.rotateStage ? options.mediaRect.width : options.mediaRect.height;
+
+  if (
+    options.media.width <= 0 ||
+    options.media.height <= 0 ||
+    renderedWidth <= 0 ||
+    renderedHeight <= 0
+  ) {
+    return 1;
+  }
+
+  const cssPixelsPerSourcePixel = Math.min(
+    renderedWidth / options.media.width,
+    renderedHeight / options.media.height,
+  );
+  const physicalPixelsPerSourcePixel = cssPixelsPerSourcePixel * normalizedDpr;
+
+  if (physicalPixelsPerSourcePixel <= 0) {
+    return 1;
+  }
+
+  return presetScale / physicalPixelsPerSourcePixel;
+}
+
+export function getViewerEffectiveScale(
+  state: ViewerPanZoomState,
+  options: ViewerPhysicalScaleOptions,
+): number {
+  return getViewerPresetTransformScale(state.presetScale, options) * state.fineScale;
 }
 
 export function getFilmstripScrollbarMetrics(
