@@ -324,6 +324,17 @@ export function CaseWorkspaceBoard({
     }
   }
 
+  function showWorkspaceSavingNotification() {
+    pushNotification("Saving workspace updates...", "info", {
+      key: "workspace-saving",
+      sticky: true,
+    });
+  }
+
+  function dismissWorkspaceSavingNotification() {
+    dismissNotification("workspace-saving");
+  }
+
   async function saveGroupOrder(nextGroupIds: string[]) {
     const response = await fetch("/api/ops/group-reorder", {
       method: "POST",
@@ -402,6 +413,7 @@ export function CaseWorkspaceBoard({
     );
 
     setGroups(nextGroups);
+    showWorkspaceSavingNotification();
 
     startTransition(() => {
       void updateGroupVisibility(targetGroup.slug, nextVisibility)
@@ -420,6 +432,9 @@ export function CaseWorkspaceBoard({
             error instanceof Error ? error.message : "Failed to update group visibility.",
             "error",
           );
+        })
+        .finally(() => {
+          dismissWorkspaceSavingNotification();
         });
     });
   }
@@ -436,19 +451,6 @@ export function CaseWorkspaceBoard({
 
     dismissNotification("workspace-no-public-groups");
   }, [publicGroupCount]);
-
-  useEffect(() => {
-    if (isPending) {
-      pushNotification("Saving workspace updates...", "info", {
-        key: "workspace-saving",
-        sticky: true,
-      });
-      return;
-    }
-
-    dismissNotification("workspace-saving");
-  }, [isPending]);
-
   return (
     <Stack spacing={{ xs: 2.25, md: 3 }}>
       <Box
@@ -554,6 +556,14 @@ export function CaseWorkspaceBoard({
                       }
 
                       setIsDeployingPublicSite(true);
+                      pushNotification(
+                        "Deploying a fresh public export to Cloudflare Pages...",
+                        "info",
+                        {
+                          key: "workspace-deploying-public-site",
+                          sticky: true,
+                        },
+                      );
                       startTransition(() => {
                         void deployPublicSite()
                           .then((result) => {
@@ -569,6 +579,7 @@ export function CaseWorkspaceBoard({
                             );
                           })
                           .finally(() => {
+                            dismissNotification("workspace-deploying-public-site");
                             setIsDeployingPublicSite(false);
                           });
                       });
@@ -630,11 +641,24 @@ export function CaseWorkspaceBoard({
                   order,
                 }));
 
+                const previousGroups = groups;
                 setGroups(reordered);
+                showWorkspaceSavingNotification();
                 startTransition(() => {
-                  void saveGroupOrder(reordered.map((group) => group.id)).then(() =>
-                    router.refresh(),
-                  );
+                  void saveGroupOrder(reordered.map((group) => group.id))
+                    .then(() => {
+                      router.refresh();
+                    })
+                    .catch((error) => {
+                      setGroups(previousGroups);
+                      pushNotification(
+                        error instanceof Error ? error.message : "Failed to persist group order.",
+                        "error",
+                      );
+                    })
+                    .finally(() => {
+                      dismissWorkspaceSavingNotification();
+                    });
                 });
               }}
             >
