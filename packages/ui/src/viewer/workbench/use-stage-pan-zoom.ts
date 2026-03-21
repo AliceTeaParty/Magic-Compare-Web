@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -22,6 +23,13 @@ import { clampNumber } from "@magic-compare/shared-utils";
 interface PointerSample {
   x: number;
   y: number;
+}
+
+interface WheelLikeEvent {
+  cancelable: boolean;
+  ctrlKey: boolean;
+  deltaY: number;
+  preventDefault: () => void;
 }
 
 /**
@@ -137,11 +145,11 @@ export function useStagePanZoom({
   /**
    * Reapplies the shared clamp rules so every gesture path respects the same pan bounds.
    */
-  function applyPanZoom(nextState: ViewerPanZoomState) {
+  const applyPanZoom = useCallback((nextState: ViewerPanZoomState) => {
     setPanZoomState(
       clampViewerPanZoom(nextState, mediaRect, getViewerEffectiveScale(nextState, scaleOptions)),
     );
-  }
+  }, [mediaRect, scaleOptions, setPanZoomState]);
 
   /**
    * Mouse dragging only starts once the image is actually zoomed in; otherwise dragging would fight
@@ -217,16 +225,23 @@ export function useStagePanZoom({
   }
 
   /**
-   * Allows pinch-to-zoom trackpad gestures without hijacking ordinary wheel scrolling.
+   * Trackpad zoom uses wheel events on desktop, but the handler itself must stay stable so the
+   * stage can attach one non-passive DOM listener instead of resubscribing on every render.
    */
-  function handleWheel(event: ReactWheelEvent<HTMLDivElement>) {
+  const handleWheel = useCallback((event: WheelLikeEvent) => {
     if (!event.ctrlKey) {
       return;
     }
 
-    event.preventDefault();
     if (!active) {
       return;
+    }
+
+    // React's delegated wheel listener may be passive in some environments, so preventDefault must
+    // run only when the browser still allows cancellation. A native non-passive listener is added
+    // by the stage component for the real scroll suppression path.
+    if (event.cancelable) {
+      event.preventDefault();
     }
 
     const nextFineScale = clampNumber(
@@ -241,7 +256,7 @@ export function useStagePanZoom({
       x: panZoomStateRef.current.x,
       y: panZoomStateRef.current.y,
     });
-  }
+  }, [active, applyPanZoom]);
 
   /**
    * Captures the starting distance and center point for a two-finger pinch gesture.
@@ -307,6 +322,10 @@ export function useStagePanZoom({
     });
   }
 
+  /**
+   * Clears or rebases the active pinch gesture when fingers leave the screen so the next gesture
+   * starts from the current scale instead of jumping back to stale touch coordinates.
+   */
   function handleTouchEnd(event: ReactTouchEvent<HTMLDivElement>) {
     if (event.touches.length >= 2) {
       const firstSample = getTouchSample(event.touches[0]);
@@ -337,6 +356,7 @@ export function useStagePanZoom({
     consumeStageClick() {
       return !suppressStageClickRef.current;
     },
+    handleNonPassiveWheel: handleWheel,
     stageHandlers: {
       onPointerDown: handlePointerDown,
       onPointerMove: handlePointerMove,
@@ -346,7 +366,7 @@ export function useStagePanZoom({
       onTouchMove: handleTouchMove,
       onTouchEnd: handleTouchEnd,
       onTouchCancel: handleTouchEnd,
-      onWheel: handleWheel,
+      onWheel: handleWheel as (event: ReactWheelEvent<HTMLDivElement>) => void,
     },
   };
 }

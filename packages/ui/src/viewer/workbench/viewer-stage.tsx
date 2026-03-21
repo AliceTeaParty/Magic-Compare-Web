@@ -446,7 +446,9 @@ function ABCompareStage({
   setActive: (nextActive: boolean) => void;
   setPanZoomState: (nextState: ViewerPanZoomState) => void;
 }) {
-  const { consumeStageClick, effectiveScale, stageHandlers } = useStagePanZoom({
+  const stageSurfaceRef = useRef<HTMLDivElement | null>(null);
+  const { consumeStageClick, effectiveScale, handleNonPassiveWheel, stageHandlers } =
+    useStagePanZoom({
     active,
     activeAsset,
     devicePixelRatio,
@@ -455,6 +457,27 @@ function ABCompareStage({
     rotateStage,
     setPanZoomState,
   });
+
+  useEffect(() => {
+    const stageNode = stageSurfaceRef.current;
+
+    if (!stageNode) {
+      return;
+    }
+
+    /**
+     * Browser zoom gestures must be cancellable at the DOM layer because React can delegate wheel
+     * listeners passively, which still applies the zoom but pollutes the console during smoke/CI.
+     */
+    function handleWheel(event: WheelEvent) {
+      handleNonPassiveWheel(event);
+    }
+
+    stageNode.addEventListener("wheel", handleWheel, { passive: false });
+    return () => {
+      stageNode.removeEventListener("wheel", handleWheel);
+    };
+  }, [handleNonPassiveWheel]);
 
   /**
    * Uses a single click target for both entry and side cycling so A/B mode stays compact on mobile
@@ -475,6 +498,7 @@ function ABCompareStage({
 
   return (
     <Box
+      ref={stageSurfaceRef}
       {...stageHandlers}
       onClick={handleClick}
       sx={{

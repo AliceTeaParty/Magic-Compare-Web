@@ -1,12 +1,15 @@
 import { execFileSync, spawn } from "node:child_process";
 import process from "node:process";
 import { loadWorkspaceEnv } from "../lib/server/env/load-workspace-env";
-import { resolveSqliteDatabasePath } from "../lib/server/db/database-url";
 
 function commandName(base: string): string {
   return process.platform === "win32" ? `${base}.cmd` : base;
 }
 
+/**
+ * Keeps local bootstrap consistent with the workspace package manager entrypoints so dev startup
+ * exercises the same schema/seed commands developers would run manually.
+ */
 function runPnpm(script: "db:push" | "db:seed"): void {
   execFileSync(commandName("pnpm"), [script], {
     cwd: process.cwd(),
@@ -15,41 +18,21 @@ function runPnpm(script: "db:push" | "db:seed"): void {
   });
 }
 
-function readCaseCount(databasePath: string): number {
-  const output = execFileSync(
-    commandName("sqlite3"),
-    [databasePath, 'SELECT COUNT(*) FROM "Case";'],
-    {
-      cwd: process.cwd(),
-      stdio: ["ignore", "pipe", "inherit"],
-      env: process.env,
-      encoding: "utf8",
-    },
-  );
-
-  const count = Number(output.trim());
-  if (!Number.isFinite(count)) {
-    throw new Error(`Failed to parse case count from SQLite output: ${output}`);
-  }
-
-  return count;
-}
-
-function ensureSeededDatabase(): void {
+/**
+ * Keeps local dev startup aligned with the real demo workflow by always re-running the idempotent
+ * seed step after schema sync. Only checking SQLite content is insufficient because a fresh S3
+ * volume can still leave the viewer with metadata but no actual images.
+ */
+function ensureLocalDataReady(): void {
   loadWorkspaceEnv();
   runPnpm("db:push");
-
-  const databasePath = resolveSqliteDatabasePath();
-  const caseCount = readCaseCount(databasePath);
-
-  if (caseCount > 0) {
-    return;
-  }
-
-  console.log("Database is empty. Running db:seed before next dev.");
   runPnpm("db:seed");
 }
 
+/**
+ * Delegates to `next dev` instead of embedding a custom HTTP server so local iteration still
+ * benefits from the framework's own reload and diagnostics behavior.
+ */
 async function startNextDev(): Promise<void> {
   await new Promise<void>((resolve, reject) => {
     const child = spawn(commandName("next"), ["dev"], {
@@ -76,8 +59,12 @@ async function startNextDev(): Promise<void> {
   });
 }
 
+/**
+ * Runs the data bootstrap before Next starts so a fresh object-store volume cannot leave the first
+ * browser session on a metadata-only workspace with broken images.
+ */
 async function main() {
-  ensureSeededDatabase();
+  ensureLocalDataReady();
   await startNextDev();
 }
 
