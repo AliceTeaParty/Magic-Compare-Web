@@ -439,6 +439,7 @@ Docker 用：
 补充复盘文档：
 
 - `docs/ci-ghcr-lessons.zh-CN.md`
+- `docs/browser-smoke-and-ci-prep.zh-CN.md`
 
 ### CI 验证优先级
 
@@ -488,6 +489,8 @@ docker build -f docker/internal-site.Dockerfile -t magic-compare/internal-site .
 
 - 先用 `docker compose` 跑通 `rustfs -> rustfs-init -> internal-site`
 - 只验证运行路径和健康探活，不替代 `public:export`
+- 如果要补浏览器 smoke，至少额外验证 viewer 主图和 thumb 的 `naturalWidth > 0`
+- 不要把 `HTTP 200` 或 `img.complete === true` 当成图片真加载的充分证据
 - 失败时保留 compose 日志
 
 2. `publish`
