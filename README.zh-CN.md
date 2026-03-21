@@ -553,6 +553,7 @@ pnpm typecheck
 - [Uploader README](./tools/uploader/README.md)
 - [VSEditor 平铺导图工作流](./docs/VSEDITOR-WORKFLOW.zh-CN.md)
 - [Demo 与真实 Case / Group 流程差异](./docs/demo-vs-real-case-flow.zh-CN.md)
+- [CI / GHCR 接入复盘](./docs/ci-ghcr-lessons.zh-CN.md)
 - [English root README](./README.md)
 
 ## 🛣️ 后续方向

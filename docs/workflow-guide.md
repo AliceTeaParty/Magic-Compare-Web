@@ -412,6 +412,10 @@ Docker 用：
 
 如果另一条线程要写 `ci.yml` 和 `docker-publish.yml`，建议遵守这些边界：
 
+补充复盘文档：
+
+- `docs/ci-ghcr-lessons.zh-CN.md`
+
 ### CI 验证优先级
 
 优先验证：
@@ -460,6 +464,7 @@ docker build -f docker/internal-site.Dockerfile -t magic-compare/internal-site .
 - `publish case` 和 `public deploy` 应拆开
 - Pages 部署 job 不要并发
 - 优先把 export 结果作为可观察产物保留下来，便于排错
+- CI 中不要直接复用本地 `docker-data` bind mount；优先走单独的 compose override 和 named volumes
 
 ## 推荐的协作顺序
 
@@ -486,8 +491,10 @@ docker build -f docker/internal-site.Dockerfile -t magic-compare/internal-site .
 - `README.zh-CN.md`
 - `.env.example`
 - `docker-compose.yml`
+- `docker/ci.compose.override.yml`
 - `docker/internal-site.Dockerfile`
 - `apps/internal-site/lib/server/public-site/runtime.ts`
+- `docs/ci-ghcr-lessons.zh-CN.md`
 
 ## 一句话版本
 
