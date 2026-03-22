@@ -11,6 +11,7 @@ from pathlib import Path
 SUPPORTED_PLATFORMS = {"windows", "linux", "macos"}
 SUPPORTED_ARCHES = {"amd64", "arm64"}
 SUPPORTED_LAYOUTS = {"onefile", "onedir"}
+SUPPORTED_ARCHIVES = {"none", "zip"}
 
 
 def _normalize_platform(system_name: str) -> str:
@@ -105,6 +106,16 @@ def _build_binary(
     return dist_dir / f"{artifact_basename}{suffix}"
 
 
+def _archive_onedir_executable(executable_path: Path) -> Path:
+    """Archive the whole onedir tree once so distribution keeps a single downloadable file without reintroducing onefile cold-start cost."""
+    bundle_dir = executable_path.parent
+    archive_base = bundle_dir.parent / bundle_dir.name
+    archive_path = shutil.make_archive(
+        str(archive_base), "zip", root_dir=bundle_dir.parent, base_dir=bundle_dir.name
+    )
+    return Path(archive_path)
+
+
 def main() -> int:
     """Build a native uploader artifact and print the executable path for downstream scripts."""
     parser = argparse.ArgumentParser(
@@ -120,6 +131,12 @@ def main() -> int:
         default="onefile",
         help="onefile 便于分发；onedir 启动更快，适合本地调试。",
     )
+    parser.add_argument(
+        "--archive",
+        choices=sorted(SUPPORTED_ARCHIVES),
+        default="none",
+        help="仅对 onedir 有意义；zip 适合一次解压后长期使用。",
+    )
     args = parser.parse_args()
 
     native_platform = _normalize_platform(platform.system())
@@ -133,6 +150,11 @@ def main() -> int:
         target_arch=target_arch,
         layout=args.layout,
     )
+    if args.archive != "none":
+        if args.layout != "onedir":
+            raise RuntimeError("--archive 仅支持与 --layout onedir 一起使用。")
+        artifact_path = _archive_onedir_executable(artifact_path)
+
     print(artifact_path)
     return 0
 

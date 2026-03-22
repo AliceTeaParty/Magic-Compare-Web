@@ -9,12 +9,14 @@
 
 - `--onefile`：便于发给别人，但 macOS 冷启动会有解包开销
 - `--onedir`：目录稍大一些，但本地启动更快，适合开发和自测
+- `--onedir --archive zip`：先打成一个 zip 分发，使用者手动解压一次，后续启动仍然走快启动目录版
 
 注意：
 
 - `--onefile` 没有“首次解包后永久缓存”的官方开关
 - `--runtime-tmpdir` 只能改解包目录，不能把它变成持久缓存
 - 需要反复本地测试时，优先用 `--layout onedir`
+- 想兼顾“单文件分发体验”和“后续启动速度”时，优先分发 `onedir zip`，不要继续纠结 `onefile` 缓存
 
 CI 默认产出 3 个目标：
 
@@ -66,6 +68,25 @@ python scripts/build-binary.py --layout onedir
 tools/uploader/dist/magic-compare-uploader-macos-arm64/magic-compare-uploader-macos-arm64
 ```
 
+如需“发给别人一个包，但运行不再慢启动”：
+
+```bash
+python scripts/build-binary.py --layout onedir --archive zip
+```
+
+对应产物会变成：
+
+```text
+tools/uploader/dist/magic-compare-uploader-macos-arm64.zip
+```
+
+使用方式：
+
+1. 解压 zip
+2. 运行解压目录里的可执行文件
+
+这样解压成本只发生一次，不会像 `onefile` 那样每次冷启动都重复解包。
+
 ## 3. 指定标签名称
 
 如需显式指定命名标签，可以传：
@@ -78,6 +99,7 @@ python scripts/build-binary.py --platform linux --arch amd64
 
 - 这只影响产物命名，不会做交叉编译
 - 如需指定目录布局，可再加 `--layout onedir` 或 `--layout onefile`
+- 如需分发 zip 包，可再加 `--archive zip`，但只能和 `--layout onedir` 搭配
 - 要得到真正可运行的 `linux/arm64` 二进制，仍然要在 `linux/arm64` 原生环境里执行这个脚本
 
 ## 4. CI 入口
