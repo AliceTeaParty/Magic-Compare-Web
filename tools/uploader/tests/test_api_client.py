@@ -10,41 +10,34 @@ from src.auth import UploaderConfig
 
 
 class ApiClientTests(unittest.TestCase):
-    @mock.patch("src.api_client.clear_access_token")
     @mock.patch("src.api_client.build_request_headers")
     @mock.patch("src.api_client.httpx.post")
-    def test_retries_once_after_unauthorized_with_refreshed_user_token(
+    def test_raises_service_token_error_on_unauthorized(
         self,
         post: mock.Mock,
         build_headers: mock.Mock,
-        clear_access_token: mock.Mock,
     ) -> None:
         request = httpx.Request("POST", "https://compare.example.com/api/ops/import-sync")
-        unauthorized = httpx.Response(401, request=request)
-        success = httpx.Response(200, request=request, json={"slug": "2026"})
-        post.side_effect = [unauthorized, success]
-        build_headers.side_effect = [
-            {"cf-access-token": "stale-token"},
-            {"cf-access-token": "fresh-token"},
-        ]
+        post.return_value = httpx.Response(401, request=request)
+        build_headers.return_value = {
+            "CF-Access-Client-Id": "client-id",
+            "CF-Access-Client-Secret": "client-secret",
+        }
 
         config = UploaderConfig(
             site_url="https://compare.example.com",
             api_url="https://compare.example.com/api/ops/import-sync",
             env_path=None,
             work_dir=None,
-            access_token="stale-token",
-            service_token_client_id=None,
-            service_token_client_secret=None,
+            service_token_client_id="client-id",
+            service_token_client_secret="client-secret",
         )
 
-        result = sync_manifest(config, {"case": {"slug": "2026"}, "groups": []})
+        with self.assertRaisesRegex(RuntimeError, "Service Token"):
+            sync_manifest(config, {"case": {"slug": "2026"}, "groups": []})
 
-        self.assertEqual(result, {"slug": "2026"})
-        clear_access_token.assert_called_once_with(config)
-        self.assertEqual(build_headers.call_args_list[0].kwargs, {})
-        self.assertEqual(build_headers.call_args_list[1].kwargs, {"force_refresh_access_token": True})
-        self.assertEqual(post.call_count, 2)
+        build_headers.assert_called_once_with(config)
+        post.assert_called_once()
 
 
 if __name__ == "__main__":

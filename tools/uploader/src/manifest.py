@@ -2,39 +2,25 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from tempfile import TemporaryDirectory
 
-from .auth import UploaderConfig
 from .scanner import CaseSource, scan_case_directory
-from .storage import upload_file_to_internal_assets
-from .thumbnailer import build_thumbnail, image_dimensions
+from .thumbnailer import image_dimensions
 
-def _stage_asset(
-    asset_path: Path,
+
+def build_asset_urls(
     case_slug: str,
     group_slug: str,
     frame_order: int,
-    config: UploaderConfig,
-) -> tuple[str, str, int, int]:
+    asset_path: Path,
+) -> tuple[str, str]:
     relative_root = Path("internal-assets") / case_slug / group_slug / f"{frame_order + 1:03d}"
     image_url = f"/{(relative_root / asset_path.name).as_posix()}"
-    thumb_name = f"thumb-{asset_path.name}"
-    thumb_url = f"/{(relative_root / thumb_name).as_posix()}"
-
-    upload_file_to_internal_assets(config, asset_path, image_url)
-
-    with TemporaryDirectory(prefix="magic-compare-thumb-") as temp_dir:
-        thumb_target = Path(temp_dir) / thumb_name
-        build_thumbnail(asset_path, thumb_target)
-        upload_file_to_internal_assets(config, thumb_target, thumb_url)
-
-    width, height = image_dimensions(asset_path)
-
-    return (image_url, thumb_url, width, height)
+    thumb_url = f"/{(relative_root / f'thumb-{asset_path.name}').as_posix()}"
+    return image_url, thumb_url
 
 
-def build_import_manifest(case_root: Path, config: UploaderConfig) -> dict:
-    scanned_case: CaseSource = scan_case_directory(case_root)
+def build_import_manifest_from_case(scanned_case: CaseSource) -> dict:
+    """Build the import manifest from local files only so dry-run and sync share the same payload shape."""
     case_slug = str(scanned_case.metadata.get("slug", scanned_case.root.name.lower()))
 
     groups_payload = []
@@ -43,13 +29,8 @@ def build_import_manifest(case_root: Path, config: UploaderConfig) -> dict:
         for frame in group.frames:
             assets_payload = []
             for asset in frame.assets:
-                image_url, thumb_url, width, height = _stage_asset(
-                    asset.path,
-                    case_slug=case_slug,
-                    group_slug=group.slug,
-                    frame_order=frame.order,
-                    config=config,
-                )
+                image_url, thumb_url = build_asset_urls(case_slug, group.slug, frame.order, asset.path)
+                width, height = image_dimensions(asset.path)
                 assets_payload.append(
                     {
                         "kind": asset.kind,
@@ -104,6 +85,12 @@ def build_import_manifest(case_root: Path, config: UploaderConfig) -> dict:
     }
 
 
-def manifest_json(case_root: Path, config: UploaderConfig) -> str:
-    manifest = build_import_manifest(case_root, config)
+def build_import_manifest(case_root: Path) -> dict:
+    """Scan a structured case directory and produce the same manifest shape that sync sends to the server."""
+    scanned_case = scan_case_directory(case_root)
+    return build_import_manifest_from_case(scanned_case)
+
+
+def manifest_json(case_root: Path) -> str:
+    manifest = build_import_manifest(case_root)
     return json.dumps(manifest, indent=2, ensure_ascii=True)

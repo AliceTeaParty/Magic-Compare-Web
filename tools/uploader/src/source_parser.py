@@ -10,6 +10,8 @@ from .scanner import SUPPORTED_EXTENSIONS
 
 SOURCE_VARIANTS = {"src", "source"}
 HEATMAP_VARIANTS = {"heatmap"}
+IGNORED_BASENAMES = {".ds_store", "thumbs.db"}
+IGNORED_SUFFIXES = {".json", ".yaml", ".yml", ".txt", ".md", ".csv", ".db", ".log"}
 FILENAME_RE = re.compile(
     r"(?P<prefix>.+?)[_\-.](?P<frame>\d+)(?:[_\-.](?P<variant>[^_\-.]+))?$"
 )
@@ -59,6 +61,13 @@ class ParsedSourceGroup:
     title: str
     description: str
     frames: list[ParsedFrame]
+    ignored_files: list["IgnoredSourceFile"]
+
+
+@dataclass(frozen=True)
+class IgnoredSourceFile:
+    path: Path
+    reason: str
 
 
 def _split_tokens(input_text: str) -> list[str]:
@@ -71,6 +80,7 @@ def _extract_fps(stem: str) -> str:
 
 
 def _extract_episode(prefix: str) -> str:
+    """Prefer nearby short numeric tokens because VSEditor exports often bury episode ids inside long filenames."""
     tokens = _split_tokens(prefix)
     candidates: list[str] = []
     for token in reversed(tokens):
@@ -92,6 +102,7 @@ def _normalize_variant(raw_variant: str | None) -> str:
 
 
 def _parse_candidate(path: Path) -> SourceCandidate:
+    """Support both rich VSEditor names and fallback `<frame><variant>` names so imports stay forgiving."""
     stem = path.stem
     match = FILENAME_RE.search(stem)
     if match:
@@ -148,6 +159,7 @@ def _after_priority(candidate: SourceCandidate) -> tuple[int, str, str]:
 
 
 def _resolve_frame(order: int, candidates: list[SourceCandidate], fallback_width: int) -> ParsedFrame:
+    """Collapse one frame candidate set into before/after/misc because later plan/upload stages assume one canonical after."""
     before_candidates = [candidate for candidate in candidates if candidate.variant in SOURCE_VARIANTS]
     if len(before_candidates) != 1:
         raise ValueError(
@@ -194,6 +206,7 @@ def _resolve_frame(order: int, candidates: list[SourceCandidate], fallback_width
 
 
 def _derive_group_identity(source_root: Path, candidates: list[SourceCandidate]) -> tuple[str, str]:
+    """Fall back to the folder name when shared filename prefixes are too noisy to produce a stable human slug."""
     common_prefix = os.path.commonprefix([candidate.root_hint for candidate in candidates]).strip(" _-.")
     common_slug = kebab_case(common_prefix)
     if len(common_slug) < 8 or common_slug.count("-") < 1:
@@ -203,20 +216,64 @@ def _derive_group_identity(source_root: Path, candidates: list[SourceCandidate])
     return common_slug, title_case(common_prefix)
 
 
+def _ignore_reason(path: Path) -> str | None:
+    normalized_name = path.name.lower()
+    if normalized_name in IGNORED_BASENAMES or normalized_name.startswith("._"):
+        return "system-artifact"
+    if normalized_name.startswith("."):
+        return "hidden-file"
+    if normalized_name.endswith("~") or normalized_name.endswith(".swp") or normalized_name.endswith(".tmp"):
+        return "editor-temp"
+    if normalized_name.startswith("thumb-"):
+        # Generated thumbnails are uploader byproducts and re-importing them would only duplicate assets.
+        return "generated-thumbnail"
+    if path.suffix.lower() in IGNORED_SUFFIXES:
+        return "sidecar-file"
+    return None
+
+
+def _discover_source_files(source_root: Path) -> tuple[list[Path], list[IgnoredSourceFile]]:
+    """Collect importable source images while surfacing ignored noise instead of failing on it."""
+    image_paths: list[Path] = []
+    ignored_files: list[IgnoredSourceFile] = []
+
+    for path in sorted(candidate for candidate in source_root.rglob("*") if candidate.is_file()):
+        ignore_reason = _ignore_reason(path)
+        if ignore_reason:
+            ignored_files.append(IgnoredSourceFile(path=path, reason=ignore_reason))
+            continue
+
+        if path.suffix.lower() not in SUPPORTED_EXTENSIONS:
+            ignored_files.append(IgnoredSourceFile(path=path, reason="unsupported-file-type"))
+            continue
+
+        image_paths.append(path)
+
+    return image_paths, ignored_files
+
+
 def discover_source_group(source_root: Path) -> ParsedSourceGroup:
+    """Parse a flat source directory into structured frames while tolerating unrelated local noise."""
     source_root = source_root.resolve()
     if not source_root.exists() or not source_root.is_dir():
         raise ValueError(f"素材目录不存在或不可读：{source_root}")
 
-    image_paths = sorted(
-        path
-        for path in source_root.rglob("*")
-        if path.is_file() and path.suffix.lower() in SUPPORTED_EXTENSIONS
-    )
+    image_paths, ignored_files = _discover_source_files(source_root)
     if not image_paths:
         raise ValueError(f"{source_root} 中没有可导入的图片文件。")
 
-    parsed_candidates = [_parse_candidate(path) for path in image_paths]
+    parsed_candidates: list[SourceCandidate] = []
+    for path in image_paths:
+        try:
+            parsed_candidates.append(_parse_candidate(path))
+        except ValueError:
+            # Unparseable image names are treated as ignored noise so one accidental screenshot does
+            # not block the whole import, but the plan/report layer will still surface them.
+            ignored_files.append(IgnoredSourceFile(path=path, reason="unrecognized-image-name"))
+
+    if not parsed_candidates:
+        raise ValueError(f"{source_root} 中没有符合导入命名规则的图片文件。")
+
     grouped_candidates: dict[tuple[str, str, int], list[SourceCandidate]] = {}
     for candidate in parsed_candidates:
         grouped_candidates.setdefault(candidate.frame_key, []).append(candidate)
@@ -235,4 +292,5 @@ def discover_source_group(source_root: Path) -> ParsedSourceGroup:
         title=group_title,
         description=f"Imported from {source_root.name}.",
         frames=frames,
+        ignored_files=sorted(ignored_files, key=lambda item: item.path.as_posix()),
     )

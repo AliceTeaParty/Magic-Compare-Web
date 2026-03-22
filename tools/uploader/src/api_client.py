@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 import httpx
 
-from .auth import UploaderConfig, build_request_headers, clear_access_token
+from .auth import UploaderConfig, build_request_headers
 
 @dataclass(frozen=True)
 class CaseSearchGroup:
@@ -44,18 +44,14 @@ def group_delete_url(api_url: str) -> str:
 def _request_error(error: httpx.HTTPStatusError) -> RuntimeError:
     status_code = error.response.status_code
     if status_code in {401, 403}:
-        return RuntimeError("请求被 Cloudflare Access 或内部站拒绝。请确认 Zero Trust 登录状态或 Service Token 配置。")
+        return RuntimeError("请求被内部站拒绝。请确认 Service Token 配置和 internal-site 访问策略。")
     return RuntimeError(f"请求失败：HTTP {status_code}")
 
 
 def _post_json(config: UploaderConfig, url: str, payload: dict) -> dict:
+    """Keep uploader HTTP calls deterministic by doing a single authenticated request per operation."""
     headers = build_request_headers(config)
     response = httpx.post(url, json=payload, timeout=30.0, headers=headers)
-
-    if response.status_code in {401, 403} and not config.has_service_token and not config.is_local_site:
-        clear_access_token(config)
-        headers = build_request_headers(config, force_refresh_access_token=True)
-        response = httpx.post(url, json=payload, timeout=30.0, headers=headers)
 
     try:
         response.raise_for_status()
@@ -66,6 +62,7 @@ def _post_json(config: UploaderConfig, url: str, payload: dict) -> dict:
 
 
 def search_cases(config: UploaderConfig, query: str, limit: int = 8) -> list[CaseSearchResult]:
+    """Search cases through the internal API so the wizard can reuse remote metadata without local caches."""
     payload = _post_json(config, case_search_url(config.api_url), {"query": query, "limit": limit})
     results: list[CaseSearchResult] = []
     for item in payload.get("cases", []):
@@ -90,10 +87,12 @@ def search_cases(config: UploaderConfig, query: str, limit: int = 8) -> list[Cas
 
 
 def sync_manifest(config: UploaderConfig, manifest: dict) -> dict:
+    """Push one manifest snapshot into internal-site after uploads finished successfully."""
     return _post_json(config, config.api_url, manifest)
 
 
 def delete_group(config: UploaderConfig, case_slug: str, group_slug: str) -> dict:
+    """Delete one remote group through the same authenticated API surface used by sync."""
     return _post_json(
         config,
         group_delete_url(config.api_url),

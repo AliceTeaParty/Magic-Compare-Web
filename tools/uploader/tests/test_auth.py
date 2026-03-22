@@ -3,23 +3,21 @@ from __future__ import annotations
 import tempfile
 import unittest
 from pathlib import Path
-from types import SimpleNamespace
-from unittest import mock
 
 from src.auth import (
-    ENV_ACCESS_TOKEN_NAME,
-    UploaderConfig,
+    ENV_ACCESS_CLIENT_ID_NAME,
+    ENV_ACCESS_CLIENT_SECRET_NAME,
+    ENV_SITE_URL_NAME,
     build_request_headers,
-    ensure_cloudflared_installed,
+    ensure_remote_access_config,
     ensure_work_dir_env,
-    fetch_access_token_via_cloudflared,
     persist_config_overrides,
     resolve_uploader_config,
     uploader_env_example_path,
 )
 
 
-class UploaderAuthTests(unittest.TestCase):
+class UploaderConfigTests(unittest.TestCase):
     def setUp(self) -> None:
         self.temp_dir = tempfile.TemporaryDirectory()
         self.work_dir = Path(self.temp_dir.name) / "sample-case"
@@ -38,108 +36,66 @@ class UploaderAuthTests(unittest.TestCase):
         self.assertEqual(env_path.read_text(encoding="utf-8"), uploader_env_example_path().read_text(encoding="utf-8"))
         self.assertNotIn("MAGIC_COMPARE_PUBLIC_EXPORT_DIR", env_path.read_text(encoding="utf-8"))
 
-    def test_prefers_service_token_headers_over_user_token(self) -> None:
-        config = UploaderConfig(
-            site_url="https://compare.example.com",
-            api_url="https://compare.example.com/api/ops/import-sync",
-            env_path=None,
-            work_dir=None,
-            access_token="user-token",
-            service_token_client_id="client-id",
-            service_token_client_secret="client-secret",
-        )
-
-        headers = build_request_headers(config)
-
-        self.assertEqual(
-            headers,
-            {
-                "CF-Access-Client-Id": "client-id",
-                "CF-Access-Client-Secret": "client-secret",
-            },
-        )
-
-    def test_uses_cf_access_token_header_for_user_token(self) -> None:
-        config = UploaderConfig(
-            site_url="https://compare.example.com",
-            api_url="https://compare.example.com/api/ops/import-sync",
-            env_path=None,
-            work_dir=None,
-            access_token="user-token",
-            service_token_client_id=None,
-            service_token_client_secret=None,
-        )
-
-        headers = build_request_headers(config)
-
-        self.assertEqual(headers, {"cf-access-token": "user-token"})
-
     def test_persists_site_url_override_to_work_dir_env(self) -> None:
         config = resolve_uploader_config(self.work_dir)
 
         persist_config_overrides(config, site_url="https://compare.example.com")
 
         env_text = (self.work_dir / ".env").read_text(encoding="utf-8")
-        self.assertIn("MAGIC_COMPARE_SITE_URL=https://compare.example.com", env_text)
+        self.assertIn(f"{ENV_SITE_URL_NAME}=https://compare.example.com", env_text)
 
-    @mock.patch("src.auth.subprocess.run")
-    @mock.patch("src.auth.shutil.which")
-    @mock.patch("src.auth.sys.platform", "darwin")
-    def test_installs_cloudflared_via_brew_on_macos(self, which: mock.Mock, run: mock.Mock) -> None:
-        def which_side_effect(name: str) -> str | None:
-            if name == "cloudflared":
-                return None if run.call_count == 0 else "/opt/homebrew/bin/cloudflared"
-            if name == "brew":
-                return "/opt/homebrew/bin/brew"
-            return None
+    def test_build_request_headers_allows_local_sites_without_service_token(self) -> None:
+        config = resolve_uploader_config(self.work_dir, site_url_override="http://localhost:3000")
 
-        which.side_effect = which_side_effect
-        run.return_value = SimpleNamespace(returncode=0)
+        self.assertEqual(build_request_headers(config), {})
 
-        executable = ensure_cloudflared_installed()
-
-        self.assertEqual(executable, "/opt/homebrew/bin/cloudflared")
-        run.assert_called_once_with(["/opt/homebrew/bin/brew", "install", "cloudflared"], check=False)
-
-    @mock.patch("src.auth.ensure_cloudflared_installed", return_value="/usr/local/bin/cloudflared")
-    @mock.patch("src.auth.subprocess.run")
-    def test_fetches_access_token_and_persists_it(
-        self,
-        run: mock.Mock,
-        _ensure_cloudflared_installed: mock.Mock,
-    ) -> None:
+    def test_build_request_headers_requires_service_token_for_remote_sites(self) -> None:
         config = resolve_uploader_config(self.work_dir, site_url_override="https://compare.example.com")
 
-        run.side_effect = [
-            SimpleNamespace(returncode=0),
-            SimpleNamespace(returncode=0, stdout="token-123\n", stderr=""),
-        ]
+        with self.assertRaisesRegex(RuntimeError, "只支持 Cloudflare Service Token"):
+            build_request_headers(config)
 
-        token = fetch_access_token_via_cloudflared(config)
-
-        self.assertEqual(token, "token-123")
-        self.assertEqual(config.access_token, "token-123")
-        env_text = (self.work_dir / ".env").read_text(encoding="utf-8")
-        self.assertIn(f"{ENV_ACCESS_TOKEN_NAME}=token-123", env_text)
-        self.assertEqual(run.call_args_list[0].args[0], ["/usr/local/bin/cloudflared", "access", "login", "https://compare.example.com"])
-        self.assertEqual(
-            run.call_args_list[1].args[0],
-            ["/usr/local/bin/cloudflared", "access", "token", "-app=https://compare.example.com"],
+    def test_remote_access_config_rejects_partial_service_token(self) -> None:
+        env_path = ensure_work_dir_env(self.work_dir)
+        env_path.write_text(
+            "\n".join(
+                [
+                    "MAGIC_COMPARE_SITE_URL=https://compare.example.com",
+                    f"{ENV_ACCESS_CLIENT_ID_NAME}=client-id",
+                    "",
+                ]
+            ),
+            encoding="utf-8",
         )
 
-    def test_raises_on_half_configured_service_token(self) -> None:
-        config = UploaderConfig(
-            site_url="https://compare.example.com",
-            api_url="https://compare.example.com/api/ops/import-sync",
-            env_path=None,
-            work_dir=None,
-            access_token=None,
-            service_token_client_id="client-id",
-            service_token_client_secret=None,
-        )
+        config = resolve_uploader_config(self.work_dir)
 
         with self.assertRaisesRegex(RuntimeError, "缺少 Client Secret"):
-            build_request_headers(config)
+            ensure_remote_access_config(config)
+
+    def test_build_request_headers_prefers_service_token_for_remote_sites(self) -> None:
+        env_path = ensure_work_dir_env(self.work_dir)
+        env_path.write_text(
+            "\n".join(
+                [
+                    "MAGIC_COMPARE_SITE_URL=https://compare.example.com",
+                    f"{ENV_ACCESS_CLIENT_ID_NAME}=client-id",
+                    f"{ENV_ACCESS_CLIENT_SECRET_NAME}=client-secret",
+                    "",
+                ]
+            ),
+            encoding="utf-8",
+        )
+
+        config = resolve_uploader_config(self.work_dir)
+
+        self.assertEqual(
+            build_request_headers(config),
+            {
+                "CF-Access-Client-Id": "client-id",
+                "CF-Access-Client-Secret": "client-secret",
+            },
+        )
 
 
 if __name__ == "__main__":
