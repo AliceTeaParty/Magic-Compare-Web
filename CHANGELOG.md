@@ -6,6 +6,25 @@ Entries before that date are summarized at release level instead of being recons
 
 ## Unreleased
 
+## v1.5.1 - 2026-03-22
+
+Viewer interaction and accessibility hardening release.
+
+### Fixed
+
+- Keyboard shortcuts now properly guard against system/browser shortcuts (Ctrl+1, Cmd+←, etc.), input method composition, and form/contenteditable regions to avoid unintended mode switches and IME interference.
+
+### Changed
+
+- A/B drag interactions now skip redundant state updates when clamping produces no change, reducing render cycles during high-frequency pan/zoom operations.
+
+### Improved
+
+- Filmstrip thumbnails now use native lazy loading (`loading="lazy"`) to defer off-screen image loads, improving initial page load time for cases with many frames.
+- Removed unused React wheel event handler that was duplicating DOM-level wheel processing, reducing bundle complexity.
+- Added ARIA label to external publish link button for improved screen reader support.
+- Clarified keyboard shortcut guard layer documentation for future maintainers.
+
 ## v1.5.0 - 2026-03-22
 
 Uploader hardening release focused on making remote uploads credential-light, packaging startup less painful, and turning tag builds into real GitHub releases.
