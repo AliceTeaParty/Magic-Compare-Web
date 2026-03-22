@@ -13,6 +13,11 @@ dependencies = [
   "typer>=0.15.4"
 ]
 
+[project.optional-dependencies]
+build = [
+  "pyinstaller>=6.16.0"
+]
+
 [project.scripts]
 magic-compare-uploader = "src.cli:app"
 

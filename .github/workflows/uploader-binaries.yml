@@ -1,0 +1,88 @@
+name: Uploader Binaries
+
+run-name: Uploader Binaries • ${{ github.event_name }} • ${{ github.ref_name }}
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  build:
+    name: Build ${{ matrix.platform }}-${{ matrix.arch }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            python-version: "3.12"
+            platform: linux
+            arch: amd64
+            binary-name: magic-compare-uploader-linux-amd64
+          - os: windows-latest
+            python-version: "3.12"
+            platform: windows
+            arch: amd64
+            binary-name: magic-compare-uploader-windows-amd64.exe
+          - os: macos-14
+            python-version: "3.12"
+            platform: macos
+            arch: arm64
+            binary-name: magic-compare-uploader-macos-arm64
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: tools/uploader/pyproject.toml
+
+      - name: Install uploader build dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e "./tools/uploader[build]"
+
+      - name: Build uploader binary
+        run: |
+          cd tools/uploader
+          python scripts/build-binary.py --platform "${{ matrix.platform }}" --arch "${{ matrix.arch }}"
+
+      - name: Verify binary help output
+        run: ./tools/uploader/dist/${{ matrix.binary-name }} --help >/dev/null
+
+      - name: Smoke plan on sample flat source
+        if: matrix.platform == 'linux'
+        run: |
+          sample_dir="$(mktemp -d)"
+          python - "$sample_dir" <<'PY'
+          from pathlib import Path
+          import sys
+          from PIL import Image
+
+          root = Path(sys.argv[1])
+          Image.new("RGB", (32, 24), color=(0, 0, 0)).save(root / "24_demo_00001_100_src.png")
+          Image.new("RGB", (32, 24), color=(255, 255, 255)).save(root / "24_demo_00001_100_output.png")
+          PY
+          ./tools/uploader/dist/${{ matrix.binary-name }} plan "$sample_dir" --case-slug 2026 --group-slug smoke-demo >/dev/null
+
+      - name: Upload binary artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.binary-name }}
+          path: tools/uploader/dist/${{ matrix.binary-name }}
+          if-no-files-found: error
+          retention-days: 7

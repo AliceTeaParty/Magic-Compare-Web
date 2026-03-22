@@ -10,12 +10,18 @@ const safeGeneratedPaths = [
   "apps/public-site/.next",
   "apps/public-site/out",
   "apps/public-site/public/published",
+  "tools/uploader/.build",
   "dist",
   "coverage",
   ".turbo",
 ];
 
-const optionalToolCacheDirNames = new Set(["__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache"]);
+const optionalToolCacheDirNames = new Set([
+  "__pycache__",
+  ".pytest_cache",
+  ".mypy_cache",
+  ".ruff_cache",
+]);
 
 /**
  * Remove only paths that this script discovered from an explicit allowlist.
