@@ -4,6 +4,7 @@ import { readFile } from "node:fs/promises";
 import {
   DeleteObjectsCommand,
   GetObjectCommand,
+  HeadObjectCommand,
   ListObjectsV2Command,
   PutObjectCommand,
   S3Client,
@@ -21,6 +22,11 @@ const MIME_TYPES: Record<string, string> = {
 
 let cachedClient: S3Client | null = null;
 let cachedSignature: string | null = null;
+
+export interface InternalAssetHeadState {
+  metadata: Record<string, string>;
+  size: number;
+}
 
 function hasTraversal(input: string): boolean {
   return input.split("/").some((segment) => segment === ".." || segment.length === 0);
@@ -144,6 +150,7 @@ export async function uploadInternalAssetBuffer(
   content: Uint8Array | Buffer,
   assetUrl: string,
   contentType?: string,
+  metadata?: Record<string, string>,
 ): Promise<void> {
   const client = buildS3Client();
   const config = getInternalAssetStorageConfig();
@@ -153,8 +160,52 @@ export async function uploadInternalAssetBuffer(
       Key: internalAssetObjectKey(assetUrl),
       Body: content,
       ContentType: contentType || guessMimeType(assetUrl),
+      Metadata: metadata,
     }),
   );
+}
+
+/**
+ * Proxy uploads need a cheap existence probe so the server can skip already-matching objects
+ * without forcing uploader binaries to hold raw S3 credentials.
+ */
+export async function headInternalAsset(assetUrl: string): Promise<InternalAssetHeadState | null> {
+  const client = buildS3Client();
+  const config = getInternalAssetStorageConfig();
+
+  try {
+    const response = await client.send(
+      new HeadObjectCommand({
+        Bucket: config.bucket,
+        Key: internalAssetObjectKey(assetUrl),
+      }),
+    );
+
+    return {
+      metadata: Object.fromEntries(
+        Object.entries(response.Metadata ?? {}).map(([key, value]) => [
+          key.toLowerCase(),
+          value ?? "",
+        ]),
+      ),
+      size: Number(response.ContentLength ?? 0),
+    };
+  } catch (error) {
+    const statusCode =
+      typeof error === "object" && error && "$metadata" in error
+        ? Number(
+            (error as { $metadata?: { httpStatusCode?: number } }).$metadata?.httpStatusCode ?? 0,
+          )
+        : 0;
+    const errorName =
+      typeof error === "object" && error && "name" in error ? String(error.name) : "";
+
+    if (statusCode === 404 || errorName === "NotFound" || errorName === "NoSuchKey") {
+      return null;
+    }
+
+    throw error;
+  }
 }
 
 /**

@@ -7,18 +7,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from botocore.exceptions import (
-    BotoCoreError,
-    ClientError,
-    ConnectionClosedError,
-    ConnectTimeoutError,
-    EndpointConnectionError,
-    ReadTimeoutError,
-)
+import httpx
 
 from .config import UploaderConfig
 from .plan import PlanOperation, PreparedCasePlan
-from .storage import head_internal_asset, upload_file_to_internal_assets
+from .storage import upload_file_to_internal_assets
 from .thumbnailer import build_thumbnail
 
 MAX_UPLOAD_ATTEMPTS = 3
@@ -110,41 +103,13 @@ def _metadata_for_operation(operation: PlanOperation) -> dict[str, str]:
     }
 
 
-def _matches_remote_object(operation: PlanOperation, remote_state: object) -> bool:
-    if remote_state is None:
-        return False
-
-    metadata = getattr(remote_state, "metadata", {})
-    return (
-        metadata.get("sha256") == operation.source_sha256
-        and metadata.get("source-size") == str(operation.source_size)
-        and metadata.get("derivative-kind") == operation.derivative_kind
-    )
-
-
 def _is_retryable_upload_error(error: Exception) -> bool:
-    """Retry only transient storage failures so credential or path mistakes fail fast instead of looping."""
-    if isinstance(
-        error,
-        (
-            ConnectTimeoutError,
-            EndpointConnectionError,
-            ConnectionClosedError,
-            ReadTimeoutError,
-        ),
-    ):
+    """Retry only transient proxy failures so auth or path mistakes still fail fast with one clear error."""
+    if isinstance(error, (httpx.TimeoutException, httpx.NetworkError)):
         return True
-    if isinstance(error, ClientError):
-        status_code = error.response.get("ResponseMetadata", {}).get(
-            "HTTPStatusCode", 0
-        )
-        error_code = str(error.response.get("Error", {}).get("Code", ""))
-        return (
-            status_code == 429
-            or status_code >= 500
-            or error_code in {"SlowDown", "RequestTimeout"}
-        )
-    return isinstance(error, BotoCoreError)
+    if isinstance(error, httpx.HTTPStatusError):
+        return error.response.status_code == 429 or error.response.status_code >= 500
+    return False
 
 
 def _prepare_upload_source(
@@ -192,27 +157,23 @@ def execute_upload_plan(
             },
         )
 
-        remote_state = head_internal_asset(config, operation.target_url)
-        if _matches_remote_object(operation, remote_state):
-            operation_state["status"] = "skipped"
-            _write_session(session_path, session)
-            skipped_count += 1
-            continue
-
         last_error: str | None = None
         for attempt in range(1, MAX_UPLOAD_ATTEMPTS + 1):
             operation_state["attempts"] = attempt
             prepared_path, temp_dir = _prepare_upload_source(operation)
             try:
-                upload_file_to_internal_assets(
+                upload_result = upload_file_to_internal_assets(
                     config,
                     prepared_path,
                     operation.target_url,
                     metadata=_metadata_for_operation(operation),
                 )
-                operation_state["status"] = "uploaded"
+                operation_state["status"] = upload_result.status
                 operation_state["lastError"] = None
-                uploaded_count += 1
+                if upload_result.status == "skipped":
+                    skipped_count += 1
+                else:
+                    uploaded_count += 1
                 _write_session(session_path, session)
                 break
             except (

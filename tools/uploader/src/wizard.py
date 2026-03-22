@@ -11,7 +11,6 @@ from rich.text import Text
 
 from .api_client import CaseSearchResult, search_cases, sync_manifest
 from .commands import (
-    _ensure_s3_ready,
     _render_execution_summary,
     _prepare_runtime_config,
     _resolve_source_dir,
@@ -258,7 +257,6 @@ def run_wizard(
     if not typer.confirm("开始上传并同步到 internal-site？", default=True):
         raise typer.Abort()
 
-    _ensure_s3_ready(config)
     ensure_remote_access_config(config)
     with console.status("[bold green]正在上传对象...[/]"):
         execution_summary = execute_upload_plan(structured_plan, config)

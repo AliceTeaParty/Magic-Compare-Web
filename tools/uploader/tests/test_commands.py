@@ -33,10 +33,8 @@ class CommandFlowTests(unittest.TestCase):
 
     @mock.patch("src.commands.render_plan_summary")
     @mock.patch("src.commands.ensure_remote_access_config")
-    @mock.patch("src.commands._ensure_s3_ready")
     def test_handle_sync_dry_run_skips_remote_checks(
         self,
-        ensure_s3_ready: mock.Mock,
         ensure_remote_access_config: mock.Mock,
         _render_plan_summary: mock.Mock,
     ) -> None:
@@ -50,5 +48,4 @@ class CommandFlowTests(unittest.TestCase):
         self.assertEqual(report.status, "ok")
         self.assertIsNone(execution_summary)
         self.assertIsNone(sync_result)
-        ensure_s3_ready.assert_not_called()
         ensure_remote_access_config.assert_not_called()

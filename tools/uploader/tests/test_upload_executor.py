@@ -35,25 +35,17 @@ class UploadExecutorTests(unittest.TestCase):
             api_url="http://localhost:3000/api/ops/import-sync",
             env_path=None,
             work_dir=self.case_root,
-            s3_bucket="magic-compare-assets",
-            s3_region="us-east-1",
-            s3_endpoint="http://localhost:9000",
-            s3_access_key_id="rustfsadmin",
-            s3_secret_access_key="rustfsadmin",
-            s3_force_path_style=True,
-            s3_internal_prefix="internal-assets",
         )
 
     def tearDown(self) -> None:
         self.temp_dir.cleanup()
 
-    @mock.patch("src.upload_executor.head_internal_asset", return_value=None)
     @mock.patch("src.upload_executor.upload_file_to_internal_assets")
     def test_uploads_every_operation_and_persists_session(
         self,
         upload_file: mock.Mock,
-        _head_internal_asset: mock.Mock,
     ) -> None:
+        upload_file.return_value = type("UploadResult", (), {"status": "uploaded"})()
         plan = build_case_plan(self.case_root)
 
         summary = execute_upload_plan(plan, self.config)
@@ -74,39 +66,20 @@ class UploadExecutorTests(unittest.TestCase):
         self, upload_file: mock.Mock
     ) -> None:
         plan = build_case_plan(self.case_root)
-        remote_states = {
-            operation.target_url: type(
-                "RemoteState",
-                (),
-                {
-                    "metadata": {
-                        "sha256": operation.source_sha256,
-                        "source-size": str(operation.source_size),
-                        "derivative-kind": operation.derivative_kind,
-                    },
-                    "size": operation.source_size,
-                },
-            )
-            for operation in plan.report.operations
-        }
+        upload_file.return_value = type("UploadResult", (), {"status": "skipped"})()
 
-        with mock.patch(
-            "src.upload_executor.head_internal_asset",
-            side_effect=lambda _config, target_url: remote_states[target_url],
-        ):
-            summary = execute_upload_plan(plan, self.config)
+        summary = execute_upload_plan(plan, self.config)
 
         self.assertTrue(summary.succeeded)
         self.assertEqual(summary.skipped_count, 4)
-        upload_file.assert_not_called()
+        self.assertEqual(upload_file.call_count, 4)
 
-    @mock.patch("src.upload_executor.head_internal_asset", return_value=None)
     @mock.patch("src.upload_executor.upload_file_to_internal_assets")
     def test_plan_hash_mismatch_rebuilds_session(
         self,
         upload_file: mock.Mock,
-        _head_internal_asset: mock.Mock,
     ) -> None:
+        upload_file.return_value = type("UploadResult", (), {"status": "uploaded"})()
         plan = build_case_plan(self.case_root)
         session_path = session_file_path(self.case_root)
         session_path.parent.mkdir(parents=True, exist_ok=True)

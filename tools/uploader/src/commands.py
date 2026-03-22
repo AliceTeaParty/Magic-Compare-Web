@@ -67,14 +67,6 @@ def _prepare_runtime_config(
     return config
 
 
-def _ensure_s3_ready(config: UploaderConfig) -> None:
-    if config.has_s3_config:
-        return
-    raise RuntimeError(
-        "缺少 S3 配置。请在 .env 中补齐 MAGIC_COMPARE_S3_BUCKET / REGION / ACCESS KEY / SECRET。"
-    )
-
-
 def _render_issue_table(report: PlanReport) -> None:
     """Show blocking issues and warnings together because plan mode is only useful when users can fix inputs quickly."""
     if not report.issues:
@@ -236,7 +228,6 @@ def handle_sync(
         return case_plan.report, None, None
 
     config = _prepare_runtime_config(source_root, site_url=site_url, api_url=api_url)
-    _ensure_s3_ready(config)
     ensure_remote_access_config(config)
 
     with console.status("[bold green]正在上传对象...[/]"):

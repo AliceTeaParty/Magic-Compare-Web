@@ -3,6 +3,7 @@ from __future__ import annotations
 import ipaddress
 import os
 import stat
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import urlparse
@@ -20,6 +21,13 @@ ENV_S3_ACCESS_KEY_ID_NAME = "MAGIC_COMPARE_S3_ACCESS_KEY_ID"
 ENV_S3_SECRET_ACCESS_KEY_NAME = "MAGIC_COMPARE_S3_SECRET_ACCESS_KEY"
 ENV_S3_FORCE_PATH_STYLE_NAME = "MAGIC_COMPARE_S3_FORCE_PATH_STYLE"
 ENV_S3_INTERNAL_PREFIX_NAME = "MAGIC_COMPARE_S3_INTERNAL_PREFIX"
+
+PERSISTED_UPLOADER_ENV_KEYS = (
+    ENV_SITE_URL_NAME,
+    ENV_API_URL_NAME,
+    ENV_ACCESS_CLIENT_ID_NAME,
+    ENV_ACCESS_CLIENT_SECRET_NAME,
+)
 
 FALLBACK_SITE_URL = "http://localhost:3000"
 IMPORT_SYNC_PATH = "/api/ops/import-sync"
@@ -83,14 +91,6 @@ def _default_env_example_text() -> str:
             f"{ENV_SITE_URL_NAME}={FALLBACK_SITE_URL}",
             "# Optional explicit import endpoint. Leave blank to derive from site URL.",
             f"{ENV_API_URL_NAME}=",
-            "# S3-compatible internal asset storage.",
-            f"{ENV_S3_BUCKET_NAME}=magic-compare-assets",
-            f"{ENV_S3_REGION_NAME}=us-east-1",
-            f"{ENV_S3_ENDPOINT_NAME}=http://localhost:9000",
-            f"{ENV_S3_ACCESS_KEY_ID_NAME}=rustfsadmin",
-            f"{ENV_S3_SECRET_ACCESS_KEY_NAME}=rustfsadmin",
-            f"{ENV_S3_FORCE_PATH_STYLE_NAME}=true",
-            f"{ENV_S3_INTERNAL_PREFIX_NAME}=internal-assets",
             "# Required only when the target site is not local/private.",
             f"{ENV_ACCESS_CLIENT_ID_NAME}=",
             f"{ENV_ACCESS_CLIENT_SECRET_NAME}=",
@@ -103,8 +103,10 @@ def uploader_env_example_path() -> Path:
     return _uploader_root(Path(__file__)) / ".env.example"
 
 
-def ensure_work_dir_env(work_dir: Path) -> Path:
-    """Seed the uploader work dir from the uploader-local template instead of the website runtime env."""
+def ensure_work_dir_env(
+    work_dir: Path, *, inherited_values: dict[str, str] | None = None
+) -> Path:
+    """Seed a new work-dir env and copy the caller's uploader settings into that local runtime snapshot."""
     work_dir.mkdir(parents=True, exist_ok=True)
     env_path = work_dir / ".env"
     if env_path.exists():
@@ -118,11 +120,36 @@ def ensure_work_dir_env(work_dir: Path) -> Path:
 
     env_path.write_text(content, encoding="utf-8")
     env_path.chmod(stat.S_IRUSR | stat.S_IWUSR)
+
+    if inherited_values:
+        for key in PERSISTED_UPLOADER_ENV_KEYS:
+            value = inherited_values.get(key)
+            if value:
+                # A freshly created work-dir should inherit the caller's uploader context instead
+                # of silently falling back to template localhost values and hitting the wrong site.
+                set_key(str(env_path), key, value, quote_mode="never")
+
     return env_path
 
 
 def _clean_env_values(values: dict[str, str | None]) -> dict[str, str]:
     return {key: value for key, value in values.items() if value is not None}
+
+
+def _launcher_env_path() -> Path | None:
+    """Only probe next to the packaged binary because Python source runs should not inherit the interpreter's directory."""
+    if not getattr(sys, "frozen", False):
+        return None
+
+    executable_path = Path(sys.executable).resolve()
+    env_path = executable_path.parent / ".env"
+    return env_path if env_path.exists() else None
+
+
+def _load_env_values(env_path: Path | None) -> dict[str, str]:
+    if not env_path or not env_path.exists():
+        return {}
+    return _clean_env_values(dotenv_values(env_path))
 
 
 def _parse_env_flag(value: str | None) -> bool:
@@ -150,16 +177,32 @@ def resolve_uploader_config(
     site_url_override: str | None = None,
 ) -> UploaderConfig:
     """Resolve uploader config with a self-contained work-dir env while still allowing explicit host overrides."""
+    launcher_env_path = _launcher_env_path()
+    launcher_env_values = _load_env_values(launcher_env_path)
     cwd_dotenv = find_dotenv(usecwd=True)
     cwd_env_path = Path(cwd_dotenv) if cwd_dotenv else None
-    work_env_path = ensure_work_dir_env(work_dir) if work_dir else None
+    cwd_env_values = _load_env_values(cwd_env_path)
+    inherited_values: dict[str, str] = {}
+    inherited_values.update(launcher_env_values)
+    inherited_values.update(cwd_env_values)
+    work_env_path = (
+        ensure_work_dir_env(work_dir, inherited_values=inherited_values)
+        if work_dir
+        else None
+    )
+    work_env_values = _load_env_values(work_env_path)
 
     merged_values: dict[str, str] = {}
-    if cwd_env_path and cwd_env_path.exists():
-        merged_values.update(_clean_env_values(dotenv_values(cwd_env_path)))
-    if work_env_path and work_env_path.exists():
-        # The work-dir .env is uploader-owned and should override any generic repo root .env.
-        merged_values.update(_clean_env_values(dotenv_values(work_env_path)))
+    if launcher_env_values:
+        merged_values.update(launcher_env_values)
+    if cwd_env_values:
+        merged_values.update(cwd_env_values)
+    if work_env_values:
+        for key, value in work_env_values.items():
+            # Connection settings are primarily launcher/cwd concerns; the work-dir copy is a
+            # resume fallback and should not silently override the operator's current target.
+            if not merged_values.get(key):
+                merged_values[key] = value
 
     for key in (
         ENV_SITE_URL_NAME,
