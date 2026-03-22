@@ -1,11 +1,20 @@
-# Uploader 单文件分发说明
+# Uploader 分发说明
 
-本文档记录 uploader 单可执行文件的构建入口、CI 产物和手工构建边界。
+本文档记录 uploader 二进制分发的构建入口、CI 产物和手工构建边界。
 重点是降低 Python 环境门槛，而不是把 uploader 变成跨平台交叉编译系统。
 
 ## 1. 当前产物范围
 
-当前仓库把 uploader 打包成 PyInstaller `--onefile` 二进制。
+当前仓库支持两种 PyInstaller 布局：
+
+- `--onefile`：便于发给别人，但 macOS 冷启动会有解包开销
+- `--onedir`：目录稍大一些，但本地启动更快，适合开发和自测
+
+注意：
+
+- `--onefile` 没有“首次解包后永久缓存”的官方开关
+- `--runtime-tmpdir` 只能改解包目录，不能把它变成持久缓存
+- 需要反复本地测试时，优先用 `--layout onedir`
 
 CI 默认产出 3 个目标：
 
@@ -35,6 +44,7 @@ python scripts/build-binary.py
 默认行为：
 
 - 自动识别当前原生平台和架构
+- 默认使用 `--layout onefile`
 - 输出到 `tools/uploader/dist/`
 - 产物名称显式带平台和架构，便于发布和人工分发
 
@@ -42,6 +52,18 @@ python scripts/build-binary.py
 
 ```text
 tools/uploader/dist/magic-compare-uploader-macos-arm64
+```
+
+如需本地快速启动版：
+
+```bash
+python scripts/build-binary.py --layout onedir
+```
+
+对应可执行文件路径会变成：
+
+```text
+tools/uploader/dist/magic-compare-uploader-macos-arm64/magic-compare-uploader-macos-arm64
 ```
 
 ## 3. 指定标签名称
@@ -55,6 +77,7 @@ python scripts/build-binary.py --platform linux --arch amd64
 注意：
 
 - 这只影响产物命名，不会做交叉编译
+- 如需指定目录布局，可再加 `--layout onedir` 或 `--layout onefile`
 - 要得到真正可运行的 `linux/arm64` 二进制，仍然要在 `linux/arm64` 原生环境里执行这个脚本
 
 ## 4. CI 入口

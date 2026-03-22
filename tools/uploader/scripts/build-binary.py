@@ -10,6 +10,7 @@ from pathlib import Path
 
 SUPPORTED_PLATFORMS = {"windows", "linux", "macos"}
 SUPPORTED_ARCHES = {"amd64", "arm64"}
+SUPPORTED_LAYOUTS = {"onefile", "onedir"}
 
 
 def _normalize_platform(system_name: str) -> str:
@@ -57,13 +58,15 @@ def _build_binary(
     *,
     target_platform: str,
     target_arch: str,
+    layout: str,
 ) -> Path:
-    """Build one native binary and label it explicitly because the script does not attempt cross-compilation."""
+    """Build one native uploader artifact and make the layout explicit because onefile and onedir have very different startup trade-offs."""
     artifact_basename = _artifact_basename(target_platform, target_arch)
     dist_dir = uploader_root / "dist"
     build_root = uploader_root / ".build" / f"{target_platform}-{target_arch}"
     shutil.rmtree(build_root, ignore_errors=True)
     dist_dir.mkdir(parents=True, exist_ok=True)
+    build_flag = "--onefile" if layout == "onefile" else "--onedir"
 
     with tempfile.TemporaryDirectory(
         prefix="magic-compare-uploader-build-"
@@ -79,7 +82,7 @@ def _build_binary(
                 "PyInstaller",
                 "--noconfirm",
                 "--clean",
-                "--onefile",
+                build_flag,
                 "--name",
                 artifact_basename,
                 "--distpath",
@@ -97,11 +100,13 @@ def _build_binary(
         )
 
     suffix = ".exe" if target_platform == "windows" else ""
+    if layout == "onedir":
+        return dist_dir / artifact_basename / f"{artifact_basename}{suffix}"
     return dist_dir / f"{artifact_basename}{suffix}"
 
 
 def main() -> int:
-    """Build a single-file uploader binary for the current native platform and emit the artifact path."""
+    """Build a native uploader artifact and print the executable path for downstream scripts."""
     parser = argparse.ArgumentParser(
         description="Build the Magic Compare uploader binary."
     )
@@ -109,6 +114,12 @@ def main() -> int:
         "--platform", dest="target_platform", choices=sorted(SUPPORTED_PLATFORMS)
     )
     parser.add_argument("--arch", dest="target_arch", choices=sorted(SUPPORTED_ARCHES))
+    parser.add_argument(
+        "--layout",
+        choices=sorted(SUPPORTED_LAYOUTS),
+        default="onefile",
+        help="onefile 便于分发；onedir 启动更快，适合本地调试。",
+    )
     args = parser.parse_args()
 
     native_platform = _normalize_platform(platform.system())
@@ -120,6 +131,7 @@ def main() -> int:
         Path(__file__).resolve().parents[1],
         target_platform=target_platform,
         target_arch=target_arch,
+        layout=args.layout,
     )
     print(artifact_path)
     return 0
