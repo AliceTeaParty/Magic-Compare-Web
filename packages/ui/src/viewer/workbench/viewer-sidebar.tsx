@@ -176,6 +176,7 @@ function ViewerSidebarContent({
                     href={publishStatus.publicUrl}
                     target="_blank"
                     rel="noreferrer"
+                    aria-label="Open published page in a new tab"
                     size="small"
                     sx={{
                       width: 38,

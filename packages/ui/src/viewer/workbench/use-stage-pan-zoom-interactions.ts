@@ -6,7 +6,6 @@ import {
   useRef,
   type PointerEvent as ReactPointerEvent,
   type TouchEvent as ReactTouchEvent,
-  type WheelEvent as ReactWheelEvent,
 } from "react";
 import type { ViewerPanZoomState } from "@magic-compare/compare-core";
 import {
@@ -181,7 +180,6 @@ export function useStagePanZoomInteractions({
       onTouchMove: handleTouchMove,
       onTouchEnd: handleTouchEnd,
       onTouchCancel: handleTouchEnd,
-      onWheel: handleWheel as (event: ReactWheelEvent<HTMLDivElement>) => void,
     },
   };
 }
