@@ -17,10 +17,16 @@ class UploadExecutorTests(unittest.TestCase):
     def setUp(self) -> None:
         self.temp_dir = tempfile.TemporaryDirectory()
         self.case_root = Path(self.temp_dir.name) / "sample-case"
-        frame_dir = self.case_root / "groups" / "001-test-group" / "frames" / "001-frame-a"
+        frame_dir = (
+            self.case_root / "groups" / "001-test-group" / "frames" / "001-frame-a"
+        )
         frame_dir.mkdir(parents=True, exist_ok=True)
-        (self.case_root / "case.yaml").write_text("slug: 2026\ntitle: 2026\n", encoding="utf-8")
-        (frame_dir.parent.parent / "group.yaml").write_text("title: Test Group\n", encoding="utf-8")
+        (self.case_root / "case.yaml").write_text(
+            "slug: 2026\ntitle: 2026\n", encoding="utf-8"
+        )
+        (frame_dir.parent.parent / "group.yaml").write_text(
+            "title: Test Group\n", encoding="utf-8"
+        )
         (frame_dir / "frame.yaml").write_text("title: Frame A\n", encoding="utf-8")
         Image.new("RGB", (32, 24), color=(0, 0, 0)).save(frame_dir / "before.png")
         Image.new("RGB", (32, 24), color=(255, 255, 255)).save(frame_dir / "after.png")
@@ -55,12 +61,18 @@ class UploadExecutorTests(unittest.TestCase):
         self.assertTrue(summary.succeeded)
         self.assertEqual(summary.uploaded_count, 4)
         self.assertTrue(session_file_path(self.case_root).exists())
-        session = json.loads(session_file_path(self.case_root).read_text(encoding="utf-8"))
-        self.assertEqual(session["operations"][plan.report.operations[0].id]["status"], "uploaded")
+        session = json.loads(
+            session_file_path(self.case_root).read_text(encoding="utf-8")
+        )
+        self.assertEqual(
+            session["operations"][plan.report.operations[0].id]["status"], "uploaded"
+        )
         self.assertEqual(upload_file.call_count, 4)
 
     @mock.patch("src.upload_executor.upload_file_to_internal_assets")
-    def test_skips_remote_objects_when_metadata_matches(self, upload_file: mock.Mock) -> None:
+    def test_skips_remote_objects_when_metadata_matches(
+        self, upload_file: mock.Mock
+    ) -> None:
         plan = build_case_plan(self.case_root)
         remote_states = {
             operation.target_url: type(
@@ -78,7 +90,10 @@ class UploadExecutorTests(unittest.TestCase):
             for operation in plan.report.operations
         }
 
-        with mock.patch("src.upload_executor.head_internal_asset", side_effect=lambda _config, target_url: remote_states[target_url]):
+        with mock.patch(
+            "src.upload_executor.head_internal_asset",
+            side_effect=lambda _config, target_url: remote_states[target_url],
+        ):
             summary = execute_upload_plan(plan, self.config)
 
         self.assertTrue(summary.succeeded)

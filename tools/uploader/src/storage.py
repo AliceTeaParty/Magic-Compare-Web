@@ -49,7 +49,9 @@ def build_s3_client(config: UploaderConfig):
     )
 
 
-def head_internal_asset(config: UploaderConfig, asset_url: str) -> RemoteObjectState | None:
+def head_internal_asset(
+    config: UploaderConfig, asset_url: str
+) -> RemoteObjectState | None:
     """Read remote object metadata cheaply so resume/skip decisions do not need a full download."""
     client = build_s3_client(config)
     try:
@@ -65,7 +67,9 @@ def head_internal_asset(config: UploaderConfig, asset_url: str) -> RemoteObjectS
         raise
 
     return RemoteObjectState(
-        metadata={key.lower(): value for key, value in response.get("Metadata", {}).items()},
+        metadata={
+            key.lower(): value for key, value in response.get("Metadata", {}).items()
+        },
         size=int(response.get("ContentLength", 0)),
     )
 

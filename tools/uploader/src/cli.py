@@ -66,7 +66,9 @@ def plan(
 ) -> None:
     """只做扫描、校验和计划生成，不上传也不写远端。"""
     try:
-        report = handle_plan(source, report_json=report_json, case_slug=case_slug, group_slug=group_slug)
+        report = handle_plan(
+            source, report_json=report_json, case_slug=case_slug, group_slug=group_slug
+        )
     except Exception as error:
         _handle_top_level_error(error, default_message="预演失败")
 
@@ -90,7 +92,9 @@ def scan(source: Path) -> None:
 def manifest(
     source: Path,
     output: Path | None = typer.Option(None, "--output", "-o"),
-    site_url: str | None = typer.Option(  # kept for CLI compatibility; manifest generation is now local-only.
+    site_url: (
+        str | None
+    ) = typer.Option(  # kept for CLI compatibility; manifest generation is now local-only.
         None,
         "--site-url",
         help=f"内部站点主页，优先读取 {ENV_SITE_URL_NAME}。",
@@ -123,8 +127,12 @@ def sync(
         help=f"内部站点导入接口，优先读取 {ENV_API_URL_NAME}。",
     ),
     report_json: Path | None = typer.Option(None, "--report-json"),
-    dry_run: bool = typer.Option(False, "--dry-run", help="只执行 plan，不上传也不调用 sync 接口。"),
-    reset_session: bool = typer.Option(False, "--reset-session", help="忽略已有 upload session，从头重建。"),
+    dry_run: bool = typer.Option(
+        False, "--dry-run", help="只执行 plan，不上传也不调用 sync 接口。"
+    ),
+    reset_session: bool = typer.Option(
+        False, "--reset-session", help="忽略已有 upload session，从头重建。"
+    ),
 ) -> None:
     """对结构化 case 目录执行 plan、上传和同步。"""
     try:
@@ -150,8 +158,12 @@ def sync(
 
 @app.command("delete-group")
 def delete_group_command(
-    case_slug: str | None = typer.Option(None, "--case-slug", help="要删除 group 所在的 case slug。"),
-    group_slug: str | None = typer.Option(None, "--group-slug", help="要删除的 group slug。"),
+    case_slug: str | None = typer.Option(
+        None, "--case-slug", help="要删除 group 所在的 case slug。"
+    ),
+    group_slug: str | None = typer.Option(
+        None, "--group-slug", help="要删除的 group slug。"
+    ),
     work_dir: Path = typer.Option(
         Path.cwd(),
         "--work-dir",

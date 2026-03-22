@@ -178,7 +178,9 @@ def resolve_uploader_config(
             merged_values[key] = os.environ[key]
 
     raw_api_url = (api_url_override or merged_values.get(ENV_API_URL_NAME, "")).strip()
-    raw_site_url = (site_url_override or merged_values.get(ENV_SITE_URL_NAME, "")).strip()
+    raw_site_url = (
+        site_url_override or merged_values.get(ENV_SITE_URL_NAME, "")
+    ).strip()
 
     if not raw_site_url and raw_api_url:
         raw_site_url = internal_site_base_url(raw_api_url)
@@ -193,15 +195,25 @@ def resolve_uploader_config(
         api_url=api_url,
         env_path=work_env_path or cwd_env_path,
         work_dir=work_dir,
-        service_token_client_id=(merged_values.get(ENV_ACCESS_CLIENT_ID_NAME, "") or None),
-        service_token_client_secret=(merged_values.get(ENV_ACCESS_CLIENT_SECRET_NAME, "") or None),
+        service_token_client_id=(
+            merged_values.get(ENV_ACCESS_CLIENT_ID_NAME, "") or None
+        ),
+        service_token_client_secret=(
+            merged_values.get(ENV_ACCESS_CLIENT_SECRET_NAME, "") or None
+        ),
         s3_bucket=(merged_values.get(ENV_S3_BUCKET_NAME, "") or None),
         s3_region=(merged_values.get(ENV_S3_REGION_NAME, "") or "us-east-1"),
         s3_endpoint=(merged_values.get(ENV_S3_ENDPOINT_NAME, "") or None),
         s3_access_key_id=(merged_values.get(ENV_S3_ACCESS_KEY_ID_NAME, "") or None),
-        s3_secret_access_key=(merged_values.get(ENV_S3_SECRET_ACCESS_KEY_NAME, "") or None),
-        s3_force_path_style=_parse_env_flag(merged_values.get(ENV_S3_FORCE_PATH_STYLE_NAME, "")),
-        s3_internal_prefix=(merged_values.get(ENV_S3_INTERNAL_PREFIX_NAME, "") or "internal-assets"),
+        s3_secret_access_key=(
+            merged_values.get(ENV_S3_SECRET_ACCESS_KEY_NAME, "") or None
+        ),
+        s3_force_path_style=_parse_env_flag(
+            merged_values.get(ENV_S3_FORCE_PATH_STYLE_NAME, "")
+        ),
+        s3_internal_prefix=(
+            merged_values.get(ENV_S3_INTERNAL_PREFIX_NAME, "") or "internal-assets"
+        ),
     )
 
 
@@ -216,11 +228,23 @@ def persist_config_overrides(
         return
 
     if site_url:
-        set_key(str(config.env_path), ENV_SITE_URL_NAME, _normalize_url(site_url), quote_mode="never")
-        config.site_url = _normalize_url(site_url)
+        normalized_site_url = _normalize_url(site_url)
+        set_key(
+            str(config.env_path),
+            ENV_SITE_URL_NAME,
+            normalized_site_url,
+            quote_mode="never",
+        )
+        config.site_url = normalized_site_url
     if api_url:
-        set_key(str(config.env_path), ENV_API_URL_NAME, _normalize_url(api_url), quote_mode="never")
-        config.api_url = _normalize_url(api_url)
+        normalized_api_url = _normalize_url(api_url)
+        set_key(
+            str(config.env_path),
+            ENV_API_URL_NAME,
+            normalized_api_url,
+            quote_mode="never",
+        )
+        config.api_url = normalized_api_url
 
 
 def ensure_remote_access_config(config: UploaderConfig) -> None:
@@ -229,9 +253,13 @@ def ensure_remote_access_config(config: UploaderConfig) -> None:
         return
 
     if config.service_token_client_id and not config.service_token_client_secret:
-        raise RuntimeError("检测到 Cloudflare Service Token Client ID，但缺少 Client Secret。")
+        raise RuntimeError(
+            "检测到 Cloudflare Service Token Client ID，但缺少 Client Secret。"
+        )
     if config.service_token_client_secret and not config.service_token_client_id:
-        raise RuntimeError("检测到 Cloudflare Service Token Client Secret，但缺少 Client ID。")
+        raise RuntimeError(
+            "检测到 Cloudflare Service Token Client Secret，但缺少 Client ID。"
+        )
     if not config.has_service_token:
         raise RuntimeError(
             "远端内部站只支持 Cloudflare Service Token。请在 uploader .env 中配置 "

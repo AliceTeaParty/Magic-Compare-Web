@@ -17,7 +17,9 @@ class GenerateHeatmapTests(unittest.TestCase):
     def tearDown(self) -> None:
         self.temp_dir.cleanup()
 
-    def _make_image(self, name: str, size: tuple[int, int], color: tuple[int, int, int]) -> Path:
+    def _make_image(
+        self, name: str, size: tuple[int, int], color: tuple[int, int, int]
+    ) -> Path:
         path = self.root / name
         Image.new("RGB", size, color=color).save(path)
         return path
@@ -33,7 +35,9 @@ class GenerateHeatmapTests(unittest.TestCase):
         with Image.open(destination) as image:
             self.assertEqual(image.size, (8, 8))
 
-    def test_uses_thermal_palette_with_greener_small_changes_and_redder_large_changes(self) -> None:
+    def test_uses_thermal_palette_with_greener_small_changes_and_redder_large_changes(
+        self,
+    ) -> None:
         before = self._make_image("before.png", (48, 24), (0, 0, 0))
         after = self.root / "after.png"
 
@@ -53,9 +57,15 @@ class GenerateHeatmapTests(unittest.TestCase):
             low_change = heatmap.getpixel((10, 12))
             high_change = heatmap.getpixel((38, 12))
 
-        self.assertGreater(low_change[1], low_change[0], "small changes should stay greener")
-        self.assertGreater(high_change[0], high_change[1], "large changes should skew red")
-        self.assertGreater(high_change[0], low_change[0], "large changes should be hotter overall")
+        self.assertGreater(
+            low_change[1], low_change[0], "small changes should stay greener"
+        )
+        self.assertGreater(
+            high_change[0], high_change[1], "large changes should skew red"
+        )
+        self.assertGreater(
+            high_change[0], low_change[0], "large changes should be hotter overall"
+        )
 
     def test_rejects_mismatched_dimensions(self) -> None:
         before = self._make_image("before.png", (8, 8), (0, 0, 0))

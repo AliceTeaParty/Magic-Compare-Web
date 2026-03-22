@@ -13,7 +13,8 @@ def _interpolate_color(
     progress: float,
 ) -> tuple[int, int, int]:
     return tuple(
-        int(round(left[index] + (right[index] - left[index]) * progress)) for index in range(3)
+        int(round(left[index] + (right[index] - left[index]) * progress))
+        for index in range(3)
     )
 
 
@@ -62,7 +63,9 @@ def image_dimensions(source: Path) -> tuple[int, int]:
         return image.width, image.height
 
 
-def build_thumbnail(source: Path, destination: Path, size: tuple[int, int] = (480, 270)) -> None:
+def build_thumbnail(
+    source: Path, destination: Path, size: tuple[int, int] = (480, 270)
+) -> None:
     destination.parent.mkdir(parents=True, exist_ok=True)
 
     if source.suffix.lower() == ".svg":
@@ -88,7 +91,9 @@ def generate_heatmap(before: Path, after: Path, destination: Path) -> None:
             )
 
         difference = ImageChops.difference(before_rgb, after_rgb).convert("L")
-        lifted = difference.point(lambda value: int(round(((value / 255) ** 0.72) * 255)))
+        lifted = difference.point(
+            lambda value: int(round(((value / 255) ** 0.72) * 255))
+        )
 
         core = lifted.filter(ImageFilter.GaussianBlur(radius=1.1))
         halo = lifted.filter(ImageFilter.GaussianBlur(radius=4.6)).point(

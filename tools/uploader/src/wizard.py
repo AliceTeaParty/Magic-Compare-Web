@@ -101,7 +101,9 @@ def _choose_case(config: UploaderConfig, current_year: str) -> CaseSearchResult 
         ).strip()
 
         if not choice:
-            existing_year_case = next((item for item in results if item.slug == current_year), None)
+            existing_year_case = next(
+                (item for item in results if item.slug == current_year), None
+            )
             if existing_year_case:
                 console.print(
                     f"[yellow]检测到已有 {current_year} case，将直接复用：{existing_year_case.title}[/]"
@@ -127,7 +129,12 @@ def _resolve_work_dir(default_work_dir: Path) -> Path:
         return default_work_dir
 
     console.print(f"[yellow]工作目录已存在：{default_work_dir}[/]")
-    choice = console.input("[bold]输入 1 覆盖，2 新建时间戳目录，3 取消 [默认 2]：[/]").strip() or "2"
+    choice = (
+        console.input(
+            "[bold]输入 1 覆盖，2 新建时间戳目录，3 取消 [默认 2]：[/]"
+        ).strip()
+        or "2"
+    )
 
     if choice == "1":
         if default_work_dir.is_dir():
@@ -257,8 +264,12 @@ def run_wizard(
         execution_summary = execute_upload_plan(structured_plan, config)
     _render_execution_summary(execution_summary)
     if not execution_summary.succeeded:
-        _write_runtime_report(structured_plan.report, report_json, execution_summary=execution_summary)
-        raise RuntimeError("上传阶段存在失败对象，请修正后再次执行，session 会自动续传。")
+        _write_runtime_report(
+            structured_plan.report, report_json, execution_summary=execution_summary
+        )
+        raise RuntimeError(
+            "上传阶段存在失败对象，请修正后再次执行，session 会自动续传。"
+        )
 
     manifest_payload = build_import_manifest_from_case(structured_plan.case_source)
     with console.status("[bold green]正在同步 manifest 到 internal-site...[/]"):
@@ -270,7 +281,9 @@ def run_wizard(
         sync_result=result,
     )
 
-    viewer_url = f"{config.site_url}/cases/{result['slug']}/groups/{prepared.group_slug}"
+    viewer_url = (
+        f"{config.site_url}/cases/{result['slug']}/groups/{prepared.group_slug}"
+    )
     console.print(
         Panel(
             Text.from_markup(

@@ -158,22 +158,29 @@ def _after_priority(candidate: SourceCandidate) -> tuple[int, str, str]:
     return (2, candidate.variant, candidate.original_name.lower())
 
 
-def _resolve_frame(order: int, candidates: list[SourceCandidate], fallback_width: int) -> ParsedFrame:
+def _resolve_frame(
+    order: int, candidates: list[SourceCandidate], fallback_width: int
+) -> ParsedFrame:
     """Collapse one frame candidate set into before/after/misc because later plan/upload stages assume one canonical after."""
-    before_candidates = [candidate for candidate in candidates if candidate.variant in SOURCE_VARIANTS]
+    before_candidates = [
+        candidate for candidate in candidates if candidate.variant in SOURCE_VARIANTS
+    ]
     if len(before_candidates) != 1:
         raise ValueError(
             f"{candidates[0].title} 需要且只能有一个 src/source 原图，当前找到 {len(before_candidates)} 个。"
         )
 
-    heatmap_candidates = [candidate for candidate in candidates if candidate.variant in HEATMAP_VARIANTS]
+    heatmap_candidates = [
+        candidate for candidate in candidates if candidate.variant in HEATMAP_VARIANTS
+    ]
     if len(heatmap_candidates) > 1:
         raise ValueError(f"{candidates[0].title} 存在多个 heatmap 候选，无法自动决定。")
 
     output_candidates = [
         candidate
         for candidate in candidates
-        if candidate.variant not in SOURCE_VARIANTS and candidate.variant not in HEATMAP_VARIANTS
+        if candidate.variant not in SOURCE_VARIANTS
+        and candidate.variant not in HEATMAP_VARIANTS
     ]
     if not output_candidates:
         raise ValueError(f"{candidates[0].title} 没有可用的 after 候选。")
@@ -205,9 +212,13 @@ def _resolve_frame(order: int, candidates: list[SourceCandidate], fallback_width
     )
 
 
-def _derive_group_identity(source_root: Path, candidates: list[SourceCandidate]) -> tuple[str, str]:
+def _derive_group_identity(
+    source_root: Path, candidates: list[SourceCandidate]
+) -> tuple[str, str]:
     """Fall back to the folder name when shared filename prefixes are too noisy to produce a stable human slug."""
-    common_prefix = os.path.commonprefix([candidate.root_hint for candidate in candidates]).strip(" _-.")
+    common_prefix = os.path.commonprefix(
+        [candidate.root_hint for candidate in candidates]
+    ).strip(" _-.")
     common_slug = kebab_case(common_prefix)
     if len(common_slug) < 8 or common_slug.count("-") < 1:
         fallback = source_root.name
@@ -222,7 +233,11 @@ def _ignore_reason(path: Path) -> str | None:
         return "system-artifact"
     if normalized_name.startswith("."):
         return "hidden-file"
-    if normalized_name.endswith("~") or normalized_name.endswith(".swp") or normalized_name.endswith(".tmp"):
+    if (
+        normalized_name.endswith("~")
+        or normalized_name.endswith(".swp")
+        or normalized_name.endswith(".tmp")
+    ):
         return "editor-temp"
     if normalized_name.startswith("thumb-"):
         # Generated thumbnails are uploader byproducts and re-importing them would only duplicate assets.
@@ -232,19 +247,25 @@ def _ignore_reason(path: Path) -> str | None:
     return None
 
 
-def _discover_source_files(source_root: Path) -> tuple[list[Path], list[IgnoredSourceFile]]:
+def _discover_source_files(
+    source_root: Path,
+) -> tuple[list[Path], list[IgnoredSourceFile]]:
     """Collect importable source images while surfacing ignored noise instead of failing on it."""
     image_paths: list[Path] = []
     ignored_files: list[IgnoredSourceFile] = []
 
-    for path in sorted(candidate for candidate in source_root.rglob("*") if candidate.is_file()):
+    for path in sorted(
+        candidate for candidate in source_root.rglob("*") if candidate.is_file()
+    ):
         ignore_reason = _ignore_reason(path)
         if ignore_reason:
             ignored_files.append(IgnoredSourceFile(path=path, reason=ignore_reason))
             continue
 
         if path.suffix.lower() not in SUPPORTED_EXTENSIONS:
-            ignored_files.append(IgnoredSourceFile(path=path, reason="unsupported-file-type"))
+            ignored_files.append(
+                IgnoredSourceFile(path=path, reason="unsupported-file-type")
+            )
             continue
 
         image_paths.append(path)
@@ -269,7 +290,9 @@ def discover_source_group(source_root: Path) -> ParsedSourceGroup:
         except ValueError:
             # Unparseable image names are treated as ignored noise so one accidental screenshot does
             # not block the whole import, but the plan/report layer will still surface them.
-            ignored_files.append(IgnoredSourceFile(path=path, reason="unrecognized-image-name"))
+            ignored_files.append(
+                IgnoredSourceFile(path=path, reason="unrecognized-image-name")
+            )
 
     if not parsed_candidates:
         raise ValueError(f"{source_root} 中没有符合导入命名规则的图片文件。")
@@ -278,7 +301,9 @@ def discover_source_group(source_root: Path) -> ParsedSourceGroup:
     for candidate in parsed_candidates:
         grouped_candidates.setdefault(candidate.frame_key, []).append(candidate)
 
-    ordered_keys = sorted(grouped_candidates.keys(), key=lambda key: (int(key[1]), key[2], key[0]))
+    ordered_keys = sorted(
+        grouped_candidates.keys(), key=lambda key: (int(key[1]), key[2], key[0])
+    )
     fallback_width = max(4, len(str(max((key[2] for key in ordered_keys), default=0))))
     frames = [
         _resolve_frame(order, grouped_candidates[key], fallback_width)

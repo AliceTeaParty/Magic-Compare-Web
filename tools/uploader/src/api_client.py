@@ -6,6 +6,7 @@ import httpx
 
 from .auth import UploaderConfig, build_request_headers
 
+
 @dataclass(frozen=True)
 class CaseSearchGroup:
     slug: str
@@ -44,7 +45,9 @@ def group_delete_url(api_url: str) -> str:
 def _request_error(error: httpx.HTTPStatusError) -> RuntimeError:
     status_code = error.response.status_code
     if status_code in {401, 403}:
-        return RuntimeError("请求被内部站拒绝。请确认 Service Token 配置和 internal-site 访问策略。")
+        return RuntimeError(
+            "请求被内部站拒绝。请确认 Service Token 配置和 internal-site 访问策略。"
+        )
     return RuntimeError(f"请求失败：HTTP {status_code}")
 
 
@@ -61,9 +64,13 @@ def _post_json(config: UploaderConfig, url: str, payload: dict) -> dict:
     return response.json()
 
 
-def search_cases(config: UploaderConfig, query: str, limit: int = 8) -> list[CaseSearchResult]:
+def search_cases(
+    config: UploaderConfig, query: str, limit: int = 8
+) -> list[CaseSearchResult]:
     """Search cases through the internal API so the wizard can reuse remote metadata without local caches."""
-    payload = _post_json(config, case_search_url(config.api_url), {"query": query, "limit": limit})
+    payload = _post_json(
+        config, case_search_url(config.api_url), {"query": query, "limit": limit}
+    )
     results: list[CaseSearchResult] = []
     for item in payload.get("cases", []):
         results.append(

@@ -8,7 +8,6 @@ import sys
 import tempfile
 from pathlib import Path
 
-
 SUPPORTED_PLATFORMS = {"windows", "linux", "macos"}
 SUPPORTED_ARCHES = {"amd64", "arm64"}
 
@@ -66,7 +65,9 @@ def _build_binary(
     shutil.rmtree(build_root, ignore_errors=True)
     dist_dir.mkdir(parents=True, exist_ok=True)
 
-    with tempfile.TemporaryDirectory(prefix="magic-compare-uploader-build-") as temp_dir_name:
+    with tempfile.TemporaryDirectory(
+        prefix="magic-compare-uploader-build-"
+    ) as temp_dir_name:
         temp_dir = Path(temp_dir_name)
         launcher_path = temp_dir / "pyinstaller-entry.py"
         _write_launcher(launcher_path)
@@ -101,8 +102,12 @@ def _build_binary(
 
 def main() -> int:
     """Build a single-file uploader binary for the current native platform and emit the artifact path."""
-    parser = argparse.ArgumentParser(description="Build the Magic Compare uploader binary.")
-    parser.add_argument("--platform", dest="target_platform", choices=sorted(SUPPORTED_PLATFORMS))
+    parser = argparse.ArgumentParser(
+        description="Build the Magic Compare uploader binary."
+    )
+    parser.add_argument(
+        "--platform", dest="target_platform", choices=sorted(SUPPORTED_PLATFORMS)
+    )
     parser.add_argument("--arch", dest="target_arch", choices=sorted(SUPPORTED_ARCHES))
     args = parser.parse_args()
 

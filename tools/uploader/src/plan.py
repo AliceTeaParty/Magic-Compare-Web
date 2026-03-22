@@ -227,13 +227,17 @@ def _plan_case_source(case_source: CaseSource) -> PreparedCasePlan:
     for group in case_source.groups:
         for frame in group.frames:
             for asset in frame.assets:
-                image_url, thumb_url = build_asset_urls(case_slug, group.slug, frame.order, asset.path)
+                image_url, thumb_url = build_asset_urls(
+                    case_slug, group.slug, frame.order, asset.path
+                )
                 try:
                     validate_local_image(asset.path)
                 except Exception as error:  # pragma: no cover - defensive boundary
                     issues.append(_image_issue(asset.kind, asset.path, error))
 
-                asset_base_id = f"{case_slug}:{group.slug}:{frame.order}:{asset.path.name}"
+                asset_base_id = (
+                    f"{case_slug}:{group.slug}:{frame.order}:{asset.path.name}"
+                )
                 operations.append(
                     _build_operation(
                         identifier=f"{asset_base_id}:original",
@@ -265,7 +269,9 @@ def _plan_case_source(case_source: CaseSource) -> PreparedCasePlan:
         issues=issues,
         operations=operations,
     )
-    return PreparedCasePlan(case_root=case_source.root, case_source=case_source, report=report)
+    return PreparedCasePlan(
+        case_root=case_source.root, case_source=case_source, report=report
+    )
 
 
 def _flat_source_operations(
@@ -283,8 +289,12 @@ def _flat_source_operations(
         asset_candidates.extend(("misc", item) for item in frame.misc)
 
         for asset_kind, candidate in asset_candidates:
-            image_url, thumb_url = build_asset_urls(case_slug, group_slug, frame.order, candidate.path)
-            asset_base_id = f"{case_slug}:{group_slug}:{frame.order}:{candidate.path.name}"
+            image_url, thumb_url = build_asset_urls(
+                case_slug, group_slug, frame.order, candidate.path
+            )
+            asset_base_id = (
+                f"{case_slug}:{group_slug}:{frame.order}:{candidate.path.name}"
+            )
             operations.append(
                 _build_operation(
                     identifier=f"{asset_base_id}:original",
@@ -321,7 +331,7 @@ def build_flat_source_plan(
             ("before", frame.before),
             ("after", frame.after),
             *((("heatmap", frame.explicit_heatmap),) if frame.explicit_heatmap else ()),
-            *[( "misc", item) for item in frame.misc],
+            *[("misc", item) for item in frame.misc],
         ]:
             if candidate is None:
                 continue
@@ -330,7 +340,9 @@ def build_flat_source_plan(
             except Exception as error:  # pragma: no cover - defensive boundary
                 issues.append(_image_issue(asset_kind, candidate.path, error))
 
-    operations = _flat_source_operations(source_group, case_slug=case_slug, group_slug=group_slug)
+    operations = _flat_source_operations(
+        source_group, case_slug=case_slug, group_slug=group_slug
+    )
     issues.extend(_detect_duplicate_target_urls(operations))
     return _finalize_report(
         mode="flat-source",
@@ -365,15 +377,21 @@ def build_case_plan(case_root: Path) -> PreparedCasePlan:
             operations=[],
         )
         empty_case_source = CaseSource(root=case_root.resolve(), metadata={}, groups=[])
-        return PreparedCasePlan(case_root=case_root.resolve(), case_source=empty_case_source, report=report)
+        return PreparedCasePlan(
+            case_root=case_root.resolve(), case_source=empty_case_source, report=report
+        )
 
     return _plan_case_source(case_source)
 
 
-def build_path_plan(source: Path, *, case_slug: str | None = None, group_slug: str | None = None) -> PlanReport:
+def build_path_plan(
+    source: Path, *, case_slug: str | None = None, group_slug: str | None = None
+) -> PlanReport:
     """Build a dry-run report from either a flat source folder or a structured case directory."""
     normalized_source = source.resolve()
-    looks_structured = (normalized_source / "groups").exists() or (normalized_source / "case.yaml").exists()
+    looks_structured = (normalized_source / "groups").exists() or (
+        normalized_source / "case.yaml"
+    ).exists()
     if looks_structured:
         return build_case_plan(normalized_source).report
 
@@ -407,4 +425,6 @@ def build_path_plan(source: Path, *, case_slug: str | None = None, group_slug: s
 def write_plan_report(report: PlanReport, output_path: Path) -> None:
     """Persist machine-readable reports only when explicitly requested so regular CLI runs stay uncluttered."""
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(json.dumps(report.to_dict(), indent=2, ensure_ascii=False), encoding="utf-8")
+    output_path.write_text(
+        json.dumps(report.to_dict(), indent=2, ensure_ascii=False), encoding="utf-8"
+    )

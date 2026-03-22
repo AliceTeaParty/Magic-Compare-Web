@@ -9,8 +9,12 @@ from src.cli import _normalize_path_text, _resolve_source_dir
 
 class CliPathResolutionTests(unittest.TestCase):
     def test_normalize_path_text_strips_wrapping_quotes(self) -> None:
-        self.assertEqual(_normalize_path_text('"/tmp/example path"'), "/tmp/example path")
-        self.assertEqual(_normalize_path_text("'/tmp/example path'"), "/tmp/example path")
+        self.assertEqual(
+            _normalize_path_text('"/tmp/example path"'), "/tmp/example path"
+        )
+        self.assertEqual(
+            _normalize_path_text("'/tmp/example path'"), "/tmp/example path"
+        )
 
     def test_resolve_source_dir_accepts_quoted_absolute_path(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

@@ -35,7 +35,9 @@ class DiscoverSourceGroupTests(unittest.TestCase):
         group = discover_source_group(self.source_dir)
 
         self.assertEqual(group.slug, "test-example")
-        self.assertEqual([frame.title for frame in group.frames], ["24_02_2087", "24_02_30516"])
+        self.assertEqual(
+            [frame.title for frame in group.frames], ["24_02_2087", "24_02_30516"]
+        )
         self.assertEqual(group.frames[1].after.variant, "output")
         self.assertEqual([item.variant for item in group.frames[1].misc], ["rip"])
 
@@ -54,7 +56,9 @@ class DiscoverSourceGroupTests(unittest.TestCase):
         frame = group.frames[0]
 
         self.assertEqual(frame.after.variant, "out")
-        self.assertEqual([item.variant for item in frame.misc], ["degrain", "out1", "output"])
+        self.assertEqual(
+            [item.variant for item in frame.misc], ["degrain", "out1", "output"]
+        )
 
     def test_requires_a_single_source_candidate(self) -> None:
         self._touch("24_show_00002_100_src.png")
@@ -70,7 +74,9 @@ class DiscoverSourceGroupTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "没有可用的 after 候选"):
             discover_source_group(self.source_dir)
 
-    def test_falls_back_to_zero_padded_numeric_titles_when_metadata_is_missing(self) -> None:
+    def test_falls_back_to_zero_padded_numeric_titles_when_metadata_is_missing(
+        self,
+    ) -> None:
         names = [
             "01src.png",
             "01out.png",

@@ -29,7 +29,9 @@ class PlanReportTests(unittest.TestCase):
         (source_dir / ".DS_Store").write_text("noise", encoding="utf-8")
         (source_dir / "notes.txt").write_text("ignore me", encoding="utf-8")
 
-        report = build_path_plan(source_dir, case_slug="2026", group_slug="test-example")
+        report = build_path_plan(
+            source_dir, case_slug="2026", group_slug="test-example"
+        )
 
         self.assertEqual(report.status, "warning")
         self.assertEqual(report.summary.ignored_file_count, 2)
@@ -39,8 +41,12 @@ class PlanReportTests(unittest.TestCase):
         case_root = self.root / "sample-case"
         frame_dir = case_root / "groups" / "001-test-group" / "frames" / "001-frame-a"
         frame_dir.mkdir(parents=True, exist_ok=True)
-        (case_root / "case.yaml").write_text("slug: 2026\ntitle: 2026\n", encoding="utf-8")
-        (frame_dir.parent.parent / "group.yaml").write_text("title: Test Group\n", encoding="utf-8")
+        (case_root / "case.yaml").write_text(
+            "slug: 2026\ntitle: 2026\n", encoding="utf-8"
+        )
+        (frame_dir.parent.parent / "group.yaml").write_text(
+            "title: Test Group\n", encoding="utf-8"
+        )
         (frame_dir / "frame.yaml").write_text("title: Frame A\n", encoding="utf-8")
         (frame_dir / "before.png").write_bytes(b"not-a-real-png")
         self._make_image(frame_dir / "after.png")

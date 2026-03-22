@@ -30,7 +30,9 @@ def write_yaml(path: Path, payload: dict) -> None:
     )
 
 
-def build_case_payload(existing_case: CaseSearchResult | None, current_year: str) -> dict:
+def build_case_payload(
+    existing_case: CaseSearchResult | None, current_year: str
+) -> dict:
     if existing_case:
         return {
             "slug": existing_case.slug,
@@ -124,7 +126,9 @@ def prepare_workspace(
             asset_notes["heatmap"] = {"note": frame.explicit_heatmap.original_name}
             used_names.add(heatmap_name)
         else:
-            generate_heatmap(frame.before.path, frame.after.path, frame_dir / "heatmap.png")
+            generate_heatmap(
+                frame.before.path, frame.after.path, frame_dir / "heatmap.png"
+            )
             asset_notes["heatmap"] = {
                 "note": f"Auto-generated from {frame.before.original_name} vs {frame.after.original_name}",
             }

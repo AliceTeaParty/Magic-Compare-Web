@@ -97,7 +97,9 @@ def _write_session(session_path: Path, session: dict) -> None:
     """Persist session state after each decision so interrupted uploads can resume with minimal replay."""
     session_path.parent.mkdir(parents=True, exist_ok=True)
     session["updatedAt"] = time.time()
-    session_path.write_text(json.dumps(session, indent=2, ensure_ascii=False), encoding="utf-8")
+    session_path.write_text(
+        json.dumps(session, indent=2, ensure_ascii=False), encoding="utf-8"
+    )
 
 
 def _metadata_for_operation(operation: PlanOperation) -> dict[str, str]:
@@ -122,16 +124,32 @@ def _matches_remote_object(operation: PlanOperation, remote_state: object) -> bo
 
 def _is_retryable_upload_error(error: Exception) -> bool:
     """Retry only transient storage failures so credential or path mistakes fail fast instead of looping."""
-    if isinstance(error, (ConnectTimeoutError, EndpointConnectionError, ConnectionClosedError, ReadTimeoutError)):
+    if isinstance(
+        error,
+        (
+            ConnectTimeoutError,
+            EndpointConnectionError,
+            ConnectionClosedError,
+            ReadTimeoutError,
+        ),
+    ):
         return True
     if isinstance(error, ClientError):
-        status_code = error.response.get("ResponseMetadata", {}).get("HTTPStatusCode", 0)
+        status_code = error.response.get("ResponseMetadata", {}).get(
+            "HTTPStatusCode", 0
+        )
         error_code = str(error.response.get("Error", {}).get("Code", ""))
-        return status_code == 429 or status_code >= 500 or error_code in {"SlowDown", "RequestTimeout"}
+        return (
+            status_code == 429
+            or status_code >= 500
+            or error_code in {"SlowDown", "RequestTimeout"}
+        )
     return isinstance(error, BotoCoreError)
 
 
-def _prepare_upload_source(operation: PlanOperation) -> tuple[Path, TemporaryDirectory[str] | None]:
+def _prepare_upload_source(
+    operation: PlanOperation,
+) -> tuple[Path, TemporaryDirectory[str] | None]:
     """Generate thumbnails lazily so dry-run mode and skipped objects never pay that local CPU cost."""
     source_path = Path(operation.source_path)
     if operation.kind != "upload-thumbnail":
@@ -197,7 +215,9 @@ def execute_upload_plan(
                 uploaded_count += 1
                 _write_session(session_path, session)
                 break
-            except Exception as error:  # pragma: no cover - exercised via retry/IO tests
+            except (
+                Exception
+            ) as error:  # pragma: no cover - exercised via retry/IO tests
                 last_error = str(error)
                 operation_state["lastError"] = last_error
                 operation_state["status"] = "failed"

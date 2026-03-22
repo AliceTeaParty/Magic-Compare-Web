@@ -10,10 +10,21 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 
-from .api_client import CaseSearchGroup, CaseSearchResult, delete_group, search_cases, sync_manifest
-from .config import UploaderConfig, ensure_remote_access_config, persist_config_overrides, resolve_uploader_config
+from .api_client import (
+    CaseSearchGroup,
+    CaseSearchResult,
+    delete_group,
+    search_cases,
+    sync_manifest,
+)
+from .config import (
+    UploaderConfig,
+    ensure_remote_access_config,
+    persist_config_overrides,
+    resolve_uploader_config,
+)
 from .manifest import build_import_manifest_from_case, manifest_json
-from .plan import PlanReport, PreparedCasePlan, build_case_plan, build_path_plan, write_plan_report
+from .plan import PlanReport, build_case_plan, build_path_plan, write_plan_report
 from .upload_executor import UploadExecutionSummary, execute_upload_plan
 
 console = Console()
@@ -22,7 +33,11 @@ console = Console()
 def _normalize_path_text(path_text: str) -> str:
     normalized = path_text.strip()
 
-    while len(normalized) >= 2 and normalized[0] == normalized[-1] and normalized[0] in {"'", '"'}:
+    while (
+        len(normalized) >= 2
+        and normalized[0] == normalized[-1]
+        and normalized[0] in {"'", '"'}
+    ):
         normalized = normalized[1:-1].strip()
 
     return normalized
@@ -42,12 +57,12 @@ def _prepare_runtime_config(
     api_url: str | None,
 ) -> UploaderConfig:
     """Persist explicit CLI overrides so resumed runs keep targeting the same site and endpoint."""
-    config = resolve_uploader_config(work_dir, site_url_override=site_url, api_url_override=api_url)
+    config = resolve_uploader_config(
+        work_dir, site_url_override=site_url, api_url_override=api_url
+    )
 
-    if site_url:
-        persist_config_overrides(config, site_url=site_url)
-    if api_url:
-        persist_config_overrides(config, api_url=api_url)
+    if site_url or api_url:
+        persist_config_overrides(config, site_url=site_url, api_url=api_url)
 
     return config
 
@@ -73,7 +88,12 @@ def _render_issue_table(report: PlanReport) -> None:
 
     for issue in report.issues:
         severity_style = "red" if issue.severity == "error" else "yellow"
-        table.add_row(f"[{severity_style}]{issue.severity}[/{severity_style}]", issue.code, issue.path, issue.message)
+        table.add_row(
+            f"[{severity_style}]{issue.severity}[/{severity_style}]",
+            issue.code,
+            issue.path,
+            issue.message,
+        )
 
     console.print(table)
 
@@ -118,8 +138,7 @@ def render_plan_summary(report: PlanReport) -> None:
 def _render_execution_summary(summary: UploadExecutionSummary) -> None:
     """Summarize upload outcomes in one place so retry/resume decisions do not require opening the session JSON."""
     failure_lines = "\n".join(
-        f"- {failure.target_url}: {failure.message}"
-        for failure in summary.failures
+        f"- {failure.target_url}: {failure.message}" for failure in summary.failures
     )
     body = (
         f"[bold]Uploaded[/bold]: {summary.uploaded_count}\n"
@@ -167,7 +186,9 @@ def _write_runtime_report(
         payload["syncResult"] = sync_result
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
+    output_path.write_text(
+        json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8"
+    )
 
 
 def handle_plan(
@@ -206,22 +227,27 @@ def handle_sync(
     reset_session: bool = False,
 ) -> tuple[PlanReport, UploadExecutionSummary | None, dict | None]:
     """Run the structured-case sync flow through one shared plan so dry-run and real sync see the same issues."""
-    case_plan = build_case_plan(source.resolve())
+    source_root = source.resolve()
+    case_plan = build_case_plan(source_root)
     render_plan_summary(case_plan.report)
 
     if case_plan.report.status == "error" or dry_run:
         _write_runtime_report(case_plan.report, report_json)
         return case_plan.report, None, None
 
-    config = _prepare_runtime_config(source.resolve(), site_url=site_url, api_url=api_url)
+    config = _prepare_runtime_config(source_root, site_url=site_url, api_url=api_url)
     _ensure_s3_ready(config)
     ensure_remote_access_config(config)
 
     with console.status("[bold green]正在上传对象...[/]"):
-        execution_summary = execute_upload_plan(case_plan, config, reset_session=reset_session)
+        execution_summary = execute_upload_plan(
+            case_plan, config, reset_session=reset_session
+        )
     _render_execution_summary(execution_summary)
     if not execution_summary.succeeded:
-        _write_runtime_report(case_plan.report, report_json, execution_summary=execution_summary)
+        _write_runtime_report(
+            case_plan.report, report_json, execution_summary=execution_summary
+        )
         return case_plan.report, execution_summary, None
 
     manifest_payload = build_import_manifest_from_case(case_plan.case_source)
@@ -272,7 +298,9 @@ def _render_group_table(case: CaseSearchResult) -> None:
     console.print(table)
 
 
-def _choose_existing_case(config: UploaderConfig, initial_query: str = "") -> CaseSearchResult:
+def _choose_existing_case(
+    config: UploaderConfig, initial_query: str = ""
+) -> CaseSearchResult:
     """Resolve one remote case interactively so delete-group does not rely on users remembering exact slugs."""
     query = initial_query
 
@@ -281,11 +309,15 @@ def _choose_existing_case(config: UploaderConfig, initial_query: str = "") -> Ca
             results = search_cases(config, query, limit=8)
 
         if not results:
-            console.print("[yellow]没有找到匹配的 case。输入 / 重新搜索，或 Ctrl+C 取消。[/]")
+            console.print(
+                "[yellow]没有找到匹配的 case。输入 / 重新搜索，或 Ctrl+C 取消。[/]"
+            )
         else:
             _render_case_table(results, query)
 
-        choice = console.input("[bold]输入编号选择 case，输入 / 重新搜索，输入 q 取消：[/]").strip()
+        choice = console.input(
+            "[bold]输入编号选择 case，输入 / 重新搜索，输入 q 取消：[/]"
+        ).strip()
 
         if choice.lower() == "q":
             raise typer.Abort()
@@ -302,7 +334,9 @@ def _choose_existing_case(config: UploaderConfig, initial_query: str = "") -> Ca
         console.print("[red]输入无效，请重新选择。[/]")
 
 
-def _resolve_case_for_delete(config: UploaderConfig, case_slug: str | None) -> CaseSearchResult:
+def _resolve_case_for_delete(
+    config: UploaderConfig, case_slug: str | None
+) -> CaseSearchResult:
     """Resolve the delete target case from either an explicit slug or an interactive remote lookup."""
     if not case_slug:
         return _choose_existing_case(config)
@@ -317,7 +351,9 @@ def _resolve_case_for_delete(config: UploaderConfig, case_slug: str | None) -> C
     raise ValueError(f"未找到 case：{case_slug}")
 
 
-def _resolve_group_for_delete(case: CaseSearchResult, group_slug: str | None) -> CaseSearchGroup:
+def _resolve_group_for_delete(
+    case: CaseSearchResult, group_slug: str | None
+) -> CaseSearchGroup:
     """Force one concrete group selection before deletion so operators never delete by fuzzy context."""
     if group_slug:
         for group in case.groups:
@@ -349,7 +385,9 @@ def handle_delete_group(
     api_url: str | None,
 ) -> dict:
     """Delete-group stays interactive, but it now shares the same service-token-only runtime config path."""
-    config = _prepare_runtime_config(work_dir.resolve(), site_url=site_url, api_url=api_url)
+    config = _prepare_runtime_config(
+        work_dir.resolve(), site_url=site_url, api_url=api_url
+    )
     ensure_remote_access_config(config)
 
     selected_case = _resolve_case_for_delete(config, case_slug)

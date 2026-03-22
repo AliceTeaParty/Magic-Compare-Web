@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import random
 
-
 ACG_QUOTES = [
     "正因为不会发生，所以才叫奇迹。",
     "世界并不温柔，但你可以选择温柔地前进。",

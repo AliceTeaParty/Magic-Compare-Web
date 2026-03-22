@@ -6,7 +6,6 @@ from pathlib import Path
 
 import yaml
 
-
 ORDERED_DIRECTORY_RE = re.compile(r"^(?P<order>\d+)-(?P<slug>[a-z0-9-]+)$")
 SUPPORTED_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".avif", ".svg"}
 
@@ -144,18 +143,26 @@ def _discover_assets(frame_directory: Path) -> list[AssetSource]:
             assets.append(
                 AssetSource(
                     kind="crop",
-                    label=asset_notes.get(candidate.stem, {}).get("label", candidate.stem),
+                    label=asset_notes.get(candidate.stem, {}).get(
+                        "label", candidate.stem
+                    ),
                     path=candidate,
-                    note=asset_notes.get(candidate.stem, {}).get("note", note or candidate.name),
+                    note=asset_notes.get(candidate.stem, {}).get(
+                        "note", note or candidate.name
+                    ),
                 )
             )
         elif candidate.stem not in {"before", "after", "heatmap"}:
             assets.append(
                 AssetSource(
                     kind="misc",
-                    label=asset_notes.get(candidate.stem, {}).get("label", candidate.stem),
+                    label=asset_notes.get(candidate.stem, {}).get(
+                        "label", candidate.stem
+                    ),
                     path=candidate,
-                    note=asset_notes.get(candidate.stem, {}).get("note", note or candidate.name),
+                    note=asset_notes.get(candidate.stem, {}).get(
+                        "note", note or candidate.name
+                    ),
                 )
             )
 
@@ -170,7 +177,9 @@ def scan_case_directory(case_root: Path) -> CaseSource:
         raise ValueError(f"{case_root} does not contain a groups/ directory.")
 
     groups: list[GroupSource] = []
-    for group_directory in sorted(path for path in groups_directory.iterdir() if path.is_dir()):
+    for group_directory in sorted(
+        path for path in groups_directory.iterdir() if path.is_dir()
+    ):
         group_order, group_slug = _parse_ordered_directory(group_directory)
         group_metadata = _load_yaml(group_directory / "group.yaml")
         frames_directory = group_directory / "frames"
@@ -178,12 +187,16 @@ def scan_case_directory(case_root: Path) -> CaseSource:
             raise ValueError(f"{group_directory} does not contain a frames/ directory.")
 
         frames: list[FrameSource] = []
-        for frame_directory in sorted(path for path in frames_directory.iterdir() if path.is_dir()):
+        for frame_directory in sorted(
+            path for path in frames_directory.iterdir() if path.is_dir()
+        ):
             frame_order, frame_slug = _parse_ordered_directory(frame_directory)
             frame_metadata = _load_yaml(frame_directory / "frame.yaml")
             frames.append(
                 FrameSource(
-                    title=frame_metadata.get("title", frame_slug.replace("-", " ").title()),
+                    title=frame_metadata.get(
+                        "title", frame_slug.replace("-", " ").title()
+                    ),
                     order=frame_order - 1,
                     caption=frame_metadata.get("caption", ""),
                     directory=frame_directory,

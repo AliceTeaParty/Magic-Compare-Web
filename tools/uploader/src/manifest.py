@@ -13,7 +13,9 @@ def build_asset_urls(
     frame_order: int,
     asset_path: Path,
 ) -> tuple[str, str]:
-    relative_root = Path("internal-assets") / case_slug / group_slug / f"{frame_order + 1:03d}"
+    relative_root = (
+        Path("internal-assets") / case_slug / group_slug / f"{frame_order + 1:03d}"
+    )
     image_url = f"/{(relative_root / asset_path.name).as_posix()}"
     thumb_url = f"/{(relative_root / f'thumb-{asset_path.name}').as_posix()}"
     return image_url, thumb_url
@@ -29,7 +31,9 @@ def build_import_manifest_from_case(scanned_case: CaseSource) -> dict:
         for frame in group.frames:
             assets_payload = []
             for asset in frame.assets:
-                image_url, thumb_url = build_asset_urls(case_slug, group.slug, frame.order, asset.path)
+                image_url, thumb_url = build_asset_urls(
+                    case_slug, group.slug, frame.order, asset.path
+                )
                 width, height = image_dimensions(asset.path)
                 assets_payload.append(
                     {
@@ -61,10 +65,16 @@ def build_import_manifest_from_case(scanned_case: CaseSource) -> dict:
             {
                 "group": {
                     "slug": group.slug,
-                    "title": str(group.metadata.get("title", group.slug.replace("-", " ").title())),
+                    "title": str(
+                        group.metadata.get(
+                            "title", group.slug.replace("-", " ").title()
+                        )
+                    ),
                     "description": str(group.metadata.get("description", "")),
                     "order": group.order,
-                    "defaultMode": str(group.metadata.get("defaultMode", "before-after")),
+                    "defaultMode": str(
+                        group.metadata.get("defaultMode", "before-after")
+                    ),
                     "isPublic": bool(group.metadata.get("isPublic", False)),
                     "tags": group.metadata.get("tags", []),
                 },
@@ -75,11 +85,15 @@ def build_import_manifest_from_case(scanned_case: CaseSource) -> dict:
     return {
         "case": {
             "slug": case_slug,
-            "title": str(scanned_case.metadata.get("title", case_slug.replace("-", " ").title())),
+            "title": str(
+                scanned_case.metadata.get("title", case_slug.replace("-", " ").title())
+            ),
             "summary": str(scanned_case.metadata.get("summary", "")),
             "tags": scanned_case.metadata.get("tags", []),
             "status": str(scanned_case.metadata.get("status", "draft")),
-            "coverAssetLabel": str(scanned_case.metadata.get("coverAssetLabel", "After")),
+            "coverAssetLabel": str(
+                scanned_case.metadata.get("coverAssetLabel", "After")
+            ),
         },
         "groups": groups_payload,
     }

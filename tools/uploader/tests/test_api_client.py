@@ -17,7 +17,9 @@ class ApiClientTests(unittest.TestCase):
         post: mock.Mock,
         build_headers: mock.Mock,
     ) -> None:
-        request = httpx.Request("POST", "https://compare.example.com/api/ops/import-sync")
+        request = httpx.Request(
+            "POST", "https://compare.example.com/api/ops/import-sync"
+        )
         post.return_value = httpx.Response(401, request=request)
         build_headers.return_value = {
             "CF-Access-Client-Id": "client-id",

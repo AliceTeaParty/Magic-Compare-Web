@@ -14,10 +14,16 @@ class CommandFlowTests(unittest.TestCase):
     def setUp(self) -> None:
         self.temp_dir = tempfile.TemporaryDirectory()
         self.case_root = Path(self.temp_dir.name) / "sample-case"
-        frame_dir = self.case_root / "groups" / "001-test-group" / "frames" / "001-frame-a"
+        frame_dir = (
+            self.case_root / "groups" / "001-test-group" / "frames" / "001-frame-a"
+        )
         frame_dir.mkdir(parents=True, exist_ok=True)
-        (self.case_root / "case.yaml").write_text("slug: 2026\ntitle: 2026\n", encoding="utf-8")
-        (frame_dir.parent.parent / "group.yaml").write_text("title: Test Group\n", encoding="utf-8")
+        (self.case_root / "case.yaml").write_text(
+            "slug: 2026\ntitle: 2026\n", encoding="utf-8"
+        )
+        (frame_dir.parent.parent / "group.yaml").write_text(
+            "title: Test Group\n", encoding="utf-8"
+        )
         (frame_dir / "frame.yaml").write_text("title: Frame A\n", encoding="utf-8")
         Image.new("RGB", (32, 24), color=(0, 0, 0)).save(frame_dir / "before.png")
         Image.new("RGB", (32, 24), color=(255, 255, 255)).save(frame_dir / "after.png")
