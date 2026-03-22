@@ -151,11 +151,18 @@ def _parse_candidate(path: Path) -> SourceCandidate:
 
 
 def _after_priority(candidate: SourceCandidate) -> tuple[int, str, str]:
+    """Prioritize after candidates: out > output > rip > others.
+    
+    Allows fallback to rip if standard variants missing, improving handling of
+    tools that export non-standard naming (e.g., ripple, temporal difference maps).
+    """
     if candidate.variant == "out":
         return (0, candidate.variant, candidate.original_name.lower())
     if candidate.variant == "output":
         return (1, candidate.variant, candidate.original_name.lower())
-    return (2, candidate.variant, candidate.original_name.lower())
+    if candidate.variant == "rip":
+        return (2, candidate.variant, candidate.original_name.lower())
+    return (3, candidate.variant, candidate.original_name.lower())
 
 
 def _resolve_frame(
