@@ -42,7 +42,10 @@ interface GroupViewerWorkbenchProps {
  * Composes the viewer shell around smaller workbench modules so layout, persistence, and keyboard
  * behavior stay centralized while rendering details live in focused subcomponents.
  */
-export function GroupViewerWorkbench({ dataset, variant }: GroupViewerWorkbenchProps) {
+export function GroupViewerWorkbench({
+  dataset,
+  variant,
+}: GroupViewerWorkbenchProps) {
   const controller = useViewerController(dataset.group);
   const {
     abSide,
@@ -76,28 +79,44 @@ export function GroupViewerWorkbench({ dataset, variant }: GroupViewerWorkbenchP
   const hideFitControl = useMediaQuery(theme.breakpoints.down("sm"), {
     noSsr: true,
   });
-  const rotateStage = useMediaQuery("(max-width: 760px) and (orientation: portrait)", {
-    noSsr: true,
-  });
-  const prefersReducedMotion = useMediaQuery("(prefers-reduced-motion: reduce)", { noSsr: true });
+  const rotateStage = useMediaQuery(
+    "(max-width: 760px) and (orientation: portrait)",
+    {
+      noSsr: true,
+    },
+  );
+  const prefersReducedMotion = useMediaQuery(
+    "(prefers-reduced-motion: reduce)",
+    { noSsr: true },
+  );
   const [mediaPreferencesReady, setMediaPreferencesReady] = useState(false);
   const [viewportSize, setViewportSize] = useState(() => getViewportSize());
-  const [devicePixelRatio, setDevicePixelRatio] = useState(() => getViewerDevicePixelRatio());
-  const [fitViewViewportSignature, setFitViewViewportSignature] = useState<string | null>(null);
+  const [devicePixelRatio, setDevicePixelRatio] = useState(() =>
+    getViewerDevicePixelRatio(),
+  );
+  const [fitViewViewportSignature, setFitViewViewportSignature] = useState<
+    string | null
+  >(null);
   const [swipePosition, setSwipePosition] = useState(50);
   const [abPanZoomState, setAbPanZoomState] = useState(DEFAULT_PAN_ZOOM);
   const [abStageActive, setAbStageActive] = useState(false);
   const resolvedHideFitControl = mediaPreferencesReady ? hideFitControl : false;
-  const resolvedPrefersReducedMotion = mediaPreferencesReady ? prefersReducedMotion : false;
+  const resolvedPrefersReducedMotion = mediaPreferencesReady
+    ? prefersReducedMotion
+    : false;
   const resolvedRotateStage = mediaPreferencesReady ? rotateStage : false;
-  const resolvedShowDesktopSidebar = mediaPreferencesReady ? showDesktopSidebar : false;
+  const resolvedShowDesktopSidebar = mediaPreferencesReady
+    ? showDesktopSidebar
+    : false;
   const abSideRef = useRef(abSide);
   const abStageActiveRef = useRef(abStageActive);
   const modeRef = useRef(mode);
   const stageAspectRatio = resolvedRotateStage ? 9 / 16 : 16 / 9;
   const fittedStageSize = useMemo(
     () =>
-      fitViewViewportSignature ? getViewerFittedStageSize(viewportSize, stageAspectRatio) : null,
+      fitViewViewportSignature
+        ? getViewerFittedStageSize(viewportSize, stageAspectRatio)
+        : null,
     [fitViewViewportSignature, stageAspectRatio, viewportSize],
   );
 
@@ -241,7 +260,11 @@ export function GroupViewerWorkbench({ dataset, variant }: GroupViewerWorkbenchP
         setMode("heatmap");
       }
 
-      if (event.key === "Escape" && modeRef.current === "a-b" && abStageActiveRef.current) {
+      if (
+        event.key === "Escape" &&
+        modeRef.current === "a-b" &&
+        abStageActiveRef.current
+      ) {
         event.preventDefault();
         setAbStageActive(false);
       }
@@ -277,7 +300,11 @@ export function GroupViewerWorkbench({ dataset, variant }: GroupViewerWorkbenchP
     function handleOutsidePointerDown(event: PointerEvent) {
       const stageNode = stageRef.current;
 
-      if (!stageNode || !(event.target instanceof Node) || stageNode.contains(event.target)) {
+      if (
+        !stageNode ||
+        !(event.target instanceof Node) ||
+        stageNode.contains(event.target)
+      ) {
         return;
       }
 
@@ -285,7 +312,12 @@ export function GroupViewerWorkbench({ dataset, variant }: GroupViewerWorkbenchP
     }
 
     document.addEventListener("pointerdown", handleOutsidePointerDown, true);
-    return () => document.removeEventListener("pointerdown", handleOutsidePointerDown, true);
+    return () =>
+      document.removeEventListener(
+        "pointerdown",
+        handleOutsidePointerDown,
+        true,
+      );
   }, [abStageActive, mode]);
 
   /**
@@ -314,7 +346,9 @@ export function GroupViewerWorkbench({ dataset, variant }: GroupViewerWorkbenchP
 
     setViewportSize(nextViewportSize);
     setFitViewViewportSignature((previousSignature) =>
-      previousSignature && previousSignature === nextSignature ? null : nextSignature,
+      previousSignature && previousSignature === nextSignature
+        ? null
+        : nextSignature,
     );
   }
 
@@ -335,9 +369,14 @@ export function GroupViewerWorkbench({ dataset, variant }: GroupViewerWorkbenchP
           maxWidth: "100%",
           display: "grid",
           gridTemplateColumns:
-            sidebarOpen && resolvedShowDesktopSidebar ? "minmax(0, 1fr) 320px" : "1fr",
+            sidebarOpen && resolvedShowDesktopSidebar
+              ? "minmax(0, 1fr) 320px"
+              : "1fr",
           gridTemplateRows: "auto minmax(0, 1fr)",
-          minHeight: "calc(100svh - 16px)",
+          height: {
+            xs: "calc(100svh - 20px)",
+            md: "calc(100svh - 36px)",
+          },
           overflow: "hidden",
           border: "1px solid",
           borderColor: "divider",
@@ -367,18 +406,19 @@ export function GroupViewerWorkbench({ dataset, variant }: GroupViewerWorkbenchP
           sx={{
             minWidth: 0,
             minHeight: 0,
+            height: "100%",
             display: "grid",
             gridTemplateRows: "minmax(0, 1fr) auto",
           }}
         >
-          <Box sx={{ minHeight: 0, p: { xs: 1.5, md: 2.25 } }}>
+          <Box sx={{ minHeight: 0, height: "100%", p: { xs: 1.5, md: 2.25 } }}>
             <Stack
               spacing={1.5}
               sx={{
                 width: "100%",
                 minWidth: 0,
                 height: "100%",
-                minHeight: resolvedRotateStage ? { xs: 520, md: 560 } : { xs: 340, md: 460 },
+                minHeight: { xs: 0, md: resolvedRotateStage ? 560 : 460 },
               }}
             >
               {mode === "heatmap" && !heatmapAsset ? <HeatmapNotice /> : null}
@@ -387,7 +427,10 @@ export function GroupViewerWorkbench({ dataset, variant }: GroupViewerWorkbenchP
                 sx={{
                   flex: 1,
                   minWidth: 0,
-                  minHeight: fittedStageSize ? `${fittedStageSize.height}px` : 0,
+                  height: "100%",
+                  minHeight: fittedStageSize
+                    ? `${fittedStageSize.height}px`
+                    : 0,
                 }}
               >
                 <ViewerStage
@@ -412,7 +455,11 @@ export function GroupViewerWorkbench({ dataset, variant }: GroupViewerWorkbenchP
               </Box>
 
               {mode === "heatmap" && heatmapAsset ? (
-                <Stack direction={{ xs: "column", md: "row" }} spacing={2} alignItems="center">
+                <Stack
+                  direction={{ xs: "column", md: "row" }}
+                  spacing={2}
+                  alignItems="center"
+                >
                   <Stack direction="row" spacing={1} alignItems="center">
                     <Tune fontSize="small" />
                     <Typography variant="body2">Opacity</Typography>
@@ -423,7 +470,11 @@ export function GroupViewerWorkbench({ dataset, variant }: GroupViewerWorkbenchP
                     value={overlayOpacity}
                     onChange={(_, value) =>
                       setOverlayOpacity(
-                        clampNumber(Array.isArray(value) ? value[0] : value, 20, 95),
+                        clampNumber(
+                          Array.isArray(value) ? value[0] : value,
+                          20,
+                          95,
+                        ),
                       )
                     }
                     valueLabelDisplay="auto"
