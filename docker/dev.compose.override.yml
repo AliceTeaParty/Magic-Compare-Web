@@ -4,17 +4,9 @@ services:
     build:
       context: .
       dockerfile: docker/internal-site.Dockerfile
-    volumes:
-      - ./docker-data/internal-data:/app/data
 
   internal-site:
     image: magic-compare/internal-site:local
     build:
       context: .
       dockerfile: docker/internal-site.Dockerfile
-    volumes:
-      - ./docker-data/internal-data:/app/data
-
-  rustfs:
-    volumes:
-      - ./docker-data/rustfs:/data

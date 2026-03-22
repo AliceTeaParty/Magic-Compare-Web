@@ -23,7 +23,7 @@ x-internal-site-common: &internal-site-common
     CLOUDFLARE_ACCOUNT_ID: ${CLOUDFLARE_ACCOUNT_ID:-}
     CLOUDFLARE_API_TOKEN: ${CLOUDFLARE_API_TOKEN:-}
   volumes:
-    - internal-data:/app/data
+    - ${MAGIC_COMPARE_INTERNAL_DATA_MOUNT:-internal-data}:/app/data
 
 services:
   rustfs:
@@ -37,8 +37,7 @@ services:
       MINIO_ROOT_USER: ${MAGIC_COMPARE_S3_ACCESS_KEY_ID:-rustfsadmin}
       MINIO_ROOT_PASSWORD: ${MAGIC_COMPARE_S3_SECRET_ACCESS_KEY:-rustfsadmin}
       MALLOC_ARENA_MAX: "2"
-    command:
-      ["server", "/data", "--address", ":9000", "--console-address", ":9001"]
+    command: ["server", "/data", "--address", ":9000", "--console-address", ":9001"]
     mem_limit: 512m
     cpus: 1.0
     tmpfs:
@@ -55,7 +54,7 @@ services:
       retries: 5
       start_period: 20s
     volumes:
-      - rustfs-data:/data
+      - ${MAGIC_COMPARE_RUSTFS_DATA_MOUNT:-rustfs-data}:/data
 
   rustfs-init:
     image: minio/mc:RELEASE.2025-08-13T08-35-41Z
@@ -110,8 +109,6 @@ services:
       rustfs-init:
         condition: service_completed_successfully
     restart: "no"
-    volumes:
-      - internal-data:/app/data
 
   internal-site:
     <<: *internal-site-common

@@ -10,13 +10,3 @@ services:
     build:
       context: .
       dockerfile: docker/internal-site.Dockerfile
-    volumes:
-      - internal-data:/app/data
-
-  rustfs:
-    volumes:
-      - rustfs-data:/data
-
-volumes:
-  rustfs-data:
-  internal-data:
