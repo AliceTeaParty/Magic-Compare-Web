@@ -6,6 +6,24 @@ Entries before that date are summarized at release level instead of being recons
 
 ## Unreleased
 
+## v1.5.2 - 2026-03-22
+
+Group Viewer mobile adaptation and uploader robustness release.
+
+### Added
+
+- Uploader now accepts `rip` as a fallback after variant (priority: out > output > rip > others) to support tools that export non-standard naming like ripple or temporal difference maps.
+- Uploader wizard now offers explicit `c` option to create new case, making the intent clearer than relying on default behavior.
+
+### Fixed
+
+- Group Viewer on landscape phones now uses compact header layout (viewportWidth < 760px orientation:portrait) to prevent stage overflow and improve usable area.
+- Group Viewer stage container now properly constrains height on mobile via CSS grid and flex layout fixes, preventing content from exceeding viewport.
+- ViewerHeader and ViewerToolbar now adapt flex direction at xs breakpoint for landscape phones.
+- Both app layouts now include proper viewport meta tags with initialScale and viewportFit for full mobile device support.
+- iOS Safari blur effect on swipe handle now works correctly with WebkitBackdropFilter.
+- Custom pinch-zoom on iOS Safari now works in A/B mode with proper touchAction handling.
+
 ## v1.5.1 - 2026-03-22
 
 Viewer interaction and accessibility hardening release.
