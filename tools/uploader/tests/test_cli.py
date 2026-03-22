@@ -3,7 +3,9 @@ from __future__ import annotations
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
+from src import cli
 from src.cli import _normalize_path_text, _resolve_source_dir
 
 
@@ -24,6 +26,24 @@ class CliPathResolutionTests(unittest.TestCase):
             resolved = _resolve_source_dir(f"'{source_dir}'")
 
             self.assertEqual(resolved, source_dir.resolve())
+
+    def test_windows_stdio_reconfigures_to_utf8(self) -> None:
+        stdout = mock.Mock()
+        stderr = mock.Mock()
+
+        with (
+            mock.patch.object(cli.os, "name", "nt"),
+            mock.patch.object(cli.sys, "stdout", stdout),
+            mock.patch.object(cli.sys, "stderr", stderr),
+        ):
+            cli._configure_windows_stdio_for_unicode()
+
+        stdout.reconfigure.assert_called_once_with(
+            encoding="utf-8", errors="replace"
+        )
+        stderr.reconfigure.assert_called_once_with(
+            encoding="utf-8", errors="replace"
+        )
 
 
 if __name__ == "__main__":

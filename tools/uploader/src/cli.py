@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+import sys
 from pathlib import Path
 
 import typer
@@ -15,6 +17,24 @@ from .commands import (
     handle_sync,
 )
 from .wizard import run_wizard
+
+
+def _configure_windows_stdio_for_unicode() -> None:
+    """Force UTF-8 stdio on Windows so Rich/Typer help text can print Chinese copy even when the parent shell defaults to a legacy code page."""
+    if os.name != "nt":
+        return
+
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if callable(reconfigure):
+            # Git Bash on GitHub Actions still exposes a non-UTF console by default.
+            # Reconfiguring here keeps the frozen binary usable without asking operators
+            # to change their terminal locale just to read built-in help output.
+            reconfigure(encoding="utf-8", errors="replace")
+
+
+_configure_windows_stdio_for_unicode()
+
 
 app = typer.Typer(add_completion=False, help="Magic Compare 中文导入工具")
 
