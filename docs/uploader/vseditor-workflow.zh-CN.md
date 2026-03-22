@@ -50,13 +50,6 @@ magic-compare-uploader
 ```text
 MAGIC_COMPARE_SITE_URL=http://localhost:3000
 MAGIC_COMPARE_API_URL=
-MAGIC_COMPARE_S3_BUCKET=magic-compare-assets
-MAGIC_COMPARE_S3_REGION=us-east-1
-MAGIC_COMPARE_S3_ENDPOINT=http://localhost:9000
-MAGIC_COMPARE_S3_ACCESS_KEY_ID=rustfsadmin
-MAGIC_COMPARE_S3_SECRET_ACCESS_KEY=rustfsadmin
-MAGIC_COMPARE_S3_FORCE_PATH_STYLE=true
-MAGIC_COMPARE_S3_INTERNAL_PREFIX=internal-assets
 MAGIC_COMPARE_CF_ACCESS_CLIENT_ID=
 MAGIC_COMPARE_CF_ACCESS_CLIENT_SECRET=
 ```
@@ -66,6 +59,7 @@ MAGIC_COMPARE_CF_ACCESS_CLIENT_SECRET=
 - 本地开发时，`MAGIC_COMPARE_SITE_URL=http://localhost:3000` 通常就够了
 - 本地目标允许无认证直连
 - 如果目标是受 Cloudflare Access 保护的远端内部站，只支持 Service Token
+- uploader 上传现在统一走 `internal-site` 代理，不再要求本地持有 `S3_*` 凭据
 - uploader 不再自动安装或调用 `cloudflared`
 - uploader 相关变量只保留在自己的工作目录 `.env` 里，不再混入网站运行时模板
 
