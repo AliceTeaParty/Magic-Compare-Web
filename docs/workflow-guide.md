@@ -228,6 +228,7 @@ compose 当前会做这些事：
 
 - 基础 `docker-compose.yml` 默认通过 `MAGIC_COMPARE_INTERNAL_SITE_IMAGE` 拉取 GHCR 运行时镜像
 - `docker/dev.compose.override.yml` 才会把 `internal-site` / `internal-site-init` 切换成本地 `build`
+- 数据目录现在统一通过 `.env` 控制；留空时走 Docker named volumes，填写宿主机路径时走 bind mount
 - `internal-site` 容器本身只负责：
 
 ```bash
@@ -239,9 +240,9 @@ pnpm --filter @magic-compare/internal-site start
 - 默认 compose：Docker named volumes
   - `rustfs-data:/data`
   - `internal-data:/app/data`
-- 本地开发可选：
-  - `docker/dev.compose.override.yml`
-  - 该 override 会把数据重新映射回 `./docker-data/**`
+- 如需把数据直接写到宿主机目录，在 `.env` 里设置：
+  - `MAGIC_COMPARE_RUSTFS_DATA_MOUNT=./docker-data/rustfs`
+  - `MAGIC_COMPARE_INTERNAL_DATA_MOUNT=./docker-data/internal-data`
 
 所以这些内容不会因为容器重启而丢失：
 

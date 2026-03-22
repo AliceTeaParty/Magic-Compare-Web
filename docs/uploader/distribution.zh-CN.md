@@ -18,11 +18,11 @@
 - 需要反复本地测试时，优先用 `--layout onedir`
 - 想兼顾“单文件分发体验”和“后续启动速度”时，优先分发 `onedir zip`，不要继续纠结 `onefile` 缓存
 
-CI 默认产出 3 个目标：
+CI 默认产出 3 个 `onedir zip` 目标：
 
-- `magic-compare-uploader-windows-amd64.exe`
-- `magic-compare-uploader-linux-amd64`
-- `magic-compare-uploader-macos-arm64`
+- `magic-compare-uploader-windows-amd64.zip`
+- `magic-compare-uploader-linux-amd64.zip`
+- `magic-compare-uploader-macos-arm64.zip`
 
 `linux/arm64` 暂不放进托管 CI，而是保留同仓脚本和手工构建说明。
 
@@ -118,10 +118,11 @@ python scripts/build-binary.py --platform linux --arch amd64
 CI 每个目标会：
 
 - 安装 `tools/uploader[build]`
-- 执行 `python scripts/build-binary.py`
-- 校验二进制 `--help`
+- 执行 `python scripts/build-binary.py --layout onedir --archive zip`
+- 校验解压目录中的二进制 `--help`
 - 在 Linux 目标上额外跑一条 `plan` smoke
-- 上传对应 artifact
+- 上传对应 zip artifact
+- 在 tag push 时自动创建 GitHub Release 并附加这些 zip
 
 ## 5. linux/arm64 手工构建
 

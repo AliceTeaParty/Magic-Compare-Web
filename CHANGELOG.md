@@ -6,6 +6,28 @@ Entries before that date are summarized at release level instead of being recons
 
 ## Unreleased
 
+## v1.5.0 - 2026-03-22
+
+Uploader hardening release focused on making remote uploads credential-light, packaging startup less painful, and turning tag builds into real GitHub releases.
+
+### Added
+
+- Internal-site now exposes a dedicated asset-upload proxy endpoint so remote uploader runs only need the site URL plus Cloudflare Service Token credentials.
+- Uploader packaging now supports `onedir` and `onedir + zip`, making it possible to distribute a single archive while keeping runtime startup fast after the first manual unzip.
+- GitHub tag builds now create uploader release archives and publish a GitHub Release instead of stopping at workflow artifacts only.
+
+### Changed
+
+- Uploader config resolution now checks the packaged binary directory `.env`, then the caller cwd `.env`, and only uses the work-dir `.env` as a fallback snapshot.
+- Uploader binary CI now builds `onedir zip` artifacts by default, matching the current startup/performance tradeoff better than PyInstaller `onefile`.
+- Docker data mounts are now environment-driven: leave the new mount env vars blank to use named volumes, or point them at host paths to bind into `docker-data/**`.
+- Uploader package metadata is now versioned as `1.5.0` to match the release tag line.
+
+### Fixed
+
+- Running the packaged uploader from `dist/` no longer gets silently redirected back to `localhost` by a newly created or stale work-dir `.env`.
+- Remote uploader usage no longer requires exposing raw S3 credentials on the client side.
+
 ## v1.3.0 - 2026-03-21
 
 Refactor and stability release focused on breaking apart viewer/workspace hotspots, hardening browser-level verification, and making local runtime debugging more trustworthy.
