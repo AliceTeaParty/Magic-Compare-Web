@@ -79,6 +79,7 @@ function ThumbnailButton({
             src={thumbAsset.thumbUrl || thumbAsset.imageUrl}
             alt={frame.title}
             draggable={false}
+            loading="lazy"
             sx={{
               width: "100%",
               height: "100%",
