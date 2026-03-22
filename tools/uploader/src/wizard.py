@@ -87,7 +87,7 @@ def _render_case_table(results: list[CaseSearchResult], query: str) -> None:
 
 
 def _choose_case(config: UploaderConfig, current_year: str) -> CaseSearchResult | None:
-    """Prefer reusing the current-year case when possible so upload sessions accumulate under one predictable slug."""
+    """Offer case selection with options for reuse, creation, or search."""
     query = current_year
 
     while True:
@@ -96,8 +96,13 @@ def _choose_case(config: UploaderConfig, current_year: str) -> CaseSearchResult 
 
         _render_case_table(results, query)
         choice = console.input(
-            f"[bold]输入编号复用已有 case，回车使用当前年份 case（{current_year}），输入 / 重新搜索：[/]"
+            f"[bold]输入编号复用已有 case，回车使用 {current_year} case，输入 c 创建新 case，输入 / 重新搜索：[/]"
         ).strip()
+
+        # Create new case explicitly
+        if choice == "c":
+            console.print("[yellow]将创建新 case，稍后可编辑 case.yaml[/]")
+            return None
 
         if not choice:
             existing_year_case = next(

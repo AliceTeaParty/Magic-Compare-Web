@@ -12,12 +12,8 @@ import { useFilmstripDrag } from "./use-filmstrip-drag";
  */
 function resolveThumbnailAsset(frame: ViewerFrame) {
   return (
-    frame.assets.find(
-      (asset) => asset.kind === "after" && asset.isPrimaryDisplay,
-    ) ??
-    frame.assets.find(
-      (asset) => asset.kind === "before" && asset.isPrimaryDisplay,
-    ) ??
+    frame.assets.find((asset) => asset.kind === "after" && asset.isPrimaryDisplay) ??
+    frame.assets.find((asset) => asset.kind === "before" && asset.isPrimaryDisplay) ??
     frame.assets[0]
   );
 }
@@ -51,12 +47,8 @@ function ThumbnailButton({
         borderRadius: 2.25,
         border: "1px solid",
         borderColor: isActive ? "primary.main" : "divider",
-        backgroundColor: isActive
-          ? "rgba(232, 198, 246, 0.1)"
-          : "rgba(255, 255, 255, 0.018)",
-        boxShadow: isActive
-          ? "inset 0 0 0 1px rgba(232, 198, 246, 0.18)"
-          : "none",
+        backgroundColor: isActive ? "rgba(232, 198, 246, 0.1)" : "rgba(255, 255, 255, 0.018)",
+        boxShadow: isActive ? "inset 0 0 0 1px rgba(232, 198, 246, 0.18)" : "none",
         p: 1.1,
         transition:
           "transform 180ms cubic-bezier(0.22, 1, 0.36, 1), border-color 180ms cubic-bezier(0.22, 1, 0.36, 1), background-color 180ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 180ms cubic-bezier(0.22, 1, 0.36, 1)",
