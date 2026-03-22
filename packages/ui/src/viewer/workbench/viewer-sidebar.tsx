@@ -248,9 +248,9 @@ export function ViewerSidebar({
         {sidebarOpen && showDesktopSidebar ? (
           <Box
             component={motion.aside}
-            initial={{ opacity: 0, x: 18 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: 18 }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
             transition={{ duration: 0.18, ease: "easeOut" }}
             sx={{
               borderLeft: "1px solid",

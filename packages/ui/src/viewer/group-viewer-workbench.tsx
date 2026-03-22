@@ -373,7 +373,10 @@ export function GroupViewerWorkbench({
               ? "minmax(0, 1fr) 320px"
               : "1fr",
           gridTemplateRows: "auto minmax(0, 1fr)",
-          minHeight: "calc(100svh - 16px)",
+          height: {
+            xs: "calc(100svh - 20px)",
+            md: "calc(100svh - 36px)",
+          },
           overflow: "hidden",
           border: "1px solid",
           borderColor: "divider",
@@ -403,20 +406,19 @@ export function GroupViewerWorkbench({
           sx={{
             minWidth: 0,
             minHeight: 0,
+            height: "100%",
             display: "grid",
             gridTemplateRows: "minmax(0, 1fr) auto",
           }}
         >
-          <Box sx={{ minHeight: 0, p: { xs: 1.5, md: 2.25 } }}>
+          <Box sx={{ minHeight: 0, height: "100%", p: { xs: 1.5, md: 2.25 } }}>
             <Stack
               spacing={1.5}
               sx={{
                 width: "100%",
                 minWidth: 0,
                 height: "100%",
-                minHeight: resolvedRotateStage
-                  ? { xs: 520, md: 560 }
-                  : { xs: 340, md: 460 },
+                minHeight: { xs: 0, md: resolvedRotateStage ? 560 : 460 },
               }}
             >
               {mode === "heatmap" && !heatmapAsset ? <HeatmapNotice /> : null}
@@ -425,6 +427,7 @@ export function GroupViewerWorkbench({
                 sx={{
                   flex: 1,
                   minWidth: 0,
+                  height: "100%",
                   minHeight: fittedStageSize
                     ? `${fittedStageSize.height}px`
                     : 0,

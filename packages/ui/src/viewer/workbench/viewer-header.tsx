@@ -48,18 +48,18 @@ export function ViewerHeader({
         position: "relative",
         zIndex: 2,
         display: "flex",
-        flexDirection: { xs: "column", md: "row" },
-        alignItems: { xs: "stretch", md: "center" },
+        flexDirection: { xs: "column", sm: "row" },
+        alignItems: { xs: "stretch", sm: "center" },
         justifyContent: "space-between",
         gap: 1.5,
-        p: { xs: 2.25, md: 3 },
+        p: { xs: 1.75, md: 3 },
         borderBottom: "1px solid",
         borderColor: "divider",
         background:
           "linear-gradient(180deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.018) 100%)",
       }}
     >
-      <Stack spacing={0.2} sx={{ minWidth: 0, pr: { md: 2 } }}>
+      <Stack spacing={0.2} sx={{ minWidth: 0, pr: { sm: 2 } }}>
         <Typography variant="h4" noWrap sx={{ lineHeight: 1.18, pb: 0.16 }}>
           {groupTitle}
         </Typography>

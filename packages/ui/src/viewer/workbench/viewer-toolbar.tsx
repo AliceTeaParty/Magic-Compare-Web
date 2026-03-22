@@ -81,7 +81,7 @@ export function ViewerToolbar({
       direction="row"
       spacing={1}
       alignItems="center"
-      justifyContent={{ xs: "flex-start", md: "flex-end" }}
+      justifyContent={{ xs: "flex-start", sm: "flex-end" }}
       flexWrap="wrap"
       useFlexGap
     >

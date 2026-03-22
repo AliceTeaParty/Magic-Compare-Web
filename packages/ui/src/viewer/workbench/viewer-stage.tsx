@@ -379,6 +379,7 @@ function SwipeCompareStage({
           border: "1px solid rgba(248, 245, 255, 0.22)",
           backgroundColor: "rgba(22, 37, 76, 0.34)",
           backdropFilter: "blur(10px)",
+          WebkitBackdropFilter: "blur(10px)",
           boxShadow:
             "0 10px 24px rgba(10, 18, 42, 0.18), 0 0 18px rgba(228, 194, 242, 0.18)",
           display: "grid",
@@ -514,7 +515,7 @@ function ABCompareStage({
         width: "100%",
         height: "100%",
         overflow: "hidden",
-        touchAction: "pan-y",
+        touchAction: active ? "none" : "pan-y",
         cursor: active ? (effectiveScale > 1 ? "grab" : "pointer") : "pointer",
         userSelect: "none",
         borderRadius: 2.25,
@@ -571,9 +572,9 @@ function StagePresentationShell({
         minHeight: fitActive
           ? 0
           : rotateStage
-            ? { xs: 420, md: 520 }
-            : { xs: 220, md: 340 },
-        maxHeight: fittedSize ? `${fittedSize.height}px` : "none",
+            ? { xs: 80, md: 520 }
+            : { xs: 80, md: 340 },
+        maxHeight: fittedSize ? `${fittedSize.height}px` : "100%",
         marginInline: "auto",
         borderRadius: 2.5,
         overflow: "hidden",
@@ -791,6 +792,7 @@ export function ViewerStage({
       ref={stageRef}
       sx={{
         width: "100%",
+        height: "100%",
         minWidth: 0,
         display: "grid",
         placeItems: "center",
