@@ -216,14 +216,19 @@ export function GroupViewerWorkbench({
      * handlers, while refs keep the latest inspect state visible to the listener.
      */
     function handleKeydown(event: KeyboardEvent) {
+      // Layer 1: Skip already-handled events and input composition to avoid duplicate processing
+      // or interfering with IME (CJK input, etc.)
       if (event.defaultPrevented || event.isComposing) {
         return;
       }
 
+      // Layer 2: Skip modifier key combinations to preserve system/browser shortcuts
+      // (e.g., Ctrl+1 for browser zoom, Cmd+← for back, Alt+F for menu)
       if (event.metaKey || event.ctrlKey || event.altKey) {
         return;
       }
 
+      // Layer 3: Skip form inputs and content-editable regions to protect text editing
       if (
         event.target instanceof HTMLElement &&
         (event.target.isContentEditable ||
