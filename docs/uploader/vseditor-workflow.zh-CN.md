@@ -1,32 +1,27 @@
-# 从 VSEditor 导图到上传成功
+# 从 VSEditor 平铺目录到上传成功
 
-本文档提供从 VSEditor 平铺导图目录到内部站上传成功的最短操作路径。
-前提是已激活 uploader 的 Python 环境，按本文步骤执行即可完成整理、metadata 生成与 heatmap 生成。
+本文档给出从 VSEditor 平铺导图目录到 internal-site 导入成功的最短路径。
+重点是先做预演、再上传，并在失败后可以直接续传，而不是每次从头开始。
 
-## 1. 示例目录现状
+## 1. 起点目录
 
-示例目录是一个典型的 VSEditor 平铺导图目录：
+典型输入目录类似：
 
 ```text
 ~/Downloads/test-example/
-  24_BDMV250725..._2087_src.png
-  24_BDMV250725..._2087_output.png
-......
-  24_BDMV250725..._30516_src.png
-  24_BDMV250725..._30516_output.png
-  24_Vol.1_00002.gen.vpy-30516-rip.png
+  24_demo_00001_100_src.png
+  24_demo_00001_100_output.png
+  24_demo_00001.gen.vpy-100-rip.png
 ```
 
-现在 uploader 已经支持直接从这种目录开始，不需要你手动：
+现在 uploader 可以直接从这种平铺目录开始，不需要你手动：
 
-- 新建 `groups/`、`frames/`
-- 手动复制成 `before.png` / `after.png`
+- 新建 `groups/` / `frames/`
+- 手改 `before.png` / `after.png`
 - 手写最小 `case.yaml` / `group.yaml`
-- 手动生成 heatmap
+- 手工生成 heatmap
 
-这些都交给向导完成。
-
-## 2. 直接启动向导
+## 2. 启动方式
 
 在已激活 uploader Python 环境的终端里执行：
 
@@ -34,27 +29,23 @@
 magic-compare-uploader
 ```
 
-启动后，第一步会询问：
-
-```text
-素材目录
-```
-
-这里输入：
+第一步会询问素材目录，例如：
 
 ```text
 ~/Downloads/test-example
 ```
 
-如果你当前终端已经 `cd` 到这个目录，也可以直接回车使用默认值。
+如果当前终端已经在该目录，也可以直接回车使用默认值。
 
-接下来，向导会为这次导入准备工作目录，并在其中生成一份：
+## 3. `.env` 与连接方式
+
+向导会在工作目录里准备：
 
 ```text
-~/Downloads/test-example-case/.env
+<work-dir>/.env
 ```
 
-它来自 `tools/uploader/.env.example`。最常用的字段是：
+它来自 `tools/uploader/.env.example`。最常用字段：
 
 ```text
 MAGIC_COMPARE_SITE_URL=http://localhost:3000
@@ -66,285 +57,141 @@ MAGIC_COMPARE_S3_ACCESS_KEY_ID=rustfsadmin
 MAGIC_COMPARE_S3_SECRET_ACCESS_KEY=rustfsadmin
 MAGIC_COMPARE_S3_FORCE_PATH_STYLE=true
 MAGIC_COMPARE_S3_INTERNAL_PREFIX=internal-assets
-MAGIC_COMPARE_CF_ACCESS_TOKEN=
+MAGIC_COMPARE_CF_ACCESS_CLIENT_ID=
+MAGIC_COMPARE_CF_ACCESS_CLIENT_SECRET=
 ```
 
 说明：
 
-- 本地开发时，`MAGIC_COMPARE_SITE_URL=http://localhost:3000` 就够了
-- uploader 的工作目录只保留 Python 导入链路需要的字段，不再混入网站发布或 Pages 部署变量
-- uploader 现在会把原图、缩略图和自动 heatmap 直接上传到 S3-compatible 存储，不再写入仓库内的 runtime 目录
-- 如果本地用 `docker compose up -d rustfs rustfs-init`，上面这组 S3 默认值可以直接使用
-- 如果内部站放在 Cloudflare Zero Trust 后面，把它改成真实内部域名，例如 `https://compare-internal.example.com`
-- `MAGIC_COMPARE_CF_ACCESS_TOKEN` 不需要手填，CLI 会在登录成功后自动写回
+- 本地开发时，`MAGIC_COMPARE_SITE_URL=http://localhost:3000` 通常就够了
+- 本地目标允许无认证直连
+- 如果目标是受 Cloudflare Access 保护的远端内部站，只支持 Service Token
+- uploader 不再自动安装或调用 `cloudflared`
+- uploader 相关变量只保留在自己的工作目录 `.env` 里，不再混入网站运行时模板
 
-## 3. 工具会自动做什么
+## 4. 向导现在会先做什么
 
-### 3.1 自动解析 before / after
+在真正上传前，向导会先做一轮预演：
 
-工具会递归扫描素材目录中的图片，并按 frame 自动聚合。
+- 解析 before / after / heatmap / misc
+- 统计帧数和待上传对象数
+- 报告被忽略的垃圾文件和忽略原因
+- 对关键图片做快速解码校验
+- 预览目标路径是否冲突
 
-默认规则：
+如果预演阶段出现阻塞错误，例如：
 
-- `src` 或 `source` 识别为唯一 `before`
+- `before` / `after` 是损坏图片
+- 命名导致目标 object key 冲突
+- 平铺目录根本无法识别出合法 frame
+
+向导会先停下来，不会直接进入上传。
+
+## 5. 自动识别规则
+
+默认命名规则保持不变：
+
+- `src` / `source` 识别为 `before`
 - `out` 优先作为 `after`
 - 其次 `output`
-- 其余候选按字母序选择第一项作为 `after`
-- 未被选中的输出图降级为 `misc`
+- 其他未选中的输出图归为 `misc`
 
-对当前示例来说：
+额外行为：
 
-- `*_src.png` 会成为 `before`
-- `*_output.png` 会成为 `after`
-- `24_Vol.1_00002.gen.vpy-30516-rip.png` 会被归入 `30516` 这一帧，并作为 `misc`
+- 已有显式 `heatmap` 文件时直接使用
+- 没有显式 `heatmap` 时，工作目录阶段会自动生成
+- 隐藏文件、系统垃圾、明显 sidecar 会进入 ignored 列表，而不是把整次导入搞挂
 
-### 3.2 自动生成 frame 标题
+## 6. 选择 case 与生成工作目录
 
-frame 标题会从文件名自动提取，格式固定为：
-
-```text
-帧率_剧集号_帧号
-```
-
-例如：
-
-```text
-******py_3537_src.png
-```
-
-会生成：
-
-```text
-24_02_3537
-```
-
-规则是：
-
-- `24`：文件名开头的两位帧率
-- `02`：靠近帧号的剧集编号，自动去前导零后至少补到两位
-- `3537`：帧号本身，作为合法整数保存
-
-### 3.3 自动生成 heatmap
-
-如果当前 frame 没有现成的 `heatmap` 文件，工具会基于选中的 `before` 和 `after` 自动生成 `heatmap.png`。
-
-如果尺寸不一致，导入会直接报错，不会偷偷拉伸。
-
-## 4. 选择已有 case 或创建年份 case
-
-解析完素材并准备好工作目录后，工具会先尝试连接内部站，再默认用当前年份搜索已有 case，例如：
+向导会先默认用当前年份搜索已有 case，例如：
 
 ```text
 2026
 ```
 
-你会看到一张候选表。
+此时你可以：
 
-如果 `MAGIC_COMPARE_SITE_URL` 指向的是受 Cloudflare Access 保护的内部站，且当前 `.env` 里还没有可用 token，CLI 会自动：
+- 直接回车：优先复用同年份 case，没有则准备新建
+- 输入编号：复用某个已有 case
+- 输入 `/`：重新搜索其他关键词
 
-1. 检查 `cloudflared` 是否存在
-2. 在 macOS 上尝试自动安装 `cloudflared`
-3. 拉起浏览器访问内部站主页并完成 Access 登录
-4. 取回 token
-5. 把 token 写进工作目录 `.env` 的 `MAGIC_COMPARE_CF_ACCESS_TOKEN`
-
-整个过程不需要你手动复制 token。
-
-此时有三种用法：
-
-### 4.1 直接回车
-
-默认使用当前年份 case。
-
-- 如果服务器上已经有 `2026` 这个 case，工具会直接复用它
-- 如果没有，就自动准备一个新的 `2026` case
-
-### 4.2 输入编号
-
-输入表格里的编号，复用那个已有 case。
-
-这时 uploader 会：
-
-- 使用服务器上已有的 `title / subtitle / summary / tags / status`
-- 不覆盖这些 case metadata
-- 只把这次导入的 group 加进去
-
-### 4.3 输入 `/`
-
-重新输入搜索关键词，再看另一批候选 case。
-
-## 5. 自动生成的本地工作目录
-
-工具会自动在素材目录同级生成工作目录：
+随后 uploader 会生成结构化工作目录，例如：
 
 ```text
 ~/Downloads/test-example-case
 ```
 
-默认 group 目录是：
+如果目录已存在，会让你选择：
 
-```text
-~/Downloads/test-example-case/groups/001-test-example
-```
+- 覆盖
+- 新建时间戳目录
+- 取消
 
-如果这个工作目录已经存在，工具会询问你：
+这样做是为了避免把旧的 metadata、upload session 和人工修订记录静默覆盖掉。
 
-- 覆盖现有目录
-- 新建带时间戳的新目录
-- 取消本次导入
+## 7. metadata 确认
 
-这个工作目录除了 metadata 和整理后的图片外，还会保存本次导入所需的 `.env`，所以后续再执行 `sync`、`delete-group` 之类命令时，不需要重复填写站点地址。
+向导会生成并打开：
 
-## 6. 自动生成并确认 metadata
+- `case.yaml`（仅在新建 case 时）
+- `group.yaml`
 
-### 6.1 `case.yaml`
+如果复用已有 case，服务器已有的 case metadata 会保留，不会被这次导入偷偷覆盖。
 
-如果本次是新建年份 case，工具会自动生成：
+## 8. 结构化计划、上传与同步
 
-```yaml
-slug: 2026
-title: 2026
-subtitle: ""
-summary: <random>
-tags: []
-status: internal
-coverAssetLabel: After
-```
+metadata 确认后，向导会再跑一次针对结构化工作目录的计划：
 
-然后自动拉起系统编辑器让你确认。
+- 这次的计划结果才是实际上传依据
+- 如果结构化目录里仍然有阻塞错误，会先报错，不会进入上传
 
-如果本次复用已有 case，则会把服务器已有 metadata 写到本地 `case.yaml` 作为记录，但默认不会打开编辑，也不会拿它去覆盖服务器内容。
+上传阶段特性：
 
-### 6.2 `group.yaml`
+- 自动写入 `<work-dir>/.magic-compare/upload-session.json`
+- 默认断点续传
+- 已存在且 metadata 指纹一致的对象会自动跳过
+- 仅网络类问题会重试，配置错误不会盲重试
 
-`group.yaml` 一定会自动生成并打开编辑器确认。
+真正上传完成后，才会调用 internal-site 的 `import-sync`。
 
-默认内容大致类似：
+## 9. 常用命令补充
 
-```yaml
-title: Test Example
-description: Imported from test-example.
-defaultMode: before-after
-isPublic: false
-tags: []
-```
-
-说明：
-
-- `slug` 不写在 `group.yaml` 里，而是来自目录名 `001-test-example`
-- 如果目标 case 下已存在同 slug group，工具会先问你：
-  - 覆盖旧 group
-  - 自动改成 `test-example-2`、`test-example-3` 之类的新 slug
-
-### 6.3 `frame.yaml`
-
-每个 frame 都会自动生成 `frame.yaml`，例如：
-
-```yaml
-title: 24_02_3537
-caption: fps 24 • episode 02 • frame 3537
-```
-
-默认不会逐个打开编辑器，但它们已经落到工作目录里，后续可以自己改。
-
-## 7. 向导实际写出的目录
-
-对当前示例，大致会生成：
-
-```text
-~/Downloads/test-example-case/
-  case.yaml
-  groups/
-    001-test-example/
-      group.yaml
-      frames/
-        001-24-02-2087/
-          frame.yaml
-          assets.yaml
-          before.png
-          after.png
-          heatmap.png
-        002-24-02-3537/
-          ......
-```
-
-其中：
-
-- `assets.yaml` 会记住每个导入资产对应的原始文件名
-- `rip.png` 会作为 `misc` 资产保留
-
-## 8. 上传成功后会发生什么
-
-当你确认 `case.yaml` / `group.yaml` 后，向导会继续：
-
-1. 校验生成后的工作目录
-2. 生成缩略图
-3. 生成 import manifest
-4. 调用内部站 `POST /api/ops/import-sync`
-
-成功时，终端会输出：
-
-- `Case slug`
-- `Group slug`
-- `工作目录`
-- 内部站查看地址
-
-例如：
-
-```text
-http://localhost:3000/cases/2026/groups/test-example
-```
-
-如果你用的是 Zero Trust 受保护域名，这里会显示对应的 HTTPS 内部站地址。
-
-## 9. 这个示例里几条最关键的自动规则
-
-针对 `~/Downloads/test-example`，默认结果是：
-
-- 一个素材目录导入成一个 group
-- `*_src.png` -> `before`
-- `*_output.png` -> `after`
-- `*-rip.png` -> `misc`
-- 所有 frame 自动生成 `heatmap.png`
-- `24_BDMV250725..._3537_src.png` -> `24_02_3537`
-- 默认工作目录 -> `~/Downloads/test-example-case`
-- 默认新 case -> `2026`
-
-## 10. 失败时优先检查什么
-
-### 没有识别出 before
-
-检查是不是没有 `src` / `source`，或者同一帧里出现了多个 source 候选。
-
-### 没有识别出 after
-
-检查同一帧是否至少有一个非 source 的输出图，例如 `output`、`out`、`degrain`、`out1`。
-
-### heatmap 生成失败
-
-通常是 `before` 和 `after` 尺寸不一致。
-
-### 不能上传到已有 case
-
-优先检查：
-
-- `test-example-case/.env` 里的 `MAGIC_COMPARE_SITE_URL` 是否正确
-- 如果走本地开发，内部站是否已启动
-- 如果走 Cloudflare Zero Trust，浏览器是否能正常打开内部站主页
-- `cloudflared` 是否已完成登录并把 token 写回 `.env`
-
-## 11. 专家模式仍然保留
-
-如果你已经有一个结构化工作目录，也仍然可以继续使用旧命令：
+只看计划，不上传：
 
 ```bash
-magic-compare-uploader scan /path/to/case
-magic-compare-uploader manifest /path/to/case
-magic-compare-uploader sync /path/to/case
+magic-compare-uploader plan ~/Downloads/test-example --case-slug 2026 --group-slug test-example
 ```
 
-但对于 VSEditor 导图，默认推荐始终先用：
+对结构化工作目录做 dry-run：
 
 ```bash
-magic-compare-uploader
+magic-compare-uploader sync ~/Downloads/test-example-case --dry-run
 ```
+
+强制忽略旧 session，从头重来：
+
+```bash
+magic-compare-uploader sync ~/Downloads/test-example-case --reset-session
+```
+
+输出机器可读 JSON：
+
+```bash
+magic-compare-uploader plan ~/Downloads/test-example --report-json /tmp/uploader-plan.json
+```
+
+## 10. 失败后如何复盘
+
+优先看三处：
+
+1. 终端里的 plan / upload summary
+2. `<work-dir>/.magic-compare/upload-session.json`
+3. `--report-json` 输出的结构化报告
+
+一般场景：
+
+- 图片损坏：先修源文件，再重跑 `plan`
+- 上传到一半网络抖动：直接重跑 `sync`
+- 想强制全量重传：用 `--reset-session`
+- 远端 401/403：检查 Service Token 和 internal-site Access 策略

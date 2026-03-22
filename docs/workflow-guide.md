@@ -282,22 +282,23 @@ Docker 用：
 
 真实导入链路是：
 
-1. 扫描源素材目录
-2. 自动识别 `before / after / misc / heatmap`
-3. 生成工作目录与 metadata
-4. 打开编辑器确认 `case.yaml / group.yaml`
-5. 生成缩略图和 heatmap
-6. 直接上传内部素材到 S3-compatible 存储
-7. 构造 `ImportManifest`
-8. 调用 `POST /api/ops/import-sync`
-9. internal-site upsert case / group / frame / asset
+1. 预演 `plan`：扫描源素材目录、识别 `before / after / misc / heatmap`、校验关键图片并生成计划
+2. 生成工作目录与 metadata
+3. 打开编辑器确认 `case.yaml / group.yaml`
+4. 生成缩略图和 heatmap
+5. 直接上传内部素材到 S3-compatible 存储
+6. 构造 `ImportManifest`
+7. 调用 `POST /api/ops/import-sync`
+8. internal-site upsert case / group / frame / asset
 
 关键约束：
 
 - uploader 现在不再把图先落到 internal-site 本地目录
+- 远端内部站只支持 Cloudflare Service Token，不再走 `cloudflared` 人工登录链路
 - 内部图片 URL 仍然保留逻辑路径 `/internal-assets/...`
 - 浏览器实际访问图片时，会由 internal/public 站点将逻辑路径解析成 `MAGIC_COMPARE_S3_PUBLIC_BASE_URL` 下的公网绝对 URL
 - public-export/public-deploy 不再打包图片，Pages 只发布静态页面和 manifest
+- uploader 的 upload session 固定放在工作目录 `.magic-compare/upload-session.json`
 
 ## 发布、导出、部署三件事要分清
 
@@ -532,6 +533,7 @@ docker build -f docker/internal-site.Dockerfile -t magic-compare/internal-site .
 - `docs/uploader/vseditor-workflow.zh-CN.md`
 - `docs/demo-vs-real-case-flow.zh-CN.md`
 - `docs/uploader/boundaries-and-env-split.zh-CN.md`
+- `docs/uploader/distribution.zh-CN.md`
 
 ### 做部署、Docker、Pages、CI
 

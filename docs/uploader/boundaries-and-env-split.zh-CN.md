@@ -16,6 +16,8 @@
 - 根 `.env.example` 只保留网站、Docker、发布和 Pages 相关变量
 - uploader 说明文档移到 `docs/uploader/README.md`
 - VSEditor 导入流程文档移到 `docs/uploader/vseditor-workflow.zh-CN.md`
+- 远端接入方式统一收敛为 Cloudflare Service Token，不再保留 `cloudflared` 登录链路
+- uploader 现在先产出 `plan`，再上传，再 `sync`，并把 upload session 固定保存在工作目录内
 
 ## 3. 后续约束
 
@@ -23,3 +25,4 @@
 - 新增 uploader 使用说明、排障经验或导入规范时，优先写到 `docs/uploader/`
 - 网站 README 可以保留 uploader 导航，但不要再承载 uploader 的完整配置细节
 - 如果网站端需要消费 uploader 产物，应通过 manifest / API / 对象存储边界交互，而不是共享一份“全仓通用 env 模板”
+- uploader 的恢复/重试/报告规则要继续围绕工作目录实现，不要再把运行状态散落回网站目录或仓库根目录

@@ -1,0 +1,103 @@
+# Uploader 单文件分发说明
+
+本文档记录 uploader 单可执行文件的构建入口、CI 产物和手工构建边界。
+重点是降低 Python 环境门槛，而不是把 uploader 变成跨平台交叉编译系统。
+
+## 1. 当前产物范围
+
+当前仓库把 uploader 打包成 PyInstaller `--onefile` 二进制。
+
+CI 默认产出 3 个目标：
+
+- `magic-compare-uploader-windows-amd64.exe`
+- `magic-compare-uploader-linux-amd64`
+- `magic-compare-uploader-macos-arm64`
+
+`linux/arm64` 暂不放进托管 CI，而是保留同仓脚本和手工构建说明。
+
+## 2. 本地构建入口
+
+先安装 uploader 运行依赖和 build extra：
+
+```bash
+cd tools/uploader
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -e ".[build]"
+```
+
+然后执行：
+
+```bash
+python scripts/build-binary.py
+```
+
+默认行为：
+
+- 自动识别当前原生平台和架构
+- 输出到 `tools/uploader/dist/`
+- 产物名称显式带平台和架构，便于发布和人工分发
+
+例如在 macOS/arm64 上，默认产物是：
+
+```text
+tools/uploader/dist/magic-compare-uploader-macos-arm64
+```
+
+## 3. 指定标签名称
+
+如需显式指定命名标签，可以传：
+
+```bash
+python scripts/build-binary.py --platform linux --arch amd64
+```
+
+注意：
+
+- 这只影响产物命名，不会做交叉编译
+- 要得到真正可运行的 `linux/arm64` 二进制，仍然要在 `linux/arm64` 原生环境里执行这个脚本
+
+## 4. CI 入口
+
+仓库内单独的 binary workflow：
+
+```text
+.github/workflows/uploader-binaries.yml
+```
+
+触发方式：
+
+- `workflow_dispatch`
+- `push` tag `v*`
+
+CI 每个目标会：
+
+- 安装 `tools/uploader[build]`
+- 执行 `python scripts/build-binary.py`
+- 校验二进制 `--help`
+- 在 Linux 目标上额外跑一条 `plan` smoke
+- 上传对应 artifact
+
+## 5. linux/arm64 手工构建
+
+在原生 `linux/arm64` 主机或容器里：
+
+```bash
+cd tools/uploader
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -e ".[build]"
+python scripts/build-binary.py --platform linux --arch arm64
+```
+
+预期产物：
+
+```text
+tools/uploader/dist/magic-compare-uploader-linux-arm64
+```
+
+## 6. 经验约束
+
+- uploader 分发目标是“让使用者少装 Python”，不是把仓库改造成复杂发布系统
+- build script 只负责原生平台打包；跨平台构建交给 CI runner 或原生机器
+- 功能验证至少要保留一条 `plan` smoke，因为 `--help` 只能证明二进制能启动，不能证明核心命令可用
