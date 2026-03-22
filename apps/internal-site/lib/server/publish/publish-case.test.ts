@@ -1,15 +1,23 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { publishCase } from "./publish-case";
 
-const { caseFindUnique, caseUpdate, groupUpdate, groupFindFirst, writePublishedManifest, resetPublishedGroup } =
-  vi.hoisted(() => ({
-    caseFindUnique: vi.fn(),
-    caseUpdate: vi.fn(),
-    groupUpdate: vi.fn(),
-    groupFindFirst: vi.fn(),
-    writePublishedManifest: vi.fn(),
-    resetPublishedGroup: vi.fn(),
-  }));
+const {
+  caseFindUnique,
+  caseUpdate,
+  groupUpdate,
+  groupFindFirst,
+  writePublishedManifest,
+  resetPublishedGroup,
+  assertLikelyPublicFrameAssets,
+} = vi.hoisted(() => ({
+  caseFindUnique: vi.fn(),
+  caseUpdate: vi.fn(),
+  groupUpdate: vi.fn(),
+  groupFindFirst: vi.fn(),
+  writePublishedManifest: vi.fn(),
+  resetPublishedGroup: vi.fn(),
+  assertLikelyPublicFrameAssets: vi.fn(),
+}));
 
 vi.mock("@/lib/server/db/client", () => ({
   prisma: {
@@ -29,8 +37,13 @@ vi.mock("@/lib/server/storage/published-content", () => ({
   writePublishedManifest,
 }));
 
+vi.mock("@/lib/server/storage/internal-asset-sanity", () => ({
+  assertLikelyPublicFrameAssets,
+}));
+
 vi.mock("@/lib/server/storage/internal-assets", () => ({
-  resolvePublicInternalAssetUrl: (assetUrl: string) => `https://assets.example.com/bucket${assetUrl}`,
+  resolvePublicInternalAssetUrl: (assetUrl: string) =>
+    `https://assets.example.com/bucket${assetUrl}`,
   internalAssetPublicGroupBaseUrl: (caseSlug: string, groupSlug: string) =>
     `https://assets.example.com/bucket/internal-assets/${caseSlug}/${groupSlug}`,
 }));
@@ -43,6 +56,7 @@ describe("publishCase", () => {
     groupFindFirst.mockReset();
     writePublishedManifest.mockReset();
     resetPublishedGroup.mockReset();
+    assertLikelyPublicFrameAssets.mockReset();
   });
 
   it("writes manifest-only published bundles with public asset urls", async () => {
@@ -117,12 +131,14 @@ describe("publishCase", () => {
           expect.objectContaining({
             assets: [
               expect.objectContaining({
-                imageUrl: "https://assets.example.com/bucket/internal-assets/2026/test-example/001/before.png",
+                imageUrl:
+                  "https://assets.example.com/bucket/internal-assets/2026/test-example/001/before.png",
                 thumbUrl:
                   "https://assets.example.com/bucket/internal-assets/2026/test-example/001/thumb-before.png",
               }),
               expect.objectContaining({
-                imageUrl: "https://assets.example.com/bucket/internal-assets/2026/test-example/001/after.png",
+                imageUrl:
+                  "https://assets.example.com/bucket/internal-assets/2026/test-example/001/after.png",
                 thumbUrl:
                   "https://assets.example.com/bucket/internal-assets/2026/test-example/001/thumb-after.png",
               }),
@@ -131,5 +147,69 @@ describe("publishCase", () => {
         ],
       }),
     );
+  });
+
+  it("fails before writing the manifest when public assets fail sanity check", async () => {
+    caseFindUnique.mockResolvedValue({
+      id: "case-1",
+      slug: "2026",
+      title: "2026",
+      subtitle: "",
+      summary: "summary",
+      tagsJson: "[]",
+      publishedAt: null,
+      groups: [
+        {
+          id: "group-1",
+          slug: "test-example",
+          publicSlug: "2026--test-example",
+          title: "Test Example",
+          description: "",
+          defaultMode: "before-after",
+          tagsJson: "[]",
+          isPublic: true,
+          order: 0,
+          frames: [
+            {
+              id: "frame-1",
+              title: "Frame 1",
+              caption: "",
+              order: 0,
+              isPublic: true,
+              assets: [
+                {
+                  id: "asset-before",
+                  kind: "before",
+                  label: "Before",
+                  imageUrl: "/internal-assets/2026/test-example/001/before.png",
+                  thumbUrl: "/internal-assets/2026/test-example/001/thumb-before.png",
+                  width: 1280,
+                  height: 720,
+                  note: "",
+                  isPublic: true,
+                  isPrimaryDisplay: true,
+                },
+                {
+                  id: "asset-after",
+                  kind: "after",
+                  label: "After",
+                  imageUrl: "/internal-assets/2026/test-example/001/after.png",
+                  thumbUrl: "/internal-assets/2026/test-example/001/thumb-after.png",
+                  width: 1280,
+                  height: 720,
+                  note: "",
+                  isPublic: true,
+                  isPrimaryDisplay: true,
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+    assertLikelyPublicFrameAssets.mockRejectedValue(new Error("bad public asset"));
+
+    await expect(publishCase("case-1")).rejects.toThrow("bad public asset");
+    expect(writePublishedManifest).not.toHaveBeenCalled();
   });
 });

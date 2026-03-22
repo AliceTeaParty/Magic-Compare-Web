@@ -1,16 +1,14 @@
 import type { ImportManifest } from "@magic-compare/content-schema";
 import { validateImportManifest } from "@/lib/server/validators/import-manifest";
 import { prisma } from "@/lib/server/db/client";
+import { assertLikelyImportManifestAssets } from "@/lib/server/storage/internal-asset-sanity";
 import { stringifyTags } from "./mappers";
 
 /**
  * Reuses the group row when an import is repeated so stable slugs/public settings survive, but
  * replaces frames/assets wholesale because the uploader manifest is the source of truth.
  */
-export async function upsertGroup(
-  groupEntry: ImportManifest["groups"][number],
-  caseId: string,
-) {
+export async function upsertGroup(groupEntry: ImportManifest["groups"][number], caseId: string) {
   const existingGroup = await prisma.group.findUnique({
     where: {
       caseId_slug: {
@@ -67,6 +65,7 @@ export async function upsertGroup(
  */
 export async function applyImportManifest(rawManifest: unknown) {
   const manifest = validateImportManifest(rawManifest);
+  await assertLikelyImportManifestAssets(manifest);
 
   const caseRow = await prisma.case.upsert({
     where: {
@@ -133,11 +132,7 @@ export async function applyImportManifest(rawManifest: unknown) {
 
         // Fall back to the primary after frame because that is the least surprising cover when the
         // manifest omitted an explicit label.
-        if (
-          !coverAssetId &&
-          assetEntry.kind === "after" &&
-          assetEntry.isPrimaryDisplay
-        ) {
+        if (!coverAssetId && assetEntry.kind === "after" && assetEntry.isPrimaryDisplay) {
           coverAssetId = assetRow.id;
         }
       }

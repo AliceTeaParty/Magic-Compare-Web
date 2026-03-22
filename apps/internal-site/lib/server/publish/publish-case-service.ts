@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/server/db/client";
+import { assertLikelyPublicFrameAssets } from "@/lib/server/storage/internal-asset-sanity";
 import {
   resetPublishedGroup,
   writePublishedManifest,
@@ -47,14 +48,17 @@ export async function publishCase(caseId: string) {
   for (const group of publishableGroups) {
     // Once a group is public we keep its slug stable; only first-time publishes mint one.
     const publicSlug =
-      group.publicSlug ??
-      (await ensurePublicSlug(caseRow.slug, group.slug, group.id));
+      group.publicSlug ?? (await ensurePublicSlug(caseRow.slug, group.slug, group.id));
 
     if (publicSlug !== group.publicSlug) {
       await prisma.group.update({
         where: { id: group.id },
         data: { publicSlug },
       });
+    }
+
+    for (const frame of group.frames.filter((frame) => frame.isPublic)) {
+      await assertLikelyPublicFrameAssets(frame);
     }
 
     const manifest = buildPublishManifest({
