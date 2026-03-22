@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import {
   clampViewerPanZoom,
   getViewerEffectiveScale,
@@ -29,6 +29,22 @@ export function useStagePanZoomState({
   rotateStage: boolean;
   setPanZoomState: (nextState: ViewerPanZoomState) => void;
 }) {
+  const panZoomStateRef = useRef(panZoomState);
+
+  useEffect(() => {
+    panZoomStateRef.current = panZoomState;
+  }, [panZoomState]);
+
+  function isSamePanZoomState(nextState: ViewerPanZoomState): boolean {
+    const currentState = panZoomStateRef.current;
+    return (
+      currentState.presetScale === nextState.presetScale &&
+      currentState.fineScale === nextState.fineScale &&
+      currentState.x === nextState.x &&
+      currentState.y === nextState.y
+    );
+  }
+
   const scaleOptions = useMemo(
     () => ({
       devicePixelRatio,
@@ -57,13 +73,15 @@ export function useStagePanZoomState({
   );
 
   useEffect(() => {
-    setPanZoomState(
-      clampViewerPanZoom(
-        panZoomState,
-        mediaRect,
-        getViewerEffectiveScale(panZoomState, scaleOptions),
-      ),
+    const nextState = clampViewerPanZoom(
+      panZoomState,
+      mediaRect,
+      getViewerEffectiveScale(panZoomState, scaleOptions),
     );
+
+    if (!isSamePanZoomState(nextState)) {
+      setPanZoomState(nextState);
+    }
   }, [mediaRect, panZoomState, scaleOptions, setPanZoomState]);
 
   /**
@@ -71,13 +89,17 @@ export function useStagePanZoomState({
    */
   const applyPanZoom = useCallback(
     (nextState: ViewerPanZoomState) => {
-      setPanZoomState(
-        clampViewerPanZoom(
-          nextState,
-          mediaRect,
-          getViewerEffectiveScale(nextState, scaleOptions),
-        ),
+      const clampedNextState = clampViewerPanZoom(
+        nextState,
+        mediaRect,
+        getViewerEffectiveScale(nextState, scaleOptions),
       );
+
+      if (isSamePanZoomState(clampedNextState)) {
+        return;
+      }
+
+      setPanZoomState(clampedNextState);
     },
     [mediaRect, scaleOptions, setPanZoomState],
   );

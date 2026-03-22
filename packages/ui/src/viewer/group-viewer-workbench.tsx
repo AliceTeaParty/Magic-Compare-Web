@@ -216,9 +216,19 @@ export function GroupViewerWorkbench({
      * handlers, while refs keep the latest inspect state visible to the listener.
      */
     function handleKeydown(event: KeyboardEvent) {
+      if (event.defaultPrevented || event.isComposing) {
+        return;
+      }
+
+      if (event.metaKey || event.ctrlKey || event.altKey) {
+        return;
+      }
+
       if (
         event.target instanceof HTMLElement &&
-        ["INPUT", "TEXTAREA", "SELECT"].includes(event.target.tagName)
+        (event.target.isContentEditable ||
+          Boolean(event.target.closest('[contenteditable="true"]')) ||
+          ["INPUT", "TEXTAREA", "SELECT"].includes(event.target.tagName))
       ) {
         return;
       }
