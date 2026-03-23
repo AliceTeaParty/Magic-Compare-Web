@@ -6,6 +6,7 @@ from pathlib import Path
 
 import typer
 from rich.panel import Panel
+from rich.progress import BarColumn, MofNCompleteColumn, Progress, TextColumn, TimeElapsedColumn
 from rich.table import Table
 from rich.text import Text
 
@@ -263,8 +264,25 @@ def run_wizard(
         raise typer.Abort()
 
     ensure_remote_access_config(config)
-    with console.status("[bold green]正在上传对象...[/]"):
-        execution_summary = execute_upload_plan(structured_plan, config)
+    total_originals = sum(
+        1 for op in structured_plan.report.operations if op.kind == "upload-original"
+    )
+    with Progress(
+        TextColumn("[bold green]{task.description}"),
+        BarColumn(),
+        MofNCompleteColumn(),
+        TimeElapsedColumn(),
+        console=console,
+        transient=False,
+    ) as progress:
+        upload_task = progress.add_task("正在上传图片文件...", total=total_originals)
+
+        def _on_progress() -> None:
+            progress.advance(upload_task)
+
+        execution_summary = execute_upload_plan(
+            structured_plan, config, on_progress=_on_progress
+        )
     _render_execution_summary(execution_summary)
     if not execution_summary.succeeded:
         _write_runtime_report(
