@@ -9,7 +9,9 @@ dependencies = [
   "pillow>=11.2.1",
   "pyyaml>=6.0.2",
   "rich>=14.1.0",
-  "typer>=0.15.4"
+  "typer>=0.15.4",
+  "pypinyin>=0.55.0",
+  "pykakasi>=2.3.0"
 ]
 
 [project.optional-dependencies]

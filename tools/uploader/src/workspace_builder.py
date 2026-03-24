@@ -30,6 +30,30 @@ def write_yaml(path: Path, payload: dict) -> None:
     )
 
 
+def _yaml_scalar(value: object) -> str:
+    """Serialise a single YAML value to its inline representation."""
+    dumped = yaml.safe_dump(value, allow_unicode=True, default_flow_style=True)
+    dumped = dumped.strip()
+    if dumped.endswith("\n..."):
+        dumped = dumped[:-4].strip()
+    return dumped
+
+
+def write_commented_yaml(path: Path, fields: list[tuple[str, str, object]]) -> None:
+    """Write a YAML file where every field is preceded by a ``#`` comment line.
+
+    *fields* is a list of ``(comment, key, value)`` triples.  The comment text
+    is written as a ``# …`` line immediately before the ``key: value`` line.
+    Lists are rendered in YAML flow style (e.g. ``[a, b]``).
+    """
+    lines: list[str] = []
+    for comment, key, value in fields:
+        lines.append(f"# {comment}")
+        lines.append(f"{key}: {_yaml_scalar(value)}")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
 def build_case_payload(
     existing_case: CaseSearchResult | None, current_year: str
 ) -> dict:
@@ -63,6 +87,35 @@ def build_group_payload(group: ParsedSourceGroup) -> dict:
     }
 
 
+def write_case_yaml(path: Path, payload: dict) -> None:
+    """Write case.yaml with Chinese comments explaining each field."""
+    write_commented_yaml(
+        path,
+        [
+            ("唯一标识符，只含小写字母、数字和横线", "slug", payload["slug"]),
+            ("对外展示标题", "title", payload["title"]),
+            ("简介/摘要（支持 Markdown）", "summary", payload["summary"]),
+            ("标签列表，例如 [2026, TV, 720p]", "tags", payload["tags"]),
+            ("状态：internal（仅内部可见）/ published（公开）", "status", payload["status"]),
+            ("封面资产标签（通常为 After）", "coverAssetLabel", payload["coverAssetLabel"]),
+        ],
+    )
+
+
+def write_group_yaml(path: Path, payload: dict) -> None:
+    """Write group.yaml with Chinese comments explaining each field."""
+    write_commented_yaml(
+        path,
+        [
+            ("对外展示标题", "title", payload["title"]),
+            ("简介", "description", payload["description"]),
+            ("默认对比模式：before-after / split / overlay", "defaultMode", payload["defaultMode"]),
+            ("是否公开（true / false）", "isPublic", payload["isPublic"]),
+            ("标签列表", "tags", payload["tags"]),
+        ],
+    )
+
+
 def _copy_asset(source: Path, target: Path) -> None:
     target.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(source, target)
@@ -93,8 +146,8 @@ def prepare_workspace(
     group_yaml = group_dir / "group.yaml"
     frames_root = group_dir / "frames"
 
-    write_yaml(case_yaml, case_payload)
-    write_yaml(group_yaml, group_payload)
+    write_case_yaml(case_yaml, case_payload)
+    write_group_yaml(group_yaml, group_payload)
 
     for frame in source_group.frames:
         frame_dir = frames_root / f"{frame.order + 1:03d}-{frame.slug}"
