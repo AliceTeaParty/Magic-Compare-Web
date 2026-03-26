@@ -5,9 +5,22 @@
 
 ## 原则
 
-小步提交，随做随提交，不要把多个阶段内容堆到最后一次提交。
+小步、可以在开发中提交，不把多阶段内容堆成一次提交。用简洁的 git 提交流程处理，不要逐文件 git add；重点放在一条清晰、可审阅的 commit message。
+`main` 视为生产发布分支，禁止作为日常开发分支直接提交。
 
-从现在开始，`main` 视为生产发布分支，不再作为日常开发分支直接提交。
+推荐命令习惯：
+
+```bash
+git switch -c codex/<topic>
+git add -A
+git commit -m "refactor: switch uploader to frame-level presigned uploads"
+```
+
+说明：
+
+- `git add -A` 或 `git add .` 足够，不要把时间浪费在逐文件手点暂存上
+- 真正需要精力的是 commit message，要把“为什么改、改了哪一类链路”说清楚
+- 如果一个提交说明写不清，通常意味着这次改动粒度还不够干净
 
 ## 提交要求
 
@@ -21,34 +34,8 @@
 
 1. **`main` 只用于生产就绪内容**。
 2. **所有开发、重构、优化、文档补充都在独立分支上进行**。
-3. **新分支命名要可读、可检索**，建议使用：
-
-```text
-codex/<topic>
-```
-
-例如：
-
-* `codex/optimize-project`
-* `codex/viewer-mobile-polish`
-* `codex/uploader-s3-hardening`
-
-4. **一个分支只承载一组相关目标**，不要把完全无关的工作堆在同一分支。
-5. **准备合并回 `main` 前，先保证该分支已经通过必要验证**。
-
-## 推荐提交粒度
-
-适合单独提交的内容示例：
-
-* 初始化目录或基础配置
-* 新增一组 schema / 类型
-* 新增一个页面骨架
-* 接通一个 API
-* 完成一个 viewer 子功能
-* 完成缩略图带
-* 完成排序持久化
-* 修复一个明确 bug
-* 做一次样式整理或命名清理
+3. **一个分支只承载一组相关目标**，不要把完全无关的工作堆在同一分支。
+4. **准备合并回 `main` 前，先保证该分支已经通过必要验证**。
 
 ## 提交信息格式
 
@@ -56,6 +43,16 @@ codex/<topic>
 
 ```text
 <type>: <summary>
+```
+
+必要时可以追加 1-3 行补充，说明本次提交覆盖的关键链路：
+
+```text
+refactor: switch uploader to frame-level presigned uploads
+
+- remove internal binary upload proxy and import-sync dependency from uploader
+- add group-upload start/prepare/commit/complete API flow
+- move Docker/runtime defaults to external R2-style S3 storage
 ```
 
 常用 `type`：
@@ -68,19 +65,10 @@ codex/<topic>
 * `chore`：配置、脚本、依赖调整
 * `test`：测试
 
-## 示例
-
-* `feat: scaffold internal-site routes and viewer shell`
-* `feat: add shared zod schemas for case group frame asset`
-* `fix: fallback to before-after when heatmap is missing`
-* `refactor: move publish logic into internal-site server lib`
-* `style: refine filmstrip spacing and selected states`
-* `docs: add uploader directory contract`
-
 ## 禁止事项
 
 * 不要最后一次性提交所有改动。
-* 不要使用模糊提交信息，如 `update`、`fix stuff`、`wip`。
-* 不要把无关改动塞进同一提交。
+* 不要使用模糊提交信息，或是只用一行简要概括。
+* 不要写成“update”“fix stuff”“wip”这类无法审阅的提交信息。
 * 不要跳过已完成步骤的提交，导致历史无法回溯。
 * 不要继续把日常开发直接提交到 `main`。

@@ -10,7 +10,7 @@ from rich.progress import BarColumn, MofNCompleteColumn, Progress, TextColumn, T
 from rich.table import Table
 from rich.text import Text
 
-from .api_client import CaseSearchResult, search_cases, sync_manifest
+from .api_client import CaseSearchResult, search_cases
 from .commands import (
     _render_execution_summary,
     _prepare_runtime_config,
@@ -21,7 +21,6 @@ from .commands import (
 )
 from .config import UploaderConfig, ensure_remote_access_config
 from .editor import open_in_editor
-from .manifest import build_import_manifest_from_case
 from .naming import build_default_work_dir, build_unique_slug
 from .plan import build_case_plan, build_flat_source_plan, write_plan_report
 from .source_parser import ParsedSourceGroup, discover_source_group
@@ -243,7 +242,7 @@ def run_wizard(
                     f"[bold]复用已有 case[/bold]\n"
                     f"Title: {selected_case.title}\n"
                     f"Slug: {selected_case.slug}\n"
-                    "本次不会覆盖 case 的标题、摘要、tags 或 status。"
+                    "本次不会覆盖 case 的标题、摘要、tags 或公开状态。"
                 ),
                 border_style="bright_black",
                 title="Case",
@@ -292,9 +291,7 @@ def run_wizard(
             "上传阶段存在失败对象，请修正后再次执行，session 会自动续传。"
         )
 
-    manifest_payload = build_import_manifest_from_case(structured_plan.case_source)
-    with console.status("[bold green]正在同步 manifest 到 internal-site...[/]"):
-        result = sync_manifest(config, manifest_payload)
+    result = execution_summary.completion_result or {}
     _write_runtime_report(
         structured_plan.report,
         report_json,
@@ -303,13 +300,13 @@ def run_wizard(
     )
 
     viewer_url = (
-        f"{config.site_url}/cases/{result['slug']}/groups/{prepared.group_slug}"
+        f"{config.site_url}/cases/{result['caseSlug']}/groups/{prepared.group_slug}"
     )
     console.print(
         Panel(
             Text.from_markup(
                 "[bold green]上传成功[/]\n"
-                f"Case slug: {result['slug']}\n"
+                f"Case slug: {result['caseSlug']}\n"
                 f"Group slug: {prepared.group_slug}\n"
                 f"工作目录: {prepared.work_dir}\n"
                 f"内部查看: {viewer_url}"

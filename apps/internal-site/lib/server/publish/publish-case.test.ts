@@ -44,8 +44,8 @@ vi.mock("@/lib/server/storage/internal-asset-sanity", () => ({
 vi.mock("@/lib/server/storage/internal-assets", () => ({
   resolvePublicInternalAssetUrl: (assetUrl: string) =>
     `https://assets.example.com/bucket${assetUrl}`,
-  internalAssetPublicGroupBaseUrl: (caseSlug: string, groupSlug: string) =>
-    `https://assets.example.com/bucket/internal-assets/${caseSlug}/${groupSlug}`,
+  internalAssetPublicGroupBaseUrl: (storageRoot: string) =>
+    `https://assets.example.com/bucket${storageRoot}`,
 }));
 
 describe("publishCase", () => {
@@ -72,6 +72,7 @@ describe("publishCase", () => {
         {
           id: "group-1",
           slug: "test-example",
+          storageRoot: "/groups/group-1",
           publicSlug: "2026--test-example",
           title: "Test Example",
           description: "",
@@ -126,7 +127,7 @@ describe("publishCase", () => {
       expect.objectContaining({
         schemaVersion: 1,
         publicSlug: "2026--test-example",
-        assetBasePath: "https://assets.example.com/bucket/internal-assets/2026/test-example",
+        assetBasePath: "https://assets.example.com/bucket/groups/group-1",
         frames: [
           expect.objectContaining({
             assets: [
@@ -162,6 +163,7 @@ describe("publishCase", () => {
         {
           id: "group-1",
           slug: "test-example",
+          storageRoot: "/groups/group-1",
           publicSlug: "2026--test-example",
           title: "Test Example",
           description: "",

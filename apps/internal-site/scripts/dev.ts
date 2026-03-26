@@ -1,6 +1,10 @@
 import { execFileSync, spawn } from "node:child_process";
 import process from "node:process";
 import { loadWorkspaceEnv } from "../lib/server/env/load-workspace-env";
+import {
+  isInternalAssetStorageConfigured,
+  shouldHideDemoContent,
+} from "../lib/server/runtime-config";
 
 function commandName(base: string): string {
   return process.platform === "win32" ? `${base}.cmd` : base;
@@ -26,6 +30,17 @@ function runPnpm(script: "db:push" | "db:seed"): void {
 function ensureLocalDataReady(): void {
   loadWorkspaceEnv();
   runPnpm("db:push");
+
+  if (shouldHideDemoContent()) {
+    console.log("Skipping demo seed because MAGIC_COMPARE_HIDE_DEMO is enabled.");
+    return;
+  }
+
+  if (!isInternalAssetStorageConfigured()) {
+    console.log("Skipping demo seed because external S3/R2 storage is not configured.");
+    return;
+  }
+
   runPnpm("db:seed");
 }
 

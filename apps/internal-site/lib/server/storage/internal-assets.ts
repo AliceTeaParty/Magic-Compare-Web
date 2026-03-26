@@ -1,5 +1,5 @@
 import { Readable } from "node:stream";
-import { extname } from "node:path";
+import { extname, posix as pathPosix } from "node:path";
 import { readFile } from "node:fs/promises";
 import {
   DeleteObjectsCommand,
@@ -9,6 +9,7 @@ import {
   PutObjectCommand,
   S3Client,
 } from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { getInternalAssetStorageConfig } from "@/lib/server/runtime-config";
 
 const MIME_TYPES: Record<string, string> = {
@@ -28,26 +29,38 @@ export interface InternalAssetHeadState {
   size: number;
 }
 
-function hasTraversal(input: string): boolean {
-  return input.split("/").some((segment) => segment === ".." || segment.length === 0);
+export interface PresignedInternalAssetUpload {
+  key: string;
+  logicalPath: string;
+  uploadUrl: string;
+  expiresInSeconds: number;
+  contentType: string;
 }
 
-function guessMimeType(fileName: string): string {
+function hasTraversal(input: string): boolean {
+  return input
+    .split("/")
+    .some((segment) => segment === ".." || segment.length === 0);
+}
+
+export function guessMimeType(fileName: string): string {
   return MIME_TYPES[extname(fileName).toLowerCase()] ?? "application/octet-stream";
 }
 
-function assetRelativePath(assetUrl: string): string {
-  const normalizedUrl = assetUrl.replace(/^\/+/, "");
-  if (!normalizedUrl.startsWith("internal-assets/")) {
-    throw new Error(`Unsupported internal asset url: ${assetUrl}`);
+function normalizeLogicalPath(logicalPath: string): string {
+  const normalized = logicalPath.replace(/^\/+/, "");
+  if (
+    !normalized ||
+    (!normalized.startsWith("groups/") && !normalized.startsWith("internal-assets/"))
+  ) {
+    throw new Error(`Unsupported internal asset path: ${logicalPath}`);
   }
 
-  const relativePath = normalizedUrl.slice("internal-assets/".length);
-  if (!relativePath || hasTraversal(relativePath)) {
-    throw new Error(`Invalid internal asset path: ${assetUrl}`);
+  if (hasTraversal(normalized)) {
+    throw new Error(`Invalid internal asset path: ${logicalPath}`);
   }
 
-  return relativePath;
+  return normalized;
 }
 
 /**
@@ -109,46 +122,50 @@ async function bodyToUint8Array(body: unknown): Promise<Uint8Array> {
   throw new Error("Unsupported S3 response body type.");
 }
 
-export function internalAssetObjectKey(assetUrl: string): string {
+export function internalAssetObjectKey(logicalPath: string): string {
   const { objectPrefix } = getInternalAssetStorageConfig();
-  const relativePath = assetRelativePath(assetUrl);
-  return objectPrefix ? `${objectPrefix}/${relativePath}` : relativePath;
-}
-
-export function resolvePublicInternalAssetUrl(assetUrl: string): string {
-  const { publicBaseUrl } = getInternalAssetStorageConfig();
-  return `${publicBaseUrl}/${internalAssetObjectKey(assetUrl)}`;
-}
-
-export function internalAssetPublicGroupBaseUrl(caseSlug: string, groupSlug: string): string {
-  const { objectPrefix, publicBaseUrl } = getInternalAssetStorageConfig();
-  const normalizedPath = [objectPrefix, caseSlug, groupSlug].join("/");
-  if (hasTraversal(normalizedPath)) {
-    throw new Error(`Invalid internal asset group path: ${caseSlug}/${groupSlug}`);
+  const relativePath = normalizeLogicalPath(logicalPath);
+  if (!objectPrefix) {
+    return relativePath;
   }
 
-  return `${publicBaseUrl}/${normalizedPath}`;
+  if (relativePath === objectPrefix || relativePath.startsWith(`${objectPrefix}/`)) {
+    return relativePath;
+  }
+
+  return `${objectPrefix}/${relativePath}`;
+}
+
+export function resolvePublicInternalAssetUrl(logicalPath: string): string {
+  const { publicBaseUrl } = getInternalAssetStorageConfig();
+  return `${publicBaseUrl}/${internalAssetObjectKey(logicalPath)}`;
+}
+
+export function internalAssetPublicGroupBaseUrl(storageRoot: string): string {
+  const { publicBaseUrl } = getInternalAssetStorageConfig();
+  const normalizedRoot = storageRoot.replace(/\/+$/, "");
+  return `${publicBaseUrl}/${internalAssetObjectKey(normalizedRoot)}`;
 }
 
 /**
- * Preserve this file-based helper because most importer paths still start from local files and
+ * Preserve this file-based helper because seed/import utilities still start from local files and
  * should not need to manually read buffers before uploading.
  */
 export async function uploadLocalFileToInternalAsset(
   localFilePath: string,
-  assetUrl: string,
+  logicalPath: string,
 ): Promise<void> {
   const content = await readFile(localFilePath);
-  await uploadInternalAssetBuffer(content, assetUrl, guessMimeType(localFilePath));
+  await uploadInternalAssetBuffer(content, logicalPath, guessMimeType(localFilePath));
 }
 
 /**
  * Keep this byte-oriented helper because import/publish utilities sometimes generate content in
- * memory and should not be forced through a temporary file just to reach S3.
+ * memory and should not be forced through a temporary file just to reach object storage.
  */
 export async function uploadInternalAssetBuffer(
   content: Uint8Array | Buffer,
-  assetUrl: string,
+  logicalPath: string,
   contentType?: string,
   metadata?: Record<string, string>,
 ): Promise<void> {
@@ -157,19 +174,51 @@ export async function uploadInternalAssetBuffer(
   await client.send(
     new PutObjectCommand({
       Bucket: config.bucket,
-      Key: internalAssetObjectKey(assetUrl),
+      Key: internalAssetObjectKey(logicalPath),
       Body: content,
-      ContentType: contentType || guessMimeType(assetUrl),
+      ContentType: contentType || guessMimeType(logicalPath),
       Metadata: metadata,
     }),
   );
 }
 
 /**
- * Proxy uploads need a cheap existence probe so the server can skip already-matching objects
- * without forcing uploader binaries to hold raw S3 credentials.
+ * Prepare one direct-to-object-storage upload so the uploader never sees raw bucket credentials
+ * while the server still controls path shape, expiry, and allowed content type per file.
  */
-export async function headInternalAsset(assetUrl: string): Promise<InternalAssetHeadState | null> {
+export async function createPresignedInternalAssetUpload(params: {
+  logicalPath: string;
+  contentType: string;
+  expiresInSeconds?: number;
+}): Promise<PresignedInternalAssetUpload> {
+  const client = buildS3Client();
+  const config = getInternalAssetStorageConfig();
+  const expiresInSeconds = params.expiresInSeconds ?? 600;
+  const key = internalAssetObjectKey(params.logicalPath);
+  const uploadUrl = await getSignedUrl(
+    client,
+    new PutObjectCommand({
+      Bucket: config.bucket,
+      Key: key,
+      ContentType: params.contentType,
+    }),
+    { expiresIn: expiresInSeconds },
+  );
+
+  return {
+    key,
+    logicalPath: params.logicalPath,
+    uploadUrl,
+    expiresInSeconds,
+    contentType: params.contentType,
+  };
+}
+
+/**
+ * Head is shared by commit and cleanup flows because both need a cheap existence check that does
+ * not download the full object body just to verify one prepared upload finished.
+ */
+export async function headInternalAsset(logicalPath: string): Promise<InternalAssetHeadState | null> {
   const client = buildS3Client();
   const config = getInternalAssetStorageConfig();
 
@@ -177,7 +226,7 @@ export async function headInternalAsset(assetUrl: string): Promise<InternalAsset
     const response = await client.send(
       new HeadObjectCommand({
         Bucket: config.bucket,
-        Key: internalAssetObjectKey(assetUrl),
+        Key: internalAssetObjectKey(logicalPath),
       }),
     );
 
@@ -209,11 +258,11 @@ export async function headInternalAsset(assetUrl: string): Promise<InternalAsset
 }
 
 /**
- * Read only a small prefix from S3 so import/publish can cheaply reject obviously broken or
- * masqueraded image objects without turning the server into a full scanner.
+ * Read only a small prefix from object storage so import/publish can cheaply reject obviously
+ * broken or masqueraded image objects without turning the server into a full scanner.
  */
 export async function readInternalAssetPrefix(
-  assetUrl: string,
+  logicalPath: string,
   byteCount = 512,
 ): Promise<Uint8Array> {
   const client = buildS3Client();
@@ -221,7 +270,7 @@ export async function readInternalAssetPrefix(
   const response = await client.send(
     new GetObjectCommand({
       Bucket: config.bucket,
-      Key: internalAssetObjectKey(assetUrl),
+      Key: internalAssetObjectKey(logicalPath),
       Range: `bytes=0-${Math.max(byteCount - 1, 0)}`,
     }),
   );
@@ -230,24 +279,21 @@ export async function readInternalAssetPrefix(
 }
 
 /**
- * Delete the whole prefix page by page because repeated imports/publishes can leave many objects
- * behind, and partial cleanup would leak stale assets into later runs.
+ * Delete the whole prefix page by page because frame retries and group resets can leave multiple
+ * prepared revisions behind, and partial cleanup would leak stale assets into later imports.
  */
-export async function deleteInternalAssetGroupObjects(
-  caseSlug: string,
-  groupSlug: string,
-): Promise<void> {
+export async function deleteInternalAssetPrefix(prefix: string): Promise<void> {
   const client = buildS3Client();
   const config = getInternalAssetStorageConfig();
-  const prefix = [config.objectPrefix, caseSlug, groupSlug].filter(Boolean).join("/") + "/";
-
+  const normalizedPrefix = internalAssetObjectKey(prefix.replace(/\/+$/, ""));
+  const listPrefix = `${normalizedPrefix}/`;
   let continuationToken: string | undefined;
 
   do {
     const page = await client.send(
       new ListObjectsV2Command({
         Bucket: config.bucket,
-        Prefix: prefix,
+        Prefix: listPrefix,
         ContinuationToken: continuationToken,
       }),
     );
@@ -270,4 +316,25 @@ export async function deleteInternalAssetGroupObjects(
 
     continuationToken = page.IsTruncated ? page.NextContinuationToken : undefined;
   } while (continuationToken);
+
+  // Some S3-compatible tools create zero-byte marker objects for folder names. Delete that exact
+  // key too so a "removed" frame/group does not leave behind a dangling pseudo-directory.
+  await client.send(
+    new DeleteObjectsCommand({
+      Bucket: config.bucket,
+      Delete: {
+        Objects: [{ Key: normalizedPrefix }, { Key: listPrefix }],
+        Quiet: true,
+      },
+    }),
+  );
+}
+
+export function buildLogicalStoragePath(...segments: Array<string | number>): string {
+  const normalized = segments.map((segment) => String(segment).replace(/^\/+|\/+$/g, ""));
+  const joined = pathPosix.join(...normalized);
+  if (hasTraversal(joined)) {
+    throw new Error(`Invalid storage path segments: ${segments.join("/")}`);
+  }
+  return `/${joined}`;
 }

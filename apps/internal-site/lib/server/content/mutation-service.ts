@@ -1,6 +1,10 @@
 import { prisma } from "@/lib/server/db/client";
 import { deletePublishedGroup } from "@/lib/server/storage/published-content";
-import { deleteInternalAssetGroupObjects } from "@/lib/server/storage/internal-assets";
+import { deleteInternalAssetPrefix } from "@/lib/server/storage/internal-assets";
+import {
+  recomputeCaseCoverAsset,
+  syncCasePublicationState,
+} from "./case-maintenance";
 
 /**
  * Centralizes the "case must exist before mutating one of its groups" guard so write paths fail
@@ -148,6 +152,7 @@ export async function deleteGroup(caseSlug: string, groupSlug: string) {
           title: true,
           isPublic: true,
           publicSlug: true,
+          storageRoot: true,
         },
       },
     },
@@ -163,27 +168,16 @@ export async function deleteGroup(caseSlug: string, groupSlug: string) {
     where: { id: targetGroup.id },
   });
 
-  await deleteInternalAssetGroupObjects(caseSlug, groupSlug);
+  if (targetGroup.storageRoot) {
+    await deleteInternalAssetPrefix(targetGroup.storageRoot);
+  }
 
   if (targetGroup.publicSlug) {
     await deletePublishedGroup(targetGroup.publicSlug);
   }
 
-  const remainingPublicGroups = caseRow.groups.filter(
-    (group) => group.id !== targetGroup.id && group.isPublic,
-  ).length;
-
-  // A published case with no public groups left is semantically no longer published, even if old
-  // metadata still exists on the case row.
-  if (caseRow.status === "published" && remainingPublicGroups === 0) {
-    await prisma.case.update({
-      where: { id: caseRow.id },
-      data: {
-        status: "internal",
-        publishedAt: null,
-      },
-    });
-  }
+  await recomputeCaseCoverAsset(caseRow.id);
+  await syncCasePublicationState(caseRow.id);
 
   return {
     caseSlug: caseRow.slug,
@@ -191,5 +185,39 @@ export async function deleteGroup(caseSlug: string, groupSlug: string) {
     groupTitle: targetGroup.title,
     removedPublishedBundle: Boolean(targetGroup.publicSlug),
     publicSlug: targetGroup.publicSlug,
+  };
+}
+
+/**
+ * Case deletion is intentionally shallow and only allowed for empty cases so operators cannot
+ * trigger recursive object-store cleanup through one overly broad API call.
+ */
+export async function deleteCase(caseSlug: string) {
+  const caseRow = await prisma.case.findUnique({
+    where: { slug: caseSlug },
+    include: {
+      groups: {
+        select: {
+          id: true,
+        },
+      },
+    },
+  });
+
+  if (!caseRow) {
+    throw new Error("Case not found.");
+  }
+
+  if (caseRow.groups.length > 0) {
+    throw new Error("Case must be empty before deletion.");
+  }
+
+  await prisma.case.delete({
+    where: { id: caseRow.id },
+  });
+
+  return {
+    caseSlug: caseRow.slug,
+    deleted: true,
   };
 }

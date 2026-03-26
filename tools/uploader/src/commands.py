@@ -13,9 +13,9 @@ from rich.text import Text
 from .api_client import (
     CaseSearchGroup,
     CaseSearchResult,
+    delete_case,
     delete_group,
     search_cases,
-    sync_manifest,
 )
 from .config import (
     UploaderConfig,
@@ -23,7 +23,7 @@ from .config import (
     persist_config_overrides,
     resolve_uploader_config,
 )
-from .manifest import build_import_manifest_from_case, manifest_json
+from .manifest import manifest_json
 from .plan import PlanReport, build_case_plan, build_path_plan, write_plan_report
 from .upload_executor import UploadExecutionSummary, execute_upload_plan
 
@@ -199,7 +199,7 @@ def handle_plan(
 
 
 def handle_manifest(source: Path, *, output: Path | None = None) -> None:
-    """Emit the local manifest shape without touching remote storage so it stays usable in plan-only workflows."""
+    """Emit the group-upload-start payload shape without touching remote storage."""
     manifest_text = manifest_json(source)
     if output:
         output.write_text(manifest_text, encoding="utf-8")
@@ -241,9 +241,7 @@ def handle_sync(
         )
         return case_plan.report, execution_summary, None
 
-    manifest_payload = build_import_manifest_from_case(case_plan.case_source)
-    with console.status("[bold green]正在同步 manifest 到 internal-site...[/]"):
-        sync_result = sync_manifest(config, manifest_payload)
+    sync_result = execution_summary.completion_result
     _write_runtime_report(
         case_plan.report,
         report_json,
@@ -410,6 +408,50 @@ def handle_delete_group(
                 f"Case slug: {result['caseSlug']}\n"
                 f"Group slug: {result['groupSlug']}\n"
                 f"公开产物: {public_cleanup}"
+            ),
+            border_style="green",
+            title="完成",
+        )
+    )
+    return result
+
+
+def handle_delete_case(
+    *,
+    case_slug: str | None,
+    work_dir: Path,
+    site_url: str | None,
+    api_url: str | None,
+) -> dict:
+    """Delete-case only succeeds for empty cases, so the CLI surfaces that constraint before calling the API."""
+    config = _prepare_runtime_config(
+        work_dir.resolve(), site_url=site_url, api_url=api_url
+    )
+    ensure_remote_access_config(config)
+    selected_case = _resolve_case_for_delete(config, case_slug)
+
+    console.print(
+        Panel(
+            Text.from_markup(
+                f"[bold]Case[/bold]: {selected_case.title} ({selected_case.slug})\n"
+                "此操作只允许删除没有任何 group 的 case。"
+            ),
+            border_style="red",
+            title="确认删除 Case",
+        )
+    )
+
+    if not typer.confirm("确认删除这个 case？", default=False):
+        raise typer.Abort()
+
+    with console.status("[bold red]正在删除 case...[/]"):
+        result = delete_case(config, selected_case.slug)
+
+    console.print(
+        Panel(
+            Text.from_markup(
+                "[bold green]删除成功[/]\n"
+                f"Case slug: {result['caseSlug']}"
             ),
             border_style="green",
             title="完成",

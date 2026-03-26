@@ -6,14 +6,14 @@ x-internal-site-common: &internal-site-common
     MAGIC_COMPARE_PUBLISHED_ROOT: ${MAGIC_COMPARE_PUBLISHED_ROOT:-/app/data/published}
     MAGIC_COMPARE_PUBLIC_EXPORT_DIR: ${MAGIC_COMPARE_PUBLIC_EXPORT_DIR:-/app/data/public-export}
     MAGIC_COMPARE_PUBLIC_SITE_BASE_URL: ${MAGIC_COMPARE_PUBLIC_SITE_BASE_URL:-}
-    MAGIC_COMPARE_S3_BUCKET: ${MAGIC_COMPARE_S3_BUCKET:-magic-compare-assets}
-    MAGIC_COMPARE_S3_REGION: ${MAGIC_COMPARE_S3_REGION:-us-east-1}
-    MAGIC_COMPARE_S3_ENDPOINT: ${MAGIC_COMPARE_DOCKER_S3_ENDPOINT:-http://rustfs:9000}
-    MAGIC_COMPARE_S3_PUBLIC_BASE_URL: ${MAGIC_COMPARE_S3_PUBLIC_BASE_URL:-http://127.0.0.1:9000/magic-compare-assets}
-    MAGIC_COMPARE_S3_ACCESS_KEY_ID: ${MAGIC_COMPARE_S3_ACCESS_KEY_ID:-rustfsadmin}
-    MAGIC_COMPARE_S3_SECRET_ACCESS_KEY: ${MAGIC_COMPARE_S3_SECRET_ACCESS_KEY:-rustfsadmin}
-    MAGIC_COMPARE_S3_FORCE_PATH_STYLE: ${MAGIC_COMPARE_S3_FORCE_PATH_STYLE:-true}
-    MAGIC_COMPARE_S3_INTERNAL_PREFIX: ${MAGIC_COMPARE_S3_INTERNAL_PREFIX:-internal-assets}
+    MAGIC_COMPARE_S3_BUCKET: ${MAGIC_COMPARE_S3_BUCKET:-}
+    MAGIC_COMPARE_S3_REGION: ${MAGIC_COMPARE_S3_REGION:-auto}
+    MAGIC_COMPARE_S3_ENDPOINT: ${MAGIC_COMPARE_S3_ENDPOINT:-}
+    MAGIC_COMPARE_S3_PUBLIC_BASE_URL: ${MAGIC_COMPARE_S3_PUBLIC_BASE_URL:-}
+    MAGIC_COMPARE_S3_ACCESS_KEY_ID: ${MAGIC_COMPARE_S3_ACCESS_KEY_ID:-}
+    MAGIC_COMPARE_S3_SECRET_ACCESS_KEY: ${MAGIC_COMPARE_S3_SECRET_ACCESS_KEY:-}
+    MAGIC_COMPARE_S3_FORCE_PATH_STYLE: ${MAGIC_COMPARE_S3_FORCE_PATH_STYLE:-false}
+    MAGIC_COMPARE_S3_INTERNAL_PREFIX: ${MAGIC_COMPARE_S3_INTERNAL_PREFIX:-}
     MAGIC_COMPARE_FOOTER_YEAR_START: ${MAGIC_COMPARE_FOOTER_YEAR_START:-2026}
     MAGIC_COMPARE_FOOTER_AUTHOR: ${MAGIC_COMPARE_FOOTER_AUTHOR:-Magic Compare}
     MAGIC_COMPARE_FOOTER_JOIN_US_LABEL: ${MAGIC_COMPARE_FOOTER_JOIN_US_LABEL:-}
@@ -26,70 +26,6 @@ x-internal-site-common: &internal-site-common
     - ${MAGIC_COMPARE_INTERNAL_DATA_MOUNT:-internal-data}:/app/data
 
 services:
-  rustfs:
-    image: quay.io/minio/minio:RELEASE.2025-04-22T22-12-26Z
-    container_name: magic-compare-rustfs
-    init: true
-    restart: unless-stopped
-    ports:
-      - "${MAGIC_COMPARE_S3_HOST_PORT:-9000}:9000"
-    environment:
-      MINIO_ROOT_USER: ${MAGIC_COMPARE_S3_ACCESS_KEY_ID:-rustfsadmin}
-      MINIO_ROOT_PASSWORD: ${MAGIC_COMPARE_S3_SECRET_ACCESS_KEY:-rustfsadmin}
-      MALLOC_ARENA_MAX: "2"
-    command: ["server", "/data", "--address", ":9000", "--console-address", ":9001"]
-    mem_limit: 512m
-    cpus: 1.0
-    tmpfs:
-      - /tmp:size=64m
-    logging:
-      driver: json-file
-      options:
-        max-size: 10m
-        max-file: "3"
-    healthcheck:
-      test: ["CMD", "sh", "-c", "curl -fsS http://127.0.0.1:9000/minio/health/live >/dev/null"]
-      interval: 30s
-      timeout: 5s
-      retries: 5
-      start_period: 20s
-    volumes:
-      - ${MAGIC_COMPARE_RUSTFS_DATA_MOUNT:-rustfs-data}:/data
-
-  rustfs-init:
-    image: minio/mc:RELEASE.2025-08-13T08-35-41Z
-    entrypoint:
-      - /bin/sh
-      - -ec
-      - |
-        endpoint="${MAGIC_COMPARE_DOCKER_S3_ENDPOINT:-http://rustfs:9000}"
-        bucket="${MAGIC_COMPARE_S3_BUCKET:-magic-compare-assets}"
-        access_key="${MAGIC_COMPARE_S3_ACCESS_KEY_ID:-rustfsadmin}"
-        secret_key="${MAGIC_COMPARE_S3_SECRET_ACCESS_KEY:-rustfsadmin}"
-
-        echo "Waiting for object storage at $${endpoint}..."
-        until mc alias set rustfs "$$endpoint" "$$access_key" "$$secret_key" --api S3v4 --path on >/dev/null 2>&1 &&
-          mc ls rustfs >/dev/null 2>&1; do
-          sleep 2
-        done
-
-        echo "Ensuring bucket $${bucket} exists..."
-        mc mb "rustfs/$$bucket" --ignore-existing >/dev/null
-
-        echo "Enabling anonymous download for bucket $${bucket}..."
-        mc anonymous set download "rustfs/$$bucket" >/dev/null
-
-        echo "Object storage bucket $${bucket} is ready."
-    depends_on:
-      rustfs:
-        condition: service_healthy
-    restart: "no"
-    environment:
-      MAGIC_COMPARE_DOCKER_S3_ENDPOINT: ${MAGIC_COMPARE_DOCKER_S3_ENDPOINT:-http://rustfs:9000}
-      MAGIC_COMPARE_S3_ACCESS_KEY_ID: ${MAGIC_COMPARE_S3_ACCESS_KEY_ID:-rustfsadmin}
-      MAGIC_COMPARE_S3_SECRET_ACCESS_KEY: ${MAGIC_COMPARE_S3_SECRET_ACCESS_KEY:-rustfsadmin}
-      MAGIC_COMPARE_S3_BUCKET: ${MAGIC_COMPARE_S3_BUCKET:-magic-compare-assets}
-
   internal-site-init:
     <<: *internal-site-common
     entrypoint:
@@ -99,15 +35,18 @@ services:
         echo "Running internal-site schema sync..."
         pnpm db:push
 
-        echo "Running internal-site demo seed..."
-        pnpm db:seed
+        if [ "${MAGIC_COMPARE_HIDE_DEMO:-true}" != "true" ] &&
+          [ -n "${MAGIC_COMPARE_S3_BUCKET:-}" ] &&
+          [ -n "${MAGIC_COMPARE_S3_PUBLIC_BASE_URL:-}" ] &&
+          [ -n "${MAGIC_COMPARE_S3_ACCESS_KEY_ID:-}" ] &&
+          [ -n "${MAGIC_COMPARE_S3_SECRET_ACCESS_KEY:-}" ]; then
+          echo "Running internal-site demo seed..."
+          pnpm db:seed
+        else
+          echo "Skipping demo seed because demo is hidden or external storage is not configured."
+        fi
 
         echo "internal-site init complete."
-    depends_on:
-      rustfs:
-        condition: service_healthy
-      rustfs-init:
-        condition: service_completed_successfully
     restart: "no"
 
   internal-site:
@@ -115,8 +54,6 @@ services:
     container_name: magic-compare-internal-site
     restart: unless-stopped
     depends_on:
-      rustfs:
-        condition: service_healthy
       internal-site-init:
         condition: service_completed_successfully
     ports:
@@ -135,5 +72,4 @@ services:
       start_period: 90s
 
 volumes:
-  rustfs-data:
   internal-data:

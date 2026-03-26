@@ -45,35 +45,19 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     env:
-      MAGIC_COMPARE_HIDE_DEMO: "false"
-      MAGIC_COMPARE_S3_BUCKET: magic-compare-assets
-      MAGIC_COMPARE_S3_PUBLIC_BASE_URL: http://127.0.0.1:9000/magic-compare-assets
+      MAGIC_COMPARE_HIDE_DEMO: "true"
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
 
       - name: Start compose stack
-        run: docker compose $CI_COMPOSE_ARGS up -d --build rustfs rustfs-init internal-site
+        run: docker compose $CI_COMPOSE_ARGS up -d --build internal-site
 
       - name: Wait for runtime readiness
         run: |
           set -euo pipefail
           for _ in {1..90}; do
-            rustfs_init_container_id="$(docker compose $CI_COMPOSE_ARGS ps -a -q rustfs-init)"
-            if [[ -n "$rustfs_init_container_id" ]]; then
-              rustfs_init_status="$(docker inspect -f '{{.State.Status}}' "$rustfs_init_container_id")"
-              if [[ "$rustfs_init_status" == "exited" ]]; then
-                rustfs_init_exit_code="$(docker inspect -f '{{.State.ExitCode}}' "$rustfs_init_container_id")"
-                if [[ "$rustfs_init_exit_code" != "0" ]]; then
-                  echo "rustfs-init exited with code $rustfs_init_exit_code."
-                  docker compose $CI_COMPOSE_ARGS ps
-                  docker compose $CI_COMPOSE_ARGS logs rustfs rustfs-init internal-site
-                  exit 1
-                fi
-              fi
-            fi
-
             internal_site_init_container_id="$(docker compose $CI_COMPOSE_ARGS ps -a -q internal-site-init)"
             if [[ -n "$internal_site_init_container_id" ]]; then
               internal_site_init_status="$(docker inspect -f '{{.State.Status}}' "$internal_site_init_container_id")"
@@ -82,7 +66,7 @@ jobs:
                 if [[ "$internal_site_init_exit_code" != "0" ]]; then
                   echo "internal-site-init exited with code $internal_site_init_exit_code."
                   docker compose $CI_COMPOSE_ARGS ps
-                  docker compose $CI_COMPOSE_ARGS logs rustfs rustfs-init internal-site-init internal-site
+                  docker compose $CI_COMPOSE_ARGS logs internal-site-init internal-site
                   exit 1
                 fi
               fi
@@ -95,7 +79,7 @@ jobs:
                 internal_site_exit_code="$(docker inspect -f '{{.State.ExitCode}}' "$internal_site_container_id")"
                 echo "internal-site exited with code $internal_site_exit_code before readiness."
                 docker compose $CI_COMPOSE_ARGS ps
-                docker compose $CI_COMPOSE_ARGS logs rustfs rustfs-init internal-site-init internal-site
+                docker compose $CI_COMPOSE_ARGS logs internal-site-init internal-site
                 exit 1
               fi
             fi
@@ -108,7 +92,7 @@ jobs:
 
           echo "Timed out waiting for internal-site to become ready."
           docker compose $CI_COMPOSE_ARGS ps
-          docker compose $CI_COMPOSE_ARGS logs rustfs rustfs-init internal-site-init internal-site
+          docker compose $CI_COMPOSE_ARGS logs internal-site-init internal-site
           exit 1
 
       - name: Capture compose logs
@@ -117,7 +101,7 @@ jobs:
           {
             docker compose $CI_COMPOSE_ARGS ps || true
             echo
-            docker compose $CI_COMPOSE_ARGS logs rustfs rustfs-init internal-site-init internal-site || true
+            docker compose $CI_COMPOSE_ARGS logs internal-site-init internal-site || true
           } > ghcr-smoke.compose.log
 
       - name: Write smoke summary

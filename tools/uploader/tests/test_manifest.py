@@ -6,10 +6,11 @@ from pathlib import Path
 
 from PIL import Image
 
-from src.manifest import build_import_manifest
+from src.manifest import build_group_upload_from_case
+from src.scanner import scan_case_directory
 
 
-class BuildImportManifestTests(unittest.TestCase):
+class BuildGroupUploadManifestTests(unittest.TestCase):
     def setUp(self) -> None:
         self.temp_dir = tempfile.TemporaryDirectory()
         self.case_root = Path(self.temp_dir.name) / "sample-case"
@@ -32,26 +33,24 @@ class BuildImportManifestTests(unittest.TestCase):
     def tearDown(self) -> None:
         self.temp_dir.cleanup()
 
-    def test_builds_logical_urls_without_uploading(self) -> None:
-        manifest = build_import_manifest(self.case_root)
+    def test_builds_group_upload_start_payload_and_local_thumbnail_descriptors(self) -> None:
+        scanned_case = scan_case_directory(self.case_root)
+        thumbnail_root = Path(self.temp_dir.name) / "thumbs"
 
-        assets = manifest["groups"][0]["frames"][0]["assets"]
-        self.assertEqual(
-            assets[0]["imageUrl"], "/internal-assets/2026/test-example/001/before.png"
-        )
-        self.assertEqual(
-            assets[0]["thumbUrl"],
-            "/internal-assets/2026/test-example/001/thumb-before.png",
-        )
-        self.assertEqual(
-            assets[1]["imageUrl"], "/internal-assets/2026/test-example/001/after.png"
-        )
-        self.assertEqual(
-            assets[1]["thumbUrl"],
-            "/internal-assets/2026/test-example/001/thumb-after.png",
-        )
+        prepared = build_group_upload_from_case(scanned_case, thumbnail_root)
+
+        assets = prepared.start_payload["frames"][0]["assets"]
+        self.assertEqual(prepared.start_payload["case"]["slug"], "2026")
+        self.assertEqual(prepared.start_payload["group"]["slug"], "test-example")
+        self.assertEqual(assets[0]["kind"], "before")
+        self.assertEqual(assets[0]["label"], "Before")
         self.assertEqual(assets[0]["width"], 128)
         self.assertEqual(assets[0]["height"], 72)
+        self.assertTrue(assets[0]["original"]["sha256"])
+        self.assertTrue(assets[0]["thumbnail"]["sha256"])
+        self.assertEqual(
+            prepared.frames[0].assets[0].thumbnail.source_path.parent.name, "001"
+        )
 
 
 if __name__ == "__main__":

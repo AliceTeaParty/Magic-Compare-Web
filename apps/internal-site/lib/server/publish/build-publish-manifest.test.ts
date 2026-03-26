@@ -4,8 +4,8 @@ import { buildPublishManifest } from "./build-publish-manifest";
 vi.mock("@/lib/server/storage/internal-assets", () => ({
   resolvePublicInternalAssetUrl: (assetUrl: string) =>
     `https://assets.example.com${assetUrl}`,
-  internalAssetPublicGroupBaseUrl: (caseSlug: string, groupSlug: string) =>
-    `https://assets.example.com/internal-assets/${caseSlug}/${groupSlug}`,
+  internalAssetPublicGroupBaseUrl: (storageRoot: string) =>
+    `https://assets.example.com${storageRoot}`,
 }));
 
 describe("buildPublishManifest", () => {
@@ -22,6 +22,7 @@ describe("buildPublishManifest", () => {
         group: {
           id: "group-1",
           slug: "group-1",
+          storageRoot: "/groups/group-1",
           title: "Group 1",
           description: "",
           defaultMode: "before-after",
@@ -46,6 +47,7 @@ describe("buildPublishManifest", () => {
       group: {
         id: "group-1",
         slug: "group-1",
+        storageRoot: "/groups/group-1",
         title: "Group 1",
         description: "",
         defaultMode: "a-b",
@@ -108,8 +110,7 @@ describe("buildPublishManifest", () => {
     expect(manifest).toEqual(
       expect.objectContaining({
         publicSlug: "2026--group-1",
-        assetBasePath:
-          "https://assets.example.com/internal-assets/2026/group-1",
+        assetBasePath: "https://assets.example.com/groups/group-1",
         case: expect.objectContaining({
           tags: ["grain"],
         }),

@@ -60,11 +60,8 @@ def build_case_payload(
     if existing_case:
         return {
             "slug": existing_case.slug,
-            "title": existing_case.title,
-            "summary": existing_case.summary,
-            "tags": existing_case.tags,
-            "status": existing_case.status,
             "coverAssetLabel": "After",
+            "_existingCase": True,
         }
 
     return {
@@ -72,8 +69,8 @@ def build_case_payload(
         "title": current_year,
         "summary": random_acg_quote(),
         "tags": [],
-        "status": "internal",
         "coverAssetLabel": "After",
+        "_existingCase": False,
     }
 
 
@@ -82,13 +79,22 @@ def build_group_payload(group: ParsedSourceGroup) -> dict:
         "title": group.title,
         "description": group.description,
         "defaultMode": "before-after",
-        "isPublic": False,
         "tags": [],
     }
 
 
 def write_case_yaml(path: Path, payload: dict) -> None:
     """Write case.yaml with Chinese comments explaining each field."""
+    if payload.get("_existingCase"):
+        write_commented_yaml(
+            path,
+            [
+                ("已存在的 case slug；本地修改不会改写远端 case 元数据", "slug", payload["slug"]),
+                ("封面资产标签（通常为 After）", "coverAssetLabel", payload["coverAssetLabel"]),
+            ],
+        )
+        return
+
     write_commented_yaml(
         path,
         [
@@ -96,7 +102,6 @@ def write_case_yaml(path: Path, payload: dict) -> None:
             ("对外展示标题", "title", payload["title"]),
             ("简介/摘要（支持 Markdown）", "summary", payload["summary"]),
             ("标签列表，例如 [2026, TV, 720p]", "tags", payload["tags"]),
-            ("状态：internal（仅内部可见）/ published（公开）", "status", payload["status"]),
             ("封面资产标签（通常为 After）", "coverAssetLabel", payload["coverAssetLabel"]),
         ],
     )
@@ -110,7 +115,6 @@ def write_group_yaml(path: Path, payload: dict) -> None:
             ("对外展示标题", "title", payload["title"]),
             ("简介", "description", payload["description"]),
             ("默认对比模式：before-after / split / overlay", "defaultMode", payload["defaultMode"]),
-            ("是否公开（true / false）", "isPublic", payload["isPublic"]),
             ("标签列表", "tags", payload["tags"]),
         ],
     )

@@ -6,6 +6,24 @@ Entries before that date are summarized at release level instead of being recons
 
 ## Unreleased
 
+### Added
+
+- Internal-site now exposes frame-level upload orchestration endpoints: `group-upload-start`, `group-upload-frame-prepare`, `group-upload-frame-commit`, `group-upload-complete`, and `case-delete`.
+- Uploader now persists group upload job state locally while resuming from the last fully committed frame instead of replaying the entire group.
+- Added a temporary engineering note under `docs/` to capture the main lessons from the R2/presigned upload rewrite.
+
+### Changed
+
+- Bundled local RustFS/MinIO compose services were removed; Docker, dev bootstrap, and CI now assume external S3-compatible storage, with Cloudflare R2 as the default reference setup.
+- Uploader import flow now uses presigned PUT URLs signed by internal-site and no longer calls `import-sync` or any binary upload proxy endpoint.
+- `case.yaml` no longer carries `status`, `group.yaml` no longer carries `isPublic`, and reused cases are treated as read-only metadata snapshots.
+- Internal asset keys for new uploads now live under opaque `/groups/<group>/<frame>/<revision>/...` prefixes instead of semantic `/internal-assets/<case>/<group>/...` paths.
+
+### Fixed
+
+- Group deletion now deletes the stored bucket prefix rather than guessing storage paths from slugs.
+- Demo seed and publish helpers now write data that matches the new group/frame storage model.
+
 ## v1.5.2 - 2026-03-22
 
 Group Viewer mobile adaptation and uploader robustness release.

@@ -6,33 +6,30 @@ import { prisma } from "../lib/server/db/client";
 import { publishCase } from "../lib/server/publish/publish-case";
 import { applyImportManifest } from "../lib/server/repositories/content-repository";
 import { deletePublishedGroup } from "../lib/server/storage/published-content";
-import { getPublishedRoot } from "../lib/server/runtime-config";
+import {
+  getPublishedRoot,
+  isInternalAssetStorageConfigured,
+  shouldHideDemoContent,
+} from "../lib/server/runtime-config";
 import { uploadLocalFileToInternalAsset } from "../lib/server/storage/internal-assets";
 
 const DEMO_GROUP_SLUG = "banding-check";
 const DEMO_PUBLIC_GROUP_SLUG = buildPublicGroupSlug(DEMO_CASE_SLUG, DEMO_GROUP_SLUG);
+const DEMO_STORAGE_ROOT = "/groups/demo-seed-banding-check";
+const DEMO_FRAME_ONE_PREFIX = `${DEMO_STORAGE_ROOT}/1/seed-a`;
+const DEMO_FRAME_TWO_PREFIX = `${DEMO_STORAGE_ROOT}/2/seed-a`;
 
 const demoAssets = [
-  {
-    source: "001-before.svg",
-    target: `/internal-assets/${DEMO_CASE_SLUG}/${DEMO_GROUP_SLUG}/001/before.svg`,
-  },
-  {
-    source: "001-after.svg",
-    target: `/internal-assets/${DEMO_CASE_SLUG}/${DEMO_GROUP_SLUG}/001/after.svg`,
-  },
-  {
-    source: "001-heatmap.svg",
-    target: `/internal-assets/${DEMO_CASE_SLUG}/${DEMO_GROUP_SLUG}/001/heatmap.svg`,
-  },
-  {
-    source: "002-before.svg",
-    target: `/internal-assets/${DEMO_CASE_SLUG}/${DEMO_GROUP_SLUG}/002/before.svg`,
-  },
-  {
-    source: "002-after.svg",
-    target: `/internal-assets/${DEMO_CASE_SLUG}/${DEMO_GROUP_SLUG}/002/after.svg`,
-  },
+  { source: "001-before.svg", target: `${DEMO_FRAME_ONE_PREFIX}/o1.svg` },
+  { source: "001-before.svg", target: `${DEMO_FRAME_ONE_PREFIX}/t1.svg` },
+  { source: "001-after.svg", target: `${DEMO_FRAME_ONE_PREFIX}/o2.svg` },
+  { source: "001-after.svg", target: `${DEMO_FRAME_ONE_PREFIX}/t2.svg` },
+  { source: "001-heatmap.svg", target: `${DEMO_FRAME_ONE_PREFIX}/o3.svg` },
+  { source: "001-heatmap.svg", target: `${DEMO_FRAME_ONE_PREFIX}/t3.svg` },
+  { source: "002-before.svg", target: `${DEMO_FRAME_TWO_PREFIX}/o1.svg` },
+  { source: "002-before.svg", target: `${DEMO_FRAME_TWO_PREFIX}/t1.svg` },
+  { source: "002-after.svg", target: `${DEMO_FRAME_TWO_PREFIX}/o2.svg` },
+  { source: "002-after.svg", target: `${DEMO_FRAME_TWO_PREFIX}/t2.svg` },
 ] as const;
 
 const demoManifest: ImportManifest = {
@@ -68,8 +65,8 @@ const demoManifest: ImportManifest = {
             {
               kind: "before",
               label: "Before",
-              imageUrl: `/internal-assets/${DEMO_CASE_SLUG}/${DEMO_GROUP_SLUG}/001/before.svg`,
-              thumbUrl: `/internal-assets/${DEMO_CASE_SLUG}/${DEMO_GROUP_SLUG}/001/before.svg`,
+              imageUrl: `${DEMO_FRAME_ONE_PREFIX}/o1.svg`,
+              thumbUrl: `${DEMO_FRAME_ONE_PREFIX}/t1.svg`,
               width: 1280,
               height: 720,
               note: "Original gradient",
@@ -79,8 +76,8 @@ const demoManifest: ImportManifest = {
             {
               kind: "after",
               label: "After",
-              imageUrl: `/internal-assets/${DEMO_CASE_SLUG}/${DEMO_GROUP_SLUG}/001/after.svg`,
-              thumbUrl: `/internal-assets/${DEMO_CASE_SLUG}/${DEMO_GROUP_SLUG}/001/after.svg`,
+              imageUrl: `${DEMO_FRAME_ONE_PREFIX}/o2.svg`,
+              thumbUrl: `${DEMO_FRAME_ONE_PREFIX}/t2.svg`,
               width: 1280,
               height: 720,
               note: "Debanded output",
@@ -90,8 +87,8 @@ const demoManifest: ImportManifest = {
             {
               kind: "heatmap",
               label: "Heatmap",
-              imageUrl: `/internal-assets/${DEMO_CASE_SLUG}/${DEMO_GROUP_SLUG}/001/heatmap.svg`,
-              thumbUrl: `/internal-assets/${DEMO_CASE_SLUG}/${DEMO_GROUP_SLUG}/001/heatmap.svg`,
+              imageUrl: `${DEMO_FRAME_ONE_PREFIX}/o3.svg`,
+              thumbUrl: `${DEMO_FRAME_ONE_PREFIX}/t3.svg`,
               width: 1280,
               height: 720,
               note: "Difference emphasis",
@@ -111,8 +108,8 @@ const demoManifest: ImportManifest = {
             {
               kind: "before",
               label: "Before",
-              imageUrl: `/internal-assets/${DEMO_CASE_SLUG}/${DEMO_GROUP_SLUG}/002/before.svg`,
-              thumbUrl: `/internal-assets/${DEMO_CASE_SLUG}/${DEMO_GROUP_SLUG}/002/before.svg`,
+              imageUrl: `${DEMO_FRAME_TWO_PREFIX}/o1.svg`,
+              thumbUrl: `${DEMO_FRAME_TWO_PREFIX}/t1.svg`,
               width: 1280,
               height: 720,
               note: "Original edge detail",
@@ -122,8 +119,8 @@ const demoManifest: ImportManifest = {
             {
               kind: "after",
               label: "After",
-              imageUrl: `/internal-assets/${DEMO_CASE_SLUG}/${DEMO_GROUP_SLUG}/002/after.svg`,
-              thumbUrl: `/internal-assets/${DEMO_CASE_SLUG}/${DEMO_GROUP_SLUG}/002/after.svg`,
+              imageUrl: `${DEMO_FRAME_TWO_PREFIX}/o2.svg`,
+              thumbUrl: `${DEMO_FRAME_TWO_PREFIX}/t2.svg`,
               width: 1280,
               height: 720,
               note: "Refined edge detail",
@@ -242,6 +239,16 @@ async function syncDemoManifest(existingDemoCaseId: string | null): Promise<stri
 }
 
 async function main() {
+  if (shouldHideDemoContent()) {
+    console.log("Skipping demo seed because MAGIC_COMPARE_HIDE_DEMO is enabled.");
+    return;
+  }
+
+  if (!isInternalAssetStorageConfigured()) {
+    console.log("Skipping demo seed because external S3/R2 storage is not configured.");
+    return;
+  }
+
   const existingDemoCase = await prisma.case.findUnique({
     where: { slug: DEMO_CASE_SLUG },
     select: { id: true },
@@ -256,20 +263,20 @@ async function main() {
     await publishCase(demoCaseId);
 
     if (existingDemoCase) {
-      console.log("Repaired existing demo case, refreshed demo assets in S3, and republished the demo bundle.");
+      console.log("Repaired existing demo case, refreshed demo assets in external storage, and republished the demo bundle.");
       return;
     }
 
-    console.log("Seeded demo case into SQLite, published demo bundle, and uploaded demo assets to S3.");
+    console.log("Seeded demo case into SQLite, published the demo bundle, and uploaded demo assets to external storage.");
     return;
   }
 
   if (existingDemoCase) {
-    console.log("Repaired existing demo case and refreshed demo assets in S3.");
+    console.log("Repaired existing demo case and refreshed demo assets in external storage.");
     return;
   }
 
-  console.log("Seeded demo case into SQLite and uploaded demo assets to S3.");
+  console.log("Seeded demo case into SQLite and uploaded demo assets to external storage.");
 }
 
 main()

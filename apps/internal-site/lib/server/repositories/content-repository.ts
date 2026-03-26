@@ -7,6 +7,7 @@ export type {
 } from "../content/types";
 export { applyImportManifest, upsertGroup } from "../content/import-service";
 export {
+  deleteCase,
   deleteGroup,
   reorderFrames,
   reorderGroups,
@@ -18,3 +19,9 @@ export {
   listCases,
   searchCases,
 } from "../content/query-service";
+export {
+  completeGroupUpload,
+  commitGroupUploadFrame,
+  prepareGroupUploadFrame,
+  startGroupUpload,
+} from "../uploads/upload-service";

@@ -32,7 +32,7 @@
 - `public-site` 是静态导出目标，构建产物可直接推到 Cloudflare Pages。
 - 内部原图、缩略图和 heatmap 已经统一走 S3-compatible 存储，不再使用 `.runtime` 或 `public/internal-assets`。
 - demo 是受控样本，不代表真实业务导入流程。
-- 真实内容的链路是：`uploader -> S3 -> import-sync -> internal-site -> case-publish -> public-export/public-deploy`。
+- 真实内容的链路是：`uploader -> group-upload-start -> frame prepare/upload/commit -> group-upload-complete -> internal-site -> case-publish -> public-export/public-deploy`。
 - `public-export` 和 `public-deploy` 必须显式触发，它们不是 `case-publish` 的隐式副作用。
 
 ## 当前架构中的真实分工
@@ -145,7 +145,7 @@ demo 来自：
 pnpm db:seed
 ```
 
-`db:seed` 会：
+`db:seed` 会在 demo 可见且外部对象存储配置齐全时执行，并且它会：
 
 1. 确保 demo metadata 存在
 2. 把 demo 素材上传到 S3
@@ -157,7 +157,10 @@ pnpm db:seed
 真实内容来自：
 
 - `magic-compare-uploader`
-- `POST /api/ops/import-sync`
+- `POST /api/ops/group-upload-start`
+- `POST /api/ops/group-upload-frame-prepare`
+- `POST /api/ops/group-upload-frame-commit`
+- `POST /api/ops/group-upload-complete`
 
 它们不是仓库样本，而是实际工作数据。
 
@@ -181,7 +184,6 @@ pnpm db:seed
 
 ```bash
 cp .env.example .env
-docker compose up -d rustfs rustfs-init
 pnpm install
 pnpm db:push
 pnpm dev:internal
@@ -189,26 +191,23 @@ pnpm dev:internal
 
 当前行为：
 
-- `pnpm dev:internal` 会在数据库为空时自动执行首次 `db:push + db:seed`
-- 但 demo seed 依赖 S3，所以 `rustfs` 必须先可用
+- `pnpm dev:internal` 总会先执行 `db:push`
+- 只有当 demo 未隐藏且外部 S3/R2 配置齐全时，才会继续 `db:seed`
 
-如果没有先起 S3，最常见现象是：
-
-- demo 页面可打开，但图片 404
-- 或 seed 直接失败
+如果没有配置外部对象存储，internal-site 仍可启动，但不会自动补 demo 图片数据。
 
 ## Docker 生产运行的真实路径
 
 ### 推荐入口
 
 ```bash
-docker compose up -d rustfs rustfs-init internal-site
+docker compose up -d internal-site
 ```
 
 如果是本地开发，并且你需要直接查看宿主机里的持久化目录，可改用：
 
 ```bash
-docker compose -f docker-compose.yml -f docker/dev.compose.override.yml up -d --build rustfs rustfs-init internal-site
+docker compose -f docker-compose.yml -f docker/dev.compose.override.yml up -d --build internal-site
 ```
 
 或者直接使用根脚本：
@@ -219,9 +218,8 @@ pnpm docker:dev:up
 
 compose 当前会做这些事：
 
-- 启动 `rustfs`
-- 用轻量 `rustfs-init` sidecar 自动确保 bucket 存在
-- 运行一次性的 `internal-site-init`，完成 `db:push` 和 `db:seed`
+- 运行一次性的 `internal-site-init`，完成 `db:push`
+- 仅当 demo 可见且外部对象存储配置齐全时，继续 `db:seed`
 - 启动 `internal-site`
 
 说明：
@@ -237,11 +235,9 @@ pnpm --filter @magic-compare/internal-site start
 
 ### 当前 Docker 里的持久化目录
 
-- 默认 compose：Docker named volumes
-  - `rustfs-data:/data`
+- 默认 compose：Docker named volume
   - `internal-data:/app/data`
 - 如需把数据直接写到宿主机目录，在 `.env` 里设置：
-  - `MAGIC_COMPARE_RUSTFS_DATA_MOUNT=./docker-data/rustfs`
   - `MAGIC_COMPARE_INTERNAL_DATA_MOUNT=./docker-data/internal-data`
 
 所以这些内容不会因为容器重启而丢失：
@@ -249,21 +245,21 @@ pnpm --filter @magic-compare/internal-site start
 - SQLite
 - published bundle
 - public export 目录
-- S3 数据
+- SQLite
+- published bundle
+- public export 目录
 
 ### Docker 中最容易踩的坑
 
-#### 1. 不能把宿主机的 S3 endpoint 直接给容器用
+#### 1. compose 不再自带本地对象存储
 
-宿主机本地开发时：
+现在必须显式提供外部 S3-compatible 配置，例如 Cloudflare R2：
 
-- `MAGIC_COMPARE_S3_ENDPOINT=http://localhost:9000`
-
-但容器内不能继续用这个地址，因为容器里的 `localhost` 指向它自己。
-
-Docker compose 已经单独提供：
-
-- `MAGIC_COMPARE_DOCKER_S3_ENDPOINT=http://rustfs:9000`
+- `MAGIC_COMPARE_S3_BUCKET`
+- `MAGIC_COMPARE_S3_ENDPOINT`
+- `MAGIC_COMPARE_S3_PUBLIC_BASE_URL`
+- `MAGIC_COMPARE_S3_ACCESS_KEY_ID`
+- `MAGIC_COMPARE_S3_SECRET_ACCESS_KEY`
 
 #### 2. Docker 数据库路径必须走 Docker 专用 env
 
@@ -287,16 +283,18 @@ Docker 用：
 2. 生成工作目录与 metadata
 3. 打开编辑器确认 `case.yaml / group.yaml`
 4. 生成缩略图和 heatmap
-5. 直接上传内部素材到 S3-compatible 存储
-6. 构造 `ImportManifest`
-7. 调用 `POST /api/ops/import-sync`
-8. internal-site upsert case / group / frame / asset
+5. 调用 `POST /api/ops/group-upload-start`
+6. 按 frame 调用 `POST /api/ops/group-upload-frame-prepare`
+7. uploader 用返回的 presigned PUT URL 直接上传该 frame 的原图与缩略图
+8. 调用 `POST /api/ops/group-upload-frame-commit`
+9. 全部 frame 完成后调用 `POST /api/ops/group-upload-complete`
 
 关键约束：
 
-- uploader 现在不再把图先落到 internal-site 本地目录
+- uploader 现在不再把图先落到 internal-site 本地目录，也不再调用服务器二进制上传代理
 - 远端内部站只支持 Cloudflare Service Token，不再走 `cloudflared` 人工登录链路
-- 内部图片 URL 仍然保留逻辑路径 `/internal-assets/...`
+- 新上传对象统一放在 `/groups/<group-storage-uuid>/<frame-order>/<frame-revision-uuid>/...`
+- group 默认内部草稿；公开开关不再来自 `case.yaml` / `group.yaml`
 - 浏览器实际访问图片时，会由 internal/public 站点将逻辑路径解析成 `MAGIC_COMPARE_S3_PUBLIC_BASE_URL` 下的公网绝对 URL
 - public-export/public-deploy 不再打包图片，Pages 只发布静态页面和 manifest
 - uploader 的 upload session 固定放在工作目录 `.magic-compare/upload-session.json`
@@ -445,7 +443,7 @@ Docker 用：
 
 ### CI 验证优先级
 
-`ci.yml` 当前分成两个 job。
+`ci.yml` 当前分成三个主要验证段。
 
 第一段 `verify` 优先验证：
 
@@ -455,21 +453,17 @@ pnpm test
 pnpm build
 ```
 
-第二段 `public-export-demo` 负责补上 demo 导出闭环：
+第二段 `compose-smoke` 负责验证当前 Docker 运行路径：
 
 ```bash
-docker compose -f docker-compose.yml -f docker/ci.compose.override.yml up -d rustfs rustfs-init
-pnpm db:push
-pnpm db:seed
-pnpm public:export
+docker compose -f docker-compose.yml -f docker/ci.compose.override.yml up -d --build internal-site
 ```
 
 关键约束：
 
-- CI 不应假设 checkout 后已经有 published group
-- 应从临时 SQLite 和运行时 seed 出来的 demo 数据开始验证
-- `MAGIC_COMPARE_HIDE_DEMO=false` 应显式写入 CI 环境
-- 导出成功后最好保留日志和导出产物，便于排错
+- CI 不应假设 runner 上存在本地 S3/minio sidecar
+- compose smoke 默认不依赖 demo seed；只有显式提供外部对象存储配置时才应该验证 demo
+- 运行失败后最好保留 compose 日志，便于排错
 
 ### Docker 镜像构建与发布入口
 
@@ -489,7 +483,7 @@ docker build -f docker/internal-site.Dockerfile -t magic-compare/internal-site .
 
 1. `smoke`
 
-- 先用 `docker compose` 跑通 `rustfs -> rustfs-init -> internal-site`
+- 先用 `docker compose` 跑通 `internal-site-init -> internal-site`
 - 只验证运行路径和健康探活，不替代 `public:export`
 - 如果要补浏览器 smoke，至少额外验证 viewer 主图和 thumb 的 `naturalWidth > 0`
 - 不要把 `HTTP 200` 或 `img.complete === true` 当成图片真加载的充分证据

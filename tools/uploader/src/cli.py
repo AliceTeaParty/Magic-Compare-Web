@@ -11,6 +11,7 @@ from .commands import (
     _normalize_path_text,
     _resolve_source_dir,
     console,
+    handle_delete_case,
     handle_delete_group,
     handle_manifest,
     handle_plan,
@@ -56,7 +57,7 @@ def main(
     api_url: str | None = typer.Option(
         None,
         "--api-url",
-        help=f"内部站点导入接口，优先读取 {ENV_API_URL_NAME}。",
+        help=f"内部站点 group-upload-start 接口，优先读取 {ENV_API_URL_NAME}。",
     ),
     report_json: Path | None = typer.Option(
         None,
@@ -125,7 +126,7 @@ def manifest(
         help=f"内部站点导入接口，优先读取 {ENV_API_URL_NAME}。",
     ),
 ) -> None:
-    """生成 import manifest JSON，但不执行上传。"""
+    """生成 group-upload-start payload JSON，但不执行上传。"""
     _ = site_url, api_url
     try:
         handle_manifest(source, output=output)
@@ -154,7 +155,7 @@ def sync(
         False, "--reset-session", help="忽略已有 upload session，从头重建。"
     ),
 ) -> None:
-    """对结构化 case 目录执行 plan、上传和同步。"""
+    """对结构化 case 目录执行 plan、直传和服务端提交。"""
     try:
         report, execution_summary, _sync_result = handle_sync(
             source,
@@ -205,6 +206,42 @@ def delete_group_command(
         handle_delete_group(
             case_slug=case_slug,
             group_slug=group_slug,
+            work_dir=work_dir,
+            site_url=site_url,
+            api_url=api_url,
+        )
+    except typer.Abort:
+        console.print("[yellow]已取消删除。[/]")
+        raise typer.Exit(code=1) from None
+    except Exception as error:
+        _handle_top_level_error(error, default_message="删除失败")
+
+
+@app.command("delete-case")
+def delete_case_command(
+    case_slug: str | None = typer.Option(
+        None, "--case-slug", help="要删除的空 case slug。"
+    ),
+    work_dir: Path = typer.Option(
+        Path.cwd(),
+        "--work-dir",
+        help="用于读取工作目录 .env 的目录。",
+    ),
+    site_url: str | None = typer.Option(
+        None,
+        "--site-url",
+        help=f"内部站点主页，优先读取 {ENV_SITE_URL_NAME}。",
+    ),
+    api_url: str | None = typer.Option(
+        None,
+        "--api-url",
+        help=f"内部站点 group-upload-start 接口，优先读取 {ENV_API_URL_NAME}。",
+    ),
+) -> None:
+    """删除一个没有任何 group 的 case。"""
+    try:
+        handle_delete_case(
+            case_slug=case_slug,
             work_dir=work_dir,
             site_url=site_url,
             api_url=api_url,

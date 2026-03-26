@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 import { ZodError } from "zod";
-import { applyImportManifest } from "@/lib/server/repositories/content-repository";
+import { prepareGroupUploadFrame } from "@/lib/server/repositories/content-repository";
 
 export async function POST(request: Request) {
   try {
     const payload = await request.json();
-    const result = await applyImportManifest(payload);
+    const result = await prepareGroupUploadFrame(payload);
     return NextResponse.json(result);
   } catch (error) {
     if (error instanceof ZodError) {
@@ -13,8 +13,8 @@ export async function POST(request: Request) {
     }
 
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Import failed." },
-      { status: 500 },
+      { error: error instanceof Error ? error.message : "Failed to prepare frame upload." },
+      { status: 400 },
     );
   }
 }

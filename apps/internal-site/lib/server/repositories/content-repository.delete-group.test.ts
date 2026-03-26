@@ -1,25 +1,29 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { deleteGroup } from "./content-repository";
+import { deleteCase, deleteGroup } from "./content-repository";
 
 const {
   caseFindUnique,
-  caseUpdate,
+  caseDelete,
   groupDelete,
   deletePublishedGroup,
-  deleteInternalAssetGroupObjects,
+  deleteInternalAssetPrefix,
+  recomputeCaseCoverAsset,
+  syncCasePublicationState,
 } = vi.hoisted(() => ({
   caseFindUnique: vi.fn(),
-  caseUpdate: vi.fn(),
+  caseDelete: vi.fn(),
   groupDelete: vi.fn(),
   deletePublishedGroup: vi.fn(),
-  deleteInternalAssetGroupObjects: vi.fn(),
+  deleteInternalAssetPrefix: vi.fn(),
+  recomputeCaseCoverAsset: vi.fn(),
+  syncCasePublicationState: vi.fn(),
 }));
 
 vi.mock("@/lib/server/db/client", () => ({
   prisma: {
     case: {
       findUnique: caseFindUnique,
-      update: caseUpdate,
+      delete: caseDelete,
     },
     group: {
       delete: groupDelete,
@@ -32,16 +36,23 @@ vi.mock("@/lib/server/storage/published-content", () => ({
 }));
 
 vi.mock("@/lib/server/storage/internal-assets", () => ({
-  deleteInternalAssetGroupObjects,
+  deleteInternalAssetPrefix,
+}));
+
+vi.mock("@/lib/server/content/case-maintenance", () => ({
+  recomputeCaseCoverAsset,
+  syncCasePublicationState,
 }));
 
 describe("deleteGroup", () => {
   beforeEach(() => {
     caseFindUnique.mockReset();
-    caseUpdate.mockReset();
+    caseDelete.mockReset();
     groupDelete.mockReset();
     deletePublishedGroup.mockReset();
-    deleteInternalAssetGroupObjects.mockReset();
+    deleteInternalAssetPrefix.mockReset();
+    recomputeCaseCoverAsset.mockReset();
+    syncCasePublicationState.mockReset();
   });
 
   it("deletes the group and cleans internal assets", async () => {
@@ -56,6 +67,7 @@ describe("deleteGroup", () => {
           title: "Test Example",
           isPublic: false,
           publicSlug: null,
+          storageRoot: "/groups/group-1",
         },
       ],
     });
@@ -65,9 +77,10 @@ describe("deleteGroup", () => {
     expect(groupDelete).toHaveBeenCalledWith({
       where: { id: "group-1" },
     });
-    expect(deleteInternalAssetGroupObjects).toHaveBeenCalledWith("2026", "test-example");
+    expect(deleteInternalAssetPrefix).toHaveBeenCalledWith("/groups/group-1");
     expect(deletePublishedGroup).not.toHaveBeenCalled();
-    expect(caseUpdate).not.toHaveBeenCalled();
+    expect(recomputeCaseCoverAsset).toHaveBeenCalledWith("case-1");
+    expect(syncCasePublicationState).toHaveBeenCalledWith("case-1");
     expect(result).toEqual({
       caseSlug: "2026",
       groupSlug: "test-example",
@@ -89,6 +102,7 @@ describe("deleteGroup", () => {
           title: "Test Example",
           isPublic: true,
           publicSlug: "2026--test-example",
+          storageRoot: "/groups/group-1",
         },
       ],
     });
@@ -96,12 +110,44 @@ describe("deleteGroup", () => {
     await deleteGroup("2026", "test-example");
 
     expect(deletePublishedGroup).toHaveBeenCalledWith("2026--test-example");
-    expect(caseUpdate).toHaveBeenCalledWith({
-      where: { id: "case-1" },
-      data: {
-        status: "internal",
-        publishedAt: null,
-      },
+    expect(syncCasePublicationState).toHaveBeenCalledWith("case-1");
+  });
+});
+
+describe("deleteCase", () => {
+  beforeEach(() => {
+    caseFindUnique.mockReset();
+    caseDelete.mockReset();
+  });
+
+  it("deletes an empty case", async () => {
+    caseFindUnique.mockResolvedValue({
+      id: "case-1",
+      slug: "2026",
+      groups: [],
     });
+
+    const result = await deleteCase("2026");
+
+    expect(caseDelete).toHaveBeenCalledWith({
+      where: { id: "case-1" },
+    });
+    expect(result).toEqual({
+      caseSlug: "2026",
+      deleted: true,
+    });
+  });
+
+  it("rejects non-empty cases", async () => {
+    caseFindUnique.mockResolvedValue({
+      id: "case-1",
+      slug: "2026",
+      groups: [{ id: "group-1" }],
+    });
+
+    await expect(deleteCase("2026")).rejects.toThrow(
+      "Case must be empty before deletion.",
+    );
+    expect(caseDelete).not.toHaveBeenCalled();
   });
 });

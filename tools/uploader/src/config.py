@@ -14,13 +14,6 @@ ENV_SITE_URL_NAME = "MAGIC_COMPARE_SITE_URL"
 ENV_API_URL_NAME = "MAGIC_COMPARE_API_URL"
 ENV_ACCESS_CLIENT_ID_NAME = "MAGIC_COMPARE_CF_ACCESS_CLIENT_ID"
 ENV_ACCESS_CLIENT_SECRET_NAME = "MAGIC_COMPARE_CF_ACCESS_CLIENT_SECRET"
-ENV_S3_BUCKET_NAME = "MAGIC_COMPARE_S3_BUCKET"
-ENV_S3_REGION_NAME = "MAGIC_COMPARE_S3_REGION"
-ENV_S3_ENDPOINT_NAME = "MAGIC_COMPARE_S3_ENDPOINT"
-ENV_S3_ACCESS_KEY_ID_NAME = "MAGIC_COMPARE_S3_ACCESS_KEY_ID"
-ENV_S3_SECRET_ACCESS_KEY_NAME = "MAGIC_COMPARE_S3_SECRET_ACCESS_KEY"
-ENV_S3_FORCE_PATH_STYLE_NAME = "MAGIC_COMPARE_S3_FORCE_PATH_STYLE"
-ENV_S3_INTERNAL_PREFIX_NAME = "MAGIC_COMPARE_S3_INTERNAL_PREFIX"
 
 PERSISTED_UPLOADER_ENV_KEYS = (
     ENV_SITE_URL_NAME,
@@ -30,7 +23,7 @@ PERSISTED_UPLOADER_ENV_KEYS = (
 )
 
 FALLBACK_SITE_URL = "http://localhost:3000"
-IMPORT_SYNC_PATH = "/api/ops/import-sync"
+GROUP_UPLOAD_START_PATH = "/api/ops/group-upload-start"
 
 
 @dataclass
@@ -41,13 +34,6 @@ class UploaderConfig:
     work_dir: Path | None
     service_token_client_id: str | None = None
     service_token_client_secret: str | None = None
-    s3_bucket: str | None = None
-    s3_region: str | None = None
-    s3_endpoint: str | None = None
-    s3_access_key_id: str | None = None
-    s3_secret_access_key: str | None = None
-    s3_force_path_style: bool = False
-    s3_internal_prefix: str = "internal-assets"
 
     @property
     def is_local_site(self) -> bool:
@@ -63,15 +49,6 @@ class UploaderConfig:
     @property
     def has_service_token(self) -> bool:
         return bool(self.service_token_client_id and self.service_token_client_secret)
-
-    @property
-    def has_s3_config(self) -> bool:
-        return bool(
-            self.s3_bucket
-            and self.s3_region
-            and self.s3_access_key_id
-            and self.s3_secret_access_key
-        )
 
 
 def _uploader_root(current_file: Path) -> Path:
@@ -167,7 +144,7 @@ def internal_site_base_url(api_url: str) -> str:
 
 
 def import_sync_url(site_url: str) -> str:
-    return f"{_normalize_url(site_url)}{IMPORT_SYNC_PATH}"
+    return f"{_normalize_url(site_url)}{GROUP_UPLOAD_START_PATH}"
 
 
 def resolve_uploader_config(
@@ -209,13 +186,6 @@ def resolve_uploader_config(
         ENV_API_URL_NAME,
         ENV_ACCESS_CLIENT_ID_NAME,
         ENV_ACCESS_CLIENT_SECRET_NAME,
-        ENV_S3_BUCKET_NAME,
-        ENV_S3_REGION_NAME,
-        ENV_S3_ENDPOINT_NAME,
-        ENV_S3_ACCESS_KEY_ID_NAME,
-        ENV_S3_SECRET_ACCESS_KEY_NAME,
-        ENV_S3_FORCE_PATH_STYLE_NAME,
-        ENV_S3_INTERNAL_PREFIX_NAME,
     ):
         if key in os.environ and os.environ[key]:
             merged_values[key] = os.environ[key]
@@ -243,19 +213,6 @@ def resolve_uploader_config(
         ),
         service_token_client_secret=(
             merged_values.get(ENV_ACCESS_CLIENT_SECRET_NAME, "") or None
-        ),
-        s3_bucket=(merged_values.get(ENV_S3_BUCKET_NAME, "") or None),
-        s3_region=(merged_values.get(ENV_S3_REGION_NAME, "") or "us-east-1"),
-        s3_endpoint=(merged_values.get(ENV_S3_ENDPOINT_NAME, "") or None),
-        s3_access_key_id=(merged_values.get(ENV_S3_ACCESS_KEY_ID_NAME, "") or None),
-        s3_secret_access_key=(
-            merged_values.get(ENV_S3_SECRET_ACCESS_KEY_NAME, "") or None
-        ),
-        s3_force_path_style=_parse_env_flag(
-            merged_values.get(ENV_S3_FORCE_PATH_STYLE_NAME, "")
-        ),
-        s3_internal_prefix=(
-            merged_values.get(ENV_S3_INTERNAL_PREFIX_NAME, "") or "internal-assets"
         ),
     )
 

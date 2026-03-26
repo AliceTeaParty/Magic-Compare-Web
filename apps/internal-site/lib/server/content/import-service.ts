@@ -1,14 +1,50 @@
+import { randomUUID } from "node:crypto";
+import { posix as pathPosix } from "node:path";
 import type { ImportManifest } from "@magic-compare/content-schema";
 import { validateImportManifest } from "@/lib/server/validators/import-manifest";
 import { prisma } from "@/lib/server/db/client";
 import { assertLikelyImportManifestAssets } from "@/lib/server/storage/internal-asset-sanity";
+import { buildLogicalStoragePath } from "@/lib/server/storage/internal-assets";
 import { stringifyTags } from "./mappers";
+
+function inferGroupStorageRoot(groupEntry: ImportManifest["groups"][number]): string {
+  const firstAsset = groupEntry.frames[0]?.assets[0];
+  if (!firstAsset) {
+    return buildLogicalStoragePath("groups", randomUUID());
+  }
+
+  const normalized = firstAsset.imageUrl.replace(/^\/+/, "");
+  const segments = normalized.split("/").filter(Boolean);
+  if (segments[0] === "groups" && segments.length >= 4) {
+    return buildLogicalStoragePath(...segments.slice(0, 2));
+  }
+  if (segments[0] === "internal-assets" && segments.length >= 5) {
+    return buildLogicalStoragePath(...segments.slice(0, 3));
+  }
+
+  return buildLogicalStoragePath("groups", randomUUID());
+}
+
+function inferFrameStoragePrefix(
+  assetUrl: string,
+  fallbackRoot: string,
+  frameOrder: number,
+): string {
+  const normalized = assetUrl.replace(/^\/+/, "");
+  const segments = normalized.split("/").filter(Boolean);
+  if (segments.length >= 2) {
+    return buildLogicalStoragePath(...segments.slice(0, -1));
+  }
+
+  return pathPosix.join(fallbackRoot, String(frameOrder + 1), randomUUID());
+}
 
 /**
  * Reuses the group row when an import is repeated so stable slugs/public settings survive, but
  * replaces frames/assets wholesale because the uploader manifest is the source of truth.
  */
 export async function upsertGroup(groupEntry: ImportManifest["groups"][number], caseId: string) {
+  const storageRoot = inferGroupStorageRoot(groupEntry);
   const existingGroup = await prisma.group.findUnique({
     where: {
       caseId_slug: {
@@ -29,6 +65,7 @@ export async function upsertGroup(groupEntry: ImportManifest["groups"][number], 
         defaultMode: groupEntry.group.defaultMode,
         isPublic: groupEntry.group.isPublic,
         tagsJson: stringifyTags(groupEntry.group.tags),
+        storageRoot,
       },
     });
   }
@@ -55,6 +92,7 @@ export async function upsertGroup(groupEntry: ImportManifest["groups"][number], 
       defaultMode: groupEntry.group.defaultMode,
       isPublic: groupEntry.group.isPublic,
       tagsJson: stringifyTags(groupEntry.group.tags),
+      storageRoot,
     },
   });
 }
@@ -101,6 +139,11 @@ export async function applyImportManifest(rawManifest: unknown) {
           caption: frameEntry.frame.caption,
           order: frameEntry.frame.order,
           isPublic: frameEntry.frame.isPublic,
+          storagePrefix: inferFrameStoragePrefix(
+            frameEntry.assets[0]?.imageUrl ?? "",
+            groupRow.storageRoot,
+            frameEntry.frame.order,
+          ),
         },
       });
 

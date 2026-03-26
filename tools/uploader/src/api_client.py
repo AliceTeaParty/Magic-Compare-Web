@@ -42,13 +42,36 @@ def group_delete_url(api_url: str) -> str:
     return _replace_operation_url(api_url, "group-delete")
 
 
+def case_delete_url(api_url: str) -> str:
+    return _replace_operation_url(api_url, "case-delete")
+
+
+def group_upload_frame_prepare_url(api_url: str) -> str:
+    return _replace_operation_url(api_url, "group-upload-frame-prepare")
+
+
+def group_upload_frame_commit_url(api_url: str) -> str:
+    return _replace_operation_url(api_url, "group-upload-frame-commit")
+
+
+def group_upload_complete_url(api_url: str) -> str:
+    return _replace_operation_url(api_url, "group-upload-complete")
+
+
 def _request_error(error: httpx.HTTPStatusError) -> RuntimeError:
     status_code = error.response.status_code
+    message = ""
+    try:
+        payload = error.response.json()
+        if isinstance(payload, dict):
+            message = str(payload.get("error", "")).strip()
+    except Exception:
+        message = ""
     if status_code in {401, 403}:
         return RuntimeError(
             "请求被内部站拒绝。请确认 Service Token 配置和 internal-site 访问策略。"
         )
-    return RuntimeError(f"请求失败：HTTP {status_code}")
+    return RuntimeError(message or f"请求失败：HTTP {status_code}")
 
 
 def _post_json(config: UploaderConfig, url: str, payload: dict) -> dict:
@@ -93,9 +116,40 @@ def search_cases(
     return results
 
 
-def sync_manifest(config: UploaderConfig, manifest: dict) -> dict:
-    """Push one manifest snapshot into internal-site after uploads finished successfully."""
-    return _post_json(config, config.api_url, manifest)
+def start_group_upload(config: UploaderConfig, payload: dict) -> dict:
+    """Create or resume one group upload job before any frame requests presigned URLs."""
+    return _post_json(config, config.api_url, payload)
+
+
+def prepare_group_upload_frame(
+    config: UploaderConfig, group_upload_job_id: str, frame_order: int
+) -> dict:
+    """Ask internal-site to approve one frame upload and return per-file presigned PUT URLs."""
+    return _post_json(
+        config,
+        group_upload_frame_prepare_url(config.api_url),
+        {"groupUploadJobId": group_upload_job_id, "frameOrder": frame_order},
+    )
+
+
+def commit_group_upload_frame(
+    config: UploaderConfig, group_upload_job_id: str, frame_order: int
+) -> dict:
+    """Tell internal-site one prepared frame finished uploading and should replace the old revision."""
+    return _post_json(
+        config,
+        group_upload_frame_commit_url(config.api_url),
+        {"groupUploadJobId": group_upload_job_id, "frameOrder": frame_order},
+    )
+
+
+def complete_group_upload(config: UploaderConfig, group_upload_job_id: str) -> dict:
+    """Finalize one group upload after every frame finished committing successfully."""
+    return _post_json(
+        config,
+        group_upload_complete_url(config.api_url),
+        {"groupUploadJobId": group_upload_job_id},
+    )
 
 
 def delete_group(config: UploaderConfig, case_slug: str, group_slug: str) -> dict:
@@ -104,4 +158,13 @@ def delete_group(config: UploaderConfig, case_slug: str, group_slug: str) -> dic
         config,
         group_delete_url(config.api_url),
         {"caseSlug": case_slug, "groupSlug": group_slug},
+    )
+
+
+def delete_case(config: UploaderConfig, case_slug: str) -> dict:
+    """Delete one empty remote case through the internal API control surface."""
+    return _post_json(
+        config,
+        case_delete_url(config.api_url),
+        {"caseSlug": case_slug},
     )

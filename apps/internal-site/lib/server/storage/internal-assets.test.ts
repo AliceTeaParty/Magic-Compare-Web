@@ -66,8 +66,8 @@ describe("internal asset storage helpers", () => {
     expect(resolvePublicInternalAssetUrl("/internal-assets/2026/test-example/001/before.png")).toBe(
       "https://assets.example.com/bucket/internal-assets/2026/test-example/001/before.png",
     );
-    expect(internalAssetPublicGroupBaseUrl("2026", "test-example")).toBe(
-      "https://assets.example.com/bucket/internal-assets/2026/test-example",
+    expect(internalAssetPublicGroupBaseUrl("/groups/abc123")).toBe(
+      "https://assets.example.com/bucket/internal-assets/groups/abc123",
     );
   });
 

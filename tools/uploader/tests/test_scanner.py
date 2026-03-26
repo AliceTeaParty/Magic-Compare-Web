@@ -17,14 +17,13 @@ class ScannerRelaxedYamlTests(unittest.TestCase):
             frame_dir.mkdir(parents=True, exist_ok=True)
 
             (case_root / "case.yaml").write_text(
-                "slug: 2026\n" "title: 2026\n" "status: internal\n",
+                "slug: 2026\n" "title: 2026\n",
                 encoding="utf-8",
             )
             (case_root / "groups" / "001-test-group" / "group.yaml").write_text(
                 "title: [Rip Check] test\n"
                 "description: imported group\n"
                 "defaultMode: before-after\n"
-                "isPublic: false\n"
                 "tags: []\n",
                 encoding="utf-8",
             )

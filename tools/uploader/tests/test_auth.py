@@ -33,7 +33,7 @@ class UploaderConfigTests(unittest.TestCase):
         self.assertTrue((self.work_dir / ".env").exists())
         self.assertEqual(config.site_url, "https://compare.example.com")
         self.assertEqual(
-            config.api_url, "https://compare.example.com/api/ops/import-sync"
+            config.api_url, "https://compare.example.com/api/ops/group-upload-start"
         )
 
     def test_creates_work_dir_env_from_uploader_template(self) -> None:
@@ -170,6 +170,11 @@ class UploaderConfigTests(unittest.TestCase):
     def test_build_request_headers_requires_service_token_for_remote_sites(
         self,
     ) -> None:
+        isolated_cwd = Path(self.temp_dir.name) / "isolated-cwd-remote"
+        isolated_cwd.mkdir(parents=True, exist_ok=True)
+        previous_cwd = Path.cwd()
+        os.chdir(isolated_cwd)
+        self.addCleanup(os.chdir, previous_cwd)
         config = resolve_uploader_config(
             self.work_dir, site_url_override="https://compare.example.com"
         )

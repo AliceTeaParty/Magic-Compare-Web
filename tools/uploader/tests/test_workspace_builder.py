@@ -53,25 +53,23 @@ class WriteCommentedYamlTests(unittest.TestCase):
             self.path,
             [
                 ("唯一标识符", "slug", "2026"),
-                ("状态", "status", "internal"),
+                ("封面", "coverAssetLabel", "After"),
             ],
         )
         text = self.path.read_text(encoding="utf-8")
         self.assertIn("# 唯一标识符", text)
-        self.assertIn("# 状态", text)
+        self.assertIn("# 封面", text)
 
     def test_values_round_trip(self) -> None:
         write_commented_yaml(
             self.path,
             [
                 ("标题", "title", "Test 测试"),
-                ("公开", "isPublic", False),
                 ("标签", "tags", ["a", "b"]),
             ],
         )
         data = yaml.safe_load(self.path.read_text(encoding="utf-8"))
         self.assertEqual(data["title"], "Test 测试")
-        self.assertEqual(data["isPublic"], False)
         self.assertEqual(data["tags"], ["a", "b"])
 
 
@@ -89,13 +87,34 @@ class CaseYamlTests(unittest.TestCase):
         text = self.path.read_text(encoding="utf-8")
         # Comments present
         self.assertIn("# 唯一标识符", text)
-        self.assertIn("# 状态", text)
         self.assertIn("# 封面资产标签", text)
         # Values round-trip correctly
         data = yaml.safe_load(text)
         self.assertEqual(data["slug"], "2026")
-        self.assertEqual(data["status"], "internal")
         self.assertIn("coverAssetLabel", data)
+
+    def test_existing_case_yaml_is_read_only_snapshot(self) -> None:
+        payload = build_case_payload(
+            type(
+                "ExistingCase",
+                (),
+                {
+                    "slug": "2026",
+                    "title": "2026",
+                    "summary": "",
+                    "tags": [],
+                    "status": "internal",
+                },
+            )(),
+            "2026",
+        )
+        write_case_yaml(self.path, payload)
+
+        data = yaml.safe_load(self.path.read_text(encoding="utf-8"))
+
+        self.assertEqual(data["slug"], "2026")
+        self.assertNotIn("title", data)
+        self.assertNotIn("tags", data)
 
 
 class GroupYamlTests(unittest.TestCase):
@@ -111,14 +130,11 @@ class GroupYamlTests(unittest.TestCase):
             "title": "测试 Group",
             "description": "",
             "defaultMode": "before-after",
-            "isPublic": False,
             "tags": [],
         }
         write_group_yaml(self.path, payload)
         text = self.path.read_text(encoding="utf-8")
         self.assertIn("# 对外展示标题", text)
         self.assertIn("# 默认对比模式", text)
-        self.assertIn("# 是否公开", text)
         data = yaml.safe_load(text)
-        self.assertEqual(data["isPublic"], False)
         self.assertEqual(data["defaultMode"], "before-after")

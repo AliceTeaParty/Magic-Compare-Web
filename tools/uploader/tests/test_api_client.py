@@ -5,7 +5,7 @@ from unittest import mock
 
 import httpx
 
-from src.api_client import sync_manifest
+from src.api_client import start_group_upload
 from src.auth import UploaderConfig
 
 
@@ -18,7 +18,7 @@ class ApiClientTests(unittest.TestCase):
         build_headers: mock.Mock,
     ) -> None:
         request = httpx.Request(
-            "POST", "https://compare.example.com/api/ops/import-sync"
+            "POST", "https://compare.example.com/api/ops/group-upload-start"
         )
         post.return_value = httpx.Response(401, request=request)
         build_headers.return_value = {
@@ -28,7 +28,7 @@ class ApiClientTests(unittest.TestCase):
 
         config = UploaderConfig(
             site_url="https://compare.example.com",
-            api_url="https://compare.example.com/api/ops/import-sync",
+            api_url="https://compare.example.com/api/ops/group-upload-start",
             env_path=None,
             work_dir=None,
             service_token_client_id="client-id",
@@ -36,11 +36,27 @@ class ApiClientTests(unittest.TestCase):
         )
 
         with self.assertRaisesRegex(RuntimeError, "Service Token"):
-            sync_manifest(config, {"case": {"slug": "2026"}, "groups": []})
+            start_group_upload(
+                config,
+                {
+                    "case": {
+                        "slug": "2026",
+                        "title": "2026",
+                        "summary": "",
+                        "tags": [],
+                        "coverAssetLabel": "After",
+                    },
+                    "group": {
+                        "slug": "test-group",
+                        "title": "Test Group",
+                        "description": "",
+                        "order": 0,
+                        "defaultMode": "before-after",
+                        "tags": [],
+                    },
+                    "frames": [],
+                },
+            )
 
         build_headers.assert_called_once_with(config)
         post.assert_called_once()
-
-
-if __name__ == "__main__":
-    unittest.main()

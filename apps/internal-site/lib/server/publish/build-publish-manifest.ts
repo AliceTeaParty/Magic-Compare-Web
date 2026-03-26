@@ -34,6 +34,7 @@ type PublishableFrame = {
 type PublishableGroup = {
   id: string;
   slug: string;
+  storageRoot: string;
   title: string;
   description: string;
   defaultMode: string;
@@ -110,7 +111,7 @@ export function buildPublishManifest(params: {
     schemaVersion: PUBLISH_SCHEMA_VERSION,
     publicSlug,
     generatedAt: publishedAt.toISOString(),
-    assetBasePath: internalAssetPublicGroupBaseUrl(caseRow.slug, group.slug),
+    assetBasePath: internalAssetPublicGroupBaseUrl(group.storageRoot),
     case: {
       slug: caseRow.slug,
       title: caseRow.title,

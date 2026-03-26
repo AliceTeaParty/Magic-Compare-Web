@@ -1,13 +1,44 @@
-import { execFileSync } from "node:child_process";
 import { mkdirSync } from "node:fs";
+import { DatabaseSync } from "node:sqlite";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { resolveSqliteDatabasePath } from "../lib/server/db/database-url";
 
-const prismaDir = path.dirname(fileURLToPath(import.meta.url));
-const databasePath = resolveSqliteDatabasePath();
+type ColumnDefinition = {
+  name: string;
+  sql: string;
+};
 
-const sql = `
+function listColumns(database: DatabaseSync, tableName: string): Set<string> {
+  const rows = database.prepare(`PRAGMA table_info("${tableName}")`).all() as Array<{
+    name: string;
+  }>;
+  return new Set(rows.map((row) => row.name));
+}
+
+/**
+ * SQLite migrations in this repo are intentionally additive because `pnpm db:push` runs in local
+ * and container bootstrap paths where we want schema drift fixed without requiring a separate tool.
+ */
+function ensureColumns(
+  database: DatabaseSync,
+  tableName: string,
+  definitions: ColumnDefinition[],
+): void {
+  const existing = listColumns(database, tableName);
+  for (const definition of definitions) {
+    if (existing.has(definition.name)) {
+      continue;
+    }
+    database.exec(`ALTER TABLE "${tableName}" ADD COLUMN ${definition.sql};`);
+  }
+}
+
+const databasePath = resolveSqliteDatabasePath();
+mkdirSync(path.dirname(databasePath), { recursive: true });
+
+const database = new DatabaseSync(databasePath);
+
+database.exec(`
 PRAGMA foreign_keys = ON;
 
 CREATE TABLE IF NOT EXISTS "Case" (
@@ -37,6 +68,8 @@ CREATE TABLE IF NOT EXISTS "Group" (
   "defaultMode" TEXT NOT NULL,
   "isPublic" BOOLEAN NOT NULL DEFAULT false,
   "tagsJson" TEXT NOT NULL DEFAULT '[]',
+  "storageRoot" TEXT NOT NULL DEFAULT '',
+  "lastUploadInputHash" TEXT,
   FOREIGN KEY ("caseId") REFERENCES "Case" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
 
@@ -51,6 +84,7 @@ CREATE TABLE IF NOT EXISTS "Frame" (
   "caption" TEXT NOT NULL DEFAULT '',
   "order" INTEGER NOT NULL,
   "isPublic" BOOLEAN NOT NULL DEFAULT true,
+  "storagePrefix" TEXT NOT NULL DEFAULT '',
   FOREIGN KEY ("groupId") REFERENCES "Group" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
 
@@ -72,12 +106,55 @@ CREATE TABLE IF NOT EXISTS "Asset" (
 );
 
 CREATE INDEX IF NOT EXISTS "Asset_frameId_idx" ON "Asset"("frameId");
-`;
 
-mkdirSync(path.dirname(databasePath), { recursive: true });
-execFileSync("sqlite3", [databasePath], {
-  input: sql,
-  stdio: ["pipe", "inherit", "inherit"],
-});
+CREATE TABLE IF NOT EXISTS "GroupUploadJob" (
+  "id" TEXT NOT NULL PRIMARY KEY,
+  "caseId" TEXT NOT NULL,
+  "groupId" TEXT NOT NULL,
+  "inputHash" TEXT NOT NULL,
+  "snapshotJson" TEXT NOT NULL,
+  "status" TEXT NOT NULL,
+  "expectedFrameCount" INTEGER NOT NULL,
+  "committedFrameCount" INTEGER NOT NULL DEFAULT 0,
+  "expiresAt" DATETIME,
+  "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY ("caseId") REFERENCES "Case" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+  FOREIGN KEY ("groupId") REFERENCES "Group" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS "GroupUploadJob_groupId_status_updatedAt_idx"
+  ON "GroupUploadJob"("groupId", "status", "updatedAt");
+
+CREATE TABLE IF NOT EXISTS "FrameUploadJob" (
+  "id" TEXT NOT NULL PRIMARY KEY,
+  "groupUploadJobId" TEXT NOT NULL,
+  "frameOrder" INTEGER NOT NULL,
+  "frameSnapshotJson" TEXT NOT NULL,
+  "preparedAssetsJson" TEXT NOT NULL DEFAULT '',
+  "pendingPrefix" TEXT,
+  "status" TEXT NOT NULL,
+  "committedAt" DATETIME,
+  "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY ("groupUploadJobId") REFERENCES "GroupUploadJob" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS "FrameUploadJob_groupUploadJobId_frameOrder_key"
+  ON "FrameUploadJob"("groupUploadJobId", "frameOrder");
+CREATE INDEX IF NOT EXISTS "FrameUploadJob_groupUploadJobId_status_idx"
+  ON "FrameUploadJob"("groupUploadJobId", "status");
+`);
+
+ensureColumns(database, "Group", [
+  { name: "storageRoot", sql: `"storageRoot" TEXT NOT NULL DEFAULT ''` },
+  { name: "lastUploadInputHash", sql: `"lastUploadInputHash" TEXT` },
+]);
+
+ensureColumns(database, "Frame", [
+  { name: "storagePrefix", sql: `"storagePrefix" TEXT NOT NULL DEFAULT ''` },
+]);
+
+database.close();
 
 console.log(`Initialized SQLite schema at ${databasePath}`);

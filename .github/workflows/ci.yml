@@ -57,7 +57,6 @@ env:
   PNPM_VERSION: "10.32.1"
   PYTHON_VERSION: "3.12"
   CI_COMPOSE_ARGS: -f docker-compose.yml -f docker/ci.compose.override.yml
-  MAGIC_COMPARE_HIDE_DEMO: "false"
 
 jobs:
   verify-uploader:
@@ -113,21 +112,13 @@ jobs:
       - name: Build workspace
         run: pnpm build
 
-  public-export-demo:
-    name: Verify Demo Public Export
+  compose-smoke:
+    name: Verify Compose Internal Site
     needs: verify
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 20
     env:
-      DATABASE_URL: file:./dev.db
-      MAGIC_COMPARE_S3_BUCKET: magic-compare-assets
-      MAGIC_COMPARE_S3_REGION: us-east-1
-      MAGIC_COMPARE_S3_ENDPOINT: http://127.0.0.1:9000
-      MAGIC_COMPARE_S3_PUBLIC_BASE_URL: http://127.0.0.1:9000/magic-compare-assets
-      MAGIC_COMPARE_S3_ACCESS_KEY_ID: rustfsadmin
-      MAGIC_COMPARE_S3_SECRET_ACCESS_KEY: rustfsadmin
-      MAGIC_COMPARE_S3_FORCE_PATH_STYLE: "true"
-      MAGIC_COMPARE_S3_INTERNAL_PREFIX: internal-assets
+      MAGIC_COMPARE_HIDE_DEMO: "true"
 
     steps:
       - name: Checkout repository
@@ -147,71 +138,49 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Start RustFS services
-        run: docker compose $CI_COMPOSE_ARGS up -d rustfs rustfs-init
+      - name: Start compose stack
+        run: docker compose $CI_COMPOSE_ARGS up -d --build internal-site
 
-      - name: Wait for RustFS bucket initialization
+      - name: Wait for internal-site readiness
         run: |
           set -euo pipefail
-          for _ in {1..60}; do
-            container_id="$(docker compose $CI_COMPOSE_ARGS ps -a -q rustfs-init)"
-            if [[ -z "$container_id" ]]; then
-              sleep 2
-              continue
-            fi
-
-            status="$(docker inspect -f '{{.State.Status}}' "$container_id")"
-            if [[ "$status" == "exited" ]]; then
-              exit_code="$(docker inspect -f '{{.State.ExitCode}}' "$container_id")"
-              if [[ "$exit_code" == "0" ]]; then
-                exit 0
+          for _ in {1..90}; do
+            internal_site_init_container_id="$(docker compose $CI_COMPOSE_ARGS ps -a -q internal-site-init)"
+            if [[ -n "$internal_site_init_container_id" ]]; then
+              internal_site_init_status="$(docker inspect -f '{{.State.Status}}' "$internal_site_init_container_id")"
+              if [[ "$internal_site_init_status" == "exited" ]]; then
+                internal_site_init_exit_code="$(docker inspect -f '{{.State.ExitCode}}' "$internal_site_init_container_id")"
+                if [[ "$internal_site_init_exit_code" != "0" ]]; then
+                  echo "internal-site-init exited with code $internal_site_init_exit_code."
+                  docker compose $CI_COMPOSE_ARGS ps
+                  docker compose $CI_COMPOSE_ARGS logs internal-site-init internal-site
+                  exit 1
+                fi
               fi
-
-              docker compose $CI_COMPOSE_ARGS logs rustfs rustfs-init
-              exit 1
             fi
 
+            internal_site_container_id="$(docker compose $CI_COMPOSE_ARGS ps -a -q internal-site)"
+            if [[ -n "$internal_site_container_id" ]]; then
+              internal_site_status="$(docker inspect -f '{{.State.Status}}' "$internal_site_container_id")"
+              if [[ "$internal_site_status" == "exited" || "$internal_site_status" == "dead" ]]; then
+                internal_site_exit_code="$(docker inspect -f '{{.State.ExitCode}}' "$internal_site_container_id")"
+                echo "internal-site exited with code $internal_site_exit_code before readiness."
+                docker compose $CI_COMPOSE_ARGS ps
+                docker compose $CI_COMPOSE_ARGS logs internal-site-init internal-site
+                exit 1
+              fi
+            fi
+
+            if curl -fsS http://127.0.0.1:3000 >/dev/null; then
+              exit 0
+            fi
             sleep 2
           done
 
-          echo "Timed out waiting for rustfs-init to finish."
-          docker compose $CI_COMPOSE_ARGS logs rustfs rustfs-init
+          echo "Timed out waiting for internal-site to become ready."
+          docker compose $CI_COMPOSE_ARGS ps
+          docker compose $CI_COMPOSE_ARGS logs internal-site-init internal-site
           exit 1
-
-      - name: Reset demo workspace state
-        run: |
-          rm -f dev.db dev.db-*
-          rm -rf content/published dist/public-site apps/public-site/public/published apps/public-site/out
-
-      - name: Initialize database schema
-        run: pnpm db:push
-
-      - name: Seed demo data
-        run: pnpm db:seed
-
-      - name: Verify published demo bundle
-        run: |
-          set -euo pipefail
-          manifest_path="content/published/groups/demo-grain-study--banding-check/manifest.json"
-          if [[ ! -f "$manifest_path" ]]; then
-            echo "Expected published demo manifest at $manifest_path."
-            find content -maxdepth 4 -type f | sort || true
-            exit 1
-          fi
-
-      - name: Export public demo site
-        run: pnpm public:export
-
-      - name: Verify exported public files
-        run: |
-          set -euo pipefail
-          test -d dist/public-site
-          test -d apps/public-site/out
-          if ! find dist/public-site \( -path '*/g/demo-grain-study--banding-check/index.html' -o -path '*/g/demo-grain-study--banding-check.html' \) | grep -q .; then
-            echo "Expected an exported page for /g/demo-grain-study--banding-check."
-            find dist/public-site -maxdepth 4 -type f | sort | sed -n '1,160p'
-            exit 1
-          fi
 
       - name: Capture compose logs
         if: always()
@@ -219,40 +188,29 @@ jobs:
           {
             docker compose $CI_COMPOSE_ARGS ps || true
             echo
-            docker compose $CI_COMPOSE_ARGS logs rustfs rustfs-init || true
-          } > ci-public-export-demo.compose.log
+            docker compose $CI_COMPOSE_ARGS logs internal-site-init internal-site || true
+          } > ci-compose-smoke.log
 
       - name: Write job summary
         if: always()
         run: |
           {
-            echo "## CI Demo Export Summary"
+            echo "## CI Compose Smoke Summary"
             echo
-            echo "- Published manifest: \`content/published/groups/demo-grain-study--banding-check/manifest.json\`"
-            echo "- Static export mirror: \`dist/public-site\`"
-            echo "- Next export output: \`apps/public-site/out\`"
+            echo "- Compose files: \`docker-compose.yml\` + \`docker/ci.compose.override.yml\`"
+            echo "- Readiness probe: \`http://127.0.0.1:3000\`"
+            echo "- Demo seed: skipped in CI smoke unless external S3/R2 env is provided"
           } >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Upload public export artifact
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: public-export-demo-${{ github.run_id }}-${{ github.run_attempt }}
-          path: |
-            dist/public-site
-            apps/public-site/out
-          if-no-files-found: ignore
-          retention-days: 7
 
       - name: Upload compose logs
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: public-export-demo-logs-${{ github.run_id }}-${{ github.run_attempt }}
-          path: ci-public-export-demo.compose.log
+          name: ci-compose-smoke-logs-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ci-compose-smoke.log
           if-no-files-found: ignore
           retention-days: 7
 
-      - name: Stop RustFS services
+      - name: Stop compose stack
         if: always()
         run: docker compose $CI_COMPOSE_ARGS down --volumes --remove-orphans

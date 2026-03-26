@@ -95,17 +95,27 @@ export function getPublicExportDir(): string {
     : path.join(workspaceRoot(), "dist", "public-site");
 }
 
+export function isInternalAssetStorageConfigured(): boolean {
+  loadWorkspaceEnv();
+  return Boolean(
+    process.env[S3_BUCKET_ENV_NAME]?.trim() &&
+      process.env[S3_PUBLIC_BASE_URL_ENV_NAME]?.trim() &&
+      process.env[S3_ACCESS_KEY_ID_ENV_NAME]?.trim() &&
+      process.env[S3_SECRET_ACCESS_KEY_ENV_NAME]?.trim(),
+  );
+}
+
 export function getInternalAssetStorageConfig(): InternalAssetStorageConfig {
   loadWorkspaceEnv();
   return {
     bucket: requireEnv(S3_BUCKET_ENV_NAME),
-    region: process.env[S3_REGION_ENV_NAME]?.trim() || "us-east-1",
+    region: process.env[S3_REGION_ENV_NAME]?.trim() || "auto",
     endpoint: process.env[S3_ENDPOINT_ENV_NAME]?.trim() || undefined,
     publicBaseUrl: requireAbsoluteUrlEnv(S3_PUBLIC_BASE_URL_ENV_NAME),
     accessKeyId: requireEnv(S3_ACCESS_KEY_ID_ENV_NAME),
     secretAccessKey: requireEnv(S3_SECRET_ACCESS_KEY_ENV_NAME),
     forcePathStyle: parseEnvFlag(process.env[S3_FORCE_PATH_STYLE_ENV_NAME]),
-    objectPrefix: process.env[S3_INTERNAL_PREFIX_ENV_NAME]?.trim() || "internal-assets",
+    objectPrefix: process.env[S3_INTERNAL_PREFIX_ENV_NAME]?.trim() || "",
   };
 }
 
