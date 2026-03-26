@@ -11,10 +11,14 @@ from rich.table import Table
 from rich.text import Text
 
 from .api_client import (
+    CaseGroupsResult,
+    CaseListResult,
     CaseSearchGroup,
     CaseSearchResult,
     delete_case,
     delete_group,
+    list_case_groups,
+    list_cases,
     search_cases,
 )
 from .config import (
@@ -274,6 +278,31 @@ def _render_case_table(results: list[CaseSearchResult], query: str) -> None:
     console.print(table)
 
 
+def _render_all_case_table(results: list[CaseListResult]) -> None:
+    """Show the full remote case inventory in one stable table so operators can inspect slugs before follow-up commands."""
+    table = Table(title="全部 Cases")
+    table.add_column("#", justify="right", style="cyan", no_wrap=True)
+    table.add_column("Title", style="bold white")
+    table.add_column("Slug", style="green")
+    table.add_column("Status", style="yellow")
+    table.add_column("Updated", style="magenta")
+    table.add_column("Groups", justify="right", style="blue")
+    table.add_column("Public", justify="right", style="bright_blue")
+
+    for index, result in enumerate(results, start=1):
+        table.add_row(
+            str(index),
+            result.title,
+            result.slug,
+            result.status,
+            result.updated_at or "-",
+            str(result.group_count),
+            str(result.public_group_count),
+        )
+
+    console.print(table)
+
+
 def _render_group_table(case: CaseSearchResult) -> None:
     """List group choices before destructive deletion so the confirmation step has concrete context."""
     table = Table(title=f"Case {case.title} 的 Groups")
@@ -283,6 +312,29 @@ def _render_group_table(case: CaseSearchResult) -> None:
 
     for index, group in enumerate(case.groups, start=1):
         table.add_row(str(index), group.title, group.slug)
+
+    console.print(table)
+
+
+def _render_case_workspace_groups(case_data: CaseGroupsResult) -> None:
+    """Render one case's full group list with publish and frame counts so operators can inspect remote state without opening the site."""
+    table = Table(title=f"Case {case_data.title} ({case_data.slug}) 的 Groups")
+    table.add_column("#", justify="right", style="cyan", no_wrap=True)
+    table.add_column("Title", style="bold white")
+    table.add_column("Slug", style="green")
+    table.add_column("Frames", justify="right", style="blue")
+    table.add_column("Public", style="yellow")
+    table.add_column("Mode", style="magenta")
+
+    for index, group in enumerate(case_data.groups, start=1):
+        table.add_row(
+            str(index),
+            group.title,
+            group.slug,
+            str(group.frame_count),
+            "yes" if group.is_public else "no",
+            group.default_mode,
+        )
 
     console.print(table)
 
@@ -414,6 +466,46 @@ def handle_delete_group(
         )
     )
     return result
+
+
+def handle_list_cases(
+    *,
+    work_dir: Path,
+    site_url: str | None,
+    api_url: str | None,
+) -> list[CaseListResult]:
+    """List every remote case through the dedicated API so operators are not capped by search pagination."""
+    config = _prepare_runtime_config(
+        work_dir.resolve(), site_url=site_url, api_url=api_url
+    )
+    ensure_remote_access_config(config)
+
+    with console.status("[bold green]正在请求全部 case...[/]"):
+        results = list_cases(config)
+
+    _render_all_case_table(results)
+    return results
+
+
+def handle_list_groups(
+    *,
+    case_slug: str | None,
+    work_dir: Path,
+    site_url: str | None,
+    api_url: str | None,
+) -> CaseGroupsResult:
+    """List one case's groups through the workspace summary API so the CLI can inspect the exact remote ordering and visibility state."""
+    config = _prepare_runtime_config(
+        work_dir.resolve(), site_url=site_url, api_url=api_url
+    )
+    ensure_remote_access_config(config)
+    selected_case = _resolve_case_for_delete(config, case_slug)
+
+    with console.status("[bold green]正在请求 case 下的 groups...[/]"):
+        case_data = list_case_groups(config, selected_case.slug)
+
+    _render_case_workspace_groups(case_data)
+    return case_data
 
 
 def handle_delete_case(

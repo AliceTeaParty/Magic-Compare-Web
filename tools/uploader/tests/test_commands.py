@@ -8,6 +8,7 @@ from unittest import mock
 from PIL import Image
 
 from src.commands import handle_sync
+from src.api_client import CaseGroupsResult, CaseListResult, CaseWorkspaceGroup
 
 
 class CommandFlowTests(unittest.TestCase):
@@ -49,3 +50,88 @@ class CommandFlowTests(unittest.TestCase):
         self.assertIsNone(execution_summary)
         self.assertIsNone(sync_result)
         ensure_remote_access_config.assert_not_called()
+
+    @mock.patch("src.commands._render_all_case_table")
+    @mock.patch("src.commands.list_cases")
+    @mock.patch("src.commands.ensure_remote_access_config")
+    def test_handle_list_cases_fetches_full_inventory(
+        self,
+        ensure_remote_access_config: mock.Mock,
+        list_cases: mock.Mock,
+        render_table: mock.Mock,
+    ) -> None:
+        from src.commands import handle_list_cases
+
+        list_cases.return_value = [
+            CaseListResult(
+                id="case-1",
+                slug="2026",
+                title="2026",
+                summary="",
+                tags=[],
+                status="internal",
+                published_at=None,
+                updated_at="2026-03-26T10:00:00.000Z",
+                group_count=1,
+                public_group_count=0,
+            )
+        ]
+
+        result = handle_list_cases(
+            work_dir=self.case_root,
+            site_url="https://compare.example.com",
+            api_url="https://compare.example.com/api/ops/group-upload-start",
+        )
+
+        self.assertEqual(len(result), 1)
+        ensure_remote_access_config.assert_called_once()
+        render_table.assert_called_once()
+
+    @mock.patch("src.commands._render_case_workspace_groups")
+    @mock.patch("src.commands.list_case_groups")
+    @mock.patch("src.commands.ensure_remote_access_config")
+    @mock.patch("src.commands._resolve_case_for_delete")
+    def test_handle_list_groups_fetches_case_workspace(
+        self,
+        resolve_case: mock.Mock,
+        ensure_remote_access_config: mock.Mock,
+        list_case_groups: mock.Mock,
+        render_groups: mock.Mock,
+    ) -> None:
+        from src.commands import handle_list_groups
+
+        resolve_case.return_value = mock.Mock(slug="2026")
+        list_case_groups.return_value = CaseGroupsResult(
+            id="case-1",
+            slug="2026",
+            title="2026",
+            summary="",
+            status="internal",
+            published_at=None,
+            tags=[],
+            groups=[
+                CaseWorkspaceGroup(
+                    id="group-1",
+                    slug="test-group",
+                    title="Test Group",
+                    description="",
+                    order=0,
+                    default_mode="before-after",
+                    is_public=False,
+                    public_slug=None,
+                    frame_count=12,
+                )
+            ],
+        )
+
+        result = handle_list_groups(
+            case_slug="2026",
+            work_dir=self.case_root,
+            site_url="https://compare.example.com",
+            api_url="https://compare.example.com/api/ops/group-upload-start",
+        )
+
+        self.assertEqual(result.slug, "2026")
+        ensure_remote_access_config.assert_called_once()
+        list_case_groups.assert_called_once()
+        render_groups.assert_called_once()

@@ -27,6 +27,45 @@ class CaseSearchResult:
     groups: list[CaseSearchGroup]
 
 
+@dataclass(frozen=True)
+class CaseListResult:
+    id: str
+    slug: str
+    title: str
+    summary: str
+    tags: list[str]
+    status: str
+    published_at: str | None
+    updated_at: str
+    group_count: int
+    public_group_count: int
+
+
+@dataclass(frozen=True)
+class CaseWorkspaceGroup:
+    id: str
+    slug: str
+    title: str
+    description: str
+    order: int
+    default_mode: str
+    is_public: bool
+    public_slug: str | None
+    frame_count: int
+
+
+@dataclass(frozen=True)
+class CaseGroupsResult:
+    id: str
+    slug: str
+    title: str
+    summary: str
+    status: str
+    published_at: str | None
+    tags: list[str]
+    groups: list[CaseWorkspaceGroup]
+
+
 def _replace_operation_url(api_url: str, operation: str) -> str:
     prefix, separator, _ = api_url.rpartition("/")
     if not separator:
@@ -36,6 +75,14 @@ def _replace_operation_url(api_url: str, operation: str) -> str:
 
 def case_search_url(api_url: str) -> str:
     return _replace_operation_url(api_url, "case-search")
+
+
+def case_list_url(api_url: str) -> str:
+    return _replace_operation_url(api_url, "case-list")
+
+
+def case_groups_url(api_url: str) -> str:
+    return _replace_operation_url(api_url, "case-groups")
 
 
 def group_delete_url(api_url: str) -> str:
@@ -114,6 +161,59 @@ def search_cases(
             )
         )
     return results
+
+
+def list_cases(config: UploaderConfig) -> list[CaseListResult]:
+    """Fetch the complete remote case list without the search endpoint's limit cap."""
+    payload = _post_json(config, case_list_url(config.api_url), {})
+    results: list[CaseListResult] = []
+    for item in payload.get("cases", []):
+        results.append(
+            CaseListResult(
+                id=item["id"],
+                slug=item["slug"],
+                title=item["title"],
+                summary=item.get("summary", ""),
+                tags=item.get("tags", []),
+                status=item.get("status", "internal"),
+                published_at=item.get("publishedAt"),
+                updated_at=item.get("updatedAt", ""),
+                group_count=item.get("groupCount", 0),
+                public_group_count=item.get("publicGroupCount", 0),
+            )
+        )
+    return results
+
+
+def list_case_groups(config: UploaderConfig, case_slug: str) -> CaseGroupsResult:
+    """Load one case workspace summary so CLI commands can list every group under that slug."""
+    payload = _post_json(
+        config, case_groups_url(config.api_url), {"caseSlug": case_slug}
+    )
+    case_item = payload["case"]
+    return CaseGroupsResult(
+        id=case_item["id"],
+        slug=case_item["slug"],
+        title=case_item["title"],
+        summary=case_item.get("summary", ""),
+        status=case_item.get("status", "internal"),
+        published_at=case_item.get("publishedAt"),
+        tags=case_item.get("tags", []),
+        groups=[
+            CaseWorkspaceGroup(
+                id=group["id"],
+                slug=group["slug"],
+                title=group["title"],
+                description=group.get("description", ""),
+                order=group.get("order", 0),
+                default_mode=group.get("defaultMode", "before-after"),
+                is_public=group.get("isPublic", False),
+                public_slug=group.get("publicSlug"),
+                frame_count=group.get("frameCount", 0),
+            )
+            for group in payload.get("groups", [])
+        ],
+    )
 
 
 def start_group_upload(config: UploaderConfig, payload: dict) -> dict:

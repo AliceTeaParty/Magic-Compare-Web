@@ -13,6 +13,8 @@ from .commands import (
     console,
     handle_delete_case,
     handle_delete_group,
+    handle_list_cases,
+    handle_list_groups,
     handle_manifest,
     handle_plan,
     handle_sync,
@@ -215,6 +217,71 @@ def delete_group_command(
         raise typer.Exit(code=1) from None
     except Exception as error:
         _handle_top_level_error(error, default_message="删除失败")
+
+
+@app.command("list-cases")
+def list_cases_command(
+    work_dir: Path = typer.Option(
+        Path.cwd(),
+        "--work-dir",
+        help="用于读取工作目录 .env 的目录。",
+    ),
+    site_url: str | None = typer.Option(
+        None,
+        "--site-url",
+        help=f"内部站点主页，优先读取 {ENV_SITE_URL_NAME}。",
+    ),
+    api_url: str | None = typer.Option(
+        None,
+        "--api-url",
+        help=f"内部站点 group-upload-start 接口，优先读取 {ENV_API_URL_NAME}。",
+    ),
+) -> None:
+    """列出内部站当前所有 case。"""
+    try:
+        handle_list_cases(
+            work_dir=work_dir,
+            site_url=site_url,
+            api_url=api_url,
+        )
+    except Exception as error:
+        _handle_top_level_error(error, default_message="列出 case 失败")
+
+
+@app.command("list-groups")
+def list_groups_command(
+    case_slug: str | None = typer.Option(
+        None, "--case-slug", help="要查看的 case slug；留空时交互选择。"
+    ),
+    work_dir: Path = typer.Option(
+        Path.cwd(),
+        "--work-dir",
+        help="用于读取工作目录 .env 的目录。",
+    ),
+    site_url: str | None = typer.Option(
+        None,
+        "--site-url",
+        help=f"内部站点主页，优先读取 {ENV_SITE_URL_NAME}。",
+    ),
+    api_url: str | None = typer.Option(
+        None,
+        "--api-url",
+        help=f"内部站点 group-upload-start 接口，优先读取 {ENV_API_URL_NAME}。",
+    ),
+) -> None:
+    """列出某个 case 下当前全部 group。"""
+    try:
+        handle_list_groups(
+            case_slug=case_slug,
+            work_dir=work_dir,
+            site_url=site_url,
+            api_url=api_url,
+        )
+    except typer.Abort:
+        console.print("[yellow]已取消查看。[/]")
+        raise typer.Exit(code=1) from None
+    except Exception as error:
+        _handle_top_level_error(error, default_message="列出 group 失败")
 
 
 @app.command("delete-case")
