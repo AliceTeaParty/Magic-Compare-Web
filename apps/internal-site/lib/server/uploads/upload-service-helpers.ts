@@ -82,6 +82,15 @@ export function isManagedGroupStorageRoot(storageRoot: string): boolean {
 }
 
 /**
+ * Upload resets and visibility downgrades both mutate multiple rows before case-level derived
+ * fields can be trusted again, so cover/publication refresh stays in one shared post-step.
+ */
+async function refreshCaseDerivedState(caseId: string): Promise<void> {
+  await recomputeCaseCoverAsset(caseId);
+  await syncCasePublicationState(caseId);
+}
+
+/**
  * Once an upload job exists for a public group, that group is no longer publish-ready. We lower it
  * to internal immediately and drop the published bundle so viewers never see half-replaced frames.
  */
@@ -106,22 +115,7 @@ export async function downgradeGroupVisibility(params: {
     },
   });
 
-  const remainingPublicGroups = await prisma.group.count({
-    where: {
-      caseId: params.caseId,
-      isPublic: true,
-    },
-  });
-
-  if (remainingPublicGroups === 0) {
-    await prisma.case.update({
-      where: { id: params.caseId },
-      data: {
-        coverAssetId: null,
-      },
-    });
-    await syncCasePublicationState(params.caseId);
-  }
+  await refreshCaseDerivedState(params.caseId);
 }
 
 /**
@@ -168,12 +162,6 @@ export async function clearGroupForRestart(params: {
         lastUploadInputHash: null,
       },
     }),
-    prisma.case.update({
-      where: { id: params.caseId },
-      data: {
-        coverAssetId: null,
-      },
-    }),
   ]);
 
   if (params.publicSlug) {
@@ -184,15 +172,7 @@ export async function clearGroupForRestart(params: {
     await deleteInternalAssetPrefix(params.storageRoot);
   }
 
-  const remainingPublicGroups = await prisma.group.count({
-    where: {
-      caseId: params.caseId,
-      isPublic: true,
-    },
-  });
-  if (remainingPublicGroups === 0) {
-    await syncCasePublicationState(params.caseId);
-  }
+  await refreshCaseDerivedState(params.caseId);
 }
 
 /**
@@ -520,6 +500,5 @@ export async function markUploadJobCompleted(job: ActiveUploadJob): Promise<void
     }),
   ]);
 
-  await recomputeCaseCoverAsset(job.case.id);
-  await syncCasePublicationState(job.case.id);
+  await refreshCaseDerivedState(job.case.id);
 }
