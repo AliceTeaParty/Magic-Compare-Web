@@ -295,6 +295,8 @@ Docker 用：
 
 - 不要恢复 internal-site 二进制上传代理；上传工具只能拿 presigned URL 后直传对象存储
 - 不要在 `upload-service.ts` 里混入大段 Prisma 明细和对象存储清理细节；新增分支优先落到 helper
+- 不要把 viewer 的键盘、cookie、viewport、A/B outside-click 副作用重新塞回 `group-viewer-workbench.tsx`
+- 不要让 workspace action 自己管理 toast timer、optimistic rollback、transition 样板；复用 action helper 和 notification hook
 - 不要把 uploader 的 session 读写、frame 状态推进和 Rich 输出重新揉进一个超长函数
 
 ## 发布、导出、部署三件事要分清

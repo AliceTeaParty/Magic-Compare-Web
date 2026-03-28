@@ -47,6 +47,7 @@
 已解决的问题与过时的规划。**不要把 archive/ 的内容当作当前约束来遵守。**
 
 - [archive/2026-03-26-r2-frame-upload-rewrite-notes.zh-CN.md](archive/2026-03-26-r2-frame-upload-rewrite-notes.zh-CN.md)
+- [archive/2026-03-28-maintainability-cleanup-notes.zh-CN.md](archive/2026-03-28-maintainability-cleanup-notes.zh-CN.md)
 - [archive/uploader-frontend-roadmap-2026-03-21.zh-CN.md](archive/uploader-frontend-roadmap-2026-03-21.zh-CN.md)
 - [archive/ci-ghcr-lessons.zh-CN.md](archive/ci-ghcr-lessons.zh-CN.md)
 - [archive/browser-smoke-and-ci-prep.zh-CN.md](archive/browser-smoke-and-ci-prep.zh-CN.md)

@@ -68,21 +68,155 @@ function replaceWorkspaceGroups(
 }
 
 /**
+ * Keeps fallback error formatting in one place so every workspace action surfaces the same shape
+ * when the server fails before returning a structured error payload.
+ */
+function pushWorkspaceError(
+  notifications: NotificationApi,
+  error: unknown,
+  fallbackMessage: string,
+) {
+  notifications.pushNotification(
+    error instanceof Error ? error.message : fallbackMessage,
+    "error",
+  );
+}
+
+/**
+ * Wraps async mutations in one transition helper so UI actions do not each need to repeat the same
+ * fire-and-forget transition boilerplate.
+ */
+function runWorkspaceTransition(
+  startTransition: TransitionStartFunction,
+  action: () => Promise<void>,
+) {
+  startTransition(() => {
+    void action();
+  });
+}
+
+/**
+ * Reuses one optimistic group-mutation flow for both visibility toggles and drag reorder so local
+ * state replacement, rollback, refresh, and save-indicator cleanup cannot drift apart.
+ */
+function runOptimisticGroupMutation<T>({
+  fallbackErrorMessage,
+  nextGroups,
+  onSuccess,
+  previousGroups,
+  request,
+  context,
+}: {
+  fallbackErrorMessage: string;
+  nextGroups: GroupItem[];
+  onSuccess?: (result: T) => void;
+  previousGroups: GroupItem[];
+  request: () => Promise<T>;
+  context: WorkspaceGroupMutationContext;
+}) {
+  replaceWorkspaceGroups(context.groupsRef, context.setGroups, nextGroups);
+  context.notifications.showWorkspaceSavingNotification();
+
+  runWorkspaceTransition(context.startTransition, async () => {
+    try {
+      const result = await request();
+      onSuccess?.(result);
+      context.refresh();
+    } catch (error) {
+      replaceWorkspaceGroups(
+        context.groupsRef,
+        context.setGroups,
+        previousGroups,
+      );
+      pushWorkspaceError(
+        context.notifications,
+        error,
+        fallbackErrorMessage,
+      );
+    } finally {
+      context.notifications.dismissWorkspaceSavingNotification();
+    }
+  });
+}
+
+/**
+ * Publishing and deploy actions do not need optimistic state, but they still share the same
+ * transition-wrapped request and notification pattern.
+ */
+function runWorkspaceMutation<T>({
+  onError,
+  onFinally,
+  onSuccess,
+  request,
+  startTransition,
+}: {
+  onError?: (error: unknown) => void;
+  onFinally?: () => void;
+  onSuccess?: (result: T) => void;
+  request: () => Promise<T>;
+  startTransition: TransitionStartFunction;
+}) {
+  runWorkspaceTransition(startTransition, async () => {
+    try {
+      const result = await request();
+      onSuccess?.(result);
+    } catch (error) {
+      onError?.(error);
+      if (!onError) {
+        throw error;
+      }
+      return;
+    } finally {
+      onFinally?.();
+    }
+  });
+}
+
+/**
+ * Builds the next visibility snapshot from the latest live groups so stale renders cannot invert
+ * an already-changed group back to the wrong public state.
+ */
+function buildVisibilityGroups(
+  previousGroups: GroupItem[],
+  targetGroupId: string,
+  nextVisibility: boolean,
+) {
+  return previousGroups.map((group) =>
+    group.id === targetGroupId ? { ...group, isPublic: nextVisibility } : group,
+  );
+}
+
+/**
+ * Reorders the latest live group array instead of the render-time snapshot so overlapping drag
+ * operations cannot persist an outdated order after another optimistic change lands first.
+ */
+function buildReorderedGroups(
+  previousGroups: GroupItem[],
+  activeId: string,
+  overId: string,
+) {
+  const oldIndex = previousGroups.findIndex((group) => group.id === activeId);
+  const newIndex = previousGroups.findIndex((group) => group.id === overId);
+
+  if (oldIndex === -1 || newIndex === -1) {
+    return null;
+  }
+
+  return arrayMove(previousGroups, oldIndex, newIndex).map((group, order) => ({
+    ...group,
+    order,
+  }));
+}
+
+/**
  * Visibility toggles stay optimistic because the action is binary and easy to undo, which keeps
  * workspace editing responsive without hiding persistence failures.
  */
 export function toggleWorkspaceGroupVisibility(
   targetGroup: GroupItem,
-  {
-    data,
-    groupsRef,
-    notifications,
-    refresh,
-    setGroups,
-    startTransition,
-  }: WorkspaceGroupMutationContext,
+  context: WorkspaceGroupMutationContext,
 ) {
-  const previousGroups = groupsRef.current;
+  const previousGroups = context.groupsRef.current;
   const liveTargetGroup = previousGroups.find(
     (group) => group.id === targetGroup.id,
   );
@@ -92,42 +226,29 @@ export function toggleWorkspaceGroupVisibility(
   }
 
   const nextVisibility = !liveTargetGroup.isPublic;
-  const nextGroups = previousGroups.map((group) =>
-    group.id === targetGroup.id
-      ? { ...group, isPublic: nextVisibility }
-      : group,
-  );
-
-  replaceWorkspaceGroups(groupsRef, setGroups, nextGroups);
-  notifications.showWorkspaceSavingNotification();
-
-  startTransition(() => {
-    void postJson("/api/ops/group-visibility", {
-      caseSlug: data.slug,
-      groupSlug: targetGroup.slug,
-      isPublic: nextVisibility,
-    })
-      .then(() => {
-        notifications.pushNotification(
-          nextVisibility
-            ? `Marked ${targetGroup.title} as public. Publish the case to refresh the public bundle.`
-            : `Marked ${targetGroup.title} as internal. Publish the case to remove it from the next public bundle.`,
-          "success",
-        );
-        refresh();
-      })
-      .catch((error) => {
-        replaceWorkspaceGroups(groupsRef, setGroups, previousGroups);
-        notifications.pushNotification(
-          error instanceof Error
-            ? error.message
-            : "Failed to update group visibility.",
-          "error",
-        );
-      })
-      .finally(() => {
-        notifications.dismissWorkspaceSavingNotification();
-      });
+  runOptimisticGroupMutation({
+    fallbackErrorMessage: "Failed to update group visibility.",
+    nextGroups: buildVisibilityGroups(
+      previousGroups,
+      targetGroup.id,
+      nextVisibility,
+    ),
+    onSuccess: () => {
+      context.notifications.pushNotification(
+        nextVisibility
+          ? `Marked ${targetGroup.title} as public. Publish the case to refresh the public bundle.`
+          : `Marked ${targetGroup.title} as internal. Publish the case to remove it from the next public bundle.`,
+        "success",
+      );
+    },
+    previousGroups,
+    request: async () =>
+      postJson("/api/ops/group-visibility", {
+        caseSlug: context.data.slug,
+        groupSlug: targetGroup.slug,
+        isPublic: nextVisibility,
+      }),
+    context,
   });
 }
 
@@ -141,21 +262,18 @@ export function publishWorkspaceCaseBundle({
   refresh,
   startTransition,
 }: WorkspaceMutationContext) {
-  startTransition(() => {
-    void postJson("/api/ops/case-publish", { caseId: data.id })
-      .then(() => {
-        notifications.pushNotification(
-          "Published case bundle to the shared published root.",
-          "success",
-        );
-        refresh();
-      })
-      .catch((error) => {
-        notifications.pushNotification(
-          error instanceof Error ? error.message : "Failed to publish case.",
-          "error",
-        );
-      });
+  runWorkspaceMutation({
+    onError: (error) =>
+      pushWorkspaceError(notifications, error, "Failed to publish case."),
+    onSuccess: () => {
+      notifications.pushNotification(
+        "Published case bundle to the shared published root.",
+        "success",
+      );
+      refresh();
+    },
+    request: async () => postJson("/api/ops/case-publish", { caseId: data.id }),
+    startTransition,
   });
 }
 
@@ -182,33 +300,26 @@ export function deployWorkspacePublicSite({
     "Republishing this case and deploying a fresh public export to Cloudflare Pages...",
     "info",
     {
-      // Reuse a stable key so repeated deploy attempts update one sticky notification instead of
-      // stacking transient duplicates.
       key: "workspace-deploying-public-site",
       sticky: true,
     },
   );
 
-  startTransition(() => {
-    void postJson("/api/ops/public-deploy", { caseId: data.id })
-      .then((result) => {
-        notifications.pushNotification(
-          `Deployed fresh static export to Cloudflare Pages project ${result.projectName}.`,
-          "success",
-        );
-      })
-      .catch((error) => {
-        notifications.pushNotification(
-          error instanceof Error
-            ? error.message
-            : "Failed to deploy public site.",
-          "error",
-        );
-      })
-      .finally(() => {
-        notifications.dismissNotification("workspace-deploying-public-site");
-        setIsDeployingPublicSite(false);
-      });
+  runWorkspaceMutation({
+    onError: (error) =>
+      pushWorkspaceError(notifications, error, "Failed to deploy public site."),
+    onFinally: () => {
+      notifications.dismissNotification("workspace-deploying-public-site");
+      setIsDeployingPublicSite(false);
+    },
+    onSuccess: (result: { projectName: string }) => {
+      notifications.pushNotification(
+        `Deployed fresh static export to Cloudflare Pages project ${result.projectName}.`,
+        "success",
+      );
+    },
+    request: async () => postJson("/api/ops/public-deploy", { caseId: data.id }),
+    startTransition,
   });
 }
 
@@ -219,56 +330,28 @@ export function deployWorkspacePublicSite({
 export function reorderWorkspaceGroups(
   activeId: string,
   overId: string | null,
-  {
-    data,
-    groupsRef,
-    notifications,
-    refresh,
-    setGroups,
-    startTransition,
-  }: WorkspaceGroupMutationContext,
+  context: WorkspaceGroupMutationContext,
 ) {
   if (!overId || activeId === overId) {
     return;
   }
 
-  const previousGroups = groupsRef.current;
-  const oldIndex = previousGroups.findIndex((group) => group.id === activeId);
-  const newIndex = previousGroups.findIndex((group) => group.id === overId);
+  const previousGroups = context.groupsRef.current;
+  const reordered = buildReorderedGroups(previousGroups, activeId, overId);
 
-  if (oldIndex === -1 || newIndex === -1) {
+  if (!reordered) {
     return;
   }
 
-  const reordered = arrayMove(previousGroups, oldIndex, newIndex).map(
-    (group, order) => ({
-      ...group,
-      order,
-    }),
-  );
-
-  replaceWorkspaceGroups(groupsRef, setGroups, reordered);
-  notifications.showWorkspaceSavingNotification();
-
-  startTransition(() => {
-    void postJson("/api/ops/group-reorder", {
-      caseId: data.id,
-      groupIds: reordered.map((group) => group.id),
-    })
-      .then(() => {
-        refresh();
-      })
-      .catch((error) => {
-        replaceWorkspaceGroups(groupsRef, setGroups, previousGroups);
-        notifications.pushNotification(
-          error instanceof Error
-            ? error.message
-            : "Failed to persist group order.",
-          "error",
-        );
-      })
-      .finally(() => {
-        notifications.dismissWorkspaceSavingNotification();
-      });
+  runOptimisticGroupMutation({
+    fallbackErrorMessage: "Failed to reorder groups.",
+    nextGroups: reordered,
+    previousGroups,
+    request: async () =>
+      postJson("/api/ops/group-reorder", {
+        caseId: context.data.id,
+        groupIds: reordered.map((group) => group.id),
+      }),
+    context,
   });
 }

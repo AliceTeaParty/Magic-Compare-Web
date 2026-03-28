@@ -1,22 +1,9 @@
 "use client";
 
-import { Add, FitScreen, Remove, ViewSidebar } from "@mui/icons-material";
-import {
-  Box,
-  FormControl,
-  IconButton,
-  MenuItem,
-  Select,
-  Stack,
-  ToggleButton,
-  ToggleButtonGroup,
-  Tooltip,
-} from "@mui/material";
+import { FitScreen, ViewSidebar } from "@mui/icons-material";
+import { IconButton, Stack, ToggleButton, ToggleButtonGroup, Tooltip } from "@mui/material";
 import type { ViewerMode } from "@magic-compare/content-schema";
-import {
-  VIEWER_MAX_PRESET_SCALE,
-  VIEWER_MIN_PRESET_SCALE,
-} from "@magic-compare/compare-core";
+import { AbInspectControls } from "./ab-inspect-controls";
 
 interface ViewerToolbarProps {
   abPresetScale: number;
@@ -51,8 +38,6 @@ export function ViewerToolbar({
   onToggleSidebar,
   sidebarOpen,
 }: ViewerToolbarProps) {
-  const showAbInspectControls = mode === "a-b";
-
   /**
    * Routes side selection through the parent controller so A/B state stays in sync with keyboard
    * shortcuts and stage tap cycling.
@@ -87,131 +72,13 @@ export function ViewerToolbar({
       flexWrap="wrap"
       useFlexGap
     >
-      <Stack
-        direction="row"
-        spacing={1}
-        alignItems="center"
-        sx={{
-          flexShrink: 0,
-          minHeight: 34,
-        }}
-      >
-        <Box
-          sx={{
-            width: 104,
-            minHeight: 34,
-            visibility: showAbInspectControls ? "visible" : "hidden",
-            pointerEvents: showAbInspectControls ? "auto" : "none",
-          }}
-        >
-          <FormControl
-            size="small"
-            fullWidth
-            disabled={!showAbInspectControls}
-            sx={{
-              "& .MuiOutlinedInput-root": {
-                height: 34,
-                minHeight: 34,
-              },
-              "& .MuiSelect-select": {
-                display: "flex",
-                alignItems: "center",
-                minHeight: "34px !important",
-                py: "0 !important",
-                pl: 1.5,
-                pr: 3.75,
-                fontSize: "0.92rem",
-                fontWeight: 550,
-              },
-            }}
-          >
-            <Select
-              value={abSide}
-              onChange={(event) =>
-                handleAbSideChange(
-                  String(event.target.value) as "before" | "after",
-                )
-              }
-              inputProps={{ "aria-label": "Choose A/B side" }}
-            >
-              <MenuItem value="before">Before</MenuItem>
-              <MenuItem value="after">After</MenuItem>
-            </Select>
-          </FormControl>
-        </Box>
-        <Box
-          sx={{
-            width: 168,
-            minHeight: 34,
-            visibility: showAbInspectControls ? "visible" : "hidden",
-            pointerEvents: showAbInspectControls ? "auto" : "none",
-          }}
-        >
-          <Stack
-            direction="row"
-            spacing={0.65}
-            alignItems="center"
-            sx={{
-              width: "100%",
-            }}
-          >
-            <IconButton
-              size="small"
-              aria-label="Decrease A/B scale"
-              disabled={
-                !showAbInspectControls ||
-                abPresetScale <= VIEWER_MIN_PRESET_SCALE
-              }
-              onClick={() => handleScalePresetChange(abPresetScale - 1)}
-              sx={{
-                width: 34,
-                height: 34,
-                border: "1px solid",
-                borderColor: "divider",
-                borderRadius: 999,
-              }}
-            >
-              <Remove sx={{ fontSize: 16 }} />
-            </IconButton>
-            <Box
-              sx={{
-                flex: 1,
-                height: 34,
-                minHeight: 34,
-                px: 1.1,
-                display: "grid",
-                placeItems: "center",
-                fontSize: "0.9rem",
-                fontWeight: 550,
-                borderRadius: 999,
-                whiteSpace: "nowrap",
-                border: "1px solid",
-                borderColor: "divider",
-              }}
-            >
-              {abPresetScale}x Scale
-            </Box>
-            <IconButton
-              size="small"
-              aria-label="Increase A/B scale"
-              disabled={
-                !showAbInspectControls ||
-                abPresetScale >= VIEWER_MAX_PRESET_SCALE
-              }
-              onClick={() => handleScalePresetChange(abPresetScale + 1)}
-              sx={{
-                width: 34,
-                height: 34,
-                border: "1px solid",
-                borderColor: "divider",
-                borderRadius: 999,
-              }}
-            >
-              <Add sx={{ fontSize: 16 }} />
-            </IconButton>
-          </Stack>
-        </Box>
-      </Stack>
+      <AbInspectControls
+        abPresetScale={abPresetScale}
+        abSide={abSide}
+        onAbSideChange={handleAbSideChange}
+        onScalePresetChange={handleScalePresetChange}
+        showControls={mode === "a-b"}
+      />
 
       <ToggleButtonGroup
         exclusive

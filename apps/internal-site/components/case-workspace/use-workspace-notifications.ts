@@ -1,4 +1,11 @@
-import { useCallback, useRef, useState } from "react";
+import {
+  useCallback,
+  useRef,
+  useState,
+  type Dispatch,
+  type MutableRefObject,
+  type SetStateAction,
+} from "react";
 
 export type WorkspaceNotificationTone =
   | "error"
@@ -13,37 +20,65 @@ export interface WorkspaceNotification {
   sticky?: boolean;
 }
 
-/**
- * Centralizes workspace toast lifecycle so concurrent actions can replace or pin notifications
- * without each component needing its own timer bookkeeping.
- */
-export function useWorkspaceNotifications() {
-  const [notifications, setNotifications] = useState<WorkspaceNotification[]>(
-    [],
-  );
-  const timeoutIdsRef = useRef(new Map<string, number>());
+const MAX_VISIBLE_NOTIFICATIONS = 4;
+const NOTIFICATION_TIMEOUT_MS = 4200;
 
-  /**
-   * Clears both the visible toast and any pending timeout so reused notification keys do not leave
-   * stale timers around that could dismiss a newer message unexpectedly.
-   */
-  const dismissNotification = useCallback((notificationId: string) => {
-    const timeoutId = timeoutIdsRef.current.get(notificationId);
-    if (timeoutId) {
-      window.clearTimeout(timeoutId);
-      timeoutIdsRef.current.delete(notificationId);
-    }
+/**
+ * Stable keys intentionally replace older notifications in place so long-running mutations can
+ * update one visible toast instead of flooding the fixed stack with progress variants.
+ */
+function upsertNotification(
+  current: WorkspaceNotification[],
+  nextNotification: WorkspaceNotification,
+) {
+  return [
+    nextNotification,
+    ...current.filter((notification) => notification.id !== nextNotification.id),
+  ].slice(0, MAX_VISIBLE_NOTIFICATIONS);
+}
+
+/**
+ * Centralizes timer cleanup because reused notification ids would otherwise leave stale dismissal
+ * timeouts behind that can remove a newer toast with the same key.
+ */
+function clearNotificationTimeout(
+  timeoutIds: Map<string, number>,
+  notificationId: string,
+) {
+  const timeoutId = timeoutIds.get(notificationId);
+  if (timeoutId) {
+    window.clearTimeout(timeoutId);
+    timeoutIds.delete(notificationId);
+  }
+}
+
+/**
+ * Timer-backed dismissal stays in one callback so both manual close and auto-close clear the same
+ * timeout registry before mutating visible state.
+ */
+function useDismissNotification(
+  setNotifications: Dispatch<SetStateAction<WorkspaceNotification[]>>,
+  timeoutIdsRef: MutableRefObject<Map<string, number>>,
+) {
+  return useCallback((notificationId: string) => {
+    clearNotificationTimeout(timeoutIdsRef.current, notificationId);
 
     setNotifications((current) =>
       current.filter((notification) => notification.id !== notificationId),
     );
-  }, []);
+  }, [setNotifications, timeoutIdsRef]);
+}
 
-  /**
-   * Reuses stable keys when provided so long-running workspace actions can update one toast instead
-   * of creating a new stack entry on every progress event.
-   */
-  const pushNotification = useCallback(
+/**
+ * Non-sticky notifications share one timeout registry so callers can focus on message intent
+ * instead of reimplementing replacement, capping, and dismissal plumbing.
+ */
+function usePushNotification(
+  dismissNotification: (notificationId: string) => void,
+  setNotifications: Dispatch<SetStateAction<WorkspaceNotification[]>>,
+  timeoutIdsRef: MutableRefObject<Map<string, number>>,
+) {
+  return useCallback(
     (
       message: string,
       tone: WorkspaceNotificationTone,
@@ -52,37 +87,65 @@ export function useWorkspaceNotifications() {
       const notificationId =
         options?.key ?? `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 
-      setNotifications((current) => {
-        const next = [
-          {
-            id: notificationId,
-            message,
-            tone,
-            sticky: options?.sticky,
-          },
-          ...current.filter(
-            (notification) => notification.id !== notificationId,
-          ),
-        ];
+      clearNotificationTimeout(timeoutIdsRef.current, notificationId);
 
-        // Cap the stack to four items so fixed-position toasts do not cover the entire workspace on
-        // smaller screens.
-        return next.slice(0, 4);
-      });
+      setNotifications((current) =>
+        upsertNotification(current, {
+          id: notificationId,
+          message,
+          tone,
+          sticky: options?.sticky,
+        }),
+      );
 
       if (options?.sticky) {
         return;
       }
 
-      // A little over four seconds keeps non-sticky toasts readable without forcing manual dismisses.
+      // Slightly over four seconds keeps non-sticky toasts readable without forcing manual dismisses.
       const timeoutId = window.setTimeout(() => {
         dismissNotification(notificationId);
-      }, 4200);
+      }, NOTIFICATION_TIMEOUT_MS);
 
       timeoutIdsRef.current.set(notificationId, timeoutId);
     },
-    [dismissNotification],
+    [dismissNotification, setNotifications, timeoutIdsRef],
   );
+}
+
+/**
+ * The queue hook only wires shared notification state together; timer behavior and stack updates
+ * live in smaller helpers so the exported workspace hook stays readable.
+ */
+function useNotificationQueue() {
+  const [notifications, setNotifications] = useState<WorkspaceNotification[]>(
+    [],
+  );
+  const timeoutIdsRef = useRef(new Map<string, number>());
+  const dismissNotification = useDismissNotification(
+    setNotifications,
+    timeoutIdsRef,
+  );
+  const pushNotification = usePushNotification(
+    dismissNotification,
+    setNotifications,
+    timeoutIdsRef,
+  );
+
+  return {
+    notifications,
+    dismissNotification,
+    pushNotification,
+  };
+}
+
+/**
+ * Centralizes workspace toast lifecycle so concurrent actions can replace or pin notifications
+ * without each component needing its own timer bookkeeping.
+ */
+export function useWorkspaceNotifications() {
+  const { notifications, dismissNotification, pushNotification } =
+    useNotificationQueue();
 
   /**
    * Uses a dedicated sticky notification so multiple save operations can share one visible
