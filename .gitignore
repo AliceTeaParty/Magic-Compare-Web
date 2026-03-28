@@ -54,6 +54,10 @@ venv/
 # MCP Vector Search index directory
 .mcp-vector-search/
 
+# Local MCP and Claude Code configuration (machine-specific paths)
+.mcp.json
+.claude/
+
 # Project References
 tmp/
 
