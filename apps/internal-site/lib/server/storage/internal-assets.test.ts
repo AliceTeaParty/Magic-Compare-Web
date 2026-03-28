@@ -9,6 +9,7 @@ import {
   getInternalAssetStorageConfig,
 } from "@/lib/server/runtime-config";
 import {
+  createPresignedInternalAssetUpload,
   internalAssetObjectKey,
   internalAssetPublicGroupBaseUrl,
   resolvePublicInternalAssetUrl,
@@ -87,5 +88,24 @@ describe("internal asset storage helpers", () => {
       secretAccessKey: "rustfsadmin",
       objectPrefix: "internal-assets",
     });
+  });
+
+  it("does not presign optional sdk checksum parameters for direct uploads", async () => {
+    process.env[S3_BUCKET_ENV_NAME] = "magic-compare-assets";
+    process.env[S3_ENDPOINT_ENV_NAME] =
+      "https://magic-compare-assets.example.r2.cloudflarestorage.com";
+    process.env[S3_PUBLIC_BASE_URL_ENV_NAME] = "https://assets.example.com/bucket";
+    process.env[S3_ACCESS_KEY_ID_ENV_NAME] = "example-access-key";
+    process.env[S3_SECRET_ACCESS_KEY_ENV_NAME] = "example-secret-key";
+    process.env[S3_INTERNAL_PREFIX_ENV_NAME] = "internal-assets";
+
+    const signed = await createPresignedInternalAssetUpload({
+      logicalPath: "/groups/abc123/1/revision/o1.png",
+      contentType: "image/png",
+    });
+
+    const url = new URL(signed.uploadUrl);
+    expect(url.searchParams.get("x-amz-checksum-crc32")).toBeNull();
+    expect(url.searchParams.get("x-amz-sdk-checksum-algorithm")).toBeNull();
   });
 });

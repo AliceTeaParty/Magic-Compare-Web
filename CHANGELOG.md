@@ -9,6 +9,7 @@ Entries before that date are summarized at release level instead of being recons
 ### Fixed
 
 - CI compose smoke and GHCR Docker smoke now explicitly set `MAGIC_COMPARE_HIDE_DEMO=false` whenever they expect demo seed to run against the CI RustFS sidecar, matching the new “demo only seeds when demo is visible and external storage is configured” runtime rule.
+- Internal-site presigned PUT URLs now disable optional SDK request checksums for direct uploads, preventing R2 from rejecting real frame uploads with `403 Forbidden` because the URL had signed an empty-body CRC32.
 
 ## v1.6.1 - 2026-03-28
 

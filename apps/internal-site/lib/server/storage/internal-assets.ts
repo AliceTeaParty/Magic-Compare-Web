@@ -86,6 +86,10 @@ function buildS3Client(): S3Client {
     region: config.region,
     endpoint: config.endpoint,
     forcePathStyle: config.forcePathStyle,
+    // Direct-upload presigned URLs do not know the eventual request body up front. If the SDK
+    // auto-adds flexible checksums here, it signs the empty-body CRC32 into the URL and R2 rejects
+    // every real upload with 403.
+    requestChecksumCalculation: "WHEN_REQUIRED",
     credentials: {
       accessKeyId: config.accessKeyId,
       secretAccessKey: config.secretAccessKey,
