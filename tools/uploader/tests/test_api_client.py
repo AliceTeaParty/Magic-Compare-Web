@@ -153,3 +153,50 @@ class ApiClientTests(unittest.TestCase):
         self.assertEqual(len(result.groups), 1)
         self.assertEqual(result.groups[0].frame_count, 12)
         post.assert_called_once()
+
+    @mock.patch("src.api_client.build_request_headers")
+    @mock.patch("src.api_client.httpx.post")
+    def test_reports_target_url_for_connection_refused(
+        self,
+        post: mock.Mock,
+        build_headers: mock.Mock,
+    ) -> None:
+        request = httpx.Request(
+            "POST", "http://localhost:3000/api/ops/group-upload-start"
+        )
+        post.side_effect = httpx.ConnectError(
+            "[WinError 10061] actively refused", request=request
+        )
+        local_config = UploaderConfig(
+            site_url="http://localhost:3000",
+            api_url="http://localhost:3000/api/ops/group-upload-start",
+            env_path=None,
+            work_dir=None,
+        )
+        build_headers.return_value = {}
+
+        with self.assertRaisesRegex(RuntimeError, "localhost:3000") as context:
+            start_group_upload(
+                local_config,
+                {
+                    "case": {
+                        "slug": "2026",
+                        "title": "2026",
+                        "summary": "",
+                        "tags": [],
+                        "coverAssetLabel": "After",
+                    },
+                    "group": {
+                        "slug": "test-group",
+                        "title": "Test Group",
+                        "description": "",
+                        "order": 0,
+                        "defaultMode": "before-after",
+                        "tags": [],
+                    },
+                    "frames": [],
+                },
+            )
+
+        self.assertIn("group-upload-start", str(context.exception))
+        self.assertIn("localhost", str(context.exception))

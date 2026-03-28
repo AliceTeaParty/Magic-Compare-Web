@@ -121,10 +121,44 @@ def _request_error(error: httpx.HTTPStatusError) -> RuntimeError:
     return RuntimeError(message or f"请求失败：HTTP {status_code}")
 
 
+def _connect_error(
+    config: UploaderConfig,
+    url: str,
+    error: httpx.ConnectError,
+) -> RuntimeError:
+    """Turn low-level socket failures into operator-facing diagnostics that mention the actual target endpoint."""
+    env_hint = (
+        f"当前读取的 uploader .env：{config.env_path}"
+        if config.env_path
+        else "当前没有读取到 uploader .env，可能正在使用命令行参数或默认地址。"
+    )
+    localhost_hint = (
+        "检测到当前目标仍是 localhost；如果 internal-site 不在这台 Windows 机器上，"
+        "请把 MAGIC_COMPARE_SITE_URL 改成真实可访问地址。"
+        if "localhost" in config.site_url or "127.0.0.1" in config.site_url
+        else "请确认目标 internal-site 已启动、端口已监听，并且这台机器能访问该地址。"
+    )
+    return RuntimeError(
+        "\n".join(
+            [
+                f"无法连接到 internal-site：{url}",
+                f"site_url：{config.site_url}",
+                f"api_url：{config.api_url}",
+                env_hint,
+                localhost_hint,
+                f"底层错误：{error}",
+            ]
+        )
+    )
+
+
 def _post_json(config: UploaderConfig, url: str, payload: dict) -> dict:
     """Keep uploader HTTP calls deterministic by doing a single authenticated request per operation."""
     headers = build_request_headers(config)
-    response = httpx.post(url, json=payload, timeout=30.0, headers=headers)
+    try:
+        response = httpx.post(url, json=payload, timeout=30.0, headers=headers)
+    except httpx.ConnectError as error:
+        raise _connect_error(config, url, error) from error
 
     try:
         response.raise_for_status()

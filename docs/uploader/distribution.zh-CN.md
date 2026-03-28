@@ -11,6 +11,13 @@
 - `--onedir`：目录稍大一些，但本地启动更快，适合开发和自测
 - `--onedir --archive zip`：先打成一个 zip 分发，使用者手动解压一次，后续启动仍然走快启动目录版
 
+Windows 产物会额外生成同名 `.cmd` 启动器：
+
+- `magic-compare-uploader-windows-amd64.exe`
+- `magic-compare-uploader-windows-amd64.cmd`
+
+推荐把 `.cmd` 当成最终给组员双击启动的入口。这样上传失败时窗口不会立即关闭，能直接看到连接拒绝、地址配置错误等提示。
+
 注意：
 
 - `--onefile` 没有“首次解包后永久缓存”的官方开关
@@ -83,7 +90,8 @@ tools/uploader/dist/magic-compare-uploader-macos-arm64.zip
 使用方式：
 
 1. 解压 zip
-2. 运行解压目录里的可执行文件
+2. Windows 上优先运行解压目录里的 `.cmd`
+3. 其他平台运行解压目录里的可执行文件
 
 这样解压成本只发生一次，不会像 `onefile` 那样每次冷启动都重复解包。
 

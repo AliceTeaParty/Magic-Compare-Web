@@ -45,6 +45,9 @@ plan -> group-upload-start -> per-frame prepare/upload/commit -> group-upload-co
 magic-compare-uploader
 ```
 
+如果你拿到的是 Windows 打包版压缩包，优先双击同目录里的 `.cmd` 启动器，不要直接双击 `.exe`。  
+这样在 internal-site 地址填错、站点没开、网络不通时，错误提示会留在窗口里，不会一闪而过。
+
 向导会依次做这些事：
 
 - 选择素材目录

@@ -116,6 +116,31 @@ def _archive_onedir_executable(executable_path: Path) -> Path:
     return Path(archive_path)
 
 
+def _write_windows_cmd_wrapper(executable_path: Path) -> Path:
+    """Create a sibling .cmd launcher so double-click users can see failures instead of losing the console immediately."""
+    wrapper_path = executable_path.with_suffix(".cmd")
+    wrapper_path.write_text(
+        "\r\n".join(
+            [
+                "@echo off",
+                "setlocal",
+                "chcp 65001 >nul",
+                f'call "%~dp0{executable_path.name}" %*',
+                "set EXIT_CODE=%ERRORLEVEL%",
+                'if not "%EXIT_CODE%"=="0" (',
+                "  echo.",
+                "  echo 上传器已退出，按任意键关闭窗口。",
+                "  pause >nul",
+                ")",
+                "exit /b %EXIT_CODE%",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    return wrapper_path
+
+
 def main() -> int:
     """Build a native uploader artifact and print the executable path for downstream scripts."""
     parser = argparse.ArgumentParser(
@@ -150,6 +175,8 @@ def main() -> int:
         target_arch=target_arch,
         layout=args.layout,
     )
+    if target_platform == "windows":
+        _write_windows_cmd_wrapper(artifact_path)
     if args.archive != "none":
         if args.layout != "onedir":
             raise RuntimeError("--archive 仅支持与 --layout onedir 一起使用。")
