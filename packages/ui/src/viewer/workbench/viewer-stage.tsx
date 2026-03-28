@@ -550,12 +550,12 @@ function StagePresentationShell({
   children,
   fittedSize,
   inspectActive,
-  rotateStage,
+  stageAspectRatio,
 }: {
   children: ReactNode;
   fittedSize: StageSize | null;
   inspectActive?: boolean;
-  rotateStage: boolean;
+  stageAspectRatio: number;
 }) {
   const fitActive = Boolean(fittedSize);
 
@@ -568,12 +568,8 @@ function StagePresentationShell({
         width: "100%",
         maxWidth: fittedSize ? `${fittedSize.width}px` : "100%",
         minWidth: 0,
-        aspectRatio: rotateStage ? "9 / 16" : "16 / 9",
-        minHeight: fitActive
-          ? 0
-          : rotateStage
-            ? { xs: 80, md: 520 }
-            : { xs: 80, md: 340 },
+        aspectRatio: stageAspectRatio,
+        minHeight: fitActive ? 0 : { xs: 80 },
         maxHeight: fittedSize ? `${fittedSize.height}px` : "100%",
         marginInline: "auto",
         borderRadius: 2.5,
@@ -760,6 +756,7 @@ interface ViewerStageProps {
   setAbStageActive: (nextActive: boolean) => void;
   setPanZoomState: (nextState: ViewerPanZoomState) => void;
   setSwipePosition: (value: number) => void;
+  stageAspectRatio: number;
   stageRef: RefObject<HTMLDivElement | null>;
   swipePosition: number;
 }
@@ -784,6 +781,7 @@ export function ViewerStage({
   setAbStageActive,
   setPanZoomState,
   setSwipePosition,
+  stageAspectRatio,
   stageRef,
   swipePosition,
 }: ViewerStageProps) {
@@ -800,7 +798,7 @@ export function ViewerStage({
     >
       <StagePresentationShell
         fittedSize={fittedStageSize}
-        rotateStage={rotateStage}
+        stageAspectRatio={stageAspectRatio}
         inspectActive={mode === "a-b" && abStageActive}
       >
         <ViewerStageContent

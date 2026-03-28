@@ -111,7 +111,15 @@ export function GroupViewerWorkbench({
   const abSideRef = useRef(abSide);
   const abStageActiveRef = useRef(abStageActive);
   const modeRef = useRef(mode);
-  const stageAspectRatio = resolvedRotateStage ? 9 / 16 : 16 / 9;
+  // Derive stage aspect ratio from the actual content dimensions so the stage frame matches the
+  // image without pillarboxing or letterboxing.  Falls back to 16:9 while assets are loading.
+  const referenceAsset = afterAsset ?? beforeAsset;
+  const contentAspectRatio = referenceAsset
+    ? referenceAsset.width / referenceAsset.height
+    : 16 / 9;
+  const stageAspectRatio = resolvedRotateStage
+    ? 1 / contentAspectRatio
+    : contentAspectRatio;
   const fittedStageSize = useMemo(
     () =>
       fitViewViewportSignature
@@ -418,7 +426,7 @@ export function GroupViewerWorkbench({
                 width: "100%",
                 minWidth: 0,
                 height: "100%",
-                minHeight: { xs: 0, md: resolvedRotateStage ? 560 : 460 },
+                minHeight: 0,
               }}
             >
               {mode === "heatmap" && !heatmapAsset ? <HeatmapNotice /> : null}
@@ -449,6 +457,7 @@ export function GroupViewerWorkbench({
                   setAbStageActive={setAbStageActive}
                   setPanZoomState={setAbPanZoomState}
                   setSwipePosition={setSwipePosition}
+                  stageAspectRatio={stageAspectRatio}
                   stageRef={stageRef}
                   swipePosition={swipePosition}
                 />
