@@ -55,7 +55,6 @@ venv/
 .mcp-vector-search/
 
 # Project References
-AGENTS.md
 tmp/
 
 # Generated workspace artifacts

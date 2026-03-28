@@ -4,27 +4,6 @@
 
 它不是产品需求文档，而是一份“如何不把现有链路做坏”的工程说明。
 
-## 这份文档基于哪些资料
-
-本轮整理前已阅读：
-
-- `docs/project-overview-guide.md`
-- `docs/demo-vs-real-case-flow.zh-CN.md`
-- `docs/ui-improvements/2026-03-20-viewer-stage-and-filmstrip-notes.zh-CN.md`
-- `docs/ui-improvements/2026-03-20-frontend-refresh.zh-CN.md`
-- `README.zh-CN.md`
-
-另外还核对了当前仓库中的运行入口与部署文件：
-
-- `.env.example`
-- `package.json`
-- `apps/internal-site/package.json`
-- `docker-compose.yml`
-- `docker/internal-site.Dockerfile`
-- `scripts/export-public.ts`
-- `scripts/deploy-public.ts`
-- `scripts/sync-published.mjs`
-- `apps/internal-site/lib/server/public-site/runtime.ts`
 
 ## 先看结论
 
@@ -166,7 +145,7 @@ pnpm db:seed
 
 更详细的区别参见：
 
-- `docs/demo-vs-real-case-flow.zh-CN.md`
+- `docs/reference/demo-vs-real.zh-CN.md`
 
 ## 本地开发的最小闭环
 
@@ -242,9 +221,6 @@ pnpm --filter @magic-compare/internal-site start
 
 所以这些内容不会因为容器重启而丢失：
 
-- SQLite
-- published bundle
-- public export 目录
 - SQLite
 - published bundle
 - public export 目录
@@ -429,8 +405,8 @@ Docker 用：
 
 更详细说明见：
 
-- `docs/ui-improvements/2026-03-20-viewer-stage-and-filmstrip-notes.zh-CN.md`
-- `docs/ui-improvements/2026-03-20-frontend-refresh.zh-CN.md`
+- `docs/archive/2026-03-20-viewer-stage-and-filmstrip-notes.zh-CN.md`
+- `docs/archive/2026-03-20-frontend-refresh.zh-CN.md`
 
 ## 给 CI / Docker 发布线程的建议
 
@@ -438,8 +414,8 @@ Docker 用：
 
 补充复盘文档：
 
-- `docs/ci-ghcr-lessons.zh-CN.md`
-- `docs/browser-smoke-and-ci-prep.zh-CN.md`
+- `docs/archive/ci-ghcr-lessons.zh-CN.md`
+- `docs/archive/browser-smoke-and-ci-prep.zh-CN.md`
 
 ### CI 验证优先级
 
@@ -516,9 +492,8 @@ docker build -f docker/internal-site.Dockerfile -t magic-compare/internal-site .
 
 先看：
 
-- `docs/project-overview-guide.md`
-- `docs/ui-improvements/2026-03-20-viewer-stage-and-filmstrip-notes.zh-CN.md`
-- `docs/ui-improvements/2026-03-20-frontend-refresh.zh-CN.md`
+- `AGENTS.md`（架构分工、viewer 布局约束）
+- `docs/workflow-guide.md`（本文档，"已经踩过的坑"节）
 
 ### 做 uploader 或导入链路
 
@@ -526,7 +501,7 @@ docker build -f docker/internal-site.Dockerfile -t magic-compare/internal-site .
 
 - `docs/uploader/README.md`
 - `docs/uploader/vseditor-workflow.zh-CN.md`
-- `docs/demo-vs-real-case-flow.zh-CN.md`
+- `docs/reference/demo-vs-real.zh-CN.md`
 - `docs/uploader/boundaries-and-env-split.zh-CN.md`
 - `docs/uploader/distribution.zh-CN.md`
 
@@ -541,7 +516,7 @@ docker build -f docker/internal-site.Dockerfile -t magic-compare/internal-site .
 - `docker/ci.compose.override.yml`
 - `docker/internal-site.Dockerfile`
 - `apps/internal-site/lib/server/public-site/runtime.ts`
-- `docs/ci-ghcr-lessons.zh-CN.md`
+- `docs/archive/ci-ghcr-lessons.zh-CN.md`
 
 ## 一句话版本
 
