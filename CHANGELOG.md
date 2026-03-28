@@ -4,13 +4,16 @@ This project started keeping a structured changelog on 2026-03-21.
 
 Entries before that date are summarized at release level instead of being reconstructed commit by commit.
 
-## Unreleased
+## v1.6.0 - 2026-03-28
+
+R2-first upload and maintainability release focused on moving internal assets to external S3-compatible storage, making frame uploads resumable and inspectable, and tightening viewer/mobile behavior before the next tag.
 
 ### Added
 
-- Internal-site now exposes frame-level upload orchestration endpoints: `group-upload-start`, `group-upload-frame-prepare`, `group-upload-frame-commit`, `group-upload-complete`, and `case-delete`.
-- Uploader now persists group upload job state locally while resuming from the last fully committed frame instead of replaying the entire group.
-- Added a temporary engineering note under `docs/` to capture the main lessons from the R2/presigned upload rewrite.
+- Internal-site now exposes frame-level upload orchestration endpoints: `group-upload-start`, `group-upload-frame-prepare`, `group-upload-frame-commit`, `group-upload-complete`, plus `case-delete`, `case-list`, and `case-groups`.
+- Uploader now persists group upload job state locally, resumes from the last fully committed frame, and exposes `list-cases` / `list-groups` commands for operator discovery.
+- Wizard upload flow now shows file-level progress, current frame/stage, and skipped/retried/failed counters instead of only a coarse original-image counter.
+- Added dedicated engineering notes and a full internal API endpoint reference under `docs/` for the new upload workflow and maintainability cleanup.
 
 ### Changed
 
@@ -18,11 +21,16 @@ Entries before that date are summarized at release level instead of being recons
 - Uploader import flow now uses presigned PUT URLs signed by internal-site and no longer calls `import-sync` or any binary upload proxy endpoint.
 - `case.yaml` no longer carries `status`, `group.yaml` no longer carries `isPublic`, and reused cases are treated as read-only metadata snapshots.
 - Internal asset keys for new uploads now live under opaque `/groups/<group>/<frame>/<revision>/...` prefixes instead of semantic `/internal-assets/<case>/<group>/...` paths.
+- Viewer/workspace hotspots were split into smaller helper modules, and uploader orchestration was decomposed into clearer runtime, progress, and wizard layers to reduce future maintenance risk.
+- Uploader package metadata is now versioned as `1.6.0` to match the release tag line.
 
 ### Fixed
 
-- Group deletion now deletes the stored bucket prefix rather than guessing storage paths from slugs.
-- Demo seed and publish helpers now write data that matches the new group/frame storage model.
+- Group deletion now deletes the stored bucket prefix rather than guessing storage paths from slugs, and demo seed/publish helpers now emit data that matches the new group/frame storage model.
+- Group restarts and public visibility downgrades now recompute case-level derived state instead of leaving `coverAssetId` empty or stale after destructive upload resets.
+- Lookahead frame prepare failures now persist into uploader session state and summary output instead of aborting with an unstructured top-level exception.
+- Wizard progress now renders frame titles as plain text, preventing bracketed names like `[v2] sample` from being swallowed by Rich markup parsing.
+- Group Viewer mobile layout now reserves A/B toolbar space up front, fixes stage sizing/layout regressions, and avoids title descenders being clipped by header overflow rules.
 
 ## v1.5.2 - 2026-03-22
 
