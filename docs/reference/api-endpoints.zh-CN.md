@@ -458,6 +458,7 @@
 - 同一 group 在输入哈希未变化、且存在活动 job 时会直接恢复现有 job。
 - 只要检测到输入变化、存在活动 job，或显式传入 `forceRestart=true`，服务端就会清空整个 group 当前数据并重建上传 job。
 - 如果目标 group 之前是公开状态，启动上传时会立刻降回 `isPublic=false`，并删除对应已发布 bundle，避免公开站点看到半替换内容。
+- 当前实现里，route 只负责 schema 校验和错误包装；具体 resume / reset / visibility downgrade 在 `lib/server/uploads/upload-service.ts` 与 `upload-service-helpers.ts` 内部分层完成。
 
 ### `POST /api/ops/group-upload-frame-prepare`
 
@@ -506,6 +507,7 @@
 - `pendingPrefix` 的中间层目录使用 `frameOrder + 1`，因此 `frameOrder=12` 时路径里会出现 `/13/`。
 - 如果这个 frame 在当前 job 下已经存在旧的 pending revision，服务端会先删掉旧 pending 前缀，再签发新 URL。
 - 如果该 frame 已经是 `committed`，这个接口会返回 `400`，避免重复 prepare。
+- presign 组装和对象路径命名都在服务端完成，uploader 不会自行决定最终 bucket key。
 
 ### `POST /api/ops/group-upload-frame-commit`
 
@@ -536,6 +538,7 @@
 - commit 是 frame 级原子切换：会先删掉该 `order` 下旧 frame 记录，再创建新 frame 和新 asset 行。
 - 新写入的 frame 当前会带 `isPublic=true`，但 group 的公开与否仍由 group 自身 `isPublic` 决定。
 - commit 成功后，旧 committed revision 的桶前缀会被删除。
+- 当前实现已经把“作业装载 / frame guard / 事务替换 / 旧前缀清理”拆成 helper，后续不要再把这些步骤重新揉回 route 层。
 
 ### `POST /api/ops/group-upload-complete`
 
@@ -636,6 +639,7 @@
 - 路由入口：`apps/internal-site/app/api/ops/*`
 - 上传契约：`apps/internal-site/lib/server/uploads/contracts.ts`
 - 上传事务实现：`apps/internal-site/lib/server/uploads/upload-service.ts`
+- 上传事务 helper：`apps/internal-site/lib/server/uploads/upload-service-helpers.ts`
 - case / group 变更实现：`apps/internal-site/lib/server/content/mutation-service.ts`
 - case 搜索实现：`apps/internal-site/lib/server/content/query-service.ts`
 - 发布实现：`apps/internal-site/lib/server/publish/publish-case-service.ts`

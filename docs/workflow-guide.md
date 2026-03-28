@@ -57,7 +57,7 @@
 - bucket 由 `MAGIC_COMPARE_S3_BUCKET` 指定
 - endpoint 由 `MAGIC_COMPARE_S3_ENDPOINT` 指定
 - 浏览器访问图片时使用 `MAGIC_COMPARE_S3_PUBLIC_BASE_URL`
-- key 前缀默认是 `internal-assets`
+- 逻辑路径当前统一落在 `/groups/<group-storage-uuid>/<frame-order>/<frame-revision-uuid>/...`
 
 重要约束：
 
@@ -270,10 +270,32 @@ Docker 用：
 - uploader 现在不再把图先落到 internal-site 本地目录，也不再调用服务器二进制上传代理
 - 远端内部站只支持 Cloudflare Service Token，不再走 `cloudflared` 人工登录链路
 - 新上传对象统一放在 `/groups/<group-storage-uuid>/<frame-order>/<frame-revision-uuid>/...`
+- 已存在的 case metadata 仍以数据库为准；uploader 不会覆盖已有 case 的 title / summary / tags
 - group 默认内部草稿；公开开关不再来自 `case.yaml` / `group.yaml`
 - 浏览器实际访问图片时，会由 internal/public 站点将逻辑路径解析成 `MAGIC_COMPARE_S3_PUBLIC_BASE_URL` 下的公网绝对 URL
 - public-export/public-deploy 不再打包图片，Pages 只发布静态页面和 manifest
 - uploader 的 upload session 固定放在工作目录 `.magic-compare/upload-session.json`
+
+### 上传链路当前的内部分层
+
+避免把 frame 级事务重新堆回一个文件，当前职责划分应保持如下：
+
+- `app/api/ops/group-upload-*`：只做 route 入口和错误转义，不写事务编排
+- `lib/server/uploads/upload-service.ts`：只保留 start / prepare / commit / complete 主流程
+- `lib/server/uploads/upload-service-helpers.ts`：承接作业装载、group 重置、presign 组装、frame 状态 guard、complete 收尾
+- `lib/server/storage/internal-assets.ts`：只负责 S3-compatible 读写、presign、按前缀删除，不负责业务状态切换
+- `tools/uploader/src/wizard.py`：只负责交互向导和工作目录确认
+- `tools/uploader/src/upload_executor.py`：只负责 start -> per-frame prepare/upload/commit -> complete 的执行状态机
+
+新增上传逻辑时，优先把“副作用顺序”塞进 helper，而不是继续往 route 或单个主流程函数里追加分支。
+
+### 近期维护约束
+
+最近几轮重构之后，下面这些边界不要再回退：
+
+- 不要恢复 internal-site 二进制上传代理；上传工具只能拿 presigned URL 后直传对象存储
+- 不要在 `upload-service.ts` 里混入大段 Prisma 明细和对象存储清理细节；新增分支优先落到 helper
+- 不要把 uploader 的 session 读写、frame 状态推进和 Rich 输出重新揉进一个超长函数
 
 ## 发布、导出、部署三件事要分清
 

@@ -6,14 +6,20 @@ from pathlib import Path
 
 import typer
 from rich.panel import Panel
-from rich.progress import BarColumn, MofNCompleteColumn, Progress, TextColumn, TimeElapsedColumn
+from rich.progress import (
+    BarColumn,
+    MofNCompleteColumn,
+    Progress,
+    TextColumn,
+    TimeElapsedColumn,
+)
 from rich.table import Table
 from rich.text import Text
 
 from .api_client import CaseSearchResult, search_cases
 from .commands import (
-    _render_execution_summary,
     _prepare_runtime_config,
+    _render_execution_summary,
     _resolve_source_dir,
     _write_runtime_report,
     console,
@@ -22,10 +28,10 @@ from .commands import (
 from .config import UploaderConfig, ensure_remote_access_config
 from .editor import open_in_editor
 from .naming import build_default_work_dir, build_unique_slug
-from .plan import build_case_plan, build_flat_source_plan, write_plan_report
+from .plan import PreparedCasePlan, build_case_plan, build_flat_source_plan, write_plan_report
 from .source_parser import ParsedSourceGroup, discover_source_group
-from .upload_executor import execute_upload_plan
-from .workspace_builder import prepare_workspace
+from .upload_executor import UploadExecutionSummary, execute_upload_plan
+from .workspace_builder import PreparedWorkspace, prepare_workspace
 
 
 def _render_source_summary(group: ParsedSourceGroup) -> None:
@@ -99,7 +105,6 @@ def _choose_case(config: UploaderConfig, current_year: str) -> CaseSearchResult 
             f"[bold]输入编号复用已有 case，回车使用 {current_year} case，输入 c 创建新 case，输入 / 重新搜索：[/]"
         ).strip()
 
-        # Create new case explicitly
         if choice == "c":
             console.print("[yellow]将创建新 case，稍后可编辑 case.yaml[/]")
             return None
@@ -185,14 +190,8 @@ def _confirm_editor(path: Path, label: str) -> None:
         raise typer.Abort()
 
 
-def run_wizard(
-    *,
-    site_url: str | None,
-    api_url: str | None,
-    report_json: Path | None = None,
-) -> None:
-    """Run the interactive uploader flow with an upfront plan step before any remote upload starts."""
-    current_year = str(datetime.now().year)
+def _show_wizard_intro() -> None:
+    """Render the fixed entry panel once so the rest of the wizard can focus on operator decisions."""
     console.print(
         Panel(
             Text.from_markup(
@@ -203,6 +202,9 @@ def run_wizard(
         )
     )
 
+
+def _discover_source_group() -> ParsedSourceGroup:
+    """Resolve and parse the source directory before any remote lookup so the wizard can show a concrete local summary first."""
     source_input = typer.prompt("素材目录", default=str(Path.cwd()))
     source_dir = _resolve_source_dir(source_input)
 
@@ -210,11 +212,17 @@ def run_wizard(
         source_group = discover_source_group(source_dir)
 
     _render_source_summary(source_group)
-    work_dir = _resolve_work_dir(build_default_work_dir(source_dir))
-    config = _prepare_runtime_config(work_dir, site_url=site_url, api_url=api_url)
+    return source_group
 
-    selected_case = _choose_case(config, current_year)
-    group_slug = _resolve_group_slug(source_group.slug, selected_case)
+
+def _plan_flat_import(
+    source_group: ParsedSourceGroup,
+    selected_case: CaseSearchResult | None,
+    current_year: str,
+    group_slug: str,
+    report_json: Path | None,
+) -> None:
+    """Run the flat-source preview before writing a workspace so operators can stop on naming or parse issues."""
     preview_report = build_flat_source_plan(
         source_group,
         case_slug=selected_case.slug if selected_case else current_year,
@@ -226,8 +234,17 @@ def run_wizard(
     if preview_report.status == "error":
         raise RuntimeError("预演计划存在阻塞错误，请先修正后再继续。")
 
+
+def _prepare_structured_workspace(
+    source_group: ParsedSourceGroup,
+    current_year: str,
+    group_slug: str,
+    selected_case: CaseSearchResult | None,
+    work_dir: Path,
+) -> PreparedWorkspace:
+    """Materialize the editable workspace only after the flat preview passed, so the work dir reflects a viable import."""
     with console.status("[bold green]正在生成工作目录与 metadata...[/]"):
-        prepared = prepare_workspace(
+        return prepare_workspace(
             source_group=source_group,
             work_dir=work_dir,
             existing_case=selected_case,
@@ -235,6 +252,12 @@ def run_wizard(
             group_slug=group_slug,
         )
 
+
+def _confirm_workspace_metadata(
+    prepared: PreparedWorkspace,
+    selected_case: CaseSearchResult | None,
+) -> None:
+    """Guide the operator through metadata review while keeping existing-case behavior explicit and non-destructive."""
     if selected_case:
         console.print(
             Panel(
@@ -253,15 +276,25 @@ def run_wizard(
 
     _confirm_editor(prepared.group_yaml, "group.yaml")
 
+
+def _build_structured_plan(
+    prepared: PreparedWorkspace,
+    report_json: Path | None,
+) -> PreparedCasePlan:
+    """Validate the structured workspace before upload so the remote flow never runs on stale or broken metadata."""
     structured_plan = build_case_plan(prepared.work_dir)
     render_plan_summary(structured_plan.report)
     if structured_plan.report.status == "error":
         _write_runtime_report(structured_plan.report, report_json)
         raise RuntimeError("结构化工作目录仍存在阻塞错误，请修正后再上传。")
+    return structured_plan
 
-    if not typer.confirm("开始上传并同步到 internal-site？", default=True):
-        raise typer.Abort()
 
+def _run_upload_with_progress(
+    structured_plan: PreparedCasePlan,
+    config: UploaderConfig,
+) -> UploadExecutionSummary:
+    """Execute uploads behind one progress bar that advances on original assets, matching the operator's mental model of per-frame work."""
     ensure_remote_access_config(config)
     total_originals = sum(
         1 for op in structured_plan.report.operations if op.kind == "upload-original"
@@ -279,9 +312,21 @@ def run_wizard(
         def _on_progress() -> None:
             progress.advance(upload_task)
 
-        execution_summary = execute_upload_plan(
-            structured_plan, config, on_progress=_on_progress
+        return execute_upload_plan(
+            structured_plan,
+            config,
+            on_progress=_on_progress,
         )
+
+
+def _handle_upload_result(
+    prepared: PreparedWorkspace,
+    structured_plan: PreparedCasePlan,
+    execution_summary: UploadExecutionSummary,
+    config: UploaderConfig,
+    report_json: Path | None,
+) -> None:
+    """Persist the final machine-readable report and render the success panel only after the server completion payload exists."""
     _render_execution_summary(execution_summary)
     if not execution_summary.succeeded:
         _write_runtime_report(
@@ -314,4 +359,51 @@ def run_wizard(
             border_style="green",
             title="完成",
         )
+    )
+
+
+def run_wizard(
+    *,
+    site_url: str | None,
+    api_url: str | None,
+    report_json: Path | None = None,
+) -> None:
+    """Run the interactive uploader flow with an upfront plan step before any remote upload starts."""
+    current_year = str(datetime.now().year)
+    _show_wizard_intro()
+
+    source_group = _discover_source_group()
+    work_dir = _resolve_work_dir(build_default_work_dir(source_group.source_root))
+    config = _prepare_runtime_config(work_dir, site_url=site_url, api_url=api_url)
+
+    selected_case = _choose_case(config, current_year)
+    group_slug = _resolve_group_slug(source_group.slug, selected_case)
+    _plan_flat_import(
+        source_group,
+        selected_case,
+        current_year,
+        group_slug,
+        report_json,
+    )
+
+    prepared = _prepare_structured_workspace(
+        source_group,
+        current_year,
+        group_slug,
+        selected_case,
+        work_dir,
+    )
+    _confirm_workspace_metadata(prepared, selected_case)
+
+    structured_plan = _build_structured_plan(prepared, report_json)
+    if not typer.confirm("开始上传并同步到 internal-site？", default=True):
+        raise typer.Abort()
+
+    execution_summary = _run_upload_with_progress(structured_plan, config)
+    _handle_upload_result(
+        prepared,
+        structured_plan,
+        execution_summary,
+        config,
+        report_json,
     )
