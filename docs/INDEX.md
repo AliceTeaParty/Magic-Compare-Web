@@ -48,6 +48,7 @@
 
 - [archive/2026-03-26-r2-frame-upload-rewrite-notes.zh-CN.md](archive/2026-03-26-r2-frame-upload-rewrite-notes.zh-CN.md)
 - [archive/2026-03-28-maintainability-cleanup-notes.zh-CN.md](archive/2026-03-28-maintainability-cleanup-notes.zh-CN.md)
+- [archive/2026-03-28-uploader-progress-and-throughput-notes.zh-CN.md](archive/2026-03-28-uploader-progress-and-throughput-notes.zh-CN.md)
 - [archive/uploader-frontend-roadmap-2026-03-21.zh-CN.md](archive/uploader-frontend-roadmap-2026-03-21.zh-CN.md)
 - [archive/ci-ghcr-lessons.zh-CN.md](archive/ci-ghcr-lessons.zh-CN.md)
 - [archive/browser-smoke-and-ci-prep.zh-CN.md](archive/browser-smoke-and-ci-prep.zh-CN.md)

@@ -275,6 +275,9 @@ Docker 用：
 - 浏览器实际访问图片时，会由 internal/public 站点将逻辑路径解析成 `MAGIC_COMPARE_S3_PUBLIC_BASE_URL` 下的公网绝对 URL
 - public-export/public-deploy 不再打包图片，Pages 只发布静态页面和 manifest
 - uploader 的 upload session 固定放在工作目录 `.magic-compare/upload-session.json`
+- wizard 当前显示的是**文件级**上传进度：总体文件条 + 当前 frame 状态 + skipped/retried/failed 计数
+- 直接 `sync` 命令仍保持轻量输出，不显示同等复杂的实时进度 UI
+- uploader 现在会复用一个共享 HTTP client，并用流式 PUT 上传文件，避免大图整文件读入内存
 
 ### 上传链路当前的内部分层
 

@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import shutil
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
 import typer
+from rich.console import Group
+from rich.live import Live
 from rich.panel import Panel
 from rich.progress import (
     BarColumn,
@@ -30,8 +33,78 @@ from .editor import open_in_editor
 from .naming import build_default_work_dir, build_unique_slug
 from .plan import PreparedCasePlan, build_case_plan, build_flat_source_plan, write_plan_report
 from .source_parser import ParsedSourceGroup, discover_source_group
-from .upload_executor import UploadExecutionSummary, execute_upload_plan
+from .upload_executor import (
+    UploadExecutionSummary,
+    UploadProgressEvent,
+    execute_upload_plan,
+)
 from .workspace_builder import PreparedWorkspace, prepare_workspace
+
+
+@dataclass
+class WizardUploadProgressState:
+    frame_status: str
+    stats_line: str
+
+
+def _event_stage_label(event: UploadProgressEvent) -> str:
+    """Map structured upload events to short Chinese stage labels for the wizard."""
+    if event.kind == "job_started":
+        return "准备上传"
+    if event.kind == "frame_resumed":
+        return "续传跳过"
+    if event.kind == "frame_prepared":
+        return "已申请上传"
+    if event.kind in {"file_uploaded", "file_failed"}:
+        return "上传中"
+    if event.kind == "frame_committed":
+        return "已提交"
+    if event.kind == "job_completed":
+        return "上传完成"
+    return event.stage
+
+
+def _progress_description(event: UploadProgressEvent) -> str:
+    """Keep the progress bar title stage-focused so the secondary lines can describe the active frame."""
+    return f"正在{_event_stage_label(event)}..."
+
+
+def _frame_status_line(event: UploadProgressEvent) -> str:
+    """Show the active frame in one line so operators can tell whether the uploader is preparing, uploading, or committing."""
+    if event.kind == "job_started":
+        return "当前 frame：等待开始"
+    if event.kind == "job_completed":
+        return "当前 frame：全部完成"
+    if event.frame_order is None or event.frame_title is None:
+        return f"当前 frame：{_event_stage_label(event)}"
+
+    return (
+        f"当前 frame：{event.frame_order + 1}/{event.total_frames} "
+        f"{event.frame_title} · {_event_stage_label(event)}"
+    )
+
+
+def _stats_line(event: UploadProgressEvent) -> str:
+    """Keep the most important counters visible without making operators open the JSON session file."""
+    return (
+        f"文件：{event.completed_files}/{event.total_files} | "
+        f"frame：{event.completed_frames}/{event.total_frames} | "
+        f"skipped：{event.skipped_files} | "
+        f"retried：{event.retried_count} | "
+        f"failed：{event.failed_count}"
+    )
+
+
+def _render_upload_progress(
+    progress: Progress,
+    state: WizardUploadProgressState,
+) -> Group:
+    """Render the file bar plus the current frame and stats lines as one Live group."""
+    return Group(
+        progress,
+        Text.from_markup(f"[cyan]{state.frame_status}[/]"),
+        Text.from_markup(f"[magenta]{state.stats_line}[/]"),
+    )
 
 
 def _render_source_summary(group: ParsedSourceGroup) -> None:
@@ -294,28 +367,48 @@ def _run_upload_with_progress(
     structured_plan: PreparedCasePlan,
     config: UploaderConfig,
 ) -> UploadExecutionSummary:
-    """Execute uploads behind one progress bar that advances on original assets, matching the operator's mental model of per-frame work."""
+    """Execute uploads behind a file-level progress display with current-frame and retry/failure counters."""
     ensure_remote_access_config(config)
-    total_originals = sum(
-        1 for op in structured_plan.report.operations if op.kind == "upload-original"
-    )
-    with Progress(
+    total_files = structured_plan.report.summary.upload_file_count
+    progress = Progress(
         TextColumn("[bold green]{task.description}"),
         BarColumn(),
         MofNCompleteColumn(),
         TimeElapsedColumn(),
         console=console,
         transient=False,
-    ) as progress:
-        upload_task = progress.add_task("正在上传图片文件...", total=total_originals)
+    )
+    upload_task = progress.add_task(
+        "准备上传...",
+        total=max(total_files, 1),
+        completed=0,
+    )
+    state = WizardUploadProgressState(
+        frame_status="当前 frame：等待开始",
+        stats_line=f"文件：0/{total_files} | frame：0/0 | skipped：0 | retried：0 | failed：0",
+    )
 
-        def _on_progress() -> None:
-            progress.advance(upload_task)
+    with Live(
+        _render_upload_progress(progress, state),
+        console=console,
+        refresh_per_second=12,
+    ) as live:
+
+        def _on_progress_event(event: UploadProgressEvent) -> None:
+            progress.update(
+                upload_task,
+                description=_progress_description(event),
+                total=max(event.total_files, 1),
+                completed=event.completed_files,
+            )
+            state.frame_status = _frame_status_line(event)
+            state.stats_line = _stats_line(event)
+            live.update(_render_upload_progress(progress, state))
 
         return execute_upload_plan(
             structured_plan,
             config,
-            on_progress=_on_progress,
+            on_progress_event=_on_progress_event,
         )
 
 

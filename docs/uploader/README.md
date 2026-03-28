@@ -11,16 +11,16 @@
 它主要负责三件事：
 
 1. **预演检查**：先扫目录、查命名、查坏图、查会不会撞路径。
-2. **上传素材**：通过 `internal-site` 代理上传原图、缩略图、heatmap。
-3. **同步清单**：把 manifest 提交给 `internal-site`，让站点能看到新内容。
+2. **直传素材**：向 `internal-site` 申请 frame 级 presigned URL，再把原图和缩略图直传到对象存储。
+3. **提交结果**：按 frame 提交，再在整组完成后通知 `internal-site` 切换数据库内容。
 
 现在 uploader 的核心流程固定是：
 
 ```text
-plan -> upload -> sync
+plan -> group-upload-start -> per-frame prepare/upload/commit -> group-upload-complete
 ```
 
-也就是说，**先检查，再上传，最后再同步到站点**。
+也就是说，**先检查，再申请上传，再按 frame 直传并提交**。
 
 ---
 
@@ -33,7 +33,7 @@ plan -> upload -> sync
 原因：
 
 - `plan` 测试有没有坏图、垃圾文件、命名冲突。
-- `sync` 默认支持续传，自动跳过已有对象。
+- `sync` 默认支持续传，从上一个已经完整提交的 frame 继续。
 
 ---
 
@@ -52,7 +52,8 @@ magic-compare-uploader
 - 执行上传计划预演
 - 生成工作目录和项目元数据
 - 打开编辑器确认 `case.yaml` / `group.yaml`
-- 上传素材、同步项目
+- 显示总体文件进度、当前 frame 和重试/失败统计
+- 按 frame 直传并提交到站点
 
 ---
 
@@ -126,7 +127,8 @@ magic-compare-uploader sync /path/to/work-dir --dry-run
 
 - 同一目录执行 `sync`：会尝试续传
 - 网络异常：自动重试
-- 远端对象已存在且指纹一致：自动跳过
+- 已完整提交的 frame：自动跳过
+- 当前未完成的 frame：会重新申请新的 presigned URL 再上传
 
 ### 什么时候用 `--reset-session`
 
@@ -191,7 +193,7 @@ MAGIC_COMPARE_CF_ACCESS_CLIENT_SECRET=*
 
 - 本地开发通常只需要 `MAGIC_COMPARE_SITE_URL=http://localhost:3000`
 - `MAGIC_COMPARE_API_URL` 只有在接口地址需要手动覆盖时才填写
-- uploader 现在统一走 `internal-site` 代理上传，不再要求在 uploader 侧配置 `S3_*`
+- uploader 现在不需要 `S3_*` 凭据；对象上传统一走 `internal-site` 签发的 presigned URL
 
 </details>
 

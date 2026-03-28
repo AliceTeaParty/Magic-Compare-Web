@@ -4,10 +4,11 @@ import json
 import threading
 import time
 from collections.abc import Callable
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from typing import Any
 
 import httpx
 
@@ -20,14 +21,16 @@ from .api_client import (
 from .config import UploaderConfig
 from .manifest import (
     PreparedGroupUpload,
+    PreparedUploadFrame,
     PreparedUploadFile,
     build_group_upload_from_case,
 )
 from .plan import PreparedCasePlan
-from .storage import upload_file_to_presigned_url
+from .storage import create_upload_http_client, upload_file_to_presigned_url
 
 MAX_UPLOAD_ATTEMPTS = 3
-_DEFAULT_MAX_WORKERS = 4
+_DEFAULT_MAX_WORKERS = 6
+_LOOKAHEAD_MAX_AGE_SECONDS = 60 * 8
 
 
 @dataclass(frozen=True)
@@ -53,6 +56,21 @@ class UploadExecutionSummary:
         return self.failed_count == 0 and self.completion_result is not None
 
 
+@dataclass(frozen=True)
+class UploadProgressEvent:
+    kind: str
+    stage: str
+    frame_order: int | None
+    frame_title: str | None
+    completed_frames: int
+    total_frames: int
+    completed_files: int
+    total_files: int
+    skipped_files: int
+    retried_count: int
+    failed_count: int
+
+
 @dataclass
 class UploadRuntimeState:
     config: UploaderConfig
@@ -61,9 +79,13 @@ class UploadRuntimeState:
     session_path: Path
     session: dict
     started_at: float
+    upload_client: httpx.Client
+    total_frames: int
+    total_files: int
     uploaded_count: int = 0
     skipped_count: int = 0
     retried_count: int = 0
+    completed_frames: int = 0
     failures: list[UploadFailure] = field(default_factory=list)
     lock: threading.Lock = field(default_factory=threading.Lock)
 
@@ -72,8 +94,24 @@ class UploadRuntimeState:
 class FrameUploadContext:
     runtime: UploadRuntimeState
     frame_order: int
+    frame_title: str
     frame_session: dict
-    on_progress: Callable[[], None] | None = None
+    on_progress_event: Callable[[UploadProgressEvent], None] | None = None
+
+
+@dataclass(frozen=True)
+class PreparedFrameCache:
+    frame_order: int
+    frame_title: str
+    prepared_frame: dict[str, Any]
+    prepared_at: float
+
+
+@dataclass(frozen=True)
+class PendingLookaheadPrepare:
+    frame_order: int
+    frame_title: str
+    future: Future[PreparedFrameCache]
 
 
 def session_file_path(case_root: Path) -> Path:
@@ -142,17 +180,58 @@ def _find_local_file(
     raise ValueError(f"无法在本地上传计划中找到 {frame_order}/{slot}/{variant}。")
 
 
-def _original_asset_count(
+def _frame_file_count(
     prepared_upload: PreparedGroupUpload, frame_order: int
 ) -> int:
-    """Count original assets only, because the CLI progress bar tracks human-visible frame media uploads."""
+    """Count every direct-upload object for one frame because progress is tracked in file units."""
     for frame in prepared_upload.frames:
         if frame.order == frame_order:
-            return len(frame.assets)
+            return len(frame.assets) * 2
     return 0
 
 
+def _total_upload_file_count(prepared_upload: PreparedGroupUpload) -> int:
+    """File-level progress counts originals and thumbnails because both consume upload time and retries."""
+    return sum(len(frame.assets) * 2 for frame in prepared_upload.frames)
+
+
+def _completed_file_count(runtime: UploadRuntimeState) -> int:
+    """Completed file progress includes uploads and resumed/skipped files but excludes failed attempts."""
+    return runtime.uploaded_count + runtime.skipped_count
+
+
+def _emit_progress_event(
+    runtime: UploadRuntimeState,
+    kind: str,
+    stage: str,
+    on_progress_event: Callable[[UploadProgressEvent], None] | None,
+    *,
+    frame_order: int | None = None,
+    frame_title: str | None = None,
+) -> None:
+    """Emit one immutable snapshot so the wizard can render progress without inspecting runtime internals."""
+    if on_progress_event is None:
+        return
+
+    on_progress_event(
+        UploadProgressEvent(
+            kind=kind,
+            stage=stage,
+            frame_order=frame_order,
+            frame_title=frame_title,
+            completed_frames=runtime.completed_frames,
+            total_frames=runtime.total_frames,
+            completed_files=_completed_file_count(runtime),
+            total_files=runtime.total_files,
+            skipped_files=runtime.skipped_count,
+            retried_count=runtime.retried_count,
+            failed_count=len(runtime.failures),
+        )
+    )
+
+
 def _execute_one_file_upload(
+    upload_client: httpx.Client,
     frame_order: int,
     file_payload: dict,
     prepared_upload: PreparedGroupUpload,
@@ -173,6 +252,7 @@ def _execute_one_file_upload(
                 local_file.source_path,
                 upload_url=str(file_payload["uploadUrl"]),
                 content_type=str(file_payload["contentType"]),
+                client=upload_client,
             )
             return "uploaded", None, retried
         except Exception as error:  # pragma: no cover - exercised by tests via mocks
@@ -189,6 +269,7 @@ def _create_runtime_state(
     plan: PreparedCasePlan,
     config: UploaderConfig,
     thumbnail_dir: Path,
+    upload_client: httpx.Client,
     *,
     reset_session: bool,
     started_at: float,
@@ -211,6 +292,9 @@ def _create_runtime_state(
         session_path=session_path,
         session=session,
         started_at=started_at,
+        upload_client=upload_client,
+        total_frames=len(prepared_upload.frames),
+        total_files=_total_upload_file_count(prepared_upload),
     )
 
 
@@ -240,44 +324,84 @@ def _ensure_frame_session(
     )
 
 
-def _advance_original_progress(
-    on_progress: Callable[[], None] | None,
-    original_count: int,
-) -> None:
-    """Advance the progress bar once per original asset so resumed frames look consistent with fresh uploads."""
-    if on_progress is None:
-        return
-
-    for _ in range(original_count):
-        on_progress()
-
-
 def _mark_frame_as_resumed(context: FrameUploadContext) -> None:
-    """Record a previously committed frame locally and mirror its original-asset count into the CLI progress bar."""
-    original_count = _original_asset_count(
-        context.runtime.prepared_upload, context.frame_order
-    )
-    context.runtime.skipped_count += original_count * 2
-    context.frame_session["status"] = "committed"
-    _write_session(context.runtime.session_path, context.runtime.session)
-    _advance_original_progress(
-        context.on_progress,
-        original_count,
-    )
-
-
-def _prepare_frame_upload(context: FrameUploadContext) -> dict:
-    """Request fresh presigned URLs for one frame and persist the pending prefix before uploads start."""
-    prepared_frame = prepare_group_upload_frame(
-        context.runtime.config,
-        context.runtime.start_result["groupUploadJobId"],
+    """Record a resumed frame as completed work so file progress jumps over already-committed revisions."""
+    context.runtime.skipped_count += _frame_file_count(
+        context.runtime.prepared_upload,
         context.frame_order,
     )
+    context.runtime.completed_frames += 1
+    context.frame_session["status"] = "committed"
+    _write_session(context.runtime.session_path, context.runtime.session)
+    _emit_progress_event(
+        context.runtime,
+        "frame_resumed",
+        "complete",
+        context.on_progress_event,
+        frame_order=context.frame_order,
+        frame_title=context.frame_title,
+    )
+
+
+def _request_frame_prepare(runtime: UploadRuntimeState, frame_order: int) -> dict[str, Any]:
+    """Ask internal-site to sign one frame's URLs without mutating local session state yet."""
+    return prepare_group_upload_frame(
+        runtime.config,
+        runtime.start_result["groupUploadJobId"],
+        frame_order,
+    )
+
+
+def _activate_prepared_frame(
+    context: FrameUploadContext,
+    prepared_frame: dict[str, Any],
+) -> dict[str, Any]:
+    """Persist the frame's active pending prefix only when the uploader is about to consume it."""
     context.frame_session["status"] = "prepared"
     context.frame_session["pendingPrefix"] = prepared_frame.get("pendingPrefix")
     context.frame_session["lastError"] = None
     _write_session(context.runtime.session_path, context.runtime.session)
+    _emit_progress_event(
+        context.runtime,
+        "frame_prepared",
+        "prepare",
+        context.on_progress_event,
+        frame_order=context.frame_order,
+        frame_title=context.frame_title,
+    )
     return prepared_frame
+
+
+def _prepare_lookahead_frame(
+    runtime: UploadRuntimeState,
+    frame: PreparedUploadFrame,
+) -> PreparedFrameCache:
+    """Prepare at most one upcoming frame in the background so the next iteration can often skip prepare latency."""
+    return PreparedFrameCache(
+        frame_order=frame.order,
+        frame_title=frame.title,
+        prepared_frame=_request_frame_prepare(runtime, frame.order),
+        prepared_at=time.monotonic(),
+    )
+
+
+def _resolve_prepared_frame(
+    context: FrameUploadContext,
+    cached_prepared_frame: PreparedFrameCache | None,
+) -> dict[str, Any]:
+    """Reuse a fresh lookahead prepare when available; otherwise request a new frame prepare synchronously."""
+    prepared_frame: dict[str, Any]
+    if (
+        cached_prepared_frame
+        and cached_prepared_frame.frame_order == context.frame_order
+        and time.monotonic() - cached_prepared_frame.prepared_at
+        <= _LOOKAHEAD_MAX_AGE_SECONDS
+    ):
+        prepared_frame = cached_prepared_frame.prepared_frame
+    else:
+        prepared_frame = _request_frame_prepare(context.runtime, context.frame_order)
+
+    return _activate_prepared_frame(context, prepared_frame)
 
 
 def _record_file_upload_result(
@@ -301,16 +425,25 @@ def _record_file_upload_result(
                 )
             )
             context.frame_session["lastError"] = error
+            _emit_progress_event(
+                context.runtime,
+                "file_failed",
+                "upload",
+                context.on_progress_event,
+                frame_order=context.frame_order,
+                frame_title=context.frame_title,
+            )
             return
 
         context.runtime.uploaded_count += 1
-
-    if (
-        status == "uploaded"
-        and context.on_progress is not None
-        and str(file_payload["variant"]) == "original"
-    ):
-        context.on_progress()
+        _emit_progress_event(
+            context.runtime,
+            "file_uploaded",
+            "upload",
+            context.on_progress_event,
+            frame_order=context.frame_order,
+            frame_title=context.frame_title,
+        )
 
 
 def _upload_prepared_frame_files(
@@ -319,10 +452,14 @@ def _upload_prepared_frame_files(
     max_workers: int,
 ) -> None:
     """Upload every presigned file for one frame in parallel and fold the results back into the runtime state."""
-    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+    file_count = len(prepared_frame.get("files", []))
+    worker_count = _resolve_file_worker_count(max_workers, file_count)
+
+    with ThreadPoolExecutor(max_workers=worker_count) as executor:
         future_to_file = {
             executor.submit(
                 _execute_one_file_upload,
+                context.runtime.upload_client,
                 context.frame_order,
                 file_payload,
                 context.runtime.prepared_upload,
@@ -340,6 +477,58 @@ def _upload_prepared_frame_files(
                 error,
                 retried,
             )
+
+
+def _resolve_file_worker_count(max_workers: int, file_count: int) -> int:
+    """Cap worker count by the current frame's file count so tiny frames do not create idle upload threads."""
+    return max(1, min(max_workers, file_count or 1))
+
+
+def _find_next_pending_frame(
+    frames: list[PreparedUploadFrame],
+    frame_states: dict[int, str],
+    current_index: int,
+) -> PreparedUploadFrame | None:
+    """Look ahead to the next non-committed frame so upload can overlap with one prepare call."""
+    for frame in frames[current_index + 1 :]:
+        if frame_states.get(frame.order, "pending") != "committed":
+            return frame
+    return None
+
+
+def _schedule_lookahead_prepare(
+    runtime: UploadRuntimeState,
+    next_pending_frame: PreparedUploadFrame | None,
+    current_lookahead: PendingLookaheadPrepare | None,
+    lookahead_executor: ThreadPoolExecutor,
+) -> PendingLookaheadPrepare | None:
+    """Keep at most one future prepare in flight so the next frame can often skip synchronous prepare latency."""
+    if current_lookahead is not None or next_pending_frame is None:
+        return current_lookahead
+
+    return PendingLookaheadPrepare(
+        frame_order=next_pending_frame.order,
+        frame_title=next_pending_frame.title,
+        future=lookahead_executor.submit(
+            _prepare_lookahead_frame,
+            runtime,
+            next_pending_frame,
+        ),
+    )
+
+
+def _consume_matching_lookahead(
+    frame_order: int,
+    current_lookahead: PendingLookaheadPrepare | None,
+) -> tuple[PreparedFrameCache | None, PendingLookaheadPrepare | None]:
+    """Only consume a cached prepare when it belongs to the frame now entering upload."""
+    if current_lookahead is None:
+        return None, None
+
+    if current_lookahead.frame_order != frame_order:
+        return None, current_lookahead
+
+    return current_lookahead.future.result(), None
 
 
 def _build_failure_summary(runtime: UploadRuntimeState) -> UploadExecutionSummary:
@@ -392,10 +581,19 @@ def _commit_frame_upload(
     context.frame_session["status"] = "committed"
     context.frame_session["pendingPrefix"] = None
     context.frame_session["lastError"] = None
+    context.runtime.completed_frames += 1
     context.runtime.session["committedFrameCount"] = (
         int(context.runtime.session["committedFrameCount"]) + 1
     )
     _write_session(context.runtime.session_path, context.runtime.session)
+    _emit_progress_event(
+        context.runtime,
+        "frame_committed",
+        "commit",
+        context.on_progress_event,
+        frame_order=context.frame_order,
+        frame_title=context.frame_title,
+    )
     return None
 
 
@@ -403,31 +601,52 @@ def _execute_frame_upload(
     context: FrameUploadContext,
     frame_state: str,
     max_workers: int,
-) -> UploadExecutionSummary | None:
+    cached_lookahead: PreparedFrameCache | None,
+    next_pending_frame: PreparedFrameUpload | None,
+    current_lookahead: PendingLookaheadPrepare | None,
+    lookahead_executor: ThreadPoolExecutor,
+) -> tuple[UploadExecutionSummary | None, PendingLookaheadPrepare | None]:
     """Execute one frame's resume, prepare, upload, and commit path as a single orchestration step."""
     if frame_state == "committed":
         _mark_frame_as_resumed(context)
-        return None
+        return (
+            None,
+            _schedule_lookahead_prepare(
+                context.runtime,
+                next_pending_frame,
+                current_lookahead,
+                lookahead_executor,
+            ),
+        )
 
-    prepared_frame = _prepare_frame_upload(context)
+    prepared_frame = _resolve_prepared_frame(context, cached_lookahead)
+    next_lookahead = _schedule_lookahead_prepare(
+        context.runtime,
+        next_pending_frame,
+        current_lookahead,
+        lookahead_executor,
+    )
     _upload_prepared_frame_files(context, prepared_frame, max_workers)
 
     if context.runtime.failures:
         context.frame_session["status"] = "failed"
         _write_session(context.runtime.session_path, context.runtime.session)
-        return _build_failure_summary(context.runtime)
+        return _build_failure_summary(context.runtime), next_lookahead
 
-    return _commit_frame_upload(context, prepared_frame)
+    return _commit_frame_upload(context, prepared_frame), next_lookahead
 
 
-def _complete_upload(runtime: UploadRuntimeState) -> UploadExecutionSummary:
+def _complete_upload(
+    runtime: UploadRuntimeState,
+    on_progress_event: Callable[[UploadProgressEvent], None] | None,
+) -> UploadExecutionSummary:
     """Finalize the remote group job and write the server completion payload back into the local session file."""
     completion_result = complete_group_upload(
         runtime.config, runtime.start_result["groupUploadJobId"]
     )
     runtime.session["result"] = completion_result
     _write_session(runtime.session_path, runtime.session)
-    return UploadExecutionSummary(
+    summary = UploadExecutionSummary(
         uploaded_count=runtime.uploaded_count,
         skipped_count=runtime.skipped_count,
         failed_count=0,
@@ -437,6 +656,13 @@ def _complete_upload(runtime: UploadRuntimeState) -> UploadExecutionSummary:
         failures=[],
         completion_result=completion_result,
     )
+    _emit_progress_event(
+        runtime,
+        "job_completed",
+        "complete",
+        on_progress_event,
+    )
+    return summary
 
 
 def execute_upload_plan(
@@ -444,7 +670,7 @@ def execute_upload_plan(
     config: UploaderConfig,
     *,
     reset_session: bool = False,
-    on_progress: Callable[[], None] | None = None,
+    on_progress_event: Callable[[UploadProgressEvent], None] | None = None,
     max_workers: int = _DEFAULT_MAX_WORKERS,
 ) -> UploadExecutionSummary:
     """Execute one group-scoped upload plan by letting internal-site approve, sign, and commit each frame."""
@@ -453,17 +679,31 @@ def execute_upload_plan(
 
     started_at = time.monotonic()
 
-    with TemporaryDirectory(prefix="magic-compare-frame-upload-") as thumbnail_dir:
+    with (
+        TemporaryDirectory(prefix="magic-compare-frame-upload-") as thumbnail_dir,
+        create_upload_http_client() as upload_client,
+        ThreadPoolExecutor(max_workers=1) as lookahead_executor,
+    ):
         runtime = _create_runtime_state(
             plan,
             config,
             Path(thumbnail_dir),
+            upload_client,
             reset_session=reset_session,
             started_at=started_at,
         )
         frame_states = _frame_states_by_order(runtime.start_result)
+        sorted_frames = sorted(runtime.prepared_upload.frames, key=lambda item: item.order)
+        pending_lookahead: PendingLookaheadPrepare | None = None
 
-        for frame in sorted(runtime.prepared_upload.frames, key=lambda item: item.order):
+        _emit_progress_event(
+            runtime,
+            "job_started",
+            "prepare",
+            on_progress_event,
+        )
+
+        for index, frame in enumerate(sorted_frames):
             frame_state = frame_states.get(frame.order, "pending")
             frame_session = _ensure_frame_session(
                 runtime, frame.order, frame.title, frame_state
@@ -471,13 +711,29 @@ def execute_upload_plan(
             frame_context = FrameUploadContext(
                 runtime=runtime,
                 frame_order=frame.order,
+                frame_title=frame.title,
                 frame_session=frame_session,
-                on_progress=on_progress,
+                on_progress_event=on_progress_event,
             )
-            commit_failure = _execute_frame_upload(
-                frame_context, frame_state, max_workers
+            cached_lookahead, pending_lookahead = _consume_matching_lookahead(
+                frame.order,
+                pending_lookahead,
+            )
+            next_pending_frame = _find_next_pending_frame(
+                sorted_frames,
+                frame_states,
+                index,
+            )
+            commit_failure, pending_lookahead = _execute_frame_upload(
+                frame_context,
+                frame_state,
+                max_workers,
+                cached_lookahead,
+                next_pending_frame,
+                pending_lookahead,
+                lookahead_executor,
             )
             if commit_failure is not None:
                 return commit_failure
 
-        return _complete_upload(runtime)
+        return _complete_upload(runtime, on_progress_event)
