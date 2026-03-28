@@ -488,6 +488,7 @@ docker build -f docker/internal-site.Dockerfile -t magic-compare/internal-site .
 
 - 先用 `docker compose` 跑通 `internal-site-init -> internal-site`
 - 只验证运行路径和健康探活，不替代 `public:export`
+- 如果 smoke 需要验证 demo seed，必须同时显式提供对象存储配置和 `MAGIC_COMPARE_HIDE_DEMO=false`
 - 如果要补浏览器 smoke，至少额外验证 viewer 主图和 thumb 的 `naturalWidth > 0`
 - 不要把 `HTTP 200` 或 `img.complete === true` 当成图片真加载的充分证据
 - 失败时保留 compose 日志

@@ -4,6 +4,12 @@ This project started keeping a structured changelog on 2026-03-21.
 
 Entries before that date are summarized at release level instead of being reconstructed commit by commit.
 
+## Unreleased
+
+### Fixed
+
+- CI compose smoke and GHCR Docker smoke now explicitly set `MAGIC_COMPARE_HIDE_DEMO=false` whenever they expect demo seed to run against the CI RustFS sidecar, matching the new “demo only seeds when demo is visible and external storage is configured” runtime rule.
+
 ## v1.6.0 - 2026-03-28
 
 R2-first upload and maintainability release focused on moving internal assets to external S3-compatible storage, making frame uploads resumable and inspectable, and tightening viewer/mobile behavior before the next tag.

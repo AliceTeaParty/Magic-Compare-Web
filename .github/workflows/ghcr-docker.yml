@@ -47,6 +47,7 @@ jobs:
     env:
       # Rustfs (minio-compatible) is wired in via ci.compose.override.yml as a CI-only sidecar.
       # FORCE_PATH_STYLE is required for minio; production R2 uses false instead.
+      MAGIC_COMPARE_HIDE_DEMO: "false"
       MAGIC_COMPARE_S3_BUCKET: magic-compare-ci
       MAGIC_COMPARE_S3_REGION: us-east-1
       MAGIC_COMPARE_S3_ENDPOINT: http://rustfs:9000
@@ -134,7 +135,7 @@ jobs:
             echo "- Runtime image target: \`${IMAGE_NAME}\`"
             echo "- Object storage: rustfs (minio-compatible) CI sidecar on port 9000"
             echo "- Readiness probe: \`http://127.0.0.1:3000\`"
-            echo "- Demo seed: enabled (S3 configured via CI env)"
+            echo "- Demo seed: enabled (\`MAGIC_COMPARE_HIDE_DEMO=false\` plus CI S3 env)"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload smoke logs
