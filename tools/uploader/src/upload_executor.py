@@ -518,17 +518,24 @@ def _schedule_lookahead_prepare(
 
 
 def _consume_matching_lookahead(
-    frame_order: int,
+    context: FrameUploadContext,
     current_lookahead: PendingLookaheadPrepare | None,
-) -> tuple[PreparedFrameCache | None, PendingLookaheadPrepare | None]:
+) -> tuple[
+    PreparedFrameCache | None,
+    PendingLookaheadPrepare | None,
+    UploadExecutionSummary | None,
+]:
     """Only consume a cached prepare when it belongs to the frame now entering upload."""
     if current_lookahead is None:
-        return None, None
+        return None, None, None
 
-    if current_lookahead.frame_order != frame_order:
-        return None, current_lookahead
+    if current_lookahead.frame_order != context.frame_order:
+        return None, current_lookahead, None
 
-    return current_lookahead.future.result(), None
+    try:
+        return current_lookahead.future.result(), None, None
+    except Exception as error:
+        return None, None, _mark_frame_prepare_failure(context, error)
 
 
 def _build_failure_summary(runtime: UploadRuntimeState) -> UploadExecutionSummary:
@@ -558,6 +565,24 @@ def _mark_frame_commit_failure(
         UploadFailure(
             operation_id=f"{context.frame_order}:commit",
             target_url=str(prepared_frame.get("pendingPrefix", "")),
+            message=str(error),
+        )
+    )
+    return _build_failure_summary(context.runtime)
+
+
+def _mark_frame_prepare_failure(
+    context: FrameUploadContext,
+    error: Exception,
+) -> UploadExecutionSummary:
+    """Persist prepare failures so lookahead errors stop the job with the same resumable session shape as other failures."""
+    context.frame_session["status"] = "failed"
+    context.frame_session["lastError"] = str(error)
+    _write_session(context.runtime.session_path, context.runtime.session)
+    context.runtime.failures.append(
+        UploadFailure(
+            operation_id=f"{context.frame_order}:prepare",
+            target_url=str(context.frame_session.get("pendingPrefix") or ""),
             message=str(error),
         )
     )
@@ -715,10 +740,16 @@ def execute_upload_plan(
                 frame_session=frame_session,
                 on_progress_event=on_progress_event,
             )
-            cached_lookahead, pending_lookahead = _consume_matching_lookahead(
-                frame.order,
+            (
+                cached_lookahead,
+                pending_lookahead,
+                lookahead_failure,
+            ) = _consume_matching_lookahead(
+                frame_context,
                 pending_lookahead,
             )
+            if lookahead_failure is not None:
+                return lookahead_failure
             next_pending_frame = _find_next_pending_frame(
                 sorted_frames,
                 frame_states,

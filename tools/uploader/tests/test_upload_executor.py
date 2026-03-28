@@ -403,3 +403,89 @@ class UploadExecutorTests(unittest.TestCase):
         self.assertEqual(events[-2].completed_frames, 2)
         self.assertEqual(events[-1].kind, "job_completed")
         self.assertEqual(events[-1].completed_files, 8)
+
+    @mock.patch("src.upload_executor.complete_group_upload")
+    @mock.patch("src.upload_executor.commit_group_upload_frame")
+    @mock.patch("src.upload_executor.prepare_group_upload_frame")
+    @mock.patch("src.upload_executor.start_group_upload")
+    @mock.patch("src.upload_executor.upload_file_to_presigned_url")
+    def test_persists_lookahead_prepare_failures_into_session_summary(
+        self,
+        upload_file: mock.Mock,
+        start_group_upload: mock.Mock,
+        prepare_group_upload_frame: mock.Mock,
+        commit_group_upload_frame: mock.Mock,
+        complete_group_upload: mock.Mock,
+    ) -> None:
+        self._create_frame("002-frame-b", "Frame B", (10, 10, 10), (240, 240, 240))
+        upload_file.return_value = None
+        start_group_upload.return_value = {
+            "groupUploadJobId": "job-4",
+            "inputHash": "hash-4",
+            "expectedFrameCount": 2,
+            "committedFrameCount": 0,
+            "frameStates": [
+                {"frameOrder": 0, "status": "pending"},
+                {"frameOrder": 1, "status": "pending"},
+            ],
+        }
+        prepare_group_upload_frame.side_effect = [
+            {
+                "groupUploadJobId": "job-4",
+                "frameOrder": 0,
+                "pendingPrefix": "/groups/group-1/1/revision-1",
+                "files": [
+                    {
+                        "slot": "slot-001",
+                        "variant": "original",
+                        "logicalPath": "/groups/group-1/1/revision-1/o1.png",
+                        "uploadUrl": "https://r2.example.com/o1",
+                        "contentType": "image/png",
+                    },
+                    {
+                        "slot": "slot-001",
+                        "variant": "thumbnail",
+                        "logicalPath": "/groups/group-1/1/revision-1/t1.png",
+                        "uploadUrl": "https://r2.example.com/t1",
+                        "contentType": "image/png",
+                    },
+                    {
+                        "slot": "slot-002",
+                        "variant": "original",
+                        "logicalPath": "/groups/group-1/1/revision-1/o2.png",
+                        "uploadUrl": "https://r2.example.com/o2",
+                        "contentType": "image/png",
+                    },
+                    {
+                        "slot": "slot-002",
+                        "variant": "thumbnail",
+                        "logicalPath": "/groups/group-1/1/revision-1/t2.png",
+                        "uploadUrl": "https://r2.example.com/t2",
+                        "contentType": "image/png",
+                    },
+                ],
+            },
+            RuntimeError("lookahead prepare failed"),
+        ]
+        commit_group_upload_frame.return_value = {
+            "groupUploadJobId": "job-4",
+            "frameOrder": 0,
+            "status": "committed",
+        }
+        plan = build_case_plan(self.case_root)
+
+        summary = execute_upload_plan(plan, self.config)
+
+        self.assertFalse(summary.succeeded)
+        self.assertEqual(summary.failed_count, 1)
+        self.assertEqual(summary.failures[0].operation_id, "1:prepare")
+        self.assertEqual(summary.failures[0].message, "lookahead prepare failed")
+        complete_group_upload.assert_not_called()
+        session = json.loads(
+            session_file_path(self.case_root).read_text(encoding="utf-8")
+        )
+        self.assertEqual(session["frames"]["1"]["status"], "failed")
+        self.assertEqual(
+            session["frames"]["1"]["lastError"],
+            "lookahead prepare failed",
+        )
