@@ -101,10 +101,10 @@ describe("internal asset storage helpers", () => {
 
     const signed = await createPresignedInternalAssetUpload({
       logicalPath: "/groups/abc123/1/revision/o1.png",
-      contentType: "image/png",
     });
 
     const url = new URL(signed.uploadUrl);
+    expect(url.searchParams.get("X-Amz-SignedHeaders")).toBe("host");
     expect(url.searchParams.get("x-amz-checksum-crc32")).toBeNull();
     expect(url.searchParams.get("x-amz-sdk-checksum-algorithm")).toBeNull();
   });

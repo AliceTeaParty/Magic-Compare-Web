@@ -217,7 +217,6 @@ export async function buildPresignedFiles(preparedAssets: PreparedUploadAsset[])
       const prepared = asset[variant];
       const signed = await createPresignedInternalAssetUpload({
         logicalPath: prepared.logicalPath,
-        contentType: prepared.contentType,
       });
       files.push({
         slot: asset.slot,

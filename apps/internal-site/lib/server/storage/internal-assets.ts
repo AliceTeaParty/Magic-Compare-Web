@@ -34,7 +34,6 @@ export interface PresignedInternalAssetUpload {
   logicalPath: string;
   uploadUrl: string;
   expiresInSeconds: number;
-  contentType: string;
 }
 
 function hasTraversal(input: string): boolean {
@@ -198,7 +197,6 @@ export async function uploadInternalAssetBuffer(
  */
 export async function createPresignedInternalAssetUpload(params: {
   logicalPath: string;
-  contentType: string;
   expiresInSeconds?: number;
 }): Promise<PresignedInternalAssetUpload> {
   const client = buildS3Client();
@@ -210,7 +208,6 @@ export async function createPresignedInternalAssetUpload(params: {
     new PutObjectCommand({
       Bucket: config.bucket,
       Key: key,
-      ContentType: params.contentType,
     }),
     { expiresIn: expiresInSeconds },
   );
@@ -220,7 +217,6 @@ export async function createPresignedInternalAssetUpload(params: {
     logicalPath: params.logicalPath,
     uploadUrl,
     expiresInSeconds,
-    contentType: params.contentType,
   };
 }
 
