@@ -31,6 +31,7 @@ jobs:
             bundle-name: magic-compare-uploader-linux-amd64
             binary-path: tools/uploader/dist/magic-compare-uploader-linux-amd64/magic-compare-uploader-linux-amd64
             archive-path: tools/uploader/dist/magic-compare-uploader-linux-amd64.zip
+            pykakasi-data-path: tools/uploader/dist/magic-compare-uploader-linux-amd64/_internal/pykakasi/data/kanwadict4.db
           - os: windows-latest
             python-version: "3.12"
             platform: windows
@@ -38,6 +39,7 @@ jobs:
             bundle-name: magic-compare-uploader-windows-amd64
             binary-path: tools/uploader/dist/magic-compare-uploader-windows-amd64/magic-compare-uploader-windows-amd64.exe
             archive-path: tools/uploader/dist/magic-compare-uploader-windows-amd64.zip
+            pykakasi-data-path: tools/uploader/dist/magic-compare-uploader-windows-amd64/_internal/pykakasi/data/kanwadict4.db
           - os: macos-14
             python-version: "3.12"
             platform: macos
@@ -45,6 +47,7 @@ jobs:
             bundle-name: magic-compare-uploader-macos-arm64
             binary-path: tools/uploader/dist/magic-compare-uploader-macos-arm64/magic-compare-uploader-macos-arm64
             archive-path: tools/uploader/dist/magic-compare-uploader-macos-arm64.zip
+            pykakasi-data-path: tools/uploader/dist/magic-compare-uploader-macos-arm64/_internal/pykakasi/data/kanwadict4.db
 
     steps:
       - name: Checkout repository
@@ -70,10 +73,14 @@ jobs:
       - name: Verify binary help output
         run: ${{ matrix.binary-path }} --help >/dev/null
 
-      - name: Smoke plan on sample flat source
-        if: matrix.platform == 'linux'
+      - name: Verify packaged pykakasi data files
+        run: test -f "${{ matrix.pykakasi-data-path }}"
+
+      - name: Smoke plan on sample flat source with kana slug
         run: |
-          sample_dir="$(mktemp -d)"
+          sample_root="$(mktemp -d)"
+          sample_dir="$sample_root/マジカル比較"
+          mkdir -p "$sample_dir"
           python - "$sample_dir" <<'PY'
           from pathlib import Path
           import sys
@@ -83,7 +90,7 @@ jobs:
           Image.new("RGB", (32, 24), color=(0, 0, 0)).save(root / "24_demo_00001_100_src.png")
           Image.new("RGB", (32, 24), color=(255, 255, 255)).save(root / "24_demo_00001_100_output.png")
           PY
-          ${{ matrix.binary-path }} plan "$sample_dir" --case-slug 2026 --group-slug smoke-demo >/dev/null
+          ${{ matrix.binary-path }} plan "$sample_dir" >/dev/null
 
       - name: Upload binary artifact
         uses: actions/upload-artifact@v4

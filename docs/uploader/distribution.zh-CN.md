@@ -24,6 +24,7 @@ Windows 产物会额外生成同名 `.cmd` 启动器：
 - `--runtime-tmpdir` 只能改解包目录，不能把它变成持久缓存
 - 需要反复本地测试时，优先用 `--layout onedir`
 - 想兼顾“单文件分发体验”和“后续启动速度”时，优先分发 `onedir zip`，不要继续纠结 `onefile` 缓存
+- 从 `v1.6.1` 开始，PyInstaller 构建会显式打包 `pykakasi/data/kanwadict4.db` 等数据文件；缺这类文件的旧包在日文 slug 路径上会直接报错，应视为坏包
 
 CI 默认产出 3 个 `onedir zip` 目标：
 
@@ -128,7 +129,8 @@ CI 每个目标会：
 - 安装 `tools/uploader[build]`
 - 执行 `python scripts/build-binary.py --layout onedir --archive zip`
 - 校验解压目录中的二进制 `--help`
-- 在 Linux 目标上额外跑一条 `plan` smoke
+- 校验 onedir 目录里存在 `pykakasi/data/kanwadict4.db`
+- 在每个平台上额外跑一条包含假名目录名的 `plan` smoke，确保 romaji slug 路径在打包后二进制里也能跑通
 - 上传对应 zip artifact
 - 在 tag push 时自动创建 GitHub Release 并附加这些 zip
 

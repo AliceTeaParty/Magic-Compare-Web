@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import unittest
+from unittest import mock
 
 from src.naming import kebab_case, _cjk_to_latin
 
@@ -22,6 +23,18 @@ class CjkToLatinTests(unittest.TestCase):
     def test_japanese_hiragana_uses_hepburn(self) -> None:
         result = _cjk_to_latin("まどか")
         self.assertTrue(result.isascii(), f"Expected ASCII hepburn, got: {result!r}")
+
+    def test_missing_pykakasi_data_raises_friendly_error(self) -> None:
+        with mock.patch(
+            "pykakasi.kakasi",
+            side_effect=FileNotFoundError(
+                "pykakasi/data/kanwadict4.db is missing from the bundle"
+            ),
+        ):
+            with self.assertRaisesRegex(RuntimeError, "v1.6.1") as context:
+                _cjk_to_latin("マジカル")
+
+        self.assertIn("pykakasi", str(context.exception))
 
     def test_mixed_ascii_and_chinese(self) -> None:
         result = _cjk_to_latin("BDRip-压制")

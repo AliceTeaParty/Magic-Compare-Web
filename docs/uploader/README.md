@@ -14,6 +14,11 @@
 2. **直传素材**：向 `internal-site` 申请 frame 级 presigned URL，再把原图和缩略图直传到对象存储。
 3. **提交结果**：按 frame 提交，再在整组完成后通知 `internal-site` 切换数据库内容。
 
+注意：
+
+- 当前服务端只接受 frame-level presigned upload 流程。
+- 如果你看到客户端还在请求 `/api/ops/internal-asset-upload` 或 `/api/ops/import-sync`，说明手里的 uploader 已经过期，必须升级到 `v1.6.1` 或更新版本。
+
 现在 uploader 的核心流程固定是：
 
 ```text

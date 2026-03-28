@@ -10,6 +10,21 @@ Entries before that date are summarized at release level instead of being recons
 
 - CI compose smoke and GHCR Docker smoke now explicitly set `MAGIC_COMPARE_HIDE_DEMO=false` whenever they expect demo seed to run against the CI RustFS sidecar, matching the new “demo only seeds when demo is visible and external storage is configured” runtime rule.
 
+## v1.6.1 - 2026-03-28
+
+Uploader binary hotfix release focused on correcting incomplete packaged artifacts and making protocol/version mismatches easier for operators to diagnose.
+
+### Changed
+
+- Uploader package metadata is now versioned as `1.6.1` to match the patched binary release line.
+- Uploader distribution docs now explicitly call out that current internal-site deployments only support the frame-level presigned upload flow; clients still requesting `internal-asset-upload` or `import-sync` are outdated and must be upgraded.
+
+### Fixed
+
+- PyInstaller uploader builds now explicitly bundle `pykakasi` dictionary data such as `pykakasi/data/kanwadict4.db`, fixing macOS and other packaged binaries that crashed when a kana-derived slug triggered romaji conversion.
+- Kana-based binary smoke checks now run in `Uploader Binaries` CI on every supported platform, so missing `pykakasi` package data is caught before a GitHub Release asset is published.
+- If a bad uploader bundle still ships without the required `pykakasi` data, the CLI now raises a clear operator-facing upgrade/rebuild error instead of exposing a raw missing-file traceback.
+
 ## v1.6.0 - 2026-03-28
 
 R2-first upload and maintainability release focused on moving internal assets to external S3-compatible storage, making frame uploads resumable and inspectable, and tightening viewer/mobile behavior before the next tag.

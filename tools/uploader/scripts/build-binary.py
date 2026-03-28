@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import platform
 import shutil
 import subprocess
@@ -54,6 +55,37 @@ def _write_launcher(launcher_path: Path) -> None:
     )
 
 
+def _pyinstaller_data_separator(target_platform: str) -> str:
+    """Match PyInstaller's platform-specific --add-data separator so native builds keep working across CI runners."""
+    return ";" if target_platform == "windows" else ":"
+
+
+def _pykakasi_data_args(target_platform: str) -> list[str]:
+    """Bundle pykakasi's sqlite dictionaries explicitly because PyInstaller does not reliably collect them from package metadata."""
+    spec = importlib.util.find_spec("pykakasi")
+    if spec is None or not spec.submodule_search_locations:
+        raise RuntimeError("构建 uploader 二进制前必须先安装 pykakasi。")
+
+    package_root = Path(next(iter(spec.submodule_search_locations))).resolve()
+    data_root = package_root / "data"
+    if not data_root.exists():
+        raise RuntimeError(f"未找到 pykakasi 数据目录：{data_root}")
+
+    separator = _pyinstaller_data_separator(target_platform)
+    add_data_args: list[str] = []
+    for data_file in sorted(path for path in data_root.rglob("*") if path.is_file()):
+        relative_parent = data_file.relative_to(data_root).parent
+        destination = Path("pykakasi") / "data" / relative_parent
+        add_data_args.extend(
+            ["--add-data", f"{data_file}{separator}{destination.as_posix()}"]
+        )
+
+    if not add_data_args:
+        raise RuntimeError(f"{data_root} 中没有可打包的 pykakasi 数据文件。")
+
+    return add_data_args
+
+
 def _build_binary(
     uploader_root: Path,
     *,
@@ -68,6 +100,7 @@ def _build_binary(
     shutil.rmtree(build_root, ignore_errors=True)
     dist_dir.mkdir(parents=True, exist_ok=True)
     build_flag = "--onefile" if layout == "onefile" else "--onedir"
+    pyinstaller_extra_args = _pykakasi_data_args(target_platform)
 
     with tempfile.TemporaryDirectory(
         prefix="magic-compare-uploader-build-"
@@ -94,6 +127,7 @@ def _build_binary(
                 str(build_root / "spec"),
                 "--paths",
                 str(uploader_root),
+                *pyinstaller_extra_args,
                 str(launcher_path),
             ],
             check=True,

@@ -4,6 +4,15 @@ import re
 from pathlib import Path
 
 
+def _pykakasi_bundle_error(error: FileNotFoundError) -> RuntimeError:
+    """Turn missing bundled sqlite dictionaries into an actionable operator hint instead of leaking PyInstaller internals."""
+    return RuntimeError(
+        "当前 uploader 打包不完整，缺少 pykakasi 数据文件；"
+        "请改用最新 v1.6.1 二进制或重新打包后再试。"
+        f" 底层错误：{error}"
+    )
+
+
 def _cjk_to_latin(text: str) -> str:
     """Convert CJK characters to Latin equivalents for slug generation.
 
@@ -14,12 +23,15 @@ def _cjk_to_latin(text: str) -> str:
     # Hiragana: U+3040-U+309F, Katakana: U+30A0-U+30FF
     has_kana = any(0x3040 <= ord(ch) <= 0x30FF for ch in text)
     if has_kana:
-        from pykakasi import kakasi  # type: ignore[import-untyped]
+        try:
+            from pykakasi import kakasi  # type: ignore[import-untyped]
 
-        kks = kakasi()
-        return "".join(
-            seg.get("hepburn") or seg.get("orig", "") for seg in kks.convert(text)
-        )
+            kks = kakasi()
+            return "".join(
+                seg.get("hepburn") or seg.get("orig", "") for seg in kks.convert(text)
+            )
+        except FileNotFoundError as error:
+            raise _pykakasi_bundle_error(error) from error
     from pypinyin import Style, lazy_pinyin  # type: ignore[import-untyped]
 
     return "".join(lazy_pinyin(text, style=Style.NORMAL))
