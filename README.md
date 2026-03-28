@@ -67,7 +67,7 @@ This repository is deliberately not a video previewer, not an online VapourSynth
 
 ```bash
 cp .env.example .env
-docker compose up -d rustfs rustfs-init
+# Fill in MAGIC_COMPARE_S3_* in .env with your S3-compatible storage (Cloudflare R2 or self-hosted minio etc.)
 pnpm install
 pnpm db:push
 pnpm db:seed
@@ -103,9 +103,7 @@ Demo content:
 - `docker/internal-site.Dockerfile` builds a full-workspace internal-site image that can also trigger public export and Pages deploy.
 - `docker-compose.yml` wires together:
   - `internal-site`
-  - `rustfs` as the S3-compatible object store
-  - `rustfs-init`, a lightweight `minio/mc` bootstrapper that ensures the bucket exists on startup
-  - `internal-site-init`, a one-off initializer that runs `db:push` and `db:seed` before the app starts
+  - `internal-site-init`, a one-off initializer that runs `db:push` and (when external storage is configured) `db:seed` before the app starts
 - server-side Docker deployment now only needs:
   - `docker-compose.yml`
   - `.env`
@@ -114,8 +112,7 @@ Demo content:
 - the base Compose file now uses Docker named volumes, so a server can run it without depending on repository-relative `docker-data` paths
 - if you want a local image build plus inspectable bind mounts during development, add `-f docker/dev.compose.override.yml`
 - for local development, prefer the root scripts: `pnpm docker:dev:up`, `pnpm docker:dev:down`, `pnpm docker:dev:logs`
-- the bundled local object-storage container now uses fixed runtime defaults; if you need to change its ports or runtime flags, edit `docker-compose.yml` directly
-- internal assets now live in S3-compatible storage configured by `MAGIC_COMPARE_S3_*`
+- internal assets live in external S3-compatible storage configured by `MAGIC_COMPARE_S3_*` (Cloudflare R2 or any S3-compatible service)
 - published bundles still live under `MAGIC_COMPARE_PUBLISHED_ROOT`
 - static public exports are mirrored into `MAGIC_COMPARE_PUBLIC_EXPORT_DIR`
 
@@ -473,7 +470,7 @@ Note:
 ### 3. Seed demo content
 
 ```bash
-docker compose up -d rustfs rustfs-init
+# Ensure MAGIC_COMPARE_S3_* is configured in .env before seeding
 pnpm db:seed
 pnpm public:export
 ```

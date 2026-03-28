@@ -47,6 +47,12 @@ export function guessMimeType(fileName: string): string {
   return MIME_TYPES[extname(fileName).toLowerCase()] ?? "application/octet-stream";
 }
 
+/**
+ * Strip leading slashes and validate that the path is rooted under a known prefix.
+ * "groups/" is the current canonical prefix for frame-level presigned uploads.
+ * "internal-assets/" is accepted for backward compat with demo seed data that predates the R2
+ * migration; those records carry the old prefix literally in their stored logical paths.
+ */
 function normalizeLogicalPath(logicalPath: string): string {
   const normalized = logicalPath.replace(/^\/+/, "");
   if (

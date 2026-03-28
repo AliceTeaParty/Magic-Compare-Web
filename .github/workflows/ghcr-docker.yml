@@ -43,21 +43,30 @@ jobs:
   smoke:
     name: Smoke Test Runtime Image Path
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 30
     env:
-      MAGIC_COMPARE_HIDE_DEMO: "true"
+      # Rustfs (minio-compatible) is wired in via ci.compose.override.yml as a CI-only sidecar.
+      # FORCE_PATH_STYLE is required for minio; production R2 uses false instead.
+      MAGIC_COMPARE_S3_BUCKET: magic-compare-ci
+      MAGIC_COMPARE_S3_REGION: us-east-1
+      MAGIC_COMPARE_S3_ENDPOINT: http://rustfs:9000
+      MAGIC_COMPARE_S3_PUBLIC_BASE_URL: http://127.0.0.1:9000/magic-compare-ci
+      MAGIC_COMPARE_S3_ACCESS_KEY_ID: rustfsadmin
+      MAGIC_COMPARE_S3_SECRET_ACCESS_KEY: rustfsadmin
+      MAGIC_COMPARE_S3_FORCE_PATH_STYLE: "true"
+      MAGIC_COMPARE_S3_INTERNAL_PREFIX: ""
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
 
       - name: Start compose stack
-        run: docker compose $CI_COMPOSE_ARGS up -d --build internal-site
+        run: docker compose $CI_COMPOSE_ARGS up -d --build internal-site rustfs
 
       - name: Wait for runtime readiness
         run: |
           set -euo pipefail
-          for _ in {1..90}; do
+          for _ in {1..120}; do
             internal_site_init_container_id="$(docker compose $CI_COMPOSE_ARGS ps -a -q internal-site-init)"
             if [[ -n "$internal_site_init_container_id" ]]; then
               internal_site_init_status="$(docker inspect -f '{{.State.Status}}' "$internal_site_init_container_id")"
@@ -66,7 +75,7 @@ jobs:
                 if [[ "$internal_site_init_exit_code" != "0" ]]; then
                   echo "internal-site-init exited with code $internal_site_init_exit_code."
                   docker compose $CI_COMPOSE_ARGS ps
-                  docker compose $CI_COMPOSE_ARGS logs internal-site-init internal-site
+                  docker compose $CI_COMPOSE_ARGS logs rustfs rustfs-init internal-site-init internal-site
                   exit 1
                 fi
               fi
@@ -79,7 +88,7 @@ jobs:
                 internal_site_exit_code="$(docker inspect -f '{{.State.ExitCode}}' "$internal_site_container_id")"
                 echo "internal-site exited with code $internal_site_exit_code before readiness."
                 docker compose $CI_COMPOSE_ARGS ps
-                docker compose $CI_COMPOSE_ARGS logs internal-site-init internal-site
+                docker compose $CI_COMPOSE_ARGS logs rustfs rustfs-init internal-site-init internal-site
                 exit 1
               fi
             fi
@@ -92,8 +101,19 @@ jobs:
 
           echo "Timed out waiting for internal-site to become ready."
           docker compose $CI_COMPOSE_ARGS ps
-          docker compose $CI_COMPOSE_ARGS logs internal-site-init internal-site
+          docker compose $CI_COMPOSE_ARGS logs rustfs rustfs-init internal-site-init internal-site
           exit 1
+
+      - name: Verify demo seed ran
+        run: |
+          set -euo pipefail
+          # Demo seed writes a manifest to object storage and metadata to SQLite.
+          # Verify internal-site can serve the demo case page as a proxy for seed success.
+          if ! curl -fsS "http://127.0.0.1:3000/cases/demo-grain-study" >/dev/null; then
+            echo "Demo case page not accessible — seed may have failed."
+            docker compose $CI_COMPOSE_ARGS logs internal-site-init internal-site
+            exit 1
+          fi
 
       - name: Capture compose logs
         if: always()
@@ -101,7 +121,7 @@ jobs:
           {
             docker compose $CI_COMPOSE_ARGS ps || true
             echo
-            docker compose $CI_COMPOSE_ARGS logs internal-site-init internal-site || true
+            docker compose $CI_COMPOSE_ARGS logs rustfs rustfs-init internal-site-init internal-site || true
           } > ghcr-smoke.compose.log
 
       - name: Write smoke summary
@@ -112,7 +132,9 @@ jobs:
             echo
             echo "- Compose files: \`docker-compose.yml\` + \`docker/ci.compose.override.yml\`"
             echo "- Runtime image target: \`${IMAGE_NAME}\`"
+            echo "- Object storage: rustfs (minio-compatible) CI sidecar on port 9000"
             echo "- Readiness probe: \`http://127.0.0.1:3000\`"
+            echo "- Demo seed: enabled (S3 configured via CI env)"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload smoke logs

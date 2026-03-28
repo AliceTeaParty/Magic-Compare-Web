@@ -1,9 +1,52 @@
 services:
+  rustfs:
+    image: quay.io/minio/minio:RELEASE.2025-04-22T22-12-26Z
+    init: true
+    ports:
+      - "9000:9000"
+    environment:
+      MINIO_ROOT_USER: rustfsadmin
+      MINIO_ROOT_PASSWORD: rustfsadmin
+      MALLOC_ARENA_MAX: "2"
+    command: ["server", "/data", "--address", ":9000"]
+    # Use tmpfs in CI — no persistence needed; keeps the runner clean.
+    tmpfs:
+      - /tmp:size=64m
+      - /data:size=512m
+    healthcheck:
+      test: ["CMD", "sh", "-c", "curl -fsS http://127.0.0.1:9000/minio/health/live >/dev/null"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  rustfs-init:
+    image: minio/mc:RELEASE.2025-08-13T08-35-41Z
+    entrypoint:
+      - /bin/sh
+      - -ec
+      - |
+        until mc alias set local http://rustfs:9000 rustfsadmin rustfsadmin --api S3v4 --path on >/dev/null 2>&1 && \
+          mc ls local >/dev/null 2>&1; do
+          sleep 2
+        done
+        mc mb local/magic-compare-ci --ignore-existing >/dev/null
+        mc anonymous set download local/magic-compare-ci >/dev/null
+        echo "CI storage bucket ready."
+    depends_on:
+      rustfs:
+        condition: service_healthy
+    restart: "no"
+
   internal-site-init:
     image: magic-compare/internal-site:ci
     build:
       context: .
       dockerfile: docker/internal-site.Dockerfile
+    # Wait for object storage before running db:seed.
+    depends_on:
+      rustfs-init:
+        condition: service_completed_successfully
 
   internal-site:
     image: magic-compare/internal-site:ci

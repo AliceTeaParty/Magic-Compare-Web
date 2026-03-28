@@ -69,7 +69,7 @@ Publish/deploy flow (must be triggered explicitly):
 - `POST /api/ops/public-deploy` → export + Cloudflare Pages upload
 
 Workspace operations:
-- `POST /api/ops/import-sync`, `POST /api/ops/group-reorder`, `POST /api/ops/frame-reorder`
+- `POST /api/ops/group-reorder`, `POST /api/ops/frame-reorder`
 
 ## Hard constraints (P0)
 
