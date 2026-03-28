@@ -6,10 +6,22 @@ Entries before that date are summarized at release level instead of being recons
 
 ## Unreleased
 
+No unreleased changes yet.
+
+## v1.6.2 - 2026-03-28
+
+R2 direct-upload stabilization release focused on making presigned PUT URLs safer, reducing signature surface area, and keeping CI smoke aligned with current demo/runtime expectations.
+
+### Changed
+
+- Uploader package metadata is now versioned as `1.6.2` to match the release tag line.
+- Presigned R2 direct-upload URLs now sign the minimum required request surface, keeping upload compatibility centered on object key and expiry instead of optional SDK-added headers.
+
 ### Fixed
 
-- CI compose smoke and GHCR Docker smoke now explicitly set `MAGIC_COMPARE_HIDE_DEMO=false` whenever they expect demo seed to run against the CI RustFS sidecar, matching the new “demo only seeds when demo is visible and external storage is configured” runtime rule.
+- CI compose smoke and GHCR Docker smoke now explicitly set `MAGIC_COMPARE_HIDE_DEMO=false` whenever they expect demo seed to run against the CI sidecar, matching the current “demo only seeds when demo is visible and external storage is configured” runtime rule.
 - Internal-site presigned PUT URLs now disable optional SDK request checksums for direct uploads, preventing R2 from rejecting real frame uploads with `403 Forbidden` because the URL had signed an empty-body CRC32.
+- Internal-site no longer signs redundant `Content-Type` constraints into direct-upload presigned URLs, reducing R2 compatibility risk and cutting one avoidable source of client/server header drift.
 
 ## v1.6.1 - 2026-03-28
 
