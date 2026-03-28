@@ -60,7 +60,16 @@ export function ViewerHeader({
       }}
     >
       <Stack spacing={0.2} sx={{ minWidth: 0, pr: { sm: 2 } }}>
-        <Typography variant="h4" noWrap sx={{ lineHeight: 1.18, pb: 0.16 }}>
+        <Typography
+          variant="h4"
+          noWrap
+          sx={{
+            lineHeight: 1.18,
+            // padding-bottom gives descenders (p, g, y…) room before overflow:hidden
+            // clips them; noWrap relies on overflow:hidden for ellipsis truncation.
+            paddingBottom: "0.18em",
+          }}
+        >
           {groupTitle}
         </Typography>
         <Typography
