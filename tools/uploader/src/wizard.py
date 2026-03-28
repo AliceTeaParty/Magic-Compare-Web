@@ -102,8 +102,8 @@ def _render_upload_progress(
     """Render the file bar plus the current frame and stats lines as one Live group."""
     return Group(
         progress,
-        Text.from_markup(f"[cyan]{state.frame_status}[/]"),
-        Text.from_markup(f"[magenta]{state.stats_line}[/]"),
+        Text(state.frame_status, style="cyan"),
+        Text(state.stats_line, style="magenta"),
     )
 
 
