@@ -90,7 +90,7 @@ def _branding_asset_args(
     uploader_root: Path, target_platform: str
 ) -> list[str]:
     """Bundle the shared ASCII logo explicitly so the frozen wizard keeps the same startup identity as source runs."""
-    branding_asset = uploader_root.parents[1] / "字符画.txt"
+    branding_asset = uploader_root / "assets" / "ascii-logo.txt"
     if not branding_asset.exists():
         raise RuntimeError(f"未找到 uploader 启动页所需资源：{branding_asset}")
 

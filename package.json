@@ -1,6 +1,7 @@
 {
   "name": "magic-compare-web",
   "private": true,
+  "version": "1.6.2",
   "packageManager": "pnpm@10.32.1",
   "scripts": {
     "build": "pnpm --filter @magic-compare/internal-site build && pnpm --filter @magic-compare/public-site build",

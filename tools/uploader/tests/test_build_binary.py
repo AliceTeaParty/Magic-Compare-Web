@@ -49,7 +49,7 @@ class BuildBinaryTests(unittest.TestCase):
         args = build_binary_module._branding_asset_args(uploader_root, "windows")
 
         self.assertEqual(args[0], "--add-data")
-        self.assertIn("字符画.txt", args[1])
+        self.assertIn("ascii-logo.txt", args[1])
 
 
 if __name__ == "__main__":
