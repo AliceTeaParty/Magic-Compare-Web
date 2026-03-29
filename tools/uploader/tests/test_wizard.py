@@ -13,6 +13,7 @@ from src.wizard import (
     WizardUploadProgressState,
     _discover_source_group,
     _frame_status_line,
+    _momentum_status_line,
     _render_completion_links,
     _render_upload_progress,
     _render_startup_banner,
@@ -38,6 +39,7 @@ class WizardProgressRenderingTests(unittest.TestCase):
             stage_status="阶段：文件上传",
             frame_status=_frame_status_line(event),
             stats_line="文件：1/4 | frame：0/2 | skipped：0 | retried：0 | failed：0",
+            momentum_status="进度：25% · 已进入上传阶段，先把前几帧稳定送上去。",
         )
 
         renderables = _render_upload_progress(Progress(), state).renderables
@@ -46,6 +48,26 @@ class WizardProgressRenderingTests(unittest.TestCase):
         self.assertEqual(
             renderables[2].plain,
             "当前 frame：1/2 [v2] sample · 文件上传",
+        )
+
+    def test_momentum_status_reports_goal_gradient_copy(self) -> None:
+        event = UploadProgressEvent(
+            kind="file_uploaded",
+            stage="upload",
+            frame_order=0,
+            frame_title="sample",
+            completed_frames=0,
+            total_frames=4,
+            completed_files=6,
+            total_files=8,
+            skipped_files=0,
+            retried_count=0,
+            failed_count=0,
+        )
+
+        self.assertEqual(
+            _momentum_status_line(event),
+            "进度：75% · 已到最后一段，收尾后就能直接打开 viewer。",
         )
 
     def test_render_startup_banner_includes_support_links(self) -> None:
@@ -84,6 +106,21 @@ class BrandingFallbackTests(unittest.TestCase):
         with mock.patch.object(branding, "_logo_candidate_paths", return_value=[Path("/definitely-missing-logo.txt")]):
             self.assertEqual(branding.load_logo_text(), branding.FALLBACK_LOGO)
         branding.load_logo_text.cache_clear()
+
+    def test_uploader_version_prefers_root_package_version(self) -> None:
+        from src import branding
+
+        branding.uploader_version.cache_clear()
+        branding.project_version.cache_clear()
+        branding.pyproject_version.cache_clear()
+        with (
+            mock.patch.object(branding, "project_version", return_value="9.9.9"),
+            mock.patch.object(branding, "pyproject_version", return_value="1.6.2"),
+        ):
+            self.assertEqual(branding.uploader_version(), "9.9.9")
+        branding.uploader_version.cache_clear()
+        branding.project_version.cache_clear()
+        branding.pyproject_version.cache_clear()
 
 
 class WizardSourcePromptTests(unittest.TestCase):

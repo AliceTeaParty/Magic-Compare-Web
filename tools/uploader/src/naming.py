@@ -13,6 +13,15 @@ def _pykakasi_bundle_error(error: FileNotFoundError) -> RuntimeError:
     )
 
 
+def _pykakasi_missing_dependency_error(error: ModuleNotFoundError) -> RuntimeError:
+    """Turn a missing dev dependency into an operator-facing setup hint instead of surfacing a raw import error during source parsing."""
+    return RuntimeError(
+        "当前本地 uploader 环境缺少 pykakasi，无法解析包含日文假名的素材名；"
+        "请先在 tools/uploader 环境里安装依赖后再试。"
+        f" 底层错误：{error}"
+    )
+
+
 def _cjk_to_latin(text: str) -> str:
     """Convert CJK characters to Latin equivalents for slug generation.
 
@@ -30,6 +39,8 @@ def _cjk_to_latin(text: str) -> str:
             return "".join(
                 seg.get("hepburn") or seg.get("orig", "") for seg in kks.convert(text)
             )
+        except ModuleNotFoundError as error:
+            raise _pykakasi_missing_dependency_error(error) from error
         except FileNotFoundError as error:
             raise _pykakasi_bundle_error(error) from error
     from pypinyin import Style, lazy_pinyin  # type: ignore[import-untyped]

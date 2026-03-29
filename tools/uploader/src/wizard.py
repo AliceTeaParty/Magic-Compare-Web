@@ -47,6 +47,7 @@ class WizardUploadProgressState:
     stage_status: str
     frame_status: str
     stats_line: str
+    momentum_status: str
 
 
 WIZARD_STEPS = (
@@ -116,6 +117,7 @@ def _render_upload_progress(
         Text(state.stage_status, style="bold white"),
         Text(state.frame_status, style="cyan"),
         Text(state.stats_line, style="magenta"),
+        Text(state.momentum_status, style="bright_black"),
     )
 
 
@@ -161,6 +163,29 @@ def _stage_status_line(event: UploadProgressEvent) -> str:
     return f"阶段：{_event_stage_label(event)}"
 
 
+def _progress_percent(event: UploadProgressEvent) -> int:
+    """Convert file progress into a stable integer percentage so operators can judge momentum at a glance."""
+    if event.total_files <= 0:
+        return 0
+    return min(100, max(0, round((event.completed_files / event.total_files) * 100)))
+
+
+def _momentum_status_line(event: UploadProgressEvent) -> str:
+    """Add a calm goal-gradient style progress note so long uploads feel advancing instead of static."""
+    percent = _progress_percent(event)
+    if event.kind == "job_started":
+        return "进度：0% · 已建立上传会话，马上开始传第一批文件。"
+    if event.kind == "job_completed":
+        return "进度：100% · 本组素材已全部同步到 internal-site。"
+    if percent < 25:
+        return f"进度：{percent}% · 已进入上传阶段，先把前几帧稳定送上去。"
+    if percent < 50:
+        return f"进度：{percent}% · 第一段进度已经建立起来，继续保持当前节奏。"
+    if percent < 75:
+        return f"进度：{percent}% · 已经过半，后面的同步会更快有感。"
+    return f"进度：{percent}% · 已到最后一段，收尾后就能直接打开 viewer。"
+
+
 def _format_remote_error(action: str, error: Exception, config: UploaderConfig) -> RuntimeError:
     """Wrap remote failures with recovery hints so operators can distinguish address, server, and auth problems without reading tracebacks."""
     message = str(error)
@@ -180,6 +205,21 @@ def _render_completion_links(workspace_url: str, viewer_url: str) -> None:
     console.print(workspace_url)
     console.print(Text("Viewer URL", style="bright_black"))
     console.print(viewer_url)
+
+
+def _render_next_step_note(workspace_url: str, viewer_url: str) -> None:
+    """Turn success into a clear next-step cue so completion feels actionable, not just decorative."""
+    console.print(
+        Panel(
+            Text.from_markup(
+                "[bold green]这次上传已经落地。[/]\n"
+                f"先打开 viewer 核对画面：{viewer_url}\n"
+                f"需要调整公开状态或继续发布，再回 workspace：{workspace_url}"
+            ),
+            title="下一步",
+            border_style="bright_black",
+        )
+    )
 
 
 def _render_source_summary(group: ParsedSourceGroup) -> None:
@@ -219,7 +259,7 @@ def _render_source_summary(group: ParsedSourceGroup) -> None:
 
 def _render_case_table(results: list[CaseSearchResult], query: str) -> None:
     """Keep case selection visual because the wizard is optimized for manual operators, not memorized slugs."""
-    table = Table(title=f"已有 Case 候选：{query or '最近更新'}")
+    table = Table(title=f"可复用的 Case：{query or '最近更新'}")
     table.add_column("#", justify="right", style="cyan", no_wrap=True)
     table.add_column("Title", style="bold white")
     table.add_column("Slug", style="green")
@@ -253,11 +293,11 @@ def _choose_case(config: UploaderConfig, current_year: str) -> CaseSearchResult 
 
         _render_case_table(results, query)
         choice = console.input(
-            f"[bold]输入编号复用已有 case，回车使用 {current_year} case，输入 c 创建新 case，输入 / 重新搜索：[/]"
+            f"[bold]输入编号直接复用；回车默认尝试复用 {current_year} case；输入 c 新建；输入 / 重新搜索：[/]"
         ).strip()
 
         if choice == "c":
-            console.print("[yellow]将创建新 case，稍后可编辑 case.yaml[/]")
+            console.print("[yellow]将新建 case；稍后会打开 case.yaml 给你确认。[/]")
             return None
 
         if not choice:
@@ -269,6 +309,7 @@ def _choose_case(config: UploaderConfig, current_year: str) -> CaseSearchResult 
                     f"[yellow]检测到已有 {current_year} case，将直接复用：{existing_year_case.title}[/]"
                 )
                 return existing_year_case
+            console.print("[yellow]没有找到同 slug 的年度 case；将改为新建 case。[/]")
             return None
 
         if choice == "/":
@@ -291,7 +332,7 @@ def _resolve_work_dir(default_work_dir: Path) -> Path:
     console.print(f"[yellow]工作目录已存在：{default_work_dir}[/]")
     choice = (
         console.input(
-            "[bold]输入 replace 覆盖，timestamp 新建时间戳目录（推荐），cancel 取消 [默认 timestamp]：[/]"
+            "[bold]输入 replace 覆盖旧目录；timestamp 新建时间戳目录（推荐）；cancel 取消 [默认 timestamp]：[/]"
         ).strip()
         or "timestamp"
     )
@@ -322,8 +363,8 @@ def _resolve_group_slug(base_slug: str, selected_case: CaseSearchResult | None) 
     suggested_slug = build_unique_slug(base_slug, existing_slugs)
     console.print(
         f"[yellow]目标 case 下已存在同名 group：{base_slug}[/]\n"
-        f"[bold]1[/] 覆盖已有 group\n"
-        f"[bold]2[/] 使用新 slug：{suggested_slug}"
+        f"[bold]1[/] 直接覆盖已有 group\n"
+        f"[bold]2[/] 改用新 slug：{suggested_slug}"
     )
     choice = console.input("[bold]请选择 [默认 2]：[/]").strip() or "2"
     if choice == "1":
@@ -337,15 +378,13 @@ def _confirm_editor(path: Path, label: str) -> None:
     """Pause after opening metadata so the wizard never uploads files that the operator has not reviewed."""
     console.print(f"[cyan]正在打开 {label}：{path}[/]")
     open_in_editor(path)
-    if not typer.confirm(f"{label} 已确认并保存，继续？", default=True):
+    if not typer.confirm(f"{label} 已确认并保存。继续下一步？", default=True):
         raise typer.Abort()
 
 
 def _show_wizard_intro() -> None:
     """Render the startup identity and support links before any prompts so operators know which tool and support channel they are using."""
     _render_startup_banner()
-    console.print(Text("一站式中文导入向导：先预演计划，再上传同步。", style="bright_black"))
-    console.print()
 
 
 def _discover_source_group() -> ParsedSourceGroup:
@@ -356,9 +395,13 @@ def _discover_source_group() -> ParsedSourceGroup:
             source_dir = _resolve_source_dir(source_input)
             with console.status("[bold green]正在解析素材文件名...[/]"):
                 source_group = discover_source_group(source_dir)
-        except Exception as error:
+        except ValueError as error:
             console.print(f"[red]素材目录无效：{error}[/]")
-            console.print("[yellow]请直接重输目录路径，支持拖拽路径和带引号路径。[/]")
+            console.print("[yellow]请直接重输目录路径。支持拖拽路径，也支持带引号路径。[/]")
+            continue
+        except RuntimeError as error:
+            console.print(f"[red]解析素材失败：{error}[/]")
+            console.print("[yellow]请先修复本地 uploader 环境或素材命名问题，再继续。[/]")
             continue
 
         _render_source_summary(source_group)
@@ -464,6 +507,7 @@ def _run_upload_with_progress(
         stage_status="阶段：准备上传",
         frame_status="当前 frame：等待开始",
         stats_line=f"文件：0/{total_files} | frame：0/0 | skipped：0 | retried：0 | failed：0",
+        momentum_status="进度：0% · 正在准备这次上传。",
     )
 
     with Live(
@@ -482,6 +526,7 @@ def _run_upload_with_progress(
             state.stage_status = _stage_status_line(event)
             state.frame_status = _frame_status_line(event)
             state.stats_line = _stats_line(event)
+            state.momentum_status = _momentum_status_line(event)
             live.update(_render_upload_progress(progress, state))
 
         try:
@@ -534,6 +579,7 @@ def _handle_upload_result(
             title="完成",
         )
     )
+    _render_next_step_note(workspace_url, viewer_url)
     _render_completion_links(workspace_url, viewer_url)
 
 
