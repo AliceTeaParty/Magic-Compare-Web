@@ -4,7 +4,6 @@ import type { CaseWorkspaceData } from "@/lib/server/repositories/content-reposi
 import {
   deployWorkspacePublicSite,
   type NotificationApi,
-  publishWorkspaceCaseBundle,
   reorderWorkspaceGroups,
   toggleWorkspaceGroupVisibility,
   type WorkspaceGroupMutationContext,
@@ -69,14 +68,6 @@ export function useWorkspaceActionHandlers({
   }
 
   /**
-   * Publishes the case explicitly instead of tying it to every toggle/reorder so operators can
-   * batch workspace edits before refreshing the public bundle.
-   */
-  function publishCaseBundle() {
-    publishWorkspaceCaseBundle(mutationContext);
-  }
-
-  /**
    * Keeps deploy single-flight on the client as well as the server lock so repeated taps do not
    * spam Cloudflare deploys before the first request has even left the browser.
    */
@@ -99,7 +90,6 @@ export function useWorkspaceActionHandlers({
   return {
     publicGroupCount,
     toggleGroupVisibility,
-    publishCaseBundle,
     deployPublicSite,
     reorderCaseGroups,
   };

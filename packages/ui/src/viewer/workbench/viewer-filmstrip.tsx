@@ -155,6 +155,7 @@ export function ViewerFilmstrip({
         pt: { xs: 1.35, md: 2 },
         pb: { xs: 2.1, md: 2.35 },
         borderTop: "1px solid",
+        borderBottom: "1px solid",
         borderColor: "divider",
         backgroundColor: "rgba(255,255,255,0.014)",
         position: "relative",

@@ -79,6 +79,7 @@ export function GroupViewerWorkbench({
   const [swipePosition, setSwipePosition] = useState(50);
   const [abPanZoomState, setAbPanZoomState] = useState(DEFAULT_PAN_ZOOM);
   const [abStageActive, setAbStageActive] = useState(false);
+  const [showAbInspectHint, setShowAbInspectHint] = useState(false);
   const {
     resolvedHideStageScrollControl,
     resolvedPrefersReducedMotion,
@@ -160,6 +161,7 @@ export function GroupViewerWorkbench({
     abSide,
     abStageActive,
     mode,
+    onResetView: resetViewerView,
     setAbSide,
     setAbStageActive,
     setMode,
@@ -190,6 +192,16 @@ export function GroupViewerWorkbench({
   }
 
   /**
+   * Restores the compare surface to its default inspection state so keyboard recovery and mode
+   * switches share the same reset path after an accidental pan, zoom, or swipe move.
+   */
+  function resetViewerView() {
+    setSwipePosition(50);
+    setAbPanZoomState(DEFAULT_PAN_ZOOM);
+    setAbStageActive(false);
+  }
+
+  /**
    * Scrolls the compare surface into a screen-filling viewing position without changing its size,
    * which keeps the first screen free to show context while still offering a one-click jump.
    */
@@ -209,6 +221,30 @@ export function GroupViewerWorkbench({
       behavior: resolvedPrefersReducedMotion ? "auto" : "smooth",
     });
   }
+
+  useEffect(() => {
+    if (mode !== "a-b" || typeof window === "undefined") {
+      return;
+    }
+
+    const hintStorageKey = "magic-compare-ab-inspect-hint";
+
+    try {
+      if (window.sessionStorage.getItem(hintStorageKey) === "1") {
+        return;
+      }
+
+      // This hint is intentionally brief and session-scoped so first-time users learn that A/B
+      // inspect is interactive without adding persistent chrome once they already know the gesture.
+      window.sessionStorage.setItem(hintStorageKey, "1");
+    } catch {
+      // Ignore storage errors; the fallback is simply showing the hint for this page load.
+    }
+
+    setShowAbInspectHint(true);
+    const timeoutId = window.setTimeout(() => setShowAbInspectHint(false), 1000);
+    return () => window.clearTimeout(timeoutId);
+  }, [mode]);
 
   return (
     <Box
@@ -281,6 +317,7 @@ export function GroupViewerWorkbench({
               <Box
                 ref={stageSlotRef}
                 sx={{
+                  position: "relative",
                   minWidth: 0,
                   // The viewport budget is only an upper bound. The outer shell must collapse to
                   // the fitted width-constrained stage height, or portrait mobile screens end up
@@ -288,6 +325,35 @@ export function GroupViewerWorkbench({
                   height: `${stageShellHeight}px`,
                 }}
               >
+                <Box
+                  aria-hidden={!showAbInspectHint}
+                  sx={{
+                    position: "absolute",
+                    top: { xs: 10, md: 14 },
+                    left: "50%",
+                    zIndex: 1,
+                    px: 1.3,
+                    py: 0.65,
+                    borderRadius: 999,
+                    border: "1px solid rgba(232, 198, 246, 0.28)",
+                    backgroundColor: "rgba(5, 13, 34, 0.72)",
+                    color: "text.secondary",
+                    fontSize: "0.77rem",
+                    fontWeight: 600,
+                    letterSpacing: "0.01em",
+                    whiteSpace: "nowrap",
+                    pointerEvents: "none",
+                    boxShadow: "0 10px 24px rgba(0, 0, 0, 0.18)",
+                    transform: showAbInspectHint
+                      ? "translate(-50%, 0)"
+                      : "translate(-50%, -6px)",
+                    opacity: showAbInspectHint ? 1 : 0,
+                    transition:
+                      "opacity 180ms cubic-bezier(0.22, 1, 0.36, 1), transform 180ms cubic-bezier(0.22, 1, 0.36, 1)",
+                  }}
+                >
+                  Select the stage, then drag, scroll, or pinch. Press R to reset.
+                </Box>
                 <ViewerStage
                   abSide={abSide}
                   abStageActive={abStageActive}

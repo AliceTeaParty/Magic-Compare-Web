@@ -340,6 +340,7 @@ Docker 用：
 
 作用：
 
+- 可选先重新 publish 某一个 case
 - 先做一次 fresh export
 - 再调用 Wrangler 上传到 Cloudflare Pages
 
@@ -357,6 +358,12 @@ Docker 用：
 必要时还可以有：
 
 - `MAGIC_COMPARE_CF_PAGES_BRANCH`
+
+当前 internal-site workspace 入口：
+
+- 顶部只保留 `Deploy Pages`
+- 这个按钮会携带当前 `caseId` 调用 `POST /api/ops/public-deploy`
+- 因此它会先 republish 当前 case，再导出并部署
 
 ## public-site 的真实路由约束
 

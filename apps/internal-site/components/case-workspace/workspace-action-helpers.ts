@@ -253,31 +253,6 @@ export function toggleWorkspaceGroupVisibility(
 }
 
 /**
- * Publishing stays explicit instead of piggybacking on every edit so operators can batch multiple
- * workspace changes before spending time rebuilding the public bundle.
- */
-export function publishWorkspaceCaseBundle({
-  data,
-  notifications,
-  refresh,
-  startTransition,
-}: WorkspaceMutationContext) {
-  runWorkspaceMutation({
-    onError: (error) =>
-      pushWorkspaceError(notifications, error, "Failed to publish case."),
-    onSuccess: () => {
-      notifications.pushNotification(
-        "Published case bundle to the shared published root.",
-        "success",
-      );
-      refresh();
-    },
-    request: async () => postJson("/api/ops/case-publish", { caseId: data.id }),
-    startTransition,
-  });
-}
-
-/**
  * Deploy remains single-flight on the client as well as the server lock so repeated taps cannot
  * queue duplicate Cloudflare deploys before the first request leaves the browser.
  */

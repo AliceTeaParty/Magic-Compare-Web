@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { CloudUpload, Publish } from "@mui/icons-material";
+import { CloudUpload } from "@mui/icons-material";
 import {
   Box,
   Button,
@@ -52,7 +52,6 @@ export function CaseWorkspaceBoard({
     publicGroupCount,
     isDeployingPublicSite,
     toggleGroupVisibility,
-    publishCaseBundle,
     deployPublicSite,
     reorderCaseGroups,
   } = useCaseWorkspaceActions({
@@ -73,7 +72,7 @@ export function CaseWorkspaceBoard({
   useEffect(() => {
     if (publicGroupCount === 0) {
       pushNotification(
-        "This case has no public groups yet. Use the per-group internal/public toggle below before publishing.",
+        "This case has no public groups yet. Use the per-group internal/public toggle below before deploying.",
         "warning",
         { key: "workspace-no-public-groups", sticky: true },
       );
@@ -163,14 +162,6 @@ export function CaseWorkspaceBoard({
                 },
               }}
             >
-              <Button
-                variant="contained"
-                startIcon={<Publish />}
-                disabled={isPending || groups.length === 0}
-                onClick={publishCaseBundle}
-              >
-                Publish Case
-              </Button>
               <Tooltip
                 title={
                   canDeployPublicSite
@@ -180,10 +171,13 @@ export function CaseWorkspaceBoard({
               >
                 <span>
                   <Button
-                    variant="outlined"
+                    variant="contained"
                     startIcon={<CloudUpload />}
                     disabled={
-                      isPending || isDeployingPublicSite || !canDeployPublicSite
+                      isPending ||
+                      isDeployingPublicSite ||
+                      !canDeployPublicSite ||
+                      groups.length === 0
                     }
                     onClick={deployPublicSite}
                   >

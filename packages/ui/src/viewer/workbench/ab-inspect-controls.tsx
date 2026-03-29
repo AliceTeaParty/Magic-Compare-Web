@@ -26,6 +26,9 @@ export function AbInspectControls({
   onScalePresetChange,
   showControls,
 }: AbInspectControlsProps) {
+  const isAtMinScale = abPresetScale <= VIEWER_MIN_PRESET_SCALE;
+  const isAtMaxScale = abPresetScale >= VIEWER_MAX_PRESET_SCALE;
+
   return (
     <Stack
       direction="row"
@@ -96,9 +99,7 @@ export function AbInspectControls({
           <IconButton
             size="small"
             aria-label="Decrease A/B scale"
-            disabled={
-              !showControls || abPresetScale <= VIEWER_MIN_PRESET_SCALE
-            }
+            disabled={!showControls || isAtMinScale}
             onClick={() => onScalePresetChange(abPresetScale - 1)}
             sx={{
               width: 34,
@@ -106,6 +107,11 @@ export function AbInspectControls({
               border: "1px solid",
               borderColor: "divider",
               borderRadius: 999,
+              "&.Mui-disabled": {
+                color: "text.disabled",
+                borderColor: "rgba(255,255,255,0.12)",
+                backgroundColor: "rgba(255,255,255,0.02)",
+              },
             }}
           >
             <Remove sx={{ fontSize: 16 }} />
@@ -131,9 +137,7 @@ export function AbInspectControls({
           <IconButton
             size="small"
             aria-label="Increase A/B scale"
-            disabled={
-              !showControls || abPresetScale >= VIEWER_MAX_PRESET_SCALE
-            }
+            disabled={!showControls || isAtMaxScale}
             onClick={() => onScalePresetChange(abPresetScale + 1)}
             sx={{
               width: 34,
@@ -141,6 +145,11 @@ export function AbInspectControls({
               border: "1px solid",
               borderColor: "divider",
               borderRadius: 999,
+              "&.Mui-disabled": {
+                color: "text.disabled",
+                borderColor: "rgba(255,255,255,0.12)",
+                backgroundColor: "rgba(255,255,255,0.02)",
+              },
             }}
           >
             <Add sx={{ fontSize: 16 }} />

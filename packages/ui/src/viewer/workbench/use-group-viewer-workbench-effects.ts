@@ -143,6 +143,7 @@ export function useViewerKeyboardShortcuts(params: {
   abSide: "before" | "after";
   abStageActive: boolean;
   mode: ViewerMode;
+  onResetView: () => void;
   setAbSide: (side: "before" | "after") => void;
   setAbStageActive: (nextActive: boolean) => void;
   setMode: (mode: ViewerMode) => void;
@@ -153,6 +154,7 @@ export function useViewerKeyboardShortcuts(params: {
     abSide,
     abStageActive,
     mode,
+    onResetView,
     setAbSide,
     setAbStageActive,
     setMode,
@@ -229,11 +231,23 @@ export function useViewerKeyboardShortcuts(params: {
       if (event.key.toLowerCase() === "i") {
         toggleSidebar();
       }
+
+      if (event.key.toLowerCase() === "r") {
+        event.preventDefault();
+        onResetView();
+      }
     }
 
     window.addEventListener("keydown", handleKeydown);
     return () => window.removeEventListener("keydown", handleKeydown);
-  }, [setAbSide, setAbStageActive, setMode, stepFrame, toggleSidebar]);
+  }, [
+    onResetView,
+    setAbSide,
+    setAbStageActive,
+    setMode,
+    stepFrame,
+    toggleSidebar,
+  ]);
 }
 
 /**
