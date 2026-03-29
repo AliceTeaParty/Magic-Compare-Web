@@ -42,6 +42,10 @@ export function SortableGroupRow({
   isPending: boolean;
   onToggleVisibility: (group: CaseWorkspaceData["groups"][number]) => void;
 }) {
+  // Workspace rows do a lot of work on mobile, so drag, visibility, and open controls share a
+  // single 40px+ baseline instead of the older mixed 32/36px targets.
+  const compactControlHeight = { xs: 42, md: 40 };
+  const compactHandleSize = { xs: 42, md: 40 };
   const { attributes, listeners, setNodeRef, transform, transition } =
     useSortable({ id: group.id });
 
@@ -113,9 +117,9 @@ export function SortableGroupRow({
                 alignSelf: { xs: "flex-start", md: "stretch" },
                 color: "text.secondary",
                 opacity: 0.78,
-                width: 36,
-                minWidth: 36,
-                height: { xs: 36, md: "auto" },
+                width: compactHandleSize,
+                minWidth: compactHandleSize,
+                height: compactHandleSize,
                 borderRadius: 2.2,
                 border: "1px solid rgba(255,255,255,0.08)",
                 backgroundColor: "rgba(255,255,255,0.03)",
@@ -193,7 +197,7 @@ export function SortableGroupRow({
                   onPointerDown={stopPointerPropagation}
                   onClick={stopClickPropagation}
                   sx={{
-                    minHeight: 32,
+                    minHeight: compactControlHeight,
                     px: 0.25,
                     py: 0.25,
                     borderRadius: 999,
@@ -208,7 +212,7 @@ export function SortableGroupRow({
                     value="internal"
                     disabled={isPending}
                     sx={{
-                      minHeight: 32,
+                      minHeight: compactControlHeight,
                       px: "10px",
                       py: "2px",
                       fontSize: "0.84rem",
@@ -221,7 +225,7 @@ export function SortableGroupRow({
                     value="public"
                     disabled={isPending}
                     sx={{
-                      minHeight: 32,
+                      minHeight: compactControlHeight,
                       px: "10px",
                       py: "2px",
                       fontSize: "0.84rem",
@@ -239,7 +243,7 @@ export function SortableGroupRow({
                   endIcon={<OpenInNew />}
                   onPointerDown={stopPointerPropagation}
                   onClick={stopClickPropagation}
-                  sx={{ minHeight: 36, px: 1.45 }}
+                  sx={{ minHeight: compactControlHeight, px: 1.45 }}
                 >
                   Open
                 </Button>

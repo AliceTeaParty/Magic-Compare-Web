@@ -30,9 +30,7 @@ import { useWorkspaceNotifications } from "./case-workspace/use-workspace-notifi
 
 /**
  * Keeps workspace-level publish/deploy controls alongside sortable group rows so operators can
- * reorder and publish from one surface without desynchronizing local optimistic state. This pass
- * also separates page-level actions from group-level controls so the first screen is easier to
- * parse under time pressure.
+ * reorder and publish from one surface without desynchronizing local optimistic state.
  */
 export function CaseWorkspaceBoard({
   data,
@@ -129,7 +127,7 @@ export function CaseWorkspaceBoard({
             }}
           >
             <Stack spacing={1.7} sx={{ minWidth: 0, pr: { xl: 2.6 } }}>
-              <Typography variant="h2" sx={{ lineHeight: 0.98 }}>
+              <Typography variant="h2" component="h1" sx={{ lineHeight: 0.98 }}>
                 {data.title}
               </Typography>
               <Typography
@@ -166,30 +164,34 @@ export function CaseWorkspaceBoard({
             <Stack
               spacing={1.15}
               sx={{
-                px: { xs: 0, xl: 1.35 },
-                py: { xs: 0, xl: 1.35 },
-                borderRadius: { xl: 3 },
-                border: { xl: "1px solid rgba(255,255,255,0.08)" },
-                backgroundColor: { xl: "rgba(255,255,255,0.025)" },
-                // Keep page actions in a dedicated surface so they stop competing with the per-group
-                // visibility/open actions further down the workspace.
-                justifySelf: { xl: "stretch" },
+                justifySelf: "end",
                 "& .MuiButton-root": {
                   minHeight: 42,
                   px: 2.1,
                 },
               }}
             >
-              <Typography variant="overline" color="text.secondary">
-                Workspace actions
-              </Typography>
               <Stack
                 direction="row"
                 spacing={1}
                 alignItems="center"
-                justifyContent={{ xs: "flex-start", xl: "flex-start" }}
+                justifyContent="flex-end"
                 flexWrap="wrap"
                 useFlexGap
+                sx={{
+                  // Match the lighter nested treatment used by the group visibility control so
+                  // page-level actions feel embedded in the header instead of wrapped by a card.
+                  // The container stays width-fit so the two actions hug each other instead of
+                  // stretching across the whole header like a secondary content column.
+                  width: "fit-content",
+                  maxWidth: "100%",
+                  alignSelf: "flex-end",
+                  p: 0.45,
+                  borderRadius: 999,
+                  border: "1px solid",
+                  borderColor: "divider",
+                  backgroundColor: "rgba(255,255,255,0.028)",
+                }}
               >
                 <Button
                   variant="text"
@@ -199,12 +201,12 @@ export function CaseWorkspaceBoard({
                     color: "text.secondary",
                     px: 1.2,
                     borderRadius: 999,
-                    backgroundColor: "rgba(255,255,255,0.018)",
-                    border: "1px solid rgba(255,255,255,0.08)",
+                    backgroundColor: "transparent",
+                    border: "1px solid transparent",
                     "&:hover": {
                       color: "text.primary",
                       borderColor: "rgba(232, 198, 246, 0.26)",
-                      backgroundColor: "rgba(255,255,255,0.05)",
+                      backgroundColor: "rgba(255,255,255,0.04)",
                     },
                   }}
                 >

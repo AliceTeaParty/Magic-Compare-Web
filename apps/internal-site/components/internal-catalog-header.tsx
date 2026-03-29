@@ -1,8 +1,8 @@
 import { Box, Stack, Typography } from "@mui/material";
 
 /**
- * Rebuilds the catalog hero as a two-part header so the page opens with both identity and
- * workflow orientation instead of a single block of copy floating above a card wall.
+ * Keeps the catalog opening minimal and editorial. The earlier right-hand workflow explainer added
+ * noise without helping repeat users, so the header now stays as a single narrative block.
  */
 export function InternalCatalogHeader() {
   return (
@@ -13,14 +13,7 @@ export function InternalCatalogHeader() {
       <Box
         sx={{
           display: "grid",
-          gap: { xs: 2, md: 2.6, xl: 3.4 },
-          alignItems: "end",
-          // Breaking into two columns on wide screens gives the page a stronger opening hierarchy
-          // than the old single-column stack, which made the catalog feel like generic app chrome.
-          gridTemplateColumns: {
-            xs: "1fr",
-            xl: "minmax(0, 1.45fr) minmax(290px, 0.82fr)",
-          },
+          gap: 1.4,
           pb: { xs: 2.75, md: 3.4 },
           borderBottom: "1px solid",
           borderColor: "divider",
@@ -37,41 +30,18 @@ export function InternalCatalogHeader() {
           },
         }}
       >
-        <Box sx={{ display: "grid", gap: 1.4, minWidth: 0 }}>
-          <Typography variant="h2">Internal catalog</Typography>
-          <Typography
-            variant="body1"
-            color="text.secondary"
-            sx={{ maxWidth: 700, lineHeight: 1.72 }}
-          >
-            Browse draft, internal, and published compare cases. Viewer pages
-            stay focused on inspection, while import and publish operations
-            remain explicit.
-          </Typography>
-        </Box>
-        <Box
-          sx={{
-            display: "grid",
-            gap: 0.7,
-            maxWidth: { xs: "100%", xl: 360 },
-            justifySelf: { xl: "end" },
-            pt: { xl: 0.4 },
-          }}
+        <Typography variant="h2" component="h1">
+          Internal catalog
+        </Typography>
+        <Typography
+          variant="body1"
+          color="text.secondary"
+          sx={{ maxWidth: 700, lineHeight: 1.72 }}
         >
-          {/* Keep a lightweight workflow cue in the header so the catalog reads like an entry point
-              into a review pipeline, not just an undifferentiated list of case cards. */}
-          <Typography variant="overline" color="text.secondary">
-            Workflow cadence
-          </Typography>
-          <Typography
-            variant="body2"
-            color="text.secondary"
-            sx={{ lineHeight: 1.72 }}
-          >
-            Scan case health here, move into the workspace to manage visibility,
-            then open the viewer only when you need frame-level inspection.
-          </Typography>
-        </Box>
+          Browse draft, internal, and published compare cases. Viewer pages
+          stay focused on inspection, while import and publish operations remain
+          explicit.
+        </Typography>
       </Box>
     </Stack>
   );

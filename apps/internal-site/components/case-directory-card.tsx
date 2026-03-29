@@ -1,16 +1,11 @@
-import {
-  ArrowOutward,
-  Collections,
-  ImageSearch,
-  Public,
-} from "@mui/icons-material";
+import { ArrowOutward, Collections, Public } from "@mui/icons-material";
 import { Box, Button, Chip, Paper, Stack, Typography } from "@mui/material";
 import Link from "next/link";
 import type { CaseCatalogItem } from "@/lib/server/repositories/content-repository";
 
 /**
- * Lets one catalog card act as a lead beat on larger screens so spacing and hierarchy do more of
- * the differentiation work without changing the underlying case semantics.
+ * Keeps each catalog card structurally consistent so operators can compare cases without the grid
+ * changing width hierarchy underneath them.
  */
 export function CaseDirectoryCard({
   item,
@@ -31,14 +26,9 @@ export function CaseDirectoryCard({
         borderColor: "divider",
         background:
           "linear-gradient(180deg, rgba(255,255,255,0.065) 0%, rgba(255,255,255,0.025) 100%)",
-        // The lead card gets a slightly larger footprint so the first row stops reading like a
-        // repeated template and starts feeling curated.
-        minHeight: { xs: 246, md: isLead ? 286 : 258 },
+        minHeight: { xs: 246, md: 258 },
         position: "relative",
         overflow: "hidden",
-        // This span is intentionally visual only; it gives the grid a stronger rhythm without
-        // implying any business-level priority or different case capabilities.
-        gridColumn: isLead ? { xl: "span 7" } : { xl: "span 5" },
         animation: "catalogCardRise 420ms cubic-bezier(0.22, 1, 0.36, 1) both",
         animationDelay: `${index * 50}ms`,
         "@keyframes catalogCardRise": {
@@ -109,63 +99,48 @@ export function CaseDirectoryCard({
         >
           {item.summary || "No summary yet."}
         </Typography>
-        <Stack
-          direction="row"
-          spacing={0.9}
-          flexWrap="wrap"
-          useFlexGap
-          sx={{ pt: 0.35 }}
-        >
-          <Chip
-            size="small"
-            icon={<Collections fontSize="small" />}
-            label={`${item.groupCount} groups`}
-            variant="outlined"
-            sx={{
-              height: 34,
-              pl: 0.6,
-              pr: 0.85,
-              "& .MuiChip-label": { px: 1.6 },
-              "& .MuiChip-icon": { ml: 0.95, mr: -0.35 },
-            }}
-          />
-          <Chip
-            size="small"
-            icon={<Public fontSize="small" />}
-            label={`${item.publicGroupCount} public`}
-            variant="outlined"
-            sx={{
-              height: 34,
-              pl: 0.6,
-              pr: 0.85,
-              "& .MuiChip-label": { px: 1.6 },
-              "& .MuiChip-icon": { ml: 0.95, mr: -0.35 },
-            }}
-          />
-          <Chip
-            size="small"
-            icon={<ImageSearch fontSize="small" />}
-            label={new Date(item.updatedAt).toLocaleDateString()}
-            variant="outlined"
-            sx={{
-              height: 34,
-              pl: 0.6,
-              pr: 0.85,
-              "& .MuiChip-label": { px: 1.6 },
-              "& .MuiChip-icon": { ml: 0.95, mr: -0.35 },
-            }}
-          />
-        </Stack>
-        <Stack direction="row" spacing={1} sx={{ pt: 1.35, mt: "auto" }}>
-          <Button
-            component={Link}
-            href={`/cases/${item.slug}`}
-            variant="outlined"
-            endIcon={<ArrowOutward />}
-            sx={{ minHeight: 42, px: 2.2, borderRadius: 999 }}
-          >
-            Open workspace
-          </Button>
+        <Stack spacing={1.1} sx={{ pt: 1.35, mt: "auto" }}>
+          {/* Keep metadata and the primary action pinned to the card floor so varying summaries do
+              not make the bottom edge drift from card to card. */}
+          <Stack direction="row" spacing={0.9} flexWrap="wrap" useFlexGap>
+            <Chip
+              size="small"
+              icon={<Collections fontSize="small" />}
+              label={`${item.groupCount} groups`}
+              variant="outlined"
+              sx={{
+                height: 34,
+                pl: 0.6,
+                pr: 0.85,
+                "& .MuiChip-label": { px: 1.6 },
+                "& .MuiChip-icon": { ml: 0.95, mr: -0.35 },
+              }}
+            />
+            <Chip
+              size="small"
+              icon={<Public fontSize="small" />}
+              label={`${item.publicGroupCount} public`}
+              variant="outlined"
+              sx={{
+                height: 34,
+                pl: 0.6,
+                pr: 0.85,
+                "& .MuiChip-label": { px: 1.6 },
+                "& .MuiChip-icon": { ml: 0.95, mr: -0.35 },
+              }}
+            />
+          </Stack>
+          <Stack direction="row" spacing={1}>
+            <Button
+              component={Link}
+              href={`/cases/${item.slug}`}
+              variant="outlined"
+              endIcon={<ArrowOutward />}
+              sx={{ minHeight: 42, px: 2.2, borderRadius: 999 }}
+            >
+              Open workspace
+            </Button>
+          </Stack>
         </Stack>
       </Stack>
     </Paper>
