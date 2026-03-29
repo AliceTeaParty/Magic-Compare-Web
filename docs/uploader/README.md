@@ -228,13 +228,14 @@ MAGIC_COMPARE_CF_ACCESS_CLIENT_SECRET=*
 <details>
 <summary><strong>🧱 其他常用命令</strong></summary>
 
-1. 只生成 manifest，不上传：
+主命令建议只记这两个：
 
 ```bash
-magic-compare-uploader manifest /path/to/work-dir -o manifest.json
+magic-compare-uploader plan /path/to/source
+magic-compare-uploader sync /path/to/work-dir
 ```
 
-2. 删除一个 group：
+其他命令只在排查、查看或清理 remote 状态时再用，例如删除一个 group：
 
 ```bash
 magic-compare-uploader delete-group --case-slug 2026 --group-slug out --work-dir /path/to/work-dir
