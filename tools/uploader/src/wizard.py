@@ -19,7 +19,7 @@ from rich.progress import (
 from rich.table import Table
 from rich.text import Text
 
-from .api_client import CaseSearchResult, search_cases
+from .api_client import CaseListResult, CaseSearchResult, list_cases, search_cases
 from .branding import ISSUES_URL, REPO_URL, load_logo_text, uploader_version
 from .commands import (
     _prepare_runtime_config,
@@ -280,6 +280,38 @@ def _render_case_table(results: list[CaseSearchResult], query: str) -> None:
     console.print(table)
 
 
+def _render_all_case_table(results: list[CaseListResult]) -> None:
+    """Show the full remote case list only on explicit request so default case selection stays focused and uncluttered."""
+    table = Table(title="全部 Case")
+    table.add_column("#", justify="right", style="cyan", no_wrap=True)
+    table.add_column("Title", style="bold white")
+    table.add_column("Slug", style="green")
+    table.add_column("Status", style="yellow")
+    table.add_column("Updated", style="magenta")
+    table.add_column("Groups", justify="right", style="blue")
+
+    for index, result in enumerate(results, start=1):
+        table.add_row(
+            str(index),
+            result.title,
+            result.slug,
+            result.status,
+            result.updated_at or "-",
+            str(result.group_count),
+        )
+
+    console.print(table)
+
+
+def _resolve_case_by_slug(config: UploaderConfig, slug: str) -> CaseSearchResult:
+    """Hydrate a selected case slug back into the richer search result shape because the wizard later needs group slugs for conflict decisions."""
+    results = search_cases(config, slug, limit=20)
+    for result in results:
+        if result.slug == slug:
+            return result
+    raise RuntimeError(f"无法重新读取 case：{slug}")
+
+
 def _choose_case(config: UploaderConfig, current_year: str) -> CaseSearchResult | None:
     """Offer case selection with options for reuse, creation, or search."""
     query = current_year
@@ -291,10 +323,20 @@ def _choose_case(config: UploaderConfig, current_year: str) -> CaseSearchResult 
         except RuntimeError as error:
             raise _format_remote_error("读取 case 列表", error, config) from error
 
-        _render_case_table(results, query)
-        choice = console.input(
-            f"[bold]输入编号直接复用；回车默认尝试复用 {current_year} case；输入 c 新建；输入 / 重新搜索：[/]"
-        ).strip()
+        if results:
+            _render_case_table(results, query)
+            prompt = (
+                f"[bold]输入编号直接复用；回车默认尝试复用 {current_year} case；"
+                "输入 all 查看全部；输入 c 新建；输入 / 重新搜索：[/]"
+            )
+        else:
+            console.print(f"[yellow]没有找到与“{query}”匹配的 case。[/]")
+            prompt = (
+                f"[bold]回车默认尝试复用 {current_year} case；"
+                "输入 all 查看全部；输入 c 新建；输入 / 重新搜索：[/]"
+            )
+
+        choice = console.input(prompt).strip()
 
         if choice == "c":
             console.print("[yellow]将新建 case；稍后会打开 case.yaml 给你确认。[/]")
@@ -311,6 +353,33 @@ def _choose_case(config: UploaderConfig, current_year: str) -> CaseSearchResult 
                 return existing_year_case
             console.print("[yellow]没有找到同 slug 的年度 case；将改为新建 case。[/]")
             return None
+
+        if choice == "all":
+            try:
+                with console.status("[bold green]正在请求全部 case 列表...[/]"):
+                    all_cases = list_cases(config)
+            except RuntimeError as error:
+                raise _format_remote_error("读取全部 case 列表", error, config) from error
+
+            if not all_cases:
+                console.print("[yellow]当前 internal-site 还没有任何 case，可直接新建。[/]")
+                continue
+
+            _render_all_case_table(all_cases)
+            all_choice = console.input(
+                "[bold]输入编号直接复用；直接回车返回搜索；输入 c 新建：[/]"
+            ).strip()
+            if all_choice == "c":
+                console.print("[yellow]将新建 case；稍后会打开 case.yaml 给你确认。[/]")
+                return None
+            if not all_choice:
+                continue
+            if all_choice.isdigit():
+                index = int(all_choice)
+                if 1 <= index <= len(all_cases):
+                    return _resolve_case_by_slug(config, all_cases[index - 1].slug)
+            console.print("[red]输入无效，请重新选择。[/]")
+            continue
 
         if choice == "/":
             query = typer.prompt("新的搜索关键词", default=query).strip()

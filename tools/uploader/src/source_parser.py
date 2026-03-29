@@ -16,6 +16,9 @@ FILENAME_RE = re.compile(
     r"(?P<prefix>.+?)[_\-.](?P<frame>\d+)(?:[_\-.](?P<variant>[^_\-.]+))?$"
 )
 FALLBACK_FILENAME_RE = re.compile(r"^(?P<frame>\d+)(?P<variant>[A-Za-z][A-Za-z0-9]*)$")
+GROUP_SUFFIX_NOISE_RE = re.compile(
+    r"(?:[_\-. ]+\d{4,5}[_\-. ]+gen[_\-. ]+vpy)$", re.IGNORECASE
+)
 
 
 @dataclass(frozen=True)
@@ -218,10 +221,15 @@ def _resolve_frame(
 def _derive_group_identity(
     source_root: Path, candidates: list[SourceCandidate]
 ) -> tuple[str, str]:
-    """Fall back to the folder name when shared filename prefixes are too noisy to produce a stable human slug."""
+    """Trim common export suffix noise before deriving slug/title so auto-generated group names reflect the work instead of one sampled frame id."""
     common_prefix = os.path.commonprefix(
         [candidate.root_hint for candidate in candidates]
     ).strip(" _-.")
+    # VSEditor exports often append one sampled frame id plus `Gen Vpy` to every file,
+    # which makes the folder-derived title look like a one-off frame instead of the case.
+    common_prefix = (
+        GROUP_SUFFIX_NOISE_RE.sub("", common_prefix).strip(" _-.") or common_prefix
+    )
     common_slug = kebab_case(common_prefix)
     if len(common_slug) < 8 or common_slug.count("-") < 1:
         fallback = source_root.name

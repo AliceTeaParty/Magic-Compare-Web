@@ -4,6 +4,19 @@ This project started keeping a structured changelog on 2026-03-21.
 
 Entries before that date are summarized at release level instead of being reconstructed commit by commit.
 
+## v1.7.1 - 2026-03-29
+
+Uploader follow-up release focused on cleaner auto-derived case titles and a calmer, more direct case-reuse flow inside the CLI wizard.
+
+### Changed
+
+- Uploader group title derivation now trims trailing sampled-frame export suffixes such as `00008 Gen Vpy`, so titles inferred from folders better reflect the actual work instead of one exported frame.
+- Uploader case selection now keeps empty search results as an explicit empty state, supports `all` to show the full case list on demand, and clarifies the reuse/create/search prompt flow around the default yearly case.
+
+### Fixed
+
+- Empty uploader case searches no longer render a misleading blank table before prompting for the next action.
+
 ## v1.7.0 - 2026-03-29
 
 ### Changed

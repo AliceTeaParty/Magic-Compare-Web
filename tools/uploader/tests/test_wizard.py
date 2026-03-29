@@ -8,9 +8,12 @@ from unittest import mock
 from rich.progress import Progress
 from rich.text import Text
 
+from src.api_client import CaseListResult, CaseSearchGroup, CaseSearchResult
+from src.config import UploaderConfig
 from src.upload_executor import UploadProgressEvent
 from src.wizard import (
     WizardUploadProgressState,
+    _choose_case,
     _discover_source_group,
     _frame_status_line,
     _momentum_status_line,
@@ -115,7 +118,7 @@ class BrandingFallbackTests(unittest.TestCase):
         branding.pyproject_version.cache_clear()
         with (
             mock.patch.object(branding, "project_version", return_value="9.9.9"),
-            mock.patch.object(branding, "pyproject_version", return_value="1.7.0"),
+            mock.patch.object(branding, "pyproject_version", return_value="1.7.1"),
         ):
             self.assertEqual(branding.uploader_version(), "9.9.9")
         branding.uploader_version.cache_clear()
@@ -138,6 +141,69 @@ class WizardSourcePromptTests(unittest.TestCase):
                 group = _discover_source_group()
 
         self.assertEqual(group.source_root, source_dir.resolve())
+
+
+class WizardCaseSelectionTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.config = UploaderConfig(
+            site_url="http://localhost:3000",
+            api_url="http://localhost:3000/api/ops/group-upload-start",
+            env_path=None,
+            work_dir=None,
+        )
+
+    def test_choose_case_skips_table_when_search_returns_empty(self) -> None:
+        with (
+            mock.patch("src.wizard.search_cases", return_value=[]),
+            mock.patch("src.wizard.console.input", side_effect=["c"]),
+            mock.patch("src.wizard._render_case_table") as render_case_table,
+            mock.patch("src.wizard.console.print") as print_mock,
+        ):
+            selected = _choose_case(self.config, "2026")
+
+        self.assertIsNone(selected)
+        render_case_table.assert_not_called()
+        printed = "\n".join(str(call.args[0]) for call in print_mock.call_args_list if call.args)
+        self.assertIn("没有找到与“2026”匹配的 case。", printed)
+
+    def test_choose_case_can_show_all_cases_and_resolve_selected_slug(self) -> None:
+        searched_case = CaseSearchResult(
+            id="case-2",
+            slug="2025",
+            title="2025 Case",
+            summary="",
+            tags=[],
+            status="internal",
+            updated_at="2026-03-29",
+            group_count=1,
+            public_group_count=0,
+            groups=[CaseSearchGroup(slug="rip", title="Rip")],
+        )
+        all_case = CaseListResult(
+            id="case-2",
+            slug="2025",
+            title="2025 Case",
+            summary="",
+            tags=[],
+            status="internal",
+            published_at=None,
+            updated_at="2026-03-29",
+            group_count=1,
+            public_group_count=0,
+        )
+
+        with (
+            mock.patch("src.wizard.search_cases", side_effect=[[], [searched_case]]),
+            mock.patch("src.wizard.list_cases", return_value=[all_case]),
+            mock.patch("src.wizard.console.input", side_effect=["all", "1"]),
+            mock.patch("src.wizard._render_case_table") as render_case_table,
+            mock.patch("src.wizard._render_all_case_table") as render_all_case_table,
+        ):
+            selected = _choose_case(self.config, "2026")
+
+        self.assertEqual(selected, searched_case)
+        render_case_table.assert_not_called()
+        render_all_case_table.assert_called_once_with([all_case])
 
 
 if __name__ == "__main__":

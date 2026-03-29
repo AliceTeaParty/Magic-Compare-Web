@@ -91,6 +91,15 @@ class DiscoverSourceGroupTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "只能有一个 src/source"):
             discover_source_group(self.source_dir)
 
+    def test_trims_sample_frame_suffix_from_auto_derived_group_title(self) -> None:
+        self._touch("24 [BDMV]ゆるキャン△ Vol 1 00008 Gen Vpy_00008_src.png")
+        self._touch("24 [BDMV]ゆるキャン△ Vol 1 00008 Gen Vpy_00008_out.png")
+
+        group = discover_source_group(self.source_dir)
+
+        self.assertEqual(group.title, "24 [BDMV]ゆるキャン△ Vol 1")
+        self.assertEqual(group.slug, "24-bdmv-yurukyan-vol-1")
+
     def test_falls_back_to_zero_padded_numeric_titles_when_metadata_is_missing(
         self,
     ) -> None:
