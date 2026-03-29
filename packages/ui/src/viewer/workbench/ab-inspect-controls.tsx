@@ -28,6 +28,10 @@ export function AbInspectControls({
 }: AbInspectControlsProps) {
   const isAtMinScale = abPresetScale <= VIEWER_MIN_PRESET_SCALE;
   const isAtMaxScale = abPresetScale >= VIEWER_MAX_PRESET_SCALE;
+  // Match the viewer toolbar target size so mode switching and zoom adjustment feel like one
+  // control family instead of mixing desktop-tight and touch-friendly hit areas.
+  const compactControlHeight = { xs: 42, md: 40 };
+  const compactIconButtonSize = { xs: 42, md: 40 };
 
   return (
     <Stack
@@ -36,13 +40,13 @@ export function AbInspectControls({
       alignItems="center"
       sx={{
         flexShrink: 0,
-        minHeight: 34,
+        minHeight: compactControlHeight,
       }}
     >
       <Box
         sx={{
           width: 104,
-          minHeight: 34,
+          minHeight: compactControlHeight,
           visibility: showControls ? "visible" : "hidden",
           pointerEvents: showControls ? "auto" : "none",
         }}
@@ -53,13 +57,13 @@ export function AbInspectControls({
           disabled={!showControls}
           sx={{
             "& .MuiOutlinedInput-root": {
-              height: 34,
-              minHeight: 34,
+              height: compactControlHeight,
+              minHeight: compactControlHeight,
             },
             "& .MuiSelect-select": {
               display: "flex",
               alignItems: "center",
-              minHeight: "34px !important",
+              minHeight: { xs: "42px !important", md: "40px !important" },
               py: "0 !important",
               pl: 1.5,
               pr: 3.75,
@@ -83,7 +87,7 @@ export function AbInspectControls({
       <Box
         sx={{
           width: 168,
-          minHeight: 34,
+          minHeight: compactControlHeight,
           visibility: showControls ? "visible" : "hidden",
           pointerEvents: showControls ? "auto" : "none",
         }}
@@ -102,8 +106,8 @@ export function AbInspectControls({
             disabled={!showControls || isAtMinScale}
             onClick={() => onScalePresetChange(abPresetScale - 1)}
             sx={{
-              width: 34,
-              height: 34,
+              width: compactIconButtonSize,
+              height: compactIconButtonSize,
               border: "1px solid",
               borderColor: "divider",
               borderRadius: 999,
@@ -119,8 +123,8 @@ export function AbInspectControls({
           <Box
             sx={{
               flex: 1,
-              height: 34,
-              minHeight: 34,
+              height: compactControlHeight,
+              minHeight: compactControlHeight,
               px: 1.1,
               display: "grid",
               placeItems: "center",
@@ -140,8 +144,8 @@ export function AbInspectControls({
             disabled={!showControls || isAtMaxScale}
             onClick={() => onScalePresetChange(abPresetScale + 1)}
             sx={{
-              width: 34,
-              height: 34,
+              width: compactIconButtonSize,
+              height: compactIconButtonSize,
               border: "1px solid",
               borderColor: "divider",
               borderRadius: 999,

@@ -36,6 +36,9 @@ export function ViewerToolbar({
   onToggleSidebar,
   sidebarOpen,
 }: ViewerToolbarProps) {
+  const compactControlHeight = { xs: 42, md: 40 };
+  const compactIconButtonSize = { xs: 42, md: 40 };
+
   /**
    * Routes side selection through the parent controller so A/B state stays in sync with keyboard
    * shortcuts and stage tap cycling.
@@ -86,8 +89,10 @@ export function ViewerToolbar({
           overflow: "visible",
           alignItems: "stretch",
           "& .MuiToggleButtonGroup-grouped": {
-            height: 34,
-            minHeight: 34,
+            // Mode switching is a primary touch action in the viewer, so it needs a larger target
+            // than the older desktop-first 34px sizing.
+            height: compactControlHeight,
+            minHeight: compactControlHeight,
             px: 1.3,
             fontWeight: 550,
             border: "1px solid",
@@ -123,8 +128,8 @@ export function ViewerToolbar({
             aria-label="Scroll the compare stage into view"
             onClick={onScrollStageIntoView}
             sx={{
-              width: 34,
-              height: 34,
+              width: compactIconButtonSize,
+              height: compactIconButtonSize,
               borderColor: "divider",
               backgroundColor: "rgba(255,255,255,0.035)",
             }}
@@ -139,8 +144,8 @@ export function ViewerToolbar({
           size="small"
           onClick={onToggleSidebar}
           sx={{
-            width: 34,
-            height: 34,
+            width: compactIconButtonSize,
+            height: compactIconButtonSize,
             "& .MuiSvgIcon-root": {
               fontSize: 18,
             },
