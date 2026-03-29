@@ -14,6 +14,7 @@
 
 - [ ] Catalog 增加 `search + status filter + updated sort`
   当前 catalog 只有卡片流，case 数量上来后会强迫用户逐卡扫描，缺少快速分流能力。
+  当前先不做。这项属于信息增强。
 
 - [ ] Viewer header 增加常驻的 `Back to workspace`
   现在返回 workspace 的主入口藏在 details drawer 内，手机端尤其不利于快速回退。
@@ -26,7 +27,7 @@
 
 ## P2
 
-- [ ] 统一 internal UI chrome 的产品语言
+- [x] 统一 internal UI chrome 的产品语言
   统一 `Internal catalog`、`Case workspace`、`Deploy Pages`、`Back to catalog`、`Open workspace` 等公共界面文案的语言策略，不影响内容标题自身语言。
 
 - [ ] 提升 catalog 卡片的信息辨识度
@@ -37,7 +38,7 @@
 
 ## P3
 
-- [ ] 补齐站点 favicon
+- [x] 补齐站点 favicon
   当前本地走查仍会请求 `favicon.ico` 并返回 `404`，不影响核心任务，但会拉低完成度。
 
 ## 审计上下文
