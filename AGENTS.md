@@ -48,28 +48,19 @@ Three independent segments — never mix their responsibilities:
 
 ## Data storage
 
-| Data | Location |
-|---|---|
-| Internal metadata | SQLite (`DATABASE_URL=file:./dev.db` locally; `MAGIC_COMPARE_DOCKER_DATABASE_URL` in Docker) |
-| Internal assets (images, thumbs, heatmaps) | S3-compatible (`MAGIC_COMPARE_S3_*`). Never write to `public/internal-assets` or `.runtime`. |
-| Published bundles | `MAGIC_COMPARE_PUBLISHED_ROOT` (defaults to `content/published`) |
-| Public static export | `MAGIC_COMPARE_PUBLIC_EXPORT_DIR` (defaults to `dist/public-site`) |
+Authoritative storage/runtime-path details live in:
+
+- `@docs/workflow-guide.md` — metadata, internal assets, published bundles, public export output, Docker runtime paths
+- `@docs/reference/demo-vs-real.zh-CN.md` — demo/bootstrap data boundary versus real import flows
 
 ## Key internal-site API endpoints
 
-Upload flow (called by uploader in order):
-- `POST /api/ops/group-upload-start`
-- `POST /api/ops/group-upload-frame-prepare` → returns presigned PUT URL; uploader uploads directly to S3
-- `POST /api/ops/group-upload-frame-commit`
-- `POST /api/ops/group-upload-complete`
+Authoritative endpoint contracts live in `@docs/reference/api-endpoints.zh-CN.md`.
 
-Publish/deploy flow (must be triggered explicitly):
-- `POST /api/ops/case-publish` → writes manifest to `MAGIC_COMPARE_PUBLISHED_ROOT`; does NOT auto-export or deploy
-- `POST /api/ops/public-export` → builds static public bundle
-- `POST /api/ops/public-deploy` → export + Cloudflare Pages upload
-
-Workspace operations:
-- `POST /api/ops/group-reorder`, `POST /api/ops/frame-reorder`
+Use that file for:
+- uploader flow (`group-upload-start` → `group-upload-frame-prepare` → `group-upload-frame-commit` → `group-upload-complete`)
+- publish/export/deploy (`case-publish`, `public-export`, `public-deploy`)
+- workspace mutations (`group-reorder`, `frame-reorder`, `group-visibility`, deletes, search/list`)
 
 ## Hard constraints (P0)
 
@@ -85,17 +76,16 @@ Workspace operations:
 When investigating current behavior, check in this order:
 1. Root `package.json` and app-level `package.json` scripts
 2. Implementation code in `apps/`, `packages/`, `scripts/`, Docker files
-3. `docs/workflow-guide.md` and other evergreen docs in `docs/`
+3. `@docs/workflow-guide.md` and other evergreen docs in `docs/`
 4. README files (navigation only — may be outdated; code always wins on conflict)
 
 ## Constraints and known gotchas
 
-- **`pnpm db:push` does not run `prisma db push`** — it runs `apps/internal-site/prisma/init-db.ts` (workaround for local Prisma schema engine issue).
-- **`public-site` requires at least one published group to build** — empty `content/published` causes misleading build errors.
-- **Demo images require both SQLite seed AND S3** — seed writes metadata; demo images are served from S3. Both must be present for the viewer to work.
-- **Internal slugs use single hyphens** (`kebab-case`); public slugs use double hyphens as separators (`case--group`).
-- **`public-site` canonical route is `/g/[publicSlug]`** — `/cases/[caseSlug]/groups/[groupSlug]` is a legacy redirect, not a primary path.
-- **Viewer layout constraints**: main stage must self-size, filmstrip must use real scroll (not a carousel black box), heatmap must share the same media rect as the base image.
+Prefer the evergreen gotcha list in `@docs/workflow-guide.md`.
+
+Keep these two reminders top-of-mind because they are easy to miss during local work:
+- **`pnpm db:push` does not run `prisma db push`** — it runs `apps/internal-site/prisma/init-db.ts`.
+- **`public-site` requires at least one published group to build** — empty published content still causes misleading build failures.
 
 ## AI agent execution rules
 
@@ -146,30 +136,27 @@ When investigating current behavior, check in this order:
 
 ## MCP tool usage
 
-- **`next-js_docs`**: App Router, static generation, server actions, caching, routing
-- **`context7`**: React, MUI, Prisma, Zod, dnd-kit, Motion, other third-party libs
-- **`mcp-vector-search`**: search current codebase before adding or modifying anything (`pnpm mcp:index` if results are empty)
-- **`cloudflare_api`**: Cloudflare account/R2/Pages configuration
+Follow `@docs/mcp-usage-guide.md` for tool order and query strategy.
 
 Search the codebase first; confirm library APIs via docs before implementing.
 
 ## Documentation
 
-Full scenario → document map: `docs/INDEX.md`
+Full scenario → document map: `@docs/INDEX.md`
 
 | Scenario | First doc to read |
 |---|---|
-| Overall workflow, constraints, known gotchas | `docs/workflow-guide.md` |
-| API integration or uploader development | `docs/reference/api-endpoints.zh-CN.md` |
-| Demo vs. real import flow differences | `docs/reference/demo-vs-real.zh-CN.md` |
-| Commit/branch conventions | `docs/commit-guide.md` |
-| MCP tool priority and principles | `docs/mcp-usage-guide.md` |
-| Uploader usage (for group members) | `docs/uploader/README.md` |
+| Overall workflow, constraints, known gotchas | `@docs/workflow-guide.md` |
+| API integration or uploader development | `@docs/reference/api-endpoints.zh-CN.md` |
+| Demo vs. real import flow differences | `@docs/reference/demo-vs-real.zh-CN.md` |
+| Commit/branch conventions | `@docs/commit-guide.md` |
+| MCP tool priority and principles | `@docs/mcp-usage-guide.md` |
+| Uploader usage (for group members) | `@docs/uploader/README.md` |
 
 **Authority levels:**
-- `docs/workflow-guide.md`, `docs/commit-guide.md`, `docs/mcp-usage-guide.md` — evergreen, high authority
-- `docs/reference/` — accurate but must stay in sync with code
-- `docs/archive/` — historical session logs; do not use as current constraints
+- `@docs/workflow-guide.md`, `@docs/commit-guide.md`, `@docs/mcp-usage-guide.md` — evergreen, high authority
+- `@docs/reference/` — accurate but must stay in sync with code
+- `@docs/archive/` — historical session logs; do not use as current constraints
 
 **Maintenance conventions:**
 - After renaming or moving any `docs/` file, fix all internal references in the same commit.
