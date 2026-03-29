@@ -27,6 +27,9 @@ plan -> group-upload-start -> per-frame prepare/upload/commit -> group-upload-co
 
 也就是说，**先检查，再申请上传，再按 frame 直传并提交**。
 
+当前 uploader 会并发处理多个 frame 的 `prepare/upload`，但 `commit` 仍然串行收口。
+这样可以减少和 `internal-site` 的往返等待，同时避免 SQLite 写入冲突。
+
 ---
 
 ## 🧭 建议记住
@@ -71,7 +74,7 @@ magic-compare-uploader
 - 生成工作目录和项目元数据
 - 打开编辑器确认 `case.yaml` / `group.yaml`
 - 显示总体文件进度、当前 frame 和重试/失败统计
-- 按 frame 直传并提交到站点
+- 按 frame 并发直传，再串行提交到站点
 
 新建 case 时，如果 `case.yaml` 里的 `slug` 不符合规则，向导不会继续走到上传阶段。
 它会直接提示你重新编辑 `case.yaml`，直到 `slug` 改成只包含小写字母、数字和单个横线为止。
@@ -88,6 +91,8 @@ magic-compare-uploader
 - 自动匹配不完整时，再让你补输入 before、after、misc 文件夹
 - `after` 和 `misc` 都支持多个目录，使用逗号分隔
 - 文件配对优先按关键文件名匹配，并容忍轻微的后缀差异，例如 `v2`
+
+上传过程中，百分比行现在只显示 `进度：N%`，不会再追加额外说明文案。
 
 上传成功后，工具会把 `workspace` 和 `viewer` 链接单独按裸文本输出，便于在终端里直接完整复制 URL。
 

@@ -278,9 +278,11 @@ Docker 用：
 - public-export/public-deploy 不再打包图片，Pages 只发布静态页面和 manifest
 - `public-site` 公开页默认不应被搜索引擎索引；页面层防爬通过 metadata / `robots.txt` 声明，真正的图片拦截和限流交给 Cloudflare
 - uploader 的 upload session 固定放在工作目录 `.magic-compare/upload-session.json`
-- wizard 当前显示的是**文件级**上传进度：总体文件条 + 当前 frame 状态 + skipped/retried/failed 计数
+- wizard 当前显示的是**文件级**上传进度：总体文件条 + 当前并发/最近 frame 状态 + skipped/retried/failed 计数
+- wizard 的百分比行只显示 `进度：N%`，不再附加额外提示语
 - 直接 `sync` 命令仍保持轻量输出，不显示同等复杂的实时进度 UI
 - uploader 现在会复用一个共享 HTTP client，并用流式 PUT 上传文件，避免大图整文件读入内存
+- uploader 现在会并发处理多个 frame 的 prepare/upload，但 commit 仍串行执行，避免 internal-site 的 SQLite 写冲突
 
 ### 上传链路当前的内部分层
 
@@ -291,7 +293,7 @@ Docker 用：
 - `lib/server/uploads/upload-service-helpers.ts`：承接作业装载、group 重置、presign 组装、frame 状态 guard、complete 收尾
 - `lib/server/storage/internal-assets.ts`：只负责 S3-compatible 读写、presign、按前缀删除，不负责业务状态切换
 - `tools/uploader/src/wizard.py`：只负责交互向导和工作目录确认
-- `tools/uploader/src/upload_executor.py`：只负责 start -> per-frame prepare/upload/commit -> complete 的执行状态机
+- `tools/uploader/src/upload_executor.py`：只负责 start -> per-frame prepare/upload/commit -> complete 的执行状态机，其中 prepare/upload 可并发，commit 串行收口
 
 新增上传逻辑时，优先把“副作用顺序”塞进 helper，而不是继续往 route 或单个主流程函数里追加分支。
 

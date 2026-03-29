@@ -70,11 +70,19 @@ def _event_stage_label(event: UploadProgressEvent) -> str:
     """Map structured upload events to short Chinese stage labels for the wizard."""
     if event.kind == "job_started":
         return "准备上传"
+    if event.kind == "frame_started":
+        return "申请上传"
     if event.kind == "frame_resumed":
         return "续传检查"
     if event.kind == "frame_prepared":
         return "申请上传"
     if event.kind in {"file_uploaded", "file_failed"}:
+        return "文件上传"
+    if event.kind == "frame_failed":
+        if event.stage == "prepare":
+            return "申请上传"
+        if event.stage == "commit":
+            return "服务端提交"
         return "文件上传"
     if event.kind == "frame_committed":
         return "服务端提交"
@@ -89,18 +97,20 @@ def _progress_description(event: UploadProgressEvent) -> str:
 
 
 def _frame_status_line(event: UploadProgressEvent) -> str:
-    """Show the active frame in one line so operators can tell whether the uploader is preparing, uploading, or committing."""
+    """Show live concurrency plus the latest frame activity so parallel uploads remain readable."""
+    concurrency = f"当前并发：{event.active_frames}/{event.frame_workers}"
     if event.kind == "job_started":
-        return "当前 frame：等待开始"
+        return f"{concurrency} | 最近 frame：等待开始"
     if event.kind == "job_completed":
-        return "当前 frame：全部完成"
+        return f"{concurrency} | 最近 frame：全部完成"
     if event.frame_order is None or event.frame_title is None:
-        return f"当前 frame：{_event_stage_label(event)}"
+        return f"{concurrency} | 最近 frame：{_event_stage_label(event)}"
 
-    return (
-        f"当前 frame：{event.frame_order + 1}/{event.total_frames} "
+    recent_frame = (
+        f"{event.frame_order + 1}/{event.total_frames} "
         f"{event.frame_title} · {_event_stage_label(event)}"
     )
+    return f"{concurrency} | 最近 frame：{recent_frame}"
 
 
 def _stats_line(event: UploadProgressEvent) -> str:
@@ -178,19 +188,8 @@ def _progress_percent(event: UploadProgressEvent) -> int:
 
 
 def _momentum_status_line(event: UploadProgressEvent) -> str:
-    """Add a calm goal-gradient style progress note so long uploads feel advancing instead of static."""
-    percent = _progress_percent(event)
-    if event.kind == "job_started":
-        return "进度：0% · 已建立上传会话，马上开始传第一批文件。"
-    if event.kind == "job_completed":
-        return "进度：100% · 本组素材已全部同步到 internal-site。"
-    if percent < 25:
-        return f"进度：{percent}% · 已进入上传阶段，先把前几帧稳定送上去。"
-    if percent < 50:
-        return f"进度：{percent}% · 第一段进度已经建立起来，继续保持当前节奏。"
-    if percent < 75:
-        return f"进度：{percent}% · 已经过半，后面的同步会更快有感。"
-    return f"进度：{percent}% · 已到最后一段，收尾后就能直接打开 viewer。"
+    """Keep the percentage line compact so long uploads do not waste space on decorative copy."""
+    return f"进度：{_progress_percent(event)}%"
 
 
 def _format_remote_error(action: str, error: Exception, config: UploaderConfig) -> RuntimeError:
@@ -728,9 +727,11 @@ def _run_upload_with_progress(
     )
     state = WizardUploadProgressState(
         stage_status="阶段：准备上传",
-        frame_status="当前 frame：等待开始",
+        frame_status=(
+            f"当前并发：0/{config.upload_frame_workers or '自动'} | 最近 frame：等待开始"
+        ),
         stats_line=f"文件：0/{total_files} | frame：0/0 | skipped：0 | retried：0 | failed：0",
-        momentum_status="进度：0% · 正在准备这次上传。",
+        momentum_status="进度：0%",
     )
 
     with Live(
@@ -757,6 +758,7 @@ def _run_upload_with_progress(
                 structured_plan,
                 config,
                 on_progress_event=_on_progress_event,
+                frame_workers=config.upload_frame_workers,
             )
         except RuntimeError as error:
             raise _format_remote_error("上传并同步", error, config) from error
@@ -819,7 +821,12 @@ def run_wizard(
     _render_stage_header(1, "先解析本地素材，确认命名和帧分组都可用。")
     source_group = _discover_source_group()
     work_dir = _resolve_work_dir(build_default_work_dir(source_group.source_root))
-    config = _prepare_runtime_config(work_dir, site_url=site_url, api_url=api_url)
+    config = _prepare_runtime_config(
+        work_dir,
+        site_url=site_url,
+        api_url=api_url,
+        frame_workers=None,
+    )
 
     _render_stage_header(2, "确认目标站点后，再复用已有 case 或创建新 case。")
     _render_target_site_summary(config)

@@ -58,14 +58,23 @@ def _prepare_runtime_config(
     *,
     site_url: str | None,
     api_url: str | None,
+    frame_workers: int | None,
 ) -> UploaderConfig:
     """Persist explicit CLI overrides so resumed runs keep targeting the same site and endpoint."""
     config = resolve_uploader_config(
-        work_dir, site_url_override=site_url, api_url_override=api_url
+        work_dir,
+        site_url_override=site_url,
+        api_url_override=api_url,
+        upload_frame_workers_override=frame_workers,
     )
 
-    if site_url or api_url:
-        persist_config_overrides(config, site_url=site_url, api_url=api_url)
+    if site_url or api_url or frame_workers is not None:
+        persist_config_overrides(
+            config,
+            site_url=site_url,
+            api_url=api_url,
+            upload_frame_workers=frame_workers,
+        )
 
     return config
 
@@ -206,6 +215,7 @@ def handle_sync(
     *,
     site_url: str | None,
     api_url: str | None,
+    frame_workers: int | None = None,
     report_json: Path | None = None,
     dry_run: bool = False,
     reset_session: bool = False,
@@ -219,12 +229,20 @@ def handle_sync(
         _write_runtime_report(case_plan.report, report_json)
         return case_plan.report, None, None
 
-    config = _prepare_runtime_config(source_root, site_url=site_url, api_url=api_url)
+    config = _prepare_runtime_config(
+        source_root,
+        site_url=site_url,
+        api_url=api_url,
+        frame_workers=frame_workers,
+    )
     ensure_remote_access_config(config)
 
     with console.status("[bold green]正在上传对象...[/]"):
         execution_summary = execute_upload_plan(
-            case_plan, config, reset_session=reset_session
+            case_plan,
+            config,
+            reset_session=reset_session,
+            frame_workers=config.upload_frame_workers,
         )
     _render_execution_summary(execution_summary)
     if not execution_summary.succeeded:
@@ -415,7 +433,10 @@ def handle_delete_group(
 ) -> dict:
     """Delete-group stays interactive, but it now shares the same service-token-only runtime config path."""
     config = _prepare_runtime_config(
-        work_dir.resolve(), site_url=site_url, api_url=api_url
+        work_dir.resolve(),
+        site_url=site_url,
+        api_url=api_url,
+        frame_workers=None,
     )
     ensure_remote_access_config(config)
 
@@ -464,7 +485,10 @@ def handle_list_cases(
 ) -> list[CaseListResult]:
     """List every remote case through the dedicated API so operators are not capped by search pagination."""
     config = _prepare_runtime_config(
-        work_dir.resolve(), site_url=site_url, api_url=api_url
+        work_dir.resolve(),
+        site_url=site_url,
+        api_url=api_url,
+        frame_workers=None,
     )
     ensure_remote_access_config(config)
 
@@ -484,7 +508,10 @@ def handle_list_groups(
 ) -> CaseGroupsResult:
     """List one case's groups through the workspace summary API so the CLI can inspect the exact remote ordering and visibility state."""
     config = _prepare_runtime_config(
-        work_dir.resolve(), site_url=site_url, api_url=api_url
+        work_dir.resolve(),
+        site_url=site_url,
+        api_url=api_url,
+        frame_workers=None,
     )
     ensure_remote_access_config(config)
     selected_case = _resolve_case_for_delete(config, case_slug)
@@ -505,7 +532,10 @@ def handle_delete_case(
 ) -> dict:
     """Delete-case only succeeds for empty cases, so the CLI surfaces that constraint before calling the API."""
     config = _prepare_runtime_config(
-        work_dir.resolve(), site_url=site_url, api_url=api_url
+        work_dir.resolve(),
+        site_url=site_url,
+        api_url=api_url,
+        frame_workers=None,
     )
     ensure_remote_access_config(config)
     selected_case = _resolve_case_for_delete(config, case_slug)
