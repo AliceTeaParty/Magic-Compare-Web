@@ -3,22 +3,16 @@ import { prisma } from "@/lib/server/db/client";
 /**
  * Recomputes the stored case cover after destructive frame/group mutations so the workspace never
  * points at an asset row that was just deleted by upload replacement or group removal.
+ *
+ * The query intentionally reads only the ordering and asset flags the cover picker needs, because
+ * upload/delete paths call this frequently and SQLite gains nothing from hydrating full frame text
+ * and URL payloads when the decision reduces to `id/kind/isPrimaryDisplay`.
  */
 export async function recomputeCaseCoverAsset(caseId: string): Promise<void> {
   const caseRow = await prisma.case.findUnique({
     where: { id: caseId },
-    include: {
-      groups: {
-        include: {
-          frames: {
-            include: {
-              assets: true,
-            },
-            orderBy: { order: "asc" },
-          },
-        },
-        orderBy: { order: "asc" },
-      },
+    select: {
+      id: true,
     },
   });
 
@@ -26,9 +20,30 @@ export async function recomputeCaseCoverAsset(caseId: string): Promise<void> {
     return;
   }
 
+  const groups = await prisma.group.findMany({
+    where: {
+      caseId,
+    },
+    select: {
+      frames: {
+        select: {
+          assets: {
+            select: {
+              id: true,
+              kind: true,
+              isPrimaryDisplay: true,
+            },
+          },
+        },
+        orderBy: { order: "asc" },
+      },
+    },
+    orderBy: { order: "asc" },
+  });
+
   let coverAssetId: string | null = null;
 
-  for (const group of caseRow.groups) {
+  for (const group of groups) {
     for (const frame of group.frames) {
       const explicitAfter = frame.assets.find(
         (asset) => asset.kind === "after" && asset.isPrimaryDisplay,

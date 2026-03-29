@@ -1,6 +1,7 @@
 import { mkdirSync } from "node:fs";
 import { DatabaseSync } from "node:sqlite";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 import { resolveSqliteDatabasePath } from "../lib/server/db/database-url";
 
 type ColumnDefinition = {
@@ -33,12 +34,76 @@ function ensureColumns(
   }
 }
 
-const databasePath = resolveSqliteDatabasePath();
-mkdirSync(path.dirname(databasePath), { recursive: true });
+/**
+ * The partial unique index for active upload jobs only works when older databases no longer keep
+ * multiple `active` rows per group, so we cancel stale duplicates before rebuilding that guard.
+ */
+function cancelDuplicateActiveUploadJobs(database: DatabaseSync): void {
+  database.exec(`
+WITH ranked AS (
+  SELECT
+    "id",
+    ROW_NUMBER() OVER (
+      PARTITION BY "groupId"
+      ORDER BY "updatedAt" DESC, "createdAt" DESC, "id" DESC
+    ) AS "rowNumber"
+  FROM "GroupUploadJob"
+  WHERE "status" = 'active'
+),
+duplicate_jobs AS (
+  SELECT "id"
+  FROM ranked
+  WHERE "rowNumber" > 1
+)
+UPDATE "FrameUploadJob"
+SET "status" = 'cancelled'
+WHERE "groupUploadJobId" IN (SELECT "id" FROM duplicate_jobs);
+`);
 
-const database = new DatabaseSync(databasePath);
+  database.exec(`
+WITH ranked AS (
+  SELECT
+    "id",
+    ROW_NUMBER() OVER (
+      PARTITION BY "groupId"
+      ORDER BY "updatedAt" DESC, "createdAt" DESC, "id" DESC
+    ) AS "rowNumber"
+  FROM "GroupUploadJob"
+  WHERE "status" = 'active'
+)
+UPDATE "GroupUploadJob"
+SET "status" = 'cancelled'
+WHERE "id" IN (
+  SELECT "id"
+  FROM ranked
+  WHERE "rowNumber" > 1
+);
+`);
+}
 
-database.exec(`
+/**
+ * Prisma cannot declare SQLite partial unique indexes, so init-db owns this additional guard and
+ * recreates the supporting indexes on every additive migration run.
+ */
+function ensureIndexes(database: DatabaseSync): void {
+  database.exec(`
+DROP INDEX IF EXISTS "GroupUploadJob_groupId_status_updatedAt_idx";
+CREATE INDEX IF NOT EXISTS "Case_updatedAt_idx" ON "Case"("updatedAt");
+CREATE INDEX IF NOT EXISTS "Group_caseId_isPublic_idx" ON "Group"("caseId", "isPublic");
+CREATE INDEX IF NOT EXISTS "GroupUploadJob_groupId_status_expiresAt_updatedAt_idx"
+  ON "GroupUploadJob"("groupId", "status", "expiresAt", "updatedAt");
+CREATE UNIQUE INDEX IF NOT EXISTS "GroupUploadJob_groupId_active_key"
+  ON "GroupUploadJob"("groupId")
+  WHERE "status" = 'active';
+`);
+}
+
+/**
+ * Keeps the schema bootstrap reusable in tests so we can verify additive migrations and SQLite-only
+ * indexes without relying on the side effects of importing this script.
+ */
+export function initializeSqliteSchema(database: DatabaseSync): void {
+  database.exec(`
 PRAGMA foreign_keys = ON;
 
 CREATE TABLE IF NOT EXISTS "Case" (
@@ -123,9 +188,6 @@ CREATE TABLE IF NOT EXISTS "GroupUploadJob" (
   FOREIGN KEY ("groupId") REFERENCES "Group" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
 
-CREATE INDEX IF NOT EXISTS "GroupUploadJob_groupId_status_updatedAt_idx"
-  ON "GroupUploadJob"("groupId", "status", "updatedAt");
-
 CREATE TABLE IF NOT EXISTS "FrameUploadJob" (
   "id" TEXT NOT NULL PRIMARY KEY,
   "groupUploadJobId" TEXT NOT NULL,
@@ -146,15 +208,40 @@ CREATE INDEX IF NOT EXISTS "FrameUploadJob_groupUploadJobId_status_idx"
   ON "FrameUploadJob"("groupUploadJobId", "status");
 `);
 
-ensureColumns(database, "Group", [
-  { name: "storageRoot", sql: `"storageRoot" TEXT NOT NULL DEFAULT ''` },
-  { name: "lastUploadInputHash", sql: `"lastUploadInputHash" TEXT` },
-]);
+  ensureColumns(database, "Group", [
+    { name: "storageRoot", sql: `"storageRoot" TEXT NOT NULL DEFAULT ''` },
+    { name: "lastUploadInputHash", sql: `"lastUploadInputHash" TEXT` },
+  ]);
 
-ensureColumns(database, "Frame", [
-  { name: "storagePrefix", sql: `"storagePrefix" TEXT NOT NULL DEFAULT ''` },
-]);
+  ensureColumns(database, "Frame", [
+    { name: "storagePrefix", sql: `"storagePrefix" TEXT NOT NULL DEFAULT ''` },
+  ]);
 
-database.close();
+  ensureColumns(database, "GroupUploadJob", [
+    { name: "committedFrameCount", sql: `"committedFrameCount" INTEGER NOT NULL DEFAULT 0` },
+    { name: "expiresAt", sql: `"expiresAt" DATETIME` },
+  ]);
 
-console.log(`Initialized SQLite schema at ${databasePath}`);
+  cancelDuplicateActiveUploadJobs(database);
+  ensureIndexes(database);
+}
+
+/**
+ * Keeps the CLI-facing db bootstrap entrypoint small while sharing the real schema work with unit
+ * tests that need a temporary SQLite file.
+ */
+export function initializeSqliteDatabase(databasePath = resolveSqliteDatabasePath()): void {
+  mkdirSync(path.dirname(databasePath), { recursive: true });
+  const database = new DatabaseSync(databasePath);
+  try {
+    initializeSqliteSchema(database);
+  } finally {
+    database.close();
+  }
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  const databasePath = resolveSqliteDatabasePath();
+  initializeSqliteDatabase(databasePath);
+  console.log(`Initialized SQLite schema at ${databasePath}`);
+}

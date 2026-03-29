@@ -9,6 +9,7 @@
 | 理解整体工作流、约束与已知坑 | [workflow-guide.md](workflow-guide.md) |
 | API 对接、上传链路开发 | [reference/api-endpoints.zh-CN.md](reference/api-endpoints.zh-CN.md) |
 | demo 与真实导入内容如何区别 | [reference/demo-vs-real.zh-CN.md](reference/demo-vs-real.zh-CN.md) |
+| SQLite / Prisma 数据库边界与上传作业约束 | [reference/database-architecture.zh-CN.md](reference/database-architecture.zh-CN.md) |
 | 提交/分支规范 | [commit-guide.md](commit-guide.md) |
 | MCP 工具使用优先级 | [mcp-usage-guide.md](mcp-usage-guide.md) |
 | 跟踪当前 Web 站点 UI/UX 待办 | [uiux-todo.md](uiux-todo.md) |
@@ -34,6 +35,7 @@
 
 - [reference/api-endpoints.zh-CN.md](reference/api-endpoints.zh-CN.md) — internal-site 全部 `/api/ops/*` 端点清单
 - [reference/demo-vs-real.zh-CN.md](reference/demo-vs-real.zh-CN.md) — demo 与真实 case/group 流程对比
+- [reference/database-architecture.zh-CN.md](reference/database-architecture.zh-CN.md) — SQLite / Prisma 边界、上传作业约束与索引设计
 
 ### Uploader 用户文档
 

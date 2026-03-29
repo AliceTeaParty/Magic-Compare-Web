@@ -50,6 +50,10 @@
 - 宿主机本地开发：`DATABASE_URL=file:./dev.db`
 - Docker：`MAGIC_COMPARE_DOCKER_DATABASE_URL=file:/app/data/sqlite/internal-site.db`
 
+数据库边界、上传作业不变式和 SQLite 特有索引的说明，统一见：
+
+- `docs/reference/database-architecture.zh-CN.md`
+
 ### 2. 内部素材
 
 统一在 S3-compatible 存储：
@@ -541,6 +545,7 @@ docker build -f docker/internal-site.Dockerfile -t magic-compare/internal-site .
 
 - `docs/uploader/README.md`
 - `docs/uploader/vseditor-workflow.zh-CN.md`
+- `docs/reference/database-architecture.zh-CN.md`
 - `docs/reference/demo-vs-real.zh-CN.md`
 - `docs/uploader/boundaries-and-env-split.zh-CN.md`
 - `docs/uploader/distribution.zh-CN.md`

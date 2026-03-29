@@ -32,16 +32,69 @@ export type PreparedUploadAsset = UploadAssetDescriptor & {
   thumbnail: UploadAssetDescriptor["thumbnail"] & { logicalPath: string };
 };
 
-const uploadJobInclude = {
-  case: true,
-  group: true,
-  frameJobs: true,
-} satisfies Prisma.GroupUploadJobInclude;
+const uploadJobSummarySelect = {
+  id: true,
+  inputHash: true,
+  expectedFrameCount: true,
+  committedFrameCount: true,
+  status: true,
+  expiresAt: true,
+  frameJobs: {
+    select: {
+      frameOrder: true,
+      status: true,
+    },
+    orderBy: {
+      frameOrder: "asc",
+    },
+  },
+} satisfies Prisma.GroupUploadJobSelect;
+
+const uploadJobLifecycleSelect = {
+  id: true,
+  inputHash: true,
+  expectedFrameCount: true,
+  committedFrameCount: true,
+  status: true,
+  expiresAt: true,
+  case: {
+    select: {
+      id: true,
+      slug: true,
+    },
+  },
+  group: {
+    select: {
+      id: true,
+      slug: true,
+      storageRoot: true,
+    },
+  },
+} satisfies Prisma.GroupUploadJobSelect;
+
+const frameUploadJobSelect = {
+  id: true,
+  frameOrder: true,
+  frameSnapshotJson: true,
+  preparedAssetsJson: true,
+  pendingPrefix: true,
+  status: true,
+  groupUploadJob: {
+    select: uploadJobLifecycleSelect,
+  },
+} satisfies Prisma.FrameUploadJobSelect;
+
+export type ActiveUploadJobSummary = Prisma.GroupUploadJobGetPayload<{
+  select: typeof uploadJobSummarySelect;
+}>;
 
 export type ActiveUploadJob = Prisma.GroupUploadJobGetPayload<{
-  include: typeof uploadJobInclude;
+  select: typeof uploadJobLifecycleSelect;
 }>;
-export type ActiveFrameUploadJob = ActiveUploadJob["frameJobs"][number];
+
+export type ActiveFrameUploadJob = Prisma.FrameUploadJobGetPayload<{
+  select: typeof frameUploadJobSelect;
+}>;
 
 /**
  * Fails with a domain-specific message when persisted JSON no longer matches the expected upload
@@ -88,6 +141,96 @@ export function isManagedGroupStorageRoot(storageRoot: string): boolean {
 async function refreshCaseDerivedState(caseId: string): Promise<void> {
   await recomputeCaseCoverAsset(caseId);
   await syncCasePublicationState(caseId);
+}
+
+/**
+ * Upload job expiry is enforced at read time so stale local resumptions stop behaving like valid
+ * active jobs even before a later start flow cancels them in the database.
+ */
+function isExpiredUploadJob(
+  expiresAt: Date | null,
+  now: Date = new Date(),
+): boolean {
+  return Boolean(expiresAt && expiresAt <= now);
+}
+
+/**
+ * Centralizes the active-job guard so narrow summary queries and frame-level lookups reject the
+ * same stale/cancelled job shapes without each caller re-implementing expiry semantics.
+ */
+function assertUploadJobIsActive(
+  job:
+    | {
+        status: string;
+        expiresAt: Date | null;
+      }
+    | null,
+  now: Date = new Date(),
+): asserts job is {
+  status: string;
+  expiresAt: Date | null;
+} {
+  if (!job || job.status !== ACTIVE_JOB_STATUS || isExpiredUploadJob(job.expiresAt, now)) {
+    throw new Error("Upload job not found.");
+  }
+}
+
+/**
+ * Cancels old jobs before the partial unique index on active uploads is relied on, so pre-index
+ * local databases and crash-leftovers converge to the same “one active job per group” invariant.
+ */
+async function cancelUploadJobs(jobIds: string[]): Promise<void> {
+  if (jobIds.length === 0) {
+    return;
+  }
+
+  await prisma.$transaction([
+    prisma.frameUploadJob.updateMany({
+      where: {
+        groupUploadJobId: {
+          in: jobIds,
+        },
+      },
+      data: {
+        status: CANCELLED_JOB_STATUS,
+      },
+    }),
+    prisma.groupUploadJob.updateMany({
+      where: {
+        id: {
+          in: jobIds,
+        },
+      },
+      data: {
+        status: CANCELLED_JOB_STATUS,
+      },
+    }),
+  ]);
+}
+
+/**
+ * Start is the only step that can legitimately replace one active job with another, so expired
+ * jobs are cancelled here before resume-or-reset decisions inspect current group state.
+ */
+export async function cancelExpiredActiveUploadJobs(
+  groupId: string,
+  now: Date = new Date(),
+): Promise<void> {
+  const expiredJobs = await prisma.groupUploadJob.findMany({
+    where: {
+      groupId,
+      status: ACTIVE_JOB_STATUS,
+      expiresAt: {
+        not: null,
+        lte: now,
+      },
+    },
+    select: {
+      id: true,
+    },
+  });
+
+  await cancelUploadJobs(expiredJobs.map((job) => job.id));
 }
 
 /**
@@ -251,12 +394,10 @@ export function summarizeUploadJob(job: {
     canComplete:
       job.expectedFrameCount > 0 &&
       job.expectedFrameCount === job.committedFrameCount,
-    frameStates: [...job.frameJobs]
-      .sort((left, right) => left.frameOrder - right.frameOrder)
-      .map((frameJob) => ({
-        frameOrder: frameJob.frameOrder,
-        status: frameJob.status,
-      })),
+    frameStates: [...job.frameJobs].map((frameJob) => ({
+      frameOrder: frameJob.frameOrder,
+      status: frameJob.status,
+    })),
   };
 }
 
@@ -371,16 +512,29 @@ export async function ensureCaseAndGroup(input: GroupUploadStartInput) {
 }
 
 /**
- * Loads the newest active job for one group so restart/resume decisions stay centralized instead of
- * being reimplemented in each API step.
+ * Loads the newest still-active upload job summary for a group so start only touches the frame
+ * states it needs for resume decisions instead of hydrating case/group payloads every time.
  */
-export async function findActiveUploadJobByGroup(groupId: string) {
+export async function findActiveUploadJobByGroup(
+  groupId: string,
+  now: Date = new Date(),
+): Promise<ActiveUploadJobSummary | null> {
   return prisma.groupUploadJob.findFirst({
     where: {
       groupId,
       status: ACTIVE_JOB_STATUS,
+      OR: [
+        {
+          expiresAt: null,
+        },
+        {
+          expiresAt: {
+            gt: now,
+          },
+        },
+      ],
     },
-    include: uploadJobInclude,
+    select: uploadJobSummarySelect,
     orderBy: {
       updatedAt: "desc",
     },
@@ -388,37 +542,61 @@ export async function findActiveUploadJobByGroup(groupId: string) {
 }
 
 /**
- * Ensures every upload step operates on a still-active job with the same eager relations, so later
- * helpers do not each need to repeat the same missing-job and status checks.
+ * Complete only needs job metadata and owning case/group ids, so this guard intentionally avoids
+ * eager-loading every frame row the way the earlier broad include did.
  */
-export async function requireActiveUploadJob(jobId: string): Promise<ActiveUploadJob> {
+export async function requireActiveUploadJob(
+  jobId: string,
+  now: Date = new Date(),
+): Promise<ActiveUploadJob> {
   const job = await prisma.groupUploadJob.findUnique({
     where: { id: jobId },
-    include: uploadJobInclude,
+    select: uploadJobLifecycleSelect,
   });
-
-  if (!job || job.status !== ACTIVE_JOB_STATUS) {
-    throw new Error("Upload job not found.");
-  }
-
+  assertUploadJobIsActive(job, now);
   return job;
 }
 
 /**
- * Resolves one frame sub-job by its persisted order value so prepare/commit cannot accidentally
- * diverge on whether they index frames by array position or business order.
+ * Prepare and commit operate on exactly one frame, so they load that frame job directly by the
+ * compound `(groupUploadJobId, frameOrder)` key instead of pulling the whole frameJobs array first.
  */
-export function requireUploadFrameJob(
-  frameJobs: ActiveUploadJob["frameJobs"],
+export async function requireActiveFrameUploadJob(
+  groupUploadJobId: string,
   frameOrder: number,
-): ActiveFrameUploadJob {
-  const frameJob = frameJobs.find((item) => item.frameOrder === frameOrder);
+  now: Date = new Date(),
+): Promise<ActiveFrameUploadJob> {
+  const frameJob = await prisma.frameUploadJob.findUnique({
+    where: {
+      groupUploadJobId_frameOrder: {
+        groupUploadJobId,
+        frameOrder,
+      },
+    },
+    select: frameUploadJobSelect,
+  });
 
   if (!frameJob) {
     throw new Error("Frame upload job not found.");
   }
 
+  assertUploadJobIsActive(frameJob.groupUploadJob, now);
   return frameJob;
+}
+
+/**
+ * Complete can trust the committed-frame counter fast path, but still needs a narrow count query
+ * to reject jobs whose row-level states drifted away from the aggregate due to earlier failures.
+ */
+export async function countUncommittedFrameJobs(groupUploadJobId: string): Promise<number> {
+  return prisma.frameUploadJob.count({
+    where: {
+      groupUploadJobId,
+      status: {
+        not: COMMITTED_FRAME_STATUS,
+      },
+    },
+  });
 }
 
 /**
