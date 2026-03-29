@@ -4,6 +4,20 @@ This project started keeping a structured changelog on 2026-03-21.
 
 Entries before that date are summarized at release level instead of being reconstructed commit by commit.
 
+## v1.7.2 - 2026-03-29
+
+Uploader release focused on making source intake more forgiving: invalid case slugs now bounce back to metadata editing, and nested compare folders no longer need to be flattened by hand before import.
+
+### Changed
+
+- Uploader now falls back to a non-flat folder mode when the source root does not contain a valid flat compare set, first auto-detecting common `before / after / misc` folder names and then prompting for missing folders only when needed.
+- Nested-folder matching now uses normalized filename similarity instead of exact stem equality alone, so common suffix drift such as `v2` no longer forces users to rename files before import.
+- Uploader documentation now describes the nested-folder import flow and the multi-folder `after / misc` prompts.
+
+### Fixed
+
+- New-case uploads no longer reach the sync stage with an invalid `case.yaml` slug; the wizard now reopens `case.yaml` until the slug matches the shared lowercase slug contract.
+
 ## v1.7.1 - 2026-03-29
 
 Uploader follow-up release focused on cleaner auto-derived case titles and a calmer, more direct case-reuse flow inside the CLI wizard.

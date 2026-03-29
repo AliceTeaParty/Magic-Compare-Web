@@ -119,3 +119,24 @@ class DiscoverSourceGroupTests(unittest.TestCase):
         self.assertEqual(group.frames[0].after.variant, "out")
         self.assertEqual(group.frames[1].after.variant, "output")
         self.assertEqual([item.variant for item in group.frames[1].misc], ["degrain"])
+
+    def test_auto_detects_nested_before_and_after_directories(self) -> None:
+        self._touch("src/24_show_00002_100.png")
+        self._touch("rip/24_show_00002_100.png")
+        self._touch("misc/24_show_00002_100.png")
+
+        group = discover_source_group(self.source_dir)
+
+        self.assertEqual(len(group.frames), 1)
+        self.assertEqual(group.frames[0].before.variant, "source")
+        self.assertEqual(group.frames[0].after.variant, "out")
+        self.assertEqual([item.variant for item in group.frames[0].misc], ["misc"])
+
+    def test_nested_mode_matches_by_similarity_when_after_name_has_extra_suffix(self) -> None:
+        self._touch("before/24_show_00002_100.png")
+        self._touch("after/24_show_00002_100_v2.png")
+
+        group = discover_source_group(self.source_dir)
+
+        self.assertEqual(len(group.frames), 1)
+        self.assertEqual(group.frames[0].after.original_name, "24_show_00002_100_v2.png")

@@ -34,7 +34,13 @@ from .editor import open_in_editor
 from .naming import build_default_work_dir, build_unique_slug
 from .plan import PreparedCasePlan, build_case_plan, build_flat_source_plan, write_plan_report
 from .scanner import scan_case_directory
-from .source_parser import ParsedSourceGroup, discover_source_group
+from .source_parser import (
+    NonFlatSourceLayout,
+    ParsedSourceGroup,
+    discover_source_group,
+    discover_source_group_from_layout,
+    suggest_nonflat_source_layout,
+)
 from .upload_executor import (
     UploadExecutionSummary,
     UploadProgressEvent,
@@ -469,15 +475,150 @@ def _show_wizard_intro() -> None:
     _render_startup_banner()
 
 
+def _resolve_child_directory_input(
+    source_root: Path,
+    raw_value: str,
+    *,
+    label: str,
+) -> Path | None:
+    """Resolve nested-folder inputs relative to the source root so drag-and-drop paths and short folder names both work."""
+    normalized = raw_value.strip()
+    if not normalized:
+        return None
+
+    candidate = Path(normalized.strip("'\"")).expanduser()
+    if not candidate.is_absolute():
+        candidate = (source_root / candidate).resolve()
+    else:
+        candidate = candidate.resolve()
+
+    if not candidate.exists() or not candidate.is_dir():
+        raise ValueError(f"{label} 不存在：{candidate}")
+
+    return candidate
+
+
+def _resolve_directory_list_input(
+    source_root: Path,
+    raw_value: str,
+    *,
+    label: str,
+) -> tuple[Path, ...]:
+    """Allow comma-separated nested-folder input so users can point multiple after or misc folders at once without repeating prompts."""
+    items = [item.strip() for item in raw_value.split(",")]
+    resolved: list[Path] = []
+    seen: set[Path] = set()
+    for item in items:
+        path = _resolve_child_directory_input(source_root, item, label=label)
+        if not path or path in seen:
+            continue
+        resolved.append(path)
+        seen.add(path)
+    return tuple(resolved)
+
+
+def _layout_hint_text(paths: tuple[Path, ...]) -> str:
+    return ", ".join(path.name for path in paths) if paths else ""
+
+
+def _prompt_nonflat_layout(source_root: Path) -> NonFlatSourceLayout:
+    """Fallback to explicit folder prompts only when auto-detection cannot confidently find a usable before/after layout."""
+    suggestion = suggest_nonflat_source_layout(source_root)
+    console.print(
+        "[yellow]检测到根目录不是平铺素材，切换到子文件夹匹配模式。[/]"
+    )
+    console.print(
+        "[bright_black]会先按 before/after/misc 常见目录名自动猜；不完整时再让你补目录。[/]"
+    )
+
+    while True:
+        try:
+            before_input = typer.prompt(
+                "before 文件夹",
+                default=suggestion.before_dir.name if suggestion.before_dir else "",
+                show_default=bool(suggestion.before_dir),
+            )
+            after_input = typer.prompt(
+                "after 文件夹（可多个，用逗号分隔）",
+                default=_layout_hint_text(suggestion.after_dirs),
+                show_default=bool(suggestion.after_dirs),
+            )
+            misc_input = typer.prompt(
+                "misc 文件夹（可多个，没有就直接回车）",
+                default=_layout_hint_text(suggestion.misc_dirs),
+                show_default=bool(suggestion.misc_dirs),
+            )
+
+            before_dir = _resolve_child_directory_input(
+                source_root,
+                before_input,
+                label="before 文件夹",
+            )
+            after_dirs = _resolve_directory_list_input(
+                source_root,
+                after_input,
+                label="after 文件夹",
+            )
+            misc_dirs = _resolve_directory_list_input(
+                source_root,
+                misc_input,
+                label="misc 文件夹",
+            )
+        except ValueError as error:
+            console.print(f"[red]目录输入无效：{error}[/]")
+            console.print("[yellow]请重新输入子文件夹路径，支持相对目录名或拖拽后的绝对路径。[/]")
+            continue
+
+        if not before_dir:
+            console.print("[red]before 文件夹不能为空。[/]")
+            continue
+        if not after_dirs:
+            console.print("[red]至少需要一个 after 文件夹。[/]")
+            continue
+
+        return NonFlatSourceLayout(
+            before_dir=before_dir,
+            after_dirs=after_dirs,
+            misc_dirs=misc_dirs,
+        )
+
+
+def _should_offer_nonflat_mode(source_dir: Path, error: ValueError) -> bool:
+    """Only switch to nested-folder prompts when the root folder itself lacks a viable flat layout and subdirectories exist to inspect."""
+    message = str(error)
+    if "根目录没有符合平铺导入命名规则的图片文件" in message:
+        return True
+    if "中没有可导入的图片文件" in message and any(
+        path.is_dir() for path in source_dir.iterdir()
+    ):
+        return True
+    return False
+
+
 def _discover_source_group() -> ParsedSourceGroup:
     """Keep source-path entry retryable because local path mistakes are common and should not abort the whole wizard."""
     while True:
         source_input = typer.prompt("素材目录", default=str(Path.cwd()))
+        source_dir: Path | None = None
         try:
             source_dir = _resolve_source_dir(source_input)
             with console.status("[bold green]正在解析素材文件名...[/]"):
                 source_group = discover_source_group(source_dir)
         except ValueError as error:
+            if source_dir and _should_offer_nonflat_mode(source_dir, error):
+                try:
+                    layout = _prompt_nonflat_layout(source_dir)
+                    with console.status("[bold green]正在按子文件夹匹配素材...[/]"):
+                        source_group = discover_source_group_from_layout(
+                            source_dir, layout
+                        )
+                except ValueError as layout_error:
+                    console.print(f"[red]子文件夹模式解析失败：{layout_error}[/]")
+                    console.print("[yellow]请调整目录选择，或回到上一级目录重新输入素材路径。[/]")
+                    continue
+                _render_source_summary(source_group)
+                return source_group
+
             console.print(f"[red]素材目录无效：{error}[/]")
             console.print("[yellow]请直接重输目录路径。支持拖拽路径，也支持带引号路径。[/]")
             continue

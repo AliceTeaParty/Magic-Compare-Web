@@ -143,6 +143,26 @@ class WizardSourcePromptTests(unittest.TestCase):
 
         self.assertEqual(group.source_root, source_dir.resolve())
 
+    def test_discover_source_group_prompts_for_nonflat_directories_when_auto_match_is_missing(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            source_dir = Path(temp_dir) / "sample"
+            (source_dir / "raw").mkdir(parents=True, exist_ok=True)
+            (source_dir / "done").mkdir(parents=True, exist_ok=True)
+            (source_dir / "raw" / "24_show_00002_100.png").write_bytes(b"")
+            (source_dir / "done" / "24_show_00002_100_v2.png").write_bytes(b"")
+
+            with (
+                mock.patch(
+                    "src.wizard.typer.prompt",
+                    side_effect=[str(source_dir), "raw", "done", ""],
+                ),
+                mock.patch("src.wizard.console.print"),
+            ):
+                group = _discover_source_group()
+
+        self.assertEqual(group.source_root, source_dir.resolve())
+        self.assertEqual(group.frames[0].after.original_name, "24_show_00002_100_v2.png")
+
 
 class WizardMetadataValidationTests(unittest.TestCase):
     def test_invalid_case_slug_reopens_case_yaml_until_fixed(self) -> None:

@@ -82,6 +82,13 @@ magic-compare-uploader
 - 处理后：`out` / `output` / `rip`
 - 热力图：`heatmap`
 
+如果素材根目录不是平铺文件，而是拆成多个子文件夹，向导现在会自动切到“非平铺模式”：
+
+- 先尝试按常见目录名自动匹配 `before / after / misc`
+- 自动匹配不完整时，再让你补输入 before、after、misc 文件夹
+- `after` 和 `misc` 都支持多个目录，使用逗号分隔
+- 文件配对优先按关键文件名匹配，并容忍轻微的后缀差异，例如 `v2`
+
 上传成功后，工具会把 `workspace` 和 `viewer` 链接单独按裸文本输出，便于在终端里直接完整复制 URL。
 
 ---
