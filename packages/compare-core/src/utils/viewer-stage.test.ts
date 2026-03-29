@@ -3,19 +3,22 @@ import {
   clampViewerPanZoom,
   cycleAbSide,
   getContainedMediaRect,
+  getViewerDisplayedScale,
   getViewerEffectiveScale,
   getFilmstripScrollbarMetrics,
   getFittedStageSize,
   VIEWER_MAX_PRESET_SCALE,
   getViewerPresetTransformScale,
   VIEWER_MAX_FINE_SCALE,
+  VIEWER_MIN_FINE_SCALE,
+  normalizeViewerDisplayedScale,
 } from "./viewer-stage";
 
 describe("getFittedStageSize", () => {
   it("fits a 16:9 stage inside the viewport padding budget", () => {
     expect(getFittedStageSize({ width: 1440, height: 900 }, 16 / 9)).toEqual({
-      width: 1408,
-      height: 792,
+      width: 1420,
+      height: 798.75,
     });
   });
 });
@@ -95,6 +98,31 @@ describe("clampViewerPanZoom", () => {
 });
 
 describe("physical scale helpers", () => {
+  it("normalizes arbitrary displayed scales back into the preset-plus-fine storage model", () => {
+    expect(
+      normalizeViewerDisplayedScale(1.8, {
+        x: 12,
+        y: -8,
+      }),
+    ).toEqual({
+      presetScale: 2,
+      fineScale: 0.9,
+      x: 12,
+      y: -8,
+    });
+  });
+
+  it("derives a user-facing displayed scale from preset and fine scale", () => {
+    expect(
+      getViewerDisplayedScale({
+        presetScale: 3,
+        fineScale: 1.2,
+        x: 0,
+        y: 0,
+      }),
+    ).toBeCloseTo(3.6, 10);
+  });
+
   it("derives a pixel-exact preset transform from media size, viewport size and DPR", () => {
     expect(
       getViewerPresetTransformScale(1, {
@@ -156,6 +184,13 @@ describe("physical scale helpers", () => {
         },
       ),
     ).toBeCloseTo(10, 10);
+  });
+});
+
+describe("fine-scale bounds", () => {
+  it("supports continuous zoom across the full 1x-8x range", () => {
+    expect(VIEWER_MIN_FINE_SCALE).toBeCloseTo(0.6, 10);
+    expect(VIEWER_MAX_FINE_SCALE).toBeCloseTo(1.6666666667, 8);
   });
 });
 

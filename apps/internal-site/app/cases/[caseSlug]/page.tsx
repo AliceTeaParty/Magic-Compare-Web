@@ -19,7 +19,15 @@ export default async function CaseWorkspacePage({
   }
 
   return (
-    <Container maxWidth="xl" sx={{ py: { xs: 4, md: 5 } }}>
+    <Container
+      maxWidth="xl"
+      sx={{
+        // Match the catalog container inset so workspace pages inherit the same visual frame and
+        // layout tweaks do not drift into page-by-page padding guesses again.
+        py: { xs: 3.75, md: 5 },
+        px: { xs: 2, md: 3 },
+      }}
+    >
       <CaseWorkspaceBoard data={data} canDeployPublicSite={isCloudflarePagesDeployConfigured()} />
     </Container>
   );

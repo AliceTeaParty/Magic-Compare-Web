@@ -53,6 +53,16 @@ magic-compare-uploader
 如果你拿到的是 Windows 打包版压缩包，优先双击同目录里的 `.cmd` 启动器，不要直接双击 `.exe`。  
 这样在 internal-site 地址填错、站点没开、网络不通时，错误提示会留在窗口里，不会一闪而过。
 
+启动后会先显示：
+
+- `Magic Compare Uploader` 的字符画 Logo
+- 当前版本
+- GitHub 仓库与 Issues 地址
+- GPLv3 / 问题反馈提示
+
+然后才会进入素材目录输入。  
+如果路径输错，不会直接退出整个向导，而是会在当前步骤提示你重输。
+
 向导会依次做这些事：
 
 - 选择素材目录
@@ -62,6 +72,14 @@ magic-compare-uploader
 - 打开编辑器确认 `case.yaml` / `group.yaml`
 - 显示总体文件进度、当前 frame 和重试/失败统计
 - 按 frame 直传并提交到站点
+
+默认文件名后缀识别：
+
+- 原图：`src` / `source` / `ori` / `origin`
+- 处理后：`out` / `output` / `rip`
+- 热力图：`heatmap`
+
+上传成功后，工具会把 `workspace` 和 `viewer` 链接单独按裸文本输出，便于在终端里直接完整复制 URL。
 
 ---
 
@@ -210,13 +228,14 @@ MAGIC_COMPARE_CF_ACCESS_CLIENT_SECRET=*
 <details>
 <summary><strong>🧱 其他常用命令</strong></summary>
 
-1. 只生成 manifest，不上传：
+主命令建议只记这两个：
 
 ```bash
-magic-compare-uploader manifest /path/to/work-dir -o manifest.json
+magic-compare-uploader plan /path/to/source
+magic-compare-uploader sync /path/to/work-dir
 ```
 
-2. 删除一个 group：
+其他命令只在排查、查看或清理 remote 状态时再用，例如删除一个 group：
 
 ```bash
 magic-compare-uploader delete-group --case-slug 2026 --group-slug out --work-dir /path/to/work-dir

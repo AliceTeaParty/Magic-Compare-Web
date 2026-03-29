@@ -6,14 +6,14 @@ import type { ViewerMode } from "@magic-compare/content-schema";
 import { AbInspectControls } from "./ab-inspect-controls";
 
 interface ViewerToolbarProps {
-  abPresetScale: number;
+  abScale: number;
   abSide: "before" | "after";
   canUseHeatmap: boolean;
   hideStageScrollControl: boolean;
   mode: ViewerMode;
   onAbSideChange: (side: "before" | "after") => void;
   onModeChange: (mode: ViewerMode) => void;
-  onScalePresetChange: (presetScale: number) => void;
+  onScaleChange: (nextScale: number) => void;
   onScrollStageIntoView: () => void;
   onToggleSidebar: () => void;
   sidebarOpen: boolean;
@@ -24,18 +24,21 @@ interface ViewerToolbarProps {
  * consistent between the internal and public shells.
  */
 export function ViewerToolbar({
-  abPresetScale,
+  abScale,
   abSide,
   canUseHeatmap,
   hideStageScrollControl,
   mode,
   onAbSideChange,
   onModeChange,
-  onScalePresetChange,
+  onScaleChange,
   onScrollStageIntoView,
   onToggleSidebar,
   sidebarOpen,
 }: ViewerToolbarProps) {
+  const compactControlHeight = { xs: 42, md: 40 };
+  const compactIconButtonSize = { xs: 42, md: 40 };
+
   /**
    * Routes side selection through the parent controller so A/B state stays in sync with keyboard
    * shortcuts and stage tap cycling.
@@ -48,8 +51,8 @@ export function ViewerToolbar({
    * Clamps preset changes through the shared controller entry point so toolbar buttons and keyboard
    * shortcuts cannot diverge from stage zoom bounds.
    */
-  function handleScalePresetChange(nextPresetScale: number) {
-    onScalePresetChange(nextPresetScale);
+  function handleScaleChange(nextScale: number) {
+    onScaleChange(nextScale);
   }
 
   /**
@@ -71,10 +74,10 @@ export function ViewerToolbar({
       useFlexGap
     >
       <AbInspectControls
-        abPresetScale={abPresetScale}
+        abScale={abScale}
         abSide={abSide}
         onAbSideChange={handleAbSideChange}
-        onScalePresetChange={handleScalePresetChange}
+        onScaleChange={handleScaleChange}
         showControls={mode === "a-b"}
       />
 
@@ -86,8 +89,10 @@ export function ViewerToolbar({
           overflow: "visible",
           alignItems: "stretch",
           "& .MuiToggleButtonGroup-grouped": {
-            height: 34,
-            minHeight: 34,
+            // Mode switching is a primary touch action in the viewer, so it needs a larger target
+            // than the older desktop-first 34px sizing.
+            height: compactControlHeight,
+            minHeight: compactControlHeight,
             px: 1.3,
             fontWeight: 550,
             border: "1px solid",
@@ -123,8 +128,8 @@ export function ViewerToolbar({
             aria-label="Scroll the compare stage into view"
             onClick={onScrollStageIntoView}
             sx={{
-              width: 34,
-              height: 34,
+              width: compactIconButtonSize,
+              height: compactIconButtonSize,
               borderColor: "divider",
               backgroundColor: "rgba(255,255,255,0.035)",
             }}
@@ -139,8 +144,8 @@ export function ViewerToolbar({
           size="small"
           onClick={onToggleSidebar}
           sx={{
-            width: 34,
-            height: 34,
+            width: compactIconButtonSize,
+            height: compactIconButtonSize,
             "& .MuiSvgIcon-root": {
               fontSize: 18,
             },

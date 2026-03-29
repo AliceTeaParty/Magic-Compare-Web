@@ -27,7 +27,6 @@ from .config import (
     persist_config_overrides,
     resolve_uploader_config,
 )
-from .manifest import manifest_json
 from .plan import PlanReport, build_case_plan, build_path_plan, write_plan_report
 from .upload_executor import UploadExecutionSummary, execute_upload_plan
 
@@ -200,17 +199,6 @@ def handle_plan(
     if report_json:
         write_plan_report(report, report_json)
     return report
-
-
-def handle_manifest(source: Path, *, output: Path | None = None) -> None:
-    """Emit the group-upload-start payload shape without touching remote storage."""
-    manifest_text = manifest_json(source)
-    if output:
-        output.write_text(manifest_text, encoding="utf-8")
-        typer.echo(f"已写入 manifest：{output}")
-        return
-
-    typer.echo(manifest_text)
 
 
 def handle_sync(

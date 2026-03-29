@@ -81,6 +81,9 @@ function ViewerSidebarContent({
   publishStatus: ViewerDataset["publishStatus"];
   variant: "public" | "internal";
 }) {
+  const compactButtonHeight = { xs: 42, md: 40 };
+  const compactIconButtonSize = { xs: 42, md: 40 };
+
   return (
     <Stack spacing={2} sx={{ p: 2.25 }}>
       {variant === "internal" ? (
@@ -101,7 +104,7 @@ function ViewerSidebarContent({
               startIcon={<ArrowBack fontSize="small" />}
               sx={{
                 alignSelf: "flex-start",
-                minHeight: 34,
+                minHeight: compactButtonHeight,
                 px: 1.35,
               }}
             >
@@ -179,8 +182,10 @@ function ViewerSidebarContent({
                     aria-label="Open published page in a new tab"
                     size="small"
                     sx={{
-                      width: 38,
-                      height: 30,
+                      // Keep the public-link affordance on the same touch-target baseline as the
+                      // rest of the viewer chrome instead of shrinking it into a special-case pill.
+                      width: compactIconButtonSize,
+                      height: compactIconButtonSize,
                       px: 0.9,
                       borderRadius: 999,
                       border: "1px solid",

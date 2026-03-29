@@ -6,6 +6,8 @@ import type {
   TouchEvent as ReactTouchEvent,
 } from "react";
 import {
+  getViewerDisplayedScale,
+  normalizeViewerDisplayedScale,
   VIEWER_MAX_FINE_SCALE,
   type ViewerPanZoomState,
 } from "@magic-compare/compare-core";
@@ -204,17 +206,15 @@ export function finishPointerPan({
  * and mobile pinch interactions cannot diverge in scale bounds.
  */
 export function applyWheelZoom({
-  active,
   applyPanZoom,
   event,
   panZoomStateRef,
 }: {
-  active: boolean;
   applyPanZoom: (nextState: ViewerPanZoomState) => void;
   event: WheelLikeEvent;
   panZoomStateRef: MutableRefObject<ViewerPanZoomState>;
 }) {
-  if (!event.ctrlKey || !active) {
+  if (!event.ctrlKey) {
     return;
   }
 
@@ -225,18 +225,21 @@ export function applyWheelZoom({
     event.preventDefault();
   }
 
-  const nextFineScale = clampNumber(
-    panZoomStateRef.current.fineScale * (event.deltaY < 0 ? 1.12 : 0.88),
+  // Ctrl+wheel is itself an explicit inspect gesture on desktop. Requiring a prior "active" click
+  // made zoom look broken unless users already knew the hidden activation step.
+  const nextDisplayedScale = clampNumber(
+    getViewerDisplayedScale(panZoomStateRef.current) *
+      (event.deltaY < 0 ? 1.12 : 0.88),
     1,
-    VIEWER_MAX_FINE_SCALE,
+    8,
   );
 
-  applyPanZoom({
-    presetScale: panZoomStateRef.current.presetScale,
-    fineScale: nextFineScale,
-    x: panZoomStateRef.current.x,
-    y: panZoomStateRef.current.y,
-  });
+  applyPanZoom(
+    normalizeViewerDisplayedScale(nextDisplayedScale, {
+      x: panZoomStateRef.current.x,
+      y: panZoomStateRef.current.y,
+    }),
+  );
 }
 
 /**

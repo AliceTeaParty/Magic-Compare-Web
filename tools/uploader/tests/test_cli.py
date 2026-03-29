@@ -5,6 +5,8 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
+from typer.testing import CliRunner
+
 from src import cli
 from src.cli import _normalize_path_text, _resolve_source_dir
 
@@ -44,6 +46,20 @@ class CliPathResolutionTests(unittest.TestCase):
         stderr.reconfigure.assert_called_once_with(
             encoding="utf-8", errors="replace"
         )
+
+    def test_help_surfaces_plan_and_sync_as_primary_commands(self) -> None:
+        runner = CliRunner()
+
+        result = runner.invoke(cli.app, ["--help"])
+
+        self.assertEqual(result.exit_code, 0)
+        self.assertIn("主要命令", result.stdout)
+        self.assertIn("杂项命令", result.stdout)
+        self.assertIn("plan", result.stdout)
+        self.assertIn("sync", result.stdout)
+        self.assertNotIn("scan", result.stdout)
+        self.assertNotIn("manifest", result.stdout)
+        self.assertIn("主要命令只有 plan 和 sync", result.stdout)
 
 
 if __name__ == "__main__":

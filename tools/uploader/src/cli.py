@@ -15,7 +15,6 @@ from .commands import (
     handle_delete_group,
     handle_list_cases,
     handle_list_groups,
-    handle_manifest,
     handle_plan,
     handle_sync,
 )
@@ -39,7 +38,11 @@ def _configure_windows_stdio_for_unicode() -> None:
 _configure_windows_stdio_for_unicode()
 
 
-app = typer.Typer(add_completion=False, help="Magic Compare 中文导入工具")
+app = typer.Typer(
+    add_completion=False,
+    help="Magic Compare 中文导入工具",
+    epilog="主要命令只有 plan 和 sync。其余命令只用于排查、查看或清理 remote 状态。",
+)
 
 
 def _handle_top_level_error(error: Exception, *, default_message: str) -> None:
@@ -54,20 +57,20 @@ def main(
     site_url: str | None = typer.Option(
         None,
         "--site-url",
-        help=f"内部站点主页，优先读取 {ENV_SITE_URL_NAME}。",
+        help=f"internal-site 首页地址；优先读取 {ENV_SITE_URL_NAME}。",
     ),
     api_url: str | None = typer.Option(
         None,
         "--api-url",
-        help=f"内部站点 group-upload-start 接口，优先读取 {ENV_API_URL_NAME}。",
+        help=f"group-upload-start 接口地址；留空时优先读取 {ENV_API_URL_NAME}，否则从 site_url 推断。",
     ),
     report_json: Path | None = typer.Option(
         None,
         "--report-json",
-        help="把当前计划/执行结果写成机器可读 JSON。",
+        help="把预演或同步结果写成 JSON 报告。",
     ),
 ) -> None:
-    """Magic Compare 中文导入工具。"""
+    """不带子命令时进入中文向导。"""
     if ctx.invoked_subcommand is not None:
         return
 
@@ -80,14 +83,14 @@ def main(
         _handle_top_level_error(error, default_message="导入失败")
 
 
-@app.command()
+@app.command(rich_help_panel="主要命令")
 def plan(
     source: Path,
     report_json: Path | None = typer.Option(None, "--report-json"),
     case_slug: str | None = typer.Option(None, "--case-slug"),
     group_slug: str | None = typer.Option(None, "--group-slug"),
 ) -> None:
-    """只做扫描、校验和计划生成，不上传也不写远端。"""
+    """预演素材目录，检查命名、坏图和目标路径，不上传。"""
     try:
         report = handle_plan(
             source, report_json=report_json, case_slug=case_slug, group_slug=group_slug
@@ -99,65 +102,28 @@ def plan(
         raise typer.Exit(code=report.exit_code)
 
 
-@app.command()
-def scan(source: Path) -> None:
-    """兼容旧入口：等价于 `plan`，但只打印摘要。"""
-    try:
-        report = handle_plan(source)
-    except Exception as error:
-        _handle_top_level_error(error, default_message="扫描失败")
-
-    if report.exit_code != 0:
-        raise typer.Exit(code=report.exit_code)
-
-
-@app.command()
-def manifest(
-    source: Path,
-    output: Path | None = typer.Option(None, "--output", "-o"),
-    site_url: (
-        str | None
-    ) = typer.Option(  # kept for CLI compatibility; manifest generation is now local-only.
-        None,
-        "--site-url",
-        help=f"内部站点主页，优先读取 {ENV_SITE_URL_NAME}。",
-    ),
-    api_url: str | None = typer.Option(
-        None,
-        "--api-url",
-        help=f"内部站点导入接口，优先读取 {ENV_API_URL_NAME}。",
-    ),
-) -> None:
-    """生成 group-upload-start payload JSON，但不执行上传。"""
-    _ = site_url, api_url
-    try:
-        handle_manifest(source, output=output)
-    except Exception as error:
-        _handle_top_level_error(error, default_message="Manifest 生成失败")
-
-
-@app.command()
+@app.command(rich_help_panel="主要命令")
 def sync(
     source: Path,
     site_url: str | None = typer.Option(
         None,
         "--site-url",
-        help=f"内部站点主页，优先读取 {ENV_SITE_URL_NAME}。",
+        help=f"internal-site 首页地址；优先读取 {ENV_SITE_URL_NAME}。",
     ),
     api_url: str | None = typer.Option(
         None,
         "--api-url",
-        help=f"内部站点导入接口，优先读取 {ENV_API_URL_NAME}。",
+        help=f"group-upload-start 接口地址；留空时优先读取 {ENV_API_URL_NAME}，否则从 site_url 推断。",
     ),
     report_json: Path | None = typer.Option(None, "--report-json"),
     dry_run: bool = typer.Option(
-        False, "--dry-run", help="只执行 plan，不上传也不调用 sync 接口。"
+        False, "--dry-run", help="只跑预演，不上传，也不调用 remote 接口。"
     ),
     reset_session: bool = typer.Option(
-        False, "--reset-session", help="忽略已有 upload session，从头重建。"
+        False, "--reset-session", help="忽略已有 upload session，从头开始这次同步。"
     ),
 ) -> None:
-    """对结构化 case 目录执行 plan、直传和服务端提交。"""
+    """对结构化 case 目录执行预演、直传和服务端提交。"""
     try:
         report, execution_summary, _sync_result = handle_sync(
             source,
@@ -179,7 +145,7 @@ def sync(
         raise typer.Exit(code=1)
 
 
-@app.command("delete-group")
+@app.command("delete-group", rich_help_panel="杂项命令")
 def delete_group_command(
     case_slug: str | None = typer.Option(
         None, "--case-slug", help="要删除 group 所在的 case slug。"
@@ -203,7 +169,7 @@ def delete_group_command(
         help=f"内部站点导入接口，优先读取 {ENV_API_URL_NAME}。",
     ),
 ) -> None:
-    """删除内部站某个 case 下的 group，并清理关联资产。"""
+    """删除 internal-site 某个 case 下的 group，并清理关联资产。"""
     try:
         handle_delete_group(
             case_slug=case_slug,
@@ -219,7 +185,7 @@ def delete_group_command(
         _handle_top_level_error(error, default_message="删除失败")
 
 
-@app.command("list-cases")
+@app.command("list-cases", rich_help_panel="杂项命令")
 def list_cases_command(
     work_dir: Path = typer.Option(
         Path.cwd(),
@@ -237,7 +203,7 @@ def list_cases_command(
         help=f"内部站点 group-upload-start 接口，优先读取 {ENV_API_URL_NAME}。",
     ),
 ) -> None:
-    """列出内部站当前所有 case。"""
+    """列出 internal-site 当前全部 case。"""
     try:
         handle_list_cases(
             work_dir=work_dir,
@@ -248,7 +214,7 @@ def list_cases_command(
         _handle_top_level_error(error, default_message="列出 case 失败")
 
 
-@app.command("list-groups")
+@app.command("list-groups", rich_help_panel="杂项命令")
 def list_groups_command(
     case_slug: str | None = typer.Option(
         None, "--case-slug", help="要查看的 case slug；留空时交互选择。"
@@ -284,7 +250,7 @@ def list_groups_command(
         _handle_top_level_error(error, default_message="列出 group 失败")
 
 
-@app.command("delete-case")
+@app.command("delete-case", rich_help_panel="杂项命令")
 def delete_case_command(
     case_slug: str | None = typer.Option(
         None, "--case-slug", help="要删除的空 case slug。"
@@ -305,7 +271,7 @@ def delete_case_command(
         help=f"内部站点 group-upload-start 接口，优先读取 {ENV_API_URL_NAME}。",
     ),
 ) -> None:
-    """删除一个没有任何 group 的 case。"""
+    """删除一个当前没有任何 group 的 case。"""
     try:
         handle_delete_case(
             case_slug=case_slug,

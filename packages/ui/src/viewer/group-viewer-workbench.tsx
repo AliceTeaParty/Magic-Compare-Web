@@ -3,6 +3,8 @@
 import { Tune } from "@mui/icons-material";
 import { Box, Paper, Slider, Stack, Typography } from "@mui/material";
 import {
+  getViewerDisplayedScale,
+  normalizeViewerDisplayedScale,
   VIEWER_MAX_PRESET_SCALE,
   VIEWER_MIN_PRESET_SCALE,
   cycleAbSide,
@@ -104,6 +106,10 @@ export function GroupViewerWorkbench({
       }),
     [stageAspectRatio, stageSlotWidth, viewportSize],
   );
+  const abDisplayedScale = useMemo(
+    () => getViewerDisplayedScale(abPanZoomState),
+    [abPanZoomState],
+  );
 
   useViewerPreferencePersistence({
     mode,
@@ -178,17 +184,17 @@ export function GroupViewerWorkbench({
   /**
    * Snaps preset zoom to the compare-core bounds so toolbar controls cannot drift from stage math.
    */
-  function setAbScalePreset(nextPresetScale: number) {
-    setAbPanZoomState(() => ({
-      presetScale: clampNumber(
-        nextPresetScale,
-        VIEWER_MIN_PRESET_SCALE,
-        VIEWER_MAX_PRESET_SCALE,
-      ) as typeof DEFAULT_PAN_ZOOM.presetScale,
-      fineScale: 1,
-      x: 0,
-      y: 0,
-    }));
+  function setAbScale(nextScale: number) {
+    setAbPanZoomState((currentState) =>
+      normalizeViewerDisplayedScale(
+        clampNumber(
+          nextScale,
+          VIEWER_MIN_PRESET_SCALE,
+          VIEWER_MAX_PRESET_SCALE,
+        ),
+        currentState,
+      ),
+    );
   }
 
   /**
@@ -280,7 +286,7 @@ export function GroupViewerWorkbench({
         }}
       >
         <ViewerHeader
-          abPresetScale={abPanZoomState.presetScale}
+          abScale={abDisplayedScale}
           abSide={abSide}
           canUseHeatmap={availableModes.includes("heatmap")}
           caseTitle={dataset.caseMeta.title}
@@ -289,7 +295,7 @@ export function GroupViewerWorkbench({
           mode={mode}
           onAbSideChange={setAbSide}
           onModeChange={setMode}
-          onScalePresetChange={setAbScalePreset}
+          onScaleChange={setAbScale}
           onScrollStageIntoView={scrollStageIntoView}
           onToggleSidebar={toggleSidebar}
           sidebarOpen={sidebarOpen}
@@ -303,7 +309,7 @@ export function GroupViewerWorkbench({
             flexDirection: "column",
           }}
         >
-          <Box sx={{ minWidth: 0, p: { xs: 1.5, md: 2.25 } }}>
+          <Box sx={{ minWidth: 0, p: { xs: 1, md: 1.5 } }}>
             <Stack
               spacing={1.5}
               sx={{

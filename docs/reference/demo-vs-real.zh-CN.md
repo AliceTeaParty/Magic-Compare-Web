@@ -205,6 +205,12 @@ magic-compare-uploader
 
 但 demo 仍然更适合作为“固定回归样本”。
 
+## 公开图片访问的当前约束
+
+- published manifest 里的图片 URL 仍然是绝对 URL，方便 `public-site` 做纯静态导出。
+- 这些绝对 URL 在生产环境里应指向 Cloudflare 代理的图片域名，而不是裸 R2 公网桶地址。
+- 页面层的 `robots` / `robots.txt` 只负责降低索引概率；真正防止机器人刷图和消耗对象存储流量，仍要靠 Cloudflare 对图片域名做 bot 管理、限流和挑战。
+
 ## 相关文件
 
 - demo seed：`apps/internal-site/prisma/seed.ts`

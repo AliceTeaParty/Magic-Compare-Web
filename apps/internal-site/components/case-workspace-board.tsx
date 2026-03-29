@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { CloudUpload } from "@mui/icons-material";
+import { ArrowBack, CloudUpload } from "@mui/icons-material";
 import {
   Box,
   Button,
@@ -90,8 +90,16 @@ export function CaseWorkspaceBoard({
     reorderCaseGroups(activeId, overId);
   }
 
+  /**
+   * Uses client-side navigation back to the catalog so the workspace keeps the app-shell feel
+   * instead of doing a full document reload for a very common "back to list" action.
+   */
+  function navigateToCatalog() {
+    router.push("/");
+  }
+
   return (
-    <Stack spacing={{ xs: 2.25, md: 3 }}>
+    <Stack spacing={{ xs: 2.6, md: 3.3 }}>
       <Box
         component={motion.div}
         initial={{ opacity: 0, y: 18 }}
@@ -105,16 +113,21 @@ export function CaseWorkspaceBoard({
           <Box
             sx={{
               display: "grid",
-              gap: { xs: 1.8, xl: 2.2 },
+              gap: { xs: 2.1, xl: 2.6 },
               alignItems: "start",
-              gridTemplateColumns: { xs: "1fr", xl: "minmax(0, 1.22fr) auto" },
-              pb: { xs: 2.8, md: 3.1 },
+              // Giving header content and page actions their own columns prevents deploy/navigation
+              // controls from visually blending into the case summary and status chips.
+              gridTemplateColumns: {
+                xs: "1fr",
+                xl: "minmax(0, 1.3fr) minmax(280px, 0.72fr)",
+              },
+              pb: { xs: 2.8, md: 3.2 },
               borderBottom: "1px solid",
               borderColor: "divider",
             }}
           >
-            <Stack spacing={1.6} sx={{ minWidth: 0, pr: { xl: 2.2 } }}>
-              <Typography variant="h2" sx={{ lineHeight: 0.98 }}>
+            <Stack spacing={1.7} sx={{ minWidth: 0, pr: { xl: 2.6 } }}>
+              <Typography variant="h2" component="h1" sx={{ lineHeight: 0.98 }}>
                 {data.title}
               </Typography>
               <Typography
@@ -129,7 +142,7 @@ export function CaseWorkspaceBoard({
                 spacing={0.9}
                 flexWrap="wrap"
                 useFlexGap
-                sx={{ pt: 0.25 }}
+                sx={{ pt: 0.35 }}
               >
                 <Chip
                   label={data.status}
@@ -149,42 +162,80 @@ export function CaseWorkspaceBoard({
               </Stack>
             </Stack>
             <Stack
-              direction="row"
-              spacing={1}
-              alignItems="center"
-              justifyContent={{ xs: "flex-start", xl: "flex-end" }}
-              flexWrap="wrap"
-              useFlexGap
+              spacing={1.15}
               sx={{
+                justifySelf: "end",
                 "& .MuiButton-root": {
                   minHeight: 42,
                   px: 2.1,
                 },
               }}
             >
-              <Tooltip
-                title={
-                  canDeployPublicSite
-                    ? ""
-                    : "Deploy Pages is disabled until Cloudflare Pages env is configured."
-                }
+              <Stack
+                direction="row"
+                spacing={1}
+                alignItems="center"
+                justifyContent="flex-end"
+                flexWrap="wrap"
+                useFlexGap
+                sx={{
+                  // Match the lighter nested treatment used by the group visibility control so
+                  // page-level actions feel embedded in the header instead of wrapped by a card.
+                  // The container stays width-fit so the two actions hug each other instead of
+                  // stretching across the whole header like a secondary content column.
+                  width: "fit-content",
+                  maxWidth: "100%",
+                  alignSelf: "flex-end",
+                  p: 0.45,
+                  borderRadius: 999,
+                  border: "1px solid",
+                  borderColor: "divider",
+                  backgroundColor: "rgba(255,255,255,0.028)",
+                }}
               >
-                <span>
-                  <Button
-                    variant="contained"
-                    startIcon={<CloudUpload />}
-                    disabled={
-                      isPending ||
-                      isDeployingPublicSite ||
-                      !canDeployPublicSite ||
-                      groups.length === 0
-                    }
-                    onClick={deployPublicSite}
-                  >
-                    Deploy Pages
-                  </Button>
-                </span>
-              </Tooltip>
+                <Button
+                  variant="text"
+                  startIcon={<ArrowBack />}
+                  onClick={navigateToCatalog}
+                  sx={{
+                    color: "text.secondary",
+                    px: 1.2,
+                    borderRadius: 999,
+                    backgroundColor: "transparent",
+                    border: "1px solid transparent",
+                    "&:hover": {
+                      color: "text.primary",
+                      borderColor: "rgba(232, 198, 246, 0.26)",
+                      backgroundColor: "rgba(255,255,255,0.04)",
+                    },
+                  }}
+                >
+                  Back to catalog
+                </Button>
+                <Tooltip
+                  title={
+                    canDeployPublicSite
+                      ? ""
+                      : "Deploy Pages is disabled until Cloudflare Pages env is configured."
+                  }
+                >
+                  <span>
+                    <Button
+                      variant="contained"
+                      startIcon={<CloudUpload />}
+                      disabled={
+                        isPending ||
+                        isDeployingPublicSite ||
+                        !canDeployPublicSite ||
+                        groups.length === 0
+                      }
+                      onClick={deployPublicSite}
+                    >
+                      Deploy Pages
+                    </Button>
+                  </span>
+                </Tooltip>
+              </Stack>
             </Stack>
           </Box>
         </Stack>
@@ -199,7 +250,9 @@ export function CaseWorkspaceBoard({
         <Paper
           elevation={0}
           sx={{
-            p: { xs: 2.2, md: 2.7 },
+            // The board padding and row gap were both loosened so adjacent groups read as separate
+            // review units instead of one dense control slab.
+            p: { xs: 2.1, md: 2.7 },
             borderRadius: 3.5,
             border: "1px solid",
             borderColor: "divider",
@@ -207,10 +260,14 @@ export function CaseWorkspaceBoard({
               "linear-gradient(180deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.02) 100%)",
           }}
         >
-          <Stack spacing={1.65}>
-            <Stack spacing={0.6}>
+          <Stack spacing={1.85}>
+            <Stack spacing={0.7}>
               <Typography variant="h6">Groups</Typography>
-              <Typography variant="body2" color="text.secondary">
+              <Typography
+                variant="body2"
+                color="text.secondary"
+                sx={{ maxWidth: 720, lineHeight: 1.72 }}
+              >
                 Drag to define case order. Group pages open in the viewer
                 workbench.
               </Typography>
@@ -229,7 +286,14 @@ export function CaseWorkspaceBoard({
                 items={groups.map((group) => group.id)}
                 strategy={rectSortingStrategy}
               >
-                <List sx={{ display: "grid", gap: 1.25 }}>
+                <List
+                  sx={{
+                    // Slightly larger inter-row spacing keeps each group row from collapsing into
+                    // the next once descriptions and actions start wrapping on smaller screens.
+                    display: "grid",
+                    gap: { xs: 1.15, md: 1.3 },
+                  }}
+                >
                   {groups.map((group) => (
                     <SortableGroupRow
                       key={group.id}

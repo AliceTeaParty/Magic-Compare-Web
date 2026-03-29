@@ -8,7 +8,7 @@ from pathlib import Path
 from .naming import kebab_case, title_case
 from .scanner import SUPPORTED_EXTENSIONS
 
-SOURCE_VARIANTS = {"src", "source"}
+SOURCE_VARIANTS = {"src", "source", "ori", "origin"}
 HEATMAP_VARIANTS = {"heatmap"}
 IGNORED_BASENAMES = {".ds_store", "thumbs.db"}
 IGNORED_SUFFIXES = {".json", ".yaml", ".yml", ".txt", ".md", ".csv", ".db", ".log"}
@@ -151,11 +151,7 @@ def _parse_candidate(path: Path) -> SourceCandidate:
 
 
 def _after_priority(candidate: SourceCandidate) -> tuple[int, str, str]:
-    """Prioritize after candidates: out > output > rip > others.
-    
-    Allows fallback to rip if standard variants missing, improving handling of
-    tools that export non-standard naming (e.g., ripple, temporal difference maps).
-    """
+    """Prioritize stable review outputs first so one directory can still contain experiments without changing the chosen after image."""
     if candidate.variant == "out":
         return (0, candidate.variant, candidate.original_name.lower())
     if candidate.variant == "output":

@@ -25,10 +25,12 @@ function resolveThumbnailAsset(frame: ViewerFrame) {
 function ThumbnailButton({
   frame,
   isActive,
+  isNearActive,
   onClick,
 }: {
   frame: ViewerFrame;
   isActive: boolean;
+  isNearActive: boolean;
   onClick: () => void;
 }) {
   const thumbAsset = resolveThumbnailAsset(frame);
@@ -38,6 +40,10 @@ function ThumbnailButton({
       data-frame-id={frame.id}
       onClick={onClick}
       sx={{
+        // This gives the browser permission to skip painting far-off thumbnails until they scroll
+        // closer to view, which trims initial work without changing the drag model.
+        contentVisibility: "auto",
+        containIntrinsicSize: "152px 114px",
         minWidth: 168,
         maxWidth: 168,
         display: "flex",
@@ -71,7 +77,9 @@ function ThumbnailButton({
             src={thumbAsset.thumbUrl || thumbAsset.imageUrl}
             alt={frame.title}
             draggable={false}
-            loading="lazy"
+            loading={isNearActive ? "eager" : "lazy"}
+            fetchPriority={isNearActive ? "high" : "auto"}
+            decoding="async"
             sx={{
               width: "100%",
               height: "100%",
@@ -147,6 +155,8 @@ export function ViewerFilmstrip({
     event.preventDefault();
   }
 
+  const activeIndex = frames.findIndex((frame) => frame.id === currentFrameId);
+
   return (
     <Box
       sx={{
@@ -199,11 +209,14 @@ export function ViewerFilmstrip({
                 : "transform 220ms cubic-bezier(0.22, 1, 0.36, 1)",
           }}
         >
-          {frames.map((frame) => (
+          {frames.map((frame, index) => (
             <ThumbnailButton
               key={frame.id}
               frame={frame}
               isActive={frame.id === currentFrameId}
+              isNearActive={
+                activeIndex === -1 || Math.abs(index - activeIndex) <= 8
+              }
               onClick={() => handleFrameSelection(frame.id)}
             />
           ))}
