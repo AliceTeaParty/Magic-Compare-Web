@@ -98,8 +98,10 @@ export async function upsertGroup(groupEntry: ImportManifest["groups"][number], 
 }
 
 /**
- * Applies the uploader manifest as an authoritative snapshot and keeps deprecated case fields like
- * `subtitle` populated for schema/publish compatibility even though the internal app no longer uses them.
+ * Applies the uploader manifest as an authoritative snapshot. Writes to the database as the
+ * single source of truth for imported content.
+ *
+ * @deprecated subtitle — kept only for PublishManifest schema compatibility.
  */
 export async function applyImportManifest(rawManifest: unknown) {
   const manifest = validateImportManifest(rawManifest);

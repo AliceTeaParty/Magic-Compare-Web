@@ -11,13 +11,13 @@ import type {
 
 type OrderedItem = { order: number };
 
-type AssetKind = "before" | "after" | "heatmap" | "crop" | "misc";
+export type AssetKind = "before" | "after" | "heatmap" | "crop" | "misc";
 
 /**
  * Buckets unexpected asset kinds under `misc` so the viewer can keep rendering legacy or
  * experimental assets without widening every downstream union immediately.
  */
-function asAssetKind(kind: string): AssetKind {
+export function asAssetKind(kind: string): AssetKind {
   if (
     kind === "before" ||
     kind === "after" ||

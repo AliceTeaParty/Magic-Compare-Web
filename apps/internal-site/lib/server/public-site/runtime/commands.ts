@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process";
 import {
-  CF_PAGES_BRANCH_ENV_NAME,
-  CF_PAGES_PROJECT_NAME_ENV_NAME,
+  getCfPagesBranch,
+  getCfPagesProjectName,
 } from "../../runtime-config";
 
 export interface CommandResult {
@@ -30,8 +30,8 @@ export function getPublicSiteBuildArgs(): string[] {
  * branch/project selection logic.
  */
 export function getWranglerPagesDeployArgs(exportDir: string): string[] {
-  const projectName = process.env[CF_PAGES_PROJECT_NAME_ENV_NAME]?.trim() || "";
-  const branch = process.env[CF_PAGES_BRANCH_ENV_NAME]?.trim() || null;
+  const projectName = getCfPagesProjectName() ?? "";
+  const branch = getCfPagesBranch();
   const args = [
     "exec",
     "wrangler",

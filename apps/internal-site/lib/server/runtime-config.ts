@@ -119,6 +119,16 @@ export function getInternalAssetStorageConfig(): InternalAssetStorageConfig {
   };
 }
 
+export function getCfPagesProjectName(): string | null {
+  loadWorkspaceEnv();
+  return process.env[CF_PAGES_PROJECT_NAME_ENV_NAME]?.trim() || null;
+}
+
+export function getCfPagesBranch(): string | null {
+  loadWorkspaceEnv();
+  return process.env[CF_PAGES_BRANCH_ENV_NAME]?.trim() || null;
+}
+
 export function isCloudflarePagesDeployConfigured(): boolean {
   loadWorkspaceEnv();
   return Boolean(

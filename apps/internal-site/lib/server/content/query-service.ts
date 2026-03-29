@@ -88,10 +88,7 @@ export async function listCases(): Promise<CaseCatalogItem[]> {
   return cases.map(mapCaseCatalogItem);
 }
 
-/**
- * Drives the internal search palette and intentionally omits deprecated `subtitle` propagation so
- * the app layer can stop depending on legacy fields while schema compatibility remains elsewhere.
- */
+/** Drives the internal search palette with runtime demo-visibility filtering. */
 export async function searchCases(
   query: string,
   limit = 8,

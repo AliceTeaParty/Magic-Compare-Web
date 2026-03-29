@@ -2,7 +2,7 @@ import {
   PUBLISH_SCHEMA_VERSION,
   type PublishManifest,
 } from "@magic-compare/content-schema";
-import { asViewerMode, parseTags } from "@/lib/server/content/mappers";
+import { asAssetKind, asViewerMode, parseTags } from "@/lib/server/content/mappers";
 import {
   internalAssetPublicGroupBaseUrl,
   resolvePublicInternalAssetUrl,
@@ -78,32 +78,13 @@ function assertPublicAssetDeliveryUrl(url: string): string {
 }
 
 /**
- * Collapses unknown asset kinds to `misc` so publishing stays forward-compatible with importer
- * experiments instead of hard-failing on metadata the public schema does not understand yet.
- */
-function asPublishManifestAssetKind(
-  kind: string,
-): PublishManifestAsset["kind"] {
-  if (
-    kind === "before" ||
-    kind === "after" ||
-    kind === "heatmap" ||
-    kind === "crop"
-  ) {
-    return kind;
-  }
-
-  return "misc";
-}
-
-/**
  * Resolves internal asset URLs into their public equivalents at publish time so the generated
  * manifest is self-contained and safe to serve from the static site.
  */
 function mapManifestAssets(assets: PublishableAsset[]): PublishManifestAsset[] {
   return assets.map((asset) => ({
     id: asset.id,
-    kind: asPublishManifestAssetKind(asset.kind),
+    kind: asAssetKind(asset.kind),
     label: asset.label,
     imageUrl: assertPublicAssetDeliveryUrl(
       resolvePublicInternalAssetUrl(asset.imageUrl),
@@ -146,9 +127,7 @@ export function buildPublishManifest(params: {
     case: {
       slug: caseRow.slug,
       title: caseRow.title,
-      // The public manifest contract still carries subtitle, so we preserve it even though the
-      // internal app no longer uses subtitle in its own view models.
-      subtitle: caseRow.subtitle ?? "",
+      subtitle: caseRow.subtitle ?? "", // @deprecated — kept for PublishManifest schema compat
       summary: caseRow.summary,
       tags: parseTags(caseRow.tagsJson),
       publishedAt: publishedAt.toISOString(),
