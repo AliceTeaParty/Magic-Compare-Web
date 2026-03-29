@@ -5,6 +5,7 @@ from .config import (
     ENV_ACCESS_CLIENT_SECRET_NAME as ENV_ACCESS_CLIENT_SECRET_NAME,
     ENV_API_URL_NAME as ENV_API_URL_NAME,
     ENV_SITE_URL_NAME as ENV_SITE_URL_NAME,
+    ENV_UPLOAD_FRAME_WORKERS_NAME as ENV_UPLOAD_FRAME_WORKERS_NAME,
     UploaderConfig as UploaderConfig,
     ensure_remote_access_config as ensure_remote_access_config,
     ensure_work_dir_env as ensure_work_dir_env,

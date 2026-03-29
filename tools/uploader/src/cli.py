@@ -116,6 +116,13 @@ def sync(
         help=f"group-upload-start 接口地址；留空时优先读取 {ENV_API_URL_NAME}，否则从 site_url 推断。",
     ),
     report_json: Path | None = typer.Option(None, "--report-json"),
+    frame_workers: int | None = typer.Option(
+        None,
+        "--frame-workers",
+        min=1,
+        max=8,
+        help="frame 级上传并发数；1 到 8，留空时自动按待处理 frame 数调整。",
+    ),
     dry_run: bool = typer.Option(
         False, "--dry-run", help="只跑预演，不上传，也不调用 remote 接口。"
     ),
@@ -129,6 +136,7 @@ def sync(
             source,
             site_url=site_url,
             api_url=api_url,
+            frame_workers=frame_workers,
             report_json=report_json,
             dry_run=dry_run,
             reset_session=reset_session,

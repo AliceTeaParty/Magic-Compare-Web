@@ -14,12 +14,14 @@ ENV_SITE_URL_NAME = "MAGIC_COMPARE_SITE_URL"
 ENV_API_URL_NAME = "MAGIC_COMPARE_API_URL"
 ENV_ACCESS_CLIENT_ID_NAME = "MAGIC_COMPARE_CF_ACCESS_CLIENT_ID"
 ENV_ACCESS_CLIENT_SECRET_NAME = "MAGIC_COMPARE_CF_ACCESS_CLIENT_SECRET"
+ENV_UPLOAD_FRAME_WORKERS_NAME = "MAGIC_COMPARE_UPLOAD_FRAME_WORKERS"
 
 PERSISTED_UPLOADER_ENV_KEYS = (
     ENV_SITE_URL_NAME,
     ENV_API_URL_NAME,
     ENV_ACCESS_CLIENT_ID_NAME,
     ENV_ACCESS_CLIENT_SECRET_NAME,
+    ENV_UPLOAD_FRAME_WORKERS_NAME,
 )
 
 FALLBACK_SITE_URL = "http://localhost:3000"
@@ -34,6 +36,7 @@ class UploaderConfig:
     work_dir: Path | None
     service_token_client_id: str | None = None
     service_token_client_secret: str | None = None
+    upload_frame_workers: int | None = None
 
     @property
     def is_local_site(self) -> bool:
@@ -71,6 +74,8 @@ def _default_env_example_text() -> str:
             "# Required only when the target site is not local/private.",
             f"{ENV_ACCESS_CLIENT_ID_NAME}=",
             f"{ENV_ACCESS_CLIENT_SECRET_NAME}=",
+            "# Optional frame-level upload concurrency. Leave blank to auto-adapt within 1-8.",
+            f"{ENV_UPLOAD_FRAME_WORKERS_NAME}=",
             "",
         ]
     )
@@ -135,6 +140,30 @@ def _parse_env_flag(value: str | None) -> bool:
     return value.strip().lower() in {"1", "true", "yes", "on"}
 
 
+def _parse_upload_frame_workers(value: str | None) -> int | None:
+    """Parse the optional frame worker setting once so CLI and env inputs share the same validity rules."""
+    if value is None:
+        return None
+
+    normalized = value.strip()
+    if not normalized:
+        return None
+
+    try:
+        parsed = int(normalized)
+    except ValueError as error:
+        raise RuntimeError(
+            f"{ENV_UPLOAD_FRAME_WORKERS_NAME} 必须是 1 到 8 之间的整数。"
+        ) from error
+
+    if parsed < 1 or parsed > 8:
+        raise RuntimeError(
+            f"{ENV_UPLOAD_FRAME_WORKERS_NAME} 必须是 1 到 8 之间的整数。"
+        )
+
+    return parsed
+
+
 def internal_site_base_url(api_url: str) -> str:
     marker = "/api/ops/"
     normalized = _normalize_url(api_url)
@@ -152,6 +181,7 @@ def resolve_uploader_config(
     *,
     api_url_override: str | None = None,
     site_url_override: str | None = None,
+    upload_frame_workers_override: int | None = None,
 ) -> UploaderConfig:
     """Resolve uploader config with a self-contained work-dir env while still allowing explicit host overrides."""
     launcher_env_path = _launcher_env_path()
@@ -194,6 +224,13 @@ def resolve_uploader_config(
     raw_site_url = (
         site_url_override or merged_values.get(ENV_SITE_URL_NAME, "")
     ).strip()
+    upload_frame_workers = (
+        upload_frame_workers_override
+        if upload_frame_workers_override is not None
+        else _parse_upload_frame_workers(
+            merged_values.get(ENV_UPLOAD_FRAME_WORKERS_NAME, "")
+        )
+    )
 
     if not raw_site_url and raw_api_url:
         raw_site_url = internal_site_base_url(raw_api_url)
@@ -214,6 +251,7 @@ def resolve_uploader_config(
         service_token_client_secret=(
             merged_values.get(ENV_ACCESS_CLIENT_SECRET_NAME, "") or None
         ),
+        upload_frame_workers=upload_frame_workers,
     )
 
 
@@ -222,6 +260,7 @@ def persist_config_overrides(
     *,
     site_url: str | None = None,
     api_url: str | None = None,
+    upload_frame_workers: int | None = None,
 ) -> None:
     """Persist CLI overrides back into the uploader-owned env so resumed runs stay consistent."""
     if not config.env_path:
@@ -245,6 +284,14 @@ def persist_config_overrides(
             quote_mode="never",
         )
         config.api_url = normalized_api_url
+    if upload_frame_workers is not None:
+        set_key(
+            str(config.env_path),
+            ENV_UPLOAD_FRAME_WORKERS_NAME,
+            str(upload_frame_workers),
+            quote_mode="never",
+        )
+        config.upload_frame_workers = upload_frame_workers
 
 
 def ensure_remote_access_config(config: UploaderConfig) -> None:

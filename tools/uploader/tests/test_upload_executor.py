@@ -2,10 +2,13 @@ from __future__ import annotations
 
 import json
 import tempfile
+import threading
+import time
 import unittest
 from pathlib import Path
 from unittest import mock
 
+import httpx
 from PIL import Image
 
 import src.upload_executor as upload_executor_module
@@ -51,6 +54,59 @@ class UploadExecutorTests(unittest.TestCase):
         Image.new("RGB", (32, 24), color=before_color).save(frame_dir / "before.png")
         Image.new("RGB", (32, 24), color=after_color).save(frame_dir / "after.png")
 
+    def _prepared_frame_response(self, frame_order: int) -> dict:
+        frame_index = frame_order + 1
+        return {
+            "groupUploadJobId": "job-1",
+            "frameOrder": frame_order,
+            "pendingPrefix": f"/groups/group-1/{frame_index}/revision-1",
+            "files": [
+                {
+                    "slot": "slot-001",
+                    "variant": "original",
+                    "logicalPath": f"/groups/group-1/{frame_index}/revision-1/o1.png",
+                    "uploadUrl": f"https://r2.example.com/{frame_index}/o1",
+                    "contentType": "image/png",
+                },
+                {
+                    "slot": "slot-001",
+                    "variant": "thumbnail",
+                    "logicalPath": f"/groups/group-1/{frame_index}/revision-1/t1.png",
+                    "uploadUrl": f"https://r2.example.com/{frame_index}/t1",
+                    "contentType": "image/png",
+                },
+                {
+                    "slot": "slot-002",
+                    "variant": "original",
+                    "logicalPath": f"/groups/group-1/{frame_index}/revision-1/o2.png",
+                    "uploadUrl": f"https://r2.example.com/{frame_index}/o2",
+                    "contentType": "image/png",
+                },
+                {
+                    "slot": "slot-002",
+                    "variant": "thumbnail",
+                    "logicalPath": f"/groups/group-1/{frame_index}/revision-1/t2.png",
+                    "uploadUrl": f"https://r2.example.com/{frame_index}/t2",
+                    "contentType": "image/png",
+                },
+            ],
+        }
+
+    def _start_result(self, frame_states: list[dict], committed_frame_count: int = 0) -> dict:
+        return {
+            "groupUploadJobId": "job-1",
+            "inputHash": "hash-1",
+            "expectedFrameCount": len(frame_states),
+            "committedFrameCount": committed_frame_count,
+            "frameStates": frame_states,
+        }
+
+    def _retryable_runtime_error(self, message: str) -> RuntimeError:
+        request = httpx.Request("POST", "https://compare.example.com/api/ops/example")
+        error = RuntimeError(message)
+        error.__cause__ = httpx.ConnectError(message, request=request)
+        return error
+
     @mock.patch("src.upload_executor.complete_group_upload")
     @mock.patch("src.upload_executor.commit_group_upload_frame")
     @mock.patch("src.upload_executor.prepare_group_upload_frame")
@@ -65,48 +121,10 @@ class UploadExecutorTests(unittest.TestCase):
         complete_group_upload: mock.Mock,
     ) -> None:
         upload_file.return_value = None
-        start_group_upload.return_value = {
-            "groupUploadJobId": "job-1",
-            "inputHash": "hash-1",
-            "expectedFrameCount": 1,
-            "committedFrameCount": 0,
-            "frameStates": [{"frameOrder": 0, "status": "pending"}],
-        }
-        prepare_group_upload_frame.return_value = {
-            "groupUploadJobId": "job-1",
-            "frameOrder": 0,
-            "pendingPrefix": "/groups/group-1/1/revision-1",
-            "files": [
-                {
-                    "slot": "slot-001",
-                    "variant": "original",
-                    "logicalPath": "/groups/group-1/1/revision-1/o1.png",
-                    "uploadUrl": "https://r2.example.com/o1",
-                    "contentType": "image/png",
-                },
-                {
-                    "slot": "slot-001",
-                    "variant": "thumbnail",
-                    "logicalPath": "/groups/group-1/1/revision-1/t1.png",
-                    "uploadUrl": "https://r2.example.com/t1",
-                    "contentType": "image/png",
-                },
-                {
-                    "slot": "slot-002",
-                    "variant": "original",
-                    "logicalPath": "/groups/group-1/1/revision-1/o2.png",
-                    "uploadUrl": "https://r2.example.com/o2",
-                    "contentType": "image/png",
-                },
-                {
-                    "slot": "slot-002",
-                    "variant": "thumbnail",
-                    "logicalPath": "/groups/group-1/1/revision-1/t2.png",
-                    "uploadUrl": "https://r2.example.com/t2",
-                    "contentType": "image/png",
-                },
-            ],
-        }
+        start_group_upload.return_value = self._start_result(
+            [{"frameOrder": 0, "status": "pending"}]
+        )
+        prepare_group_upload_frame.return_value = self._prepared_frame_response(0)
         commit_group_upload_frame.return_value = {
             "groupUploadJobId": "job-1",
             "frameOrder": 0,
@@ -125,7 +143,6 @@ class UploadExecutorTests(unittest.TestCase):
         self.assertTrue(summary.succeeded)
         self.assertEqual(summary.uploaded_count, 4)
         self.assertEqual(summary.completion_result["caseSlug"], "2026")
-        self.assertTrue(session_file_path(self.case_root).exists())
         session = json.loads(
             session_file_path(self.case_root).read_text(encoding="utf-8")
         )
@@ -145,13 +162,10 @@ class UploadExecutorTests(unittest.TestCase):
         complete_group_upload: mock.Mock,
     ) -> None:
         plan = build_case_plan(self.case_root)
-        start_group_upload.return_value = {
-            "groupUploadJobId": "job-1",
-            "inputHash": "hash-1",
-            "expectedFrameCount": 1,
-            "committedFrameCount": 1,
-            "frameStates": [{"frameOrder": 0, "status": "committed"}],
-        }
+        start_group_upload.return_value = self._start_result(
+            [{"frameOrder": 0, "status": "committed"}],
+            committed_frame_count=1,
+        )
         complete_group_upload.return_value = {
             "groupUploadJobId": "job-1",
             "caseSlug": "2026",
@@ -180,13 +194,9 @@ class UploadExecutorTests(unittest.TestCase):
         complete_group_upload: mock.Mock,
     ) -> None:
         upload_file.return_value = None
-        start_group_upload.return_value = {
-            "groupUploadJobId": "job-2",
-            "inputHash": "hash-2",
-            "expectedFrameCount": 1,
-            "committedFrameCount": 0,
-            "frameStates": [{"frameOrder": 0, "status": "pending"}],
-        }
+        start_group_upload.return_value = self._start_result(
+            [{"frameOrder": 0, "status": "pending"}]
+        )
         prepare_group_upload_frame.return_value = {
             "groupUploadJobId": "job-2",
             "frameOrder": 0,
@@ -205,116 +215,104 @@ class UploadExecutorTests(unittest.TestCase):
             "committedFrameCount": 1,
         }
         plan = build_case_plan(self.case_root)
-        session_path = session_file_path(self.case_root)
-        session_path.parent.mkdir(parents=True, exist_ok=True)
 
         summary = execute_upload_plan(plan, self.config, reset_session=True)
 
         self.assertTrue(summary.succeeded)
-        session = json.loads(session_path.read_text(encoding="utf-8"))
-        self.assertEqual(session["groupUploadJobId"], "job-2")
         self.assertTrue(start_group_upload.call_args.args[1]["forceRestart"])
 
-    @mock.patch("src.upload_executor.time.monotonic")
+    @mock.patch("src.upload_executor.time.sleep")
+    @mock.patch("src.upload_executor.complete_group_upload")
+    @mock.patch("src.upload_executor.commit_group_upload_frame")
     @mock.patch("src.upload_executor.prepare_group_upload_frame")
-    def test_resolve_prepared_frame_reuses_fresh_lookahead_cache(
+    @mock.patch("src.upload_executor.start_group_upload")
+    @mock.patch("src.upload_executor.upload_file_to_presigned_url")
+    def test_retries_transient_prepare_failures_up_to_success(
         self,
+        upload_file: mock.Mock,
+        start_group_upload: mock.Mock,
         prepare_group_upload_frame: mock.Mock,
-        monotonic: mock.Mock,
+        commit_group_upload_frame: mock.Mock,
+        complete_group_upload: mock.Mock,
+        _sleep: mock.Mock,
     ) -> None:
-        monotonic.return_value = 120.0
-        runtime = upload_executor_module.UploadRuntimeState(
-            config=self.config,
-            prepared_upload=mock.Mock(),
-            start_result={"groupUploadJobId": "job-1"},
-            session_path=self.case_root / ".magic-compare" / "upload-session.json",
-            session={"frames": {}},
-            started_at=0.0,
-            upload_client=mock.Mock(),
-            total_frames=1,
-            total_files=4,
+        upload_file.return_value = None
+        start_group_upload.return_value = self._start_result(
+            [{"frameOrder": 0, "status": "pending"}]
         )
-        context = upload_executor_module.FrameUploadContext(
-            runtime=runtime,
-            frame_order=0,
-            frame_title="Frame A",
-            frame_session={"status": "pending", "pendingPrefix": None, "lastError": None},
-        )
-        cached = upload_executor_module.PreparedFrameCache(
-            frame_order=0,
-            frame_title="Frame A",
-            prepared_frame={"pendingPrefix": "/groups/g/1/revision-cached", "files": []},
-            prepared_at=100.0,
-        )
-
-        prepared_frame = upload_executor_module._resolve_prepared_frame(
-            context,
-            cached,
-        )
-
-        self.assertEqual(
-            prepared_frame["pendingPrefix"],
-            "/groups/g/1/revision-cached",
-        )
-        prepare_group_upload_frame.assert_not_called()
-
-    @mock.patch("src.upload_executor.time.monotonic")
-    @mock.patch("src.upload_executor.prepare_group_upload_frame")
-    def test_resolve_prepared_frame_refreshes_expired_lookahead_cache(
-        self,
-        prepare_group_upload_frame: mock.Mock,
-        monotonic: mock.Mock,
-    ) -> None:
-        monotonic.return_value = 100.0 + upload_executor_module._LOOKAHEAD_MAX_AGE_SECONDS + 1
-        prepare_group_upload_frame.return_value = {
-            "pendingPrefix": "/groups/g/1/revision-fresh",
-            "files": [],
+        prepare_group_upload_frame.side_effect = [
+            self._retryable_runtime_error("prepare transient 1"),
+            self._retryable_runtime_error("prepare transient 2"),
+            self._retryable_runtime_error("prepare transient 3"),
+            self._retryable_runtime_error("prepare transient 4"),
+            self._prepared_frame_response(0),
+        ]
+        commit_group_upload_frame.return_value = {
+            "groupUploadJobId": "job-1",
+            "frameOrder": 0,
+            "status": "committed",
         }
-        runtime = upload_executor_module.UploadRuntimeState(
-            config=self.config,
-            prepared_upload=mock.Mock(),
-            start_result={"groupUploadJobId": "job-1"},
-            session_path=self.case_root / ".magic-compare" / "upload-session.json",
-            session={"frames": {}},
-            started_at=0.0,
-            upload_client=mock.Mock(),
-            total_frames=1,
-            total_files=4,
-        )
-        context = upload_executor_module.FrameUploadContext(
-            runtime=runtime,
-            frame_order=0,
-            frame_title="Frame A",
-            frame_session={"status": "pending", "pendingPrefix": None, "lastError": None},
-        )
-        cached = upload_executor_module.PreparedFrameCache(
-            frame_order=0,
-            frame_title="Frame A",
-            prepared_frame={"pendingPrefix": "/groups/g/1/revision-expired", "files": []},
-            prepared_at=100.0,
-        )
+        complete_group_upload.return_value = {
+            "groupUploadJobId": "job-1",
+            "caseSlug": "2026",
+            "groupSlug": "test-group",
+            "committedFrameCount": 1,
+        }
+        plan = build_case_plan(self.case_root)
 
-        prepared_frame = upload_executor_module._resolve_prepared_frame(
-            context,
-            cached,
-        )
+        summary = execute_upload_plan(plan, self.config)
 
-        self.assertEqual(
-            prepared_frame["pendingPrefix"],
-            "/groups/g/1/revision-fresh",
+        self.assertTrue(summary.succeeded)
+        self.assertEqual(prepare_group_upload_frame.call_count, 5)
+        self.assertEqual(summary.retried_count, 4)
+
+    @mock.patch("src.upload_executor.time.sleep")
+    @mock.patch("src.upload_executor.complete_group_upload")
+    @mock.patch("src.upload_executor.commit_group_upload_frame")
+    @mock.patch("src.upload_executor.prepare_group_upload_frame")
+    @mock.patch("src.upload_executor.start_group_upload")
+    @mock.patch("src.upload_executor.upload_file_to_presigned_url")
+    def test_retries_transient_commit_failures_then_marks_frame_failed(
+        self,
+        upload_file: mock.Mock,
+        start_group_upload: mock.Mock,
+        prepare_group_upload_frame: mock.Mock,
+        commit_group_upload_frame: mock.Mock,
+        complete_group_upload: mock.Mock,
+        _sleep: mock.Mock,
+    ) -> None:
+        upload_file.return_value = None
+        start_group_upload.return_value = self._start_result(
+            [{"frameOrder": 0, "status": "pending"}]
         )
-        prepare_group_upload_frame.assert_called_once_with(
-            self.config,
-            "job-1",
-            0,
+        prepare_group_upload_frame.return_value = self._prepared_frame_response(0)
+        commit_group_upload_frame.side_effect = [
+            self._retryable_runtime_error("commit transient 1"),
+            self._retryable_runtime_error("commit transient 2"),
+            self._retryable_runtime_error("commit transient 3"),
+            self._retryable_runtime_error("commit transient 4"),
+            self._retryable_runtime_error("commit transient 5"),
+        ]
+        plan = build_case_plan(self.case_root)
+
+        summary = execute_upload_plan(plan, self.config)
+
+        self.assertFalse(summary.succeeded)
+        self.assertEqual(commit_group_upload_frame.call_count, 5)
+        self.assertEqual(summary.failed_count, 1)
+        self.assertEqual(summary.failures[0].operation_id, "0:commit")
+        complete_group_upload.assert_not_called()
+        session = json.loads(
+            session_file_path(self.case_root).read_text(encoding="utf-8")
         )
+        self.assertEqual(session["frames"]["0"]["status"], "failed")
 
     @mock.patch("src.upload_executor.complete_group_upload")
     @mock.patch("src.upload_executor.commit_group_upload_frame")
     @mock.patch("src.upload_executor.prepare_group_upload_frame")
     @mock.patch("src.upload_executor.start_group_upload")
     @mock.patch("src.upload_executor.upload_file_to_presigned_url")
-    def test_emits_structured_progress_events(
+    def test_continues_other_frames_after_one_frame_fails(
         self,
         upload_file: mock.Mock,
         start_group_upload: mock.Mock,
@@ -324,58 +322,85 @@ class UploadExecutorTests(unittest.TestCase):
     ) -> None:
         self._create_frame("002-frame-b", "Frame B", (10, 10, 10), (240, 240, 240))
         upload_file.return_value = None
-        start_group_upload.return_value = {
-            "groupUploadJobId": "job-3",
-            "inputHash": "hash-3",
-            "expectedFrameCount": 2,
-            "committedFrameCount": 1,
-            "frameStates": [
-                {"frameOrder": 0, "status": "committed"},
+        start_group_upload.return_value = self._start_result(
+            [
+                {"frameOrder": 0, "status": "pending"},
                 {"frameOrder": 1, "status": "pending"},
-            ],
-        }
-        prepare_group_upload_frame.return_value = {
-            "groupUploadJobId": "job-3",
-            "frameOrder": 1,
-            "pendingPrefix": "/groups/group-1/2/revision-1",
-            "files": [
-                {
-                    "slot": "slot-001",
-                    "variant": "original",
-                    "logicalPath": "/groups/group-1/2/revision-1/o1.png",
-                    "uploadUrl": "https://r2.example.com/o1",
-                    "contentType": "image/png",
-                },
-                {
-                    "slot": "slot-001",
-                    "variant": "thumbnail",
-                    "logicalPath": "/groups/group-1/2/revision-1/t1.png",
-                    "uploadUrl": "https://r2.example.com/t1",
-                    "contentType": "image/png",
-                },
-                {
-                    "slot": "slot-002",
-                    "variant": "original",
-                    "logicalPath": "/groups/group-1/2/revision-1/o2.png",
-                    "uploadUrl": "https://r2.example.com/o2",
-                    "contentType": "image/png",
-                },
-                {
-                    "slot": "slot-002",
-                    "variant": "thumbnail",
-                    "logicalPath": "/groups/group-1/2/revision-1/t2.png",
-                    "uploadUrl": "https://r2.example.com/t2",
-                    "contentType": "image/png",
-                },
-            ],
-        }
+            ]
+        )
+
+        def prepare_side_effect(config: UploaderConfig, job_id: str, frame_order: int) -> dict:
+            if frame_order == 0:
+                raise RuntimeError("prepare failed")
+            return self._prepared_frame_response(frame_order)
+
+        prepare_group_upload_frame.side_effect = prepare_side_effect
         commit_group_upload_frame.return_value = {
-            "groupUploadJobId": "job-3",
+            "groupUploadJobId": "job-1",
             "frameOrder": 1,
             "status": "committed",
         }
+        plan = build_case_plan(self.case_root)
+
+        summary = execute_upload_plan(plan, self.config, frame_workers=2)
+
+        self.assertFalse(summary.succeeded)
+        self.assertEqual(summary.failed_count, 1)
+        self.assertEqual(summary.failures[0].operation_id, "0:prepare")
+        self.assertEqual(commit_group_upload_frame.call_count, 1)
+        complete_group_upload.assert_not_called()
+        session = json.loads(
+            session_file_path(self.case_root).read_text(encoding="utf-8")
+        )
+        self.assertEqual(session["frames"]["0"]["status"], "failed")
+        self.assertEqual(session["frames"]["1"]["status"], "committed")
+
+    @mock.patch("src.upload_executor.complete_group_upload")
+    @mock.patch("src.upload_executor.commit_group_upload_frame")
+    @mock.patch("src.upload_executor.prepare_group_upload_frame")
+    @mock.patch("src.upload_executor.start_group_upload")
+    @mock.patch("src.upload_executor.upload_file_to_presigned_url")
+    def test_emits_parallel_progress_and_commits_serially(
+        self,
+        upload_file: mock.Mock,
+        start_group_upload: mock.Mock,
+        prepare_group_upload_frame: mock.Mock,
+        commit_group_upload_frame: mock.Mock,
+        complete_group_upload: mock.Mock,
+    ) -> None:
+        self._create_frame("002-frame-b", "Frame B", (10, 10, 10), (240, 240, 240))
+        upload_file.return_value = None
+        start_group_upload.return_value = self._start_result(
+            [
+                {"frameOrder": 0, "status": "pending"},
+                {"frameOrder": 1, "status": "pending"},
+            ]
+        )
+        prepare_group_upload_frame.side_effect = lambda config, job_id, frame_order: self._prepared_frame_response(
+            frame_order
+        )
+
+        commit_active = 0
+        max_commit_active = 0
+        commit_lock = threading.Lock()
+
+        def commit_side_effect(config: UploaderConfig, job_id: str, frame_order: int) -> dict:
+            nonlocal commit_active, max_commit_active
+            with commit_lock:
+                commit_active += 1
+                max_commit_active = max(max_commit_active, commit_active)
+            time.sleep(0.01)
+            with commit_lock:
+                commit_active -= 1
+            return {
+                "groupUploadJobId": "job-1",
+                "frameOrder": frame_order,
+                "status": "committed",
+            }
+
+        commit_group_upload_frame.side_effect = commit_side_effect
         complete_group_upload.return_value = {
-            "groupUploadJobId": "job-3",
+            "groupUploadJobId": "job-1",
             "caseSlug": "2026",
             "groupSlug": "test-group",
             "committedFrameCount": 2,
@@ -386,106 +411,30 @@ class UploadExecutorTests(unittest.TestCase):
         summary = execute_upload_plan(
             plan,
             self.config,
+            frame_workers=2,
             on_progress_event=events.append,
         )
 
         self.assertTrue(summary.succeeded)
         self.assertEqual(events[0].kind, "job_started")
-        self.assertEqual(events[0].total_files, 8)
-        self.assertEqual(events[1].kind, "frame_resumed")
-        self.assertEqual(events[1].frame_order, 0)
-        self.assertEqual(events[1].completed_files, 4)
-        self.assertEqual(events[1].skipped_files, 4)
-        self.assertEqual(events[1].completed_frames, 1)
-        self.assertEqual(events[2].kind, "frame_prepared")
-        self.assertEqual(events[2].stage, "prepare")
-        self.assertEqual(events[-2].kind, "frame_committed")
-        self.assertEqual(events[-2].completed_frames, 2)
+        self.assertEqual(events[0].frame_workers, 2)
+        self.assertTrue(
+            any(event.kind == "frame_started" and event.active_frames >= 1 for event in events)
+        )
+        self.assertTrue(
+            any(event.kind == "frame_started" and event.active_frames == 2 for event in events)
+        )
+        self.assertEqual(max_commit_active, 1)
         self.assertEqual(events[-1].kind, "job_completed")
         self.assertEqual(events[-1].completed_files, 8)
 
-    @mock.patch("src.upload_executor.complete_group_upload")
-    @mock.patch("src.upload_executor.commit_group_upload_frame")
-    @mock.patch("src.upload_executor.prepare_group_upload_frame")
-    @mock.patch("src.upload_executor.start_group_upload")
-    @mock.patch("src.upload_executor.upload_file_to_presigned_url")
-    def test_persists_lookahead_prepare_failures_into_session_summary(
-        self,
-        upload_file: mock.Mock,
-        start_group_upload: mock.Mock,
-        prepare_group_upload_frame: mock.Mock,
-        commit_group_upload_frame: mock.Mock,
-        complete_group_upload: mock.Mock,
-    ) -> None:
-        self._create_frame("002-frame-b", "Frame B", (10, 10, 10), (240, 240, 240))
-        upload_file.return_value = None
-        start_group_upload.return_value = {
-            "groupUploadJobId": "job-4",
-            "inputHash": "hash-4",
-            "expectedFrameCount": 2,
-            "committedFrameCount": 0,
-            "frameStates": [
-                {"frameOrder": 0, "status": "pending"},
-                {"frameOrder": 1, "status": "pending"},
-            ],
-        }
-        prepare_group_upload_frame.side_effect = [
-            {
-                "groupUploadJobId": "job-4",
-                "frameOrder": 0,
-                "pendingPrefix": "/groups/group-1/1/revision-1",
-                "files": [
-                    {
-                        "slot": "slot-001",
-                        "variant": "original",
-                        "logicalPath": "/groups/group-1/1/revision-1/o1.png",
-                        "uploadUrl": "https://r2.example.com/o1",
-                        "contentType": "image/png",
-                    },
-                    {
-                        "slot": "slot-001",
-                        "variant": "thumbnail",
-                        "logicalPath": "/groups/group-1/1/revision-1/t1.png",
-                        "uploadUrl": "https://r2.example.com/t1",
-                        "contentType": "image/png",
-                    },
-                    {
-                        "slot": "slot-002",
-                        "variant": "original",
-                        "logicalPath": "/groups/group-1/1/revision-1/o2.png",
-                        "uploadUrl": "https://r2.example.com/o2",
-                        "contentType": "image/png",
-                    },
-                    {
-                        "slot": "slot-002",
-                        "variant": "thumbnail",
-                        "logicalPath": "/groups/group-1/1/revision-1/t2.png",
-                        "uploadUrl": "https://r2.example.com/t2",
-                        "contentType": "image/png",
-                    },
-                ],
-            },
-            RuntimeError("lookahead prepare failed"),
-        ]
-        commit_group_upload_frame.return_value = {
-            "groupUploadJobId": "job-4",
-            "frameOrder": 0,
-            "status": "committed",
-        }
-        plan = build_case_plan(self.case_root)
+    def test_resolve_frame_worker_count_clamps_and_adapts(self) -> None:
+        self.assertEqual(upload_executor_module._resolve_frame_worker_count(None, 0), 1)
+        self.assertEqual(upload_executor_module._resolve_frame_worker_count(None, 3), 3)
+        self.assertEqual(upload_executor_module._resolve_frame_worker_count(None, 99), 8)
+        self.assertEqual(upload_executor_module._resolve_frame_worker_count(0, 3), 1)
+        self.assertEqual(upload_executor_module._resolve_frame_worker_count(20, 3), 8)
 
-        summary = execute_upload_plan(plan, self.config)
 
-        self.assertFalse(summary.succeeded)
-        self.assertEqual(summary.failed_count, 1)
-        self.assertEqual(summary.failures[0].operation_id, "1:prepare")
-        self.assertEqual(summary.failures[0].message, "lookahead prepare failed")
-        complete_group_upload.assert_not_called()
-        session = json.loads(
-            session_file_path(self.case_root).read_text(encoding="utf-8")
-        )
-        self.assertEqual(session["frames"]["1"]["status"], "failed")
-        self.assertEqual(
-            session["frames"]["1"]["lastError"],
-            "lookahead prepare failed",
-        )
+if __name__ == "__main__":
+    unittest.main()

@@ -10,6 +10,7 @@ from src.auth import (
     ENV_ACCESS_CLIENT_ID_NAME,
     ENV_ACCESS_CLIENT_SECRET_NAME,
     ENV_SITE_URL_NAME,
+    ENV_UPLOAD_FRAME_WORKERS_NAME,
     build_request_headers,
     ensure_remote_access_config,
     ensure_work_dir_env,
@@ -157,6 +158,48 @@ class UploaderConfigTests(unittest.TestCase):
 
         env_text = (self.work_dir / ".env").read_text(encoding="utf-8")
         self.assertIn(f"{ENV_SITE_URL_NAME}=https://compare.example.com", env_text)
+
+    def test_resolves_upload_frame_workers_from_env(self) -> None:
+        env_path = ensure_work_dir_env(self.work_dir)
+        env_path.write_text(
+            "\n".join(
+                [
+                    "MAGIC_COMPARE_SITE_URL=http://localhost:3000",
+                    f"{ENV_UPLOAD_FRAME_WORKERS_NAME}=4",
+                    "",
+                ]
+            ),
+            encoding="utf-8",
+        )
+
+        config = resolve_uploader_config(self.work_dir)
+
+        self.assertEqual(config.upload_frame_workers, 4)
+
+    def test_persists_upload_frame_workers_override_to_work_dir_env(self) -> None:
+        config = resolve_uploader_config(self.work_dir)
+
+        persist_config_overrides(config, upload_frame_workers=6)
+
+        env_text = (self.work_dir / ".env").read_text(encoding="utf-8")
+        self.assertIn(f"{ENV_UPLOAD_FRAME_WORKERS_NAME}=6", env_text)
+        self.assertEqual(config.upload_frame_workers, 6)
+
+    def test_invalid_upload_frame_workers_env_raises_runtime_error(self) -> None:
+        env_path = ensure_work_dir_env(self.work_dir)
+        env_path.write_text(
+            "\n".join(
+                [
+                    "MAGIC_COMPARE_SITE_URL=http://localhost:3000",
+                    f"{ENV_UPLOAD_FRAME_WORKERS_NAME}=9",
+                    "",
+                ]
+            ),
+            encoding="utf-8",
+        )
+
+        with self.assertRaisesRegex(RuntimeError, "必须是 1 到 8 之间的整数"):
+            resolve_uploader_config(self.work_dir)
 
     def test_build_request_headers_allows_local_sites_without_service_token(
         self,

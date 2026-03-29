@@ -34,8 +34,10 @@ class CommandFlowTests(unittest.TestCase):
 
     @mock.patch("src.commands.render_plan_summary")
     @mock.patch("src.commands.ensure_remote_access_config")
+    @mock.patch("src.commands.execute_upload_plan")
     def test_handle_sync_dry_run_skips_remote_checks(
         self,
+        execute_upload_plan: mock.Mock,
         ensure_remote_access_config: mock.Mock,
         _render_plan_summary: mock.Mock,
     ) -> None:
@@ -43,6 +45,7 @@ class CommandFlowTests(unittest.TestCase):
             self.case_root,
             site_url=None,
             api_url=None,
+            frame_workers=4,
             dry_run=True,
         )
 
@@ -50,6 +53,31 @@ class CommandFlowTests(unittest.TestCase):
         self.assertIsNone(execution_summary)
         self.assertIsNone(sync_result)
         ensure_remote_access_config.assert_not_called()
+        execute_upload_plan.assert_not_called()
+
+    @mock.patch("src.commands._render_execution_summary")
+    @mock.patch("src.commands.ensure_remote_access_config")
+    @mock.patch("src.commands.execute_upload_plan")
+    def test_handle_sync_passes_frame_workers_to_executor(
+        self,
+        execute_upload_plan: mock.Mock,
+        ensure_remote_access_config: mock.Mock,
+        _render_execution_summary: mock.Mock,
+    ) -> None:
+        execute_upload_plan.return_value = mock.Mock(
+            succeeded=True,
+            completion_result={"caseSlug": "2026", "groupSlug": "test-group"},
+        )
+
+        handle_sync(
+            self.case_root,
+            site_url=None,
+            api_url=None,
+            frame_workers=5,
+        )
+
+        ensure_remote_access_config.assert_called_once()
+        self.assertEqual(execute_upload_plan.call_args.kwargs["frame_workers"], 5)
 
     @mock.patch("src.commands._render_all_case_table")
     @mock.patch("src.commands.list_cases")

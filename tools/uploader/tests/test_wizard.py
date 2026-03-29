@@ -38,12 +38,14 @@ class WizardProgressRenderingTests(unittest.TestCase):
             skipped_files=0,
             retried_count=0,
             failed_count=0,
+            active_frames=2,
+            frame_workers=4,
         )
         state = WizardUploadProgressState(
             stage_status="阶段：文件上传",
             frame_status=_frame_status_line(event),
             stats_line="文件：1/4 | frame：0/2 | skipped：0 | retried：0 | failed：0",
-            momentum_status="进度：25% · 已进入上传阶段，先把前几帧稳定送上去。",
+            momentum_status="进度：25%",
         )
 
         renderables = _render_upload_progress(Progress(), state).renderables
@@ -51,10 +53,10 @@ class WizardProgressRenderingTests(unittest.TestCase):
         self.assertIsInstance(renderables[2], Text)
         self.assertEqual(
             renderables[2].plain,
-            "当前 frame：1/2 [v2] sample · 文件上传",
+            "当前并发：2/4 | 最近 frame：1/2 [v2] sample · 文件上传",
         )
 
-    def test_momentum_status_reports_goal_gradient_copy(self) -> None:
+    def test_momentum_status_reports_plain_percent_only(self) -> None:
         event = UploadProgressEvent(
             kind="file_uploaded",
             stage="upload",
@@ -67,11 +69,13 @@ class WizardProgressRenderingTests(unittest.TestCase):
             skipped_files=0,
             retried_count=0,
             failed_count=0,
+            active_frames=1,
+            frame_workers=4,
         )
 
         self.assertEqual(
             _momentum_status_line(event),
-            "进度：75% · 已到最后一段，收尾后就能直接打开 viewer。",
+            "进度：75%",
         )
 
     def test_render_startup_banner_includes_support_links(self) -> None:
