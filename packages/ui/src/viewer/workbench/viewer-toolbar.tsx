@@ -6,14 +6,14 @@ import type { ViewerMode } from "@magic-compare/content-schema";
 import { AbInspectControls } from "./ab-inspect-controls";
 
 interface ViewerToolbarProps {
-  abPresetScale: number;
+  abScale: number;
   abSide: "before" | "after";
   canUseHeatmap: boolean;
   hideStageScrollControl: boolean;
   mode: ViewerMode;
   onAbSideChange: (side: "before" | "after") => void;
   onModeChange: (mode: ViewerMode) => void;
-  onScalePresetChange: (presetScale: number) => void;
+  onScaleChange: (nextScale: number) => void;
   onScrollStageIntoView: () => void;
   onToggleSidebar: () => void;
   sidebarOpen: boolean;
@@ -24,14 +24,14 @@ interface ViewerToolbarProps {
  * consistent between the internal and public shells.
  */
 export function ViewerToolbar({
-  abPresetScale,
+  abScale,
   abSide,
   canUseHeatmap,
   hideStageScrollControl,
   mode,
   onAbSideChange,
   onModeChange,
-  onScalePresetChange,
+  onScaleChange,
   onScrollStageIntoView,
   onToggleSidebar,
   sidebarOpen,
@@ -51,8 +51,8 @@ export function ViewerToolbar({
    * Clamps preset changes through the shared controller entry point so toolbar buttons and keyboard
    * shortcuts cannot diverge from stage zoom bounds.
    */
-  function handleScalePresetChange(nextPresetScale: number) {
-    onScalePresetChange(nextPresetScale);
+  function handleScaleChange(nextScale: number) {
+    onScaleChange(nextScale);
   }
 
   /**
@@ -74,10 +74,10 @@ export function ViewerToolbar({
       useFlexGap
     >
       <AbInspectControls
-        abPresetScale={abPresetScale}
+        abScale={abScale}
         abSide={abSide}
         onAbSideChange={handleAbSideChange}
-        onScalePresetChange={handleScalePresetChange}
+        onScaleChange={handleScaleChange}
         showControls={mode === "a-b"}
       />
 

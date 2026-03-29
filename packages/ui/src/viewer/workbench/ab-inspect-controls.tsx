@@ -8,10 +8,10 @@ import {
 } from "@magic-compare/compare-core";
 
 interface AbInspectControlsProps {
-  abPresetScale: number;
+  abScale: number;
   abSide: "before" | "after";
   onAbSideChange: (side: "before" | "after") => void;
-  onScalePresetChange: (presetScale: number) => void;
+  onScaleChange: (nextScale: number) => void;
   showControls: boolean;
 }
 
@@ -20,18 +20,26 @@ interface AbInspectControlsProps {
  * mixing mode-specific rendering details into the shared viewer action row.
  */
 export function AbInspectControls({
-  abPresetScale,
+  abScale,
   abSide,
   onAbSideChange,
-  onScalePresetChange,
+  onScaleChange,
   showControls,
 }: AbInspectControlsProps) {
-  const isAtMinScale = abPresetScale <= VIEWER_MIN_PRESET_SCALE;
-  const isAtMaxScale = abPresetScale >= VIEWER_MAX_PRESET_SCALE;
+  const isAtMinScale = abScale <= VIEWER_MIN_PRESET_SCALE;
+  const isAtMaxScale = abScale >= VIEWER_MAX_PRESET_SCALE;
   // Match the viewer toolbar target size so mode switching and zoom adjustment feel like one
   // control family instead of mixing desktop-tight and touch-friendly hit areas.
   const compactControlHeight = { xs: 42, md: 40 };
   const compactIconButtonSize = { xs: 42, md: 40 };
+
+  /**
+   * Toolbar buttons still move between whole-number checkpoints, but the displayed scale can now
+   * live between them after ctrl+wheel or pinch input.
+   */
+  function formatScaleLabel(scale: number) {
+    return `${Number(scale.toFixed(2)).toString()}x Scale`;
+  }
 
   return (
     <Stack
@@ -104,7 +112,11 @@ export function AbInspectControls({
             size="small"
             aria-label="Decrease A/B scale"
             disabled={!showControls || isAtMinScale}
-            onClick={() => onScalePresetChange(abPresetScale - 1)}
+            onClick={() =>
+              onScaleChange(
+                Math.max(VIEWER_MIN_PRESET_SCALE, Math.floor(abScale - 0.001)),
+              )
+            }
             sx={{
               width: compactIconButtonSize,
               height: compactIconButtonSize,
@@ -136,13 +148,17 @@ export function AbInspectControls({
               borderColor: "divider",
             }}
           >
-            {abPresetScale}x Scale
+            {formatScaleLabel(abScale)}
           </Box>
           <IconButton
             size="small"
             aria-label="Increase A/B scale"
             disabled={!showControls || isAtMaxScale}
-            onClick={() => onScalePresetChange(abPresetScale + 1)}
+            onClick={() =>
+              onScaleChange(
+                Math.min(VIEWER_MAX_PRESET_SCALE, Math.ceil(abScale + 0.001)),
+              )
+            }
             sx={{
               width: compactIconButtonSize,
               height: compactIconButtonSize,

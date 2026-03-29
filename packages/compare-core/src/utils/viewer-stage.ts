@@ -31,6 +31,7 @@ export interface ViewerPhysicalScaleOptions {
 }
 
 export const VIEWER_MAX_FINE_SCALE = 5 / 3;
+export const VIEWER_MIN_FINE_SCALE = 1 / VIEWER_MAX_FINE_SCALE;
 export const VIEWER_MIN_PRESET_SCALE: ViewerPresetScale = 1;
 export const VIEWER_MAX_PRESET_SCALE: ViewerPresetScale = 8;
 
@@ -102,7 +103,10 @@ export function clampViewerPanZoom(
     VIEWER_MAX_PRESET_SCALE,
     Math.max(VIEWER_MIN_PRESET_SCALE, state.presetScale),
   ) as ViewerPresetScale;
-  const fineScale = Math.min(VIEWER_MAX_FINE_SCALE, Math.max(1, state.fineScale));
+  const fineScale = Math.min(
+    VIEWER_MAX_FINE_SCALE,
+    Math.max(VIEWER_MIN_FINE_SCALE, state.fineScale),
+  );
   const scale = Math.max(0.01, effectiveScale);
 
   if (mediaRect.width <= 0 || mediaRect.height <= 0 || scale <= 1) {
@@ -163,6 +167,59 @@ export function getViewerEffectiveScale(
   options: ViewerPhysicalScaleOptions,
 ): number {
   return getViewerPresetTransformScale(state.presetScale, options) * state.fineScale;
+}
+
+/**
+ * User-facing A/B zoom is continuous even though the stored state is split into an integer preset
+ * and a fine multiplier. This helper keeps that storage normalized while allowing free zoom
+ * between the old whole-number checkpoints.
+ */
+export function normalizeViewerDisplayedScale(
+  displayedScale: number,
+  state: Pick<ViewerPanZoomState, "x" | "y">,
+): ViewerPanZoomState {
+  const clampedDisplayedScale = Math.min(
+    VIEWER_MAX_PRESET_SCALE,
+    Math.max(VIEWER_MIN_PRESET_SCALE, displayedScale),
+  );
+  let bestPresetScale = VIEWER_MIN_PRESET_SCALE;
+  let smallestDistance = Number.POSITIVE_INFINITY;
+
+  for (
+    let presetScale = VIEWER_MIN_PRESET_SCALE;
+    presetScale <= VIEWER_MAX_PRESET_SCALE;
+    presetScale += 1
+  ) {
+    const fineScale = clampedDisplayedScale / presetScale;
+
+    if (
+      fineScale < VIEWER_MIN_FINE_SCALE ||
+      fineScale > VIEWER_MAX_FINE_SCALE
+    ) {
+      continue;
+    }
+
+    const distanceFromWholeStep = Math.abs(presetScale - clampedDisplayedScale);
+    if (
+      distanceFromWholeStep < smallestDistance ||
+      (distanceFromWholeStep === smallestDistance &&
+        presetScale > bestPresetScale)
+    ) {
+      bestPresetScale = presetScale as ViewerPresetScale;
+      smallestDistance = distanceFromWholeStep;
+    }
+  }
+
+  return {
+    presetScale: bestPresetScale,
+    fineScale: clampedDisplayedScale / bestPresetScale,
+    x: state.x,
+    y: state.y,
+  };
+}
+
+export function getViewerDisplayedScale(state: ViewerPanZoomState): number {
+  return state.presetScale * state.fineScale;
 }
 
 export function getFilmstripScrollbarMetrics(

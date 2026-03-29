@@ -114,13 +114,12 @@ export function useStagePanZoomInteractions({
   const handleWheel = useCallback(
     (event: WheelLikeEvent) => {
       applyWheelZoom({
-        active,
         applyPanZoom,
         event,
         panZoomStateRef,
       });
     },
-    [active, applyPanZoom],
+    [applyPanZoom],
   );
 
   /**

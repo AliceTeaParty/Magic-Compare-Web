@@ -5,7 +5,7 @@ import type { ViewerMode } from "@magic-compare/content-schema";
 import { ViewerToolbar } from "./viewer-toolbar";
 
 interface ViewerHeaderProps {
-  abPresetScale: number;
+  abScale: number;
   abSide: "before" | "after";
   canUseHeatmap: boolean;
   caseTitle: string;
@@ -14,7 +14,7 @@ interface ViewerHeaderProps {
   mode: ViewerMode;
   onAbSideChange: (side: "before" | "after") => void;
   onModeChange: (mode: ViewerMode) => void;
-  onScalePresetChange: (presetScale: number) => void;
+  onScaleChange: (nextScale: number) => void;
   onScrollStageIntoView: () => void;
   onToggleSidebar: () => void;
   sidebarOpen: boolean;
@@ -25,7 +25,7 @@ interface ViewerHeaderProps {
  * the stage and sidebar swap between internal and public variants.
  */
 export function ViewerHeader({
-  abPresetScale,
+  abScale,
   abSide,
   canUseHeatmap,
   caseTitle,
@@ -34,7 +34,7 @@ export function ViewerHeader({
   mode,
   onAbSideChange,
   onModeChange,
-  onScalePresetChange,
+  onScaleChange,
   onScrollStageIntoView,
   onToggleSidebar,
   sidebarOpen,
@@ -81,14 +81,14 @@ export function ViewerHeader({
       </Stack>
 
       <ViewerToolbar
-        abPresetScale={abPresetScale}
+        abScale={abScale}
         abSide={abSide}
         canUseHeatmap={canUseHeatmap}
         hideStageScrollControl={hideStageScrollControl}
         mode={mode}
         onAbSideChange={onAbSideChange}
         onModeChange={onModeChange}
-        onScalePresetChange={onScalePresetChange}
+        onScaleChange={onScaleChange}
         onScrollStageIntoView={onScrollStageIntoView}
         onToggleSidebar={onToggleSidebar}
         sidebarOpen={sidebarOpen}
