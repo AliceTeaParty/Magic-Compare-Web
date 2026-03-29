@@ -26,7 +26,7 @@ describe("getViewerStageShellHeight", () => {
         availableWidth: 358,
         aspectRatio: 16 / 9,
       }),
-    ).toBeCloseTo(192.375, 10);
+    ).toBeCloseTo(196.875, 10);
   });
 
   it("falls back to the minimum shell height before layout width has been measured", () => {

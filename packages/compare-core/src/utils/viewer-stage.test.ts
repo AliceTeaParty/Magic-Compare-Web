@@ -14,8 +14,8 @@ import {
 describe("getFittedStageSize", () => {
   it("fits a 16:9 stage inside the viewport padding budget", () => {
     expect(getFittedStageSize({ width: 1440, height: 900 }, 16 / 9)).toEqual({
-      width: 1408,
-      height: 792,
+      width: 1420,
+      height: 798.75,
     });
   });
 });

@@ -6,7 +6,7 @@
     "build": "pnpm --filter @magic-compare/internal-site build && pnpm --filter @magic-compare/public-site build",
     "dev:internal": "pnpm --filter @magic-compare/internal-site dev",
     "dev:public": "pnpm --filter @magic-compare/public-site dev",
-    "debug:viewer-demo": "./debug-viewer-demo.sh",
+    "debug:viewer-demo": "./scripts/debug-viewer-demo.sh",
     "typecheck": "pnpm --recursive --if-present typecheck",
     "test": "pnpm --recursive --if-present test",
     "format": "prettier --write .",

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { CloudUpload } from "@mui/icons-material";
+import { ArrowBack, CloudUpload } from "@mui/icons-material";
 import {
   Box,
   Button,
@@ -90,6 +90,14 @@ export function CaseWorkspaceBoard({
     reorderCaseGroups(activeId, overId);
   }
 
+  /**
+   * Uses client-side navigation back to the catalog so the workspace keeps the app-shell feel
+   * instead of doing a full document reload for a very common "back to list" action.
+   */
+  function navigateToCatalog() {
+    router.push("/");
+  }
+
   return (
     <Stack spacing={{ xs: 2.25, md: 3 }}>
       <Box
@@ -162,6 +170,25 @@ export function CaseWorkspaceBoard({
                 },
               }}
             >
+              <Button
+                variant="text"
+                startIcon={<ArrowBack />}
+                onClick={navigateToCatalog}
+                sx={{
+                  color: "text.secondary",
+                  px: 1.2,
+                  borderRadius: 999,
+                  backgroundColor: "rgba(255,255,255,0.018)",
+                  border: "1px solid rgba(255,255,255,0.08)",
+                  "&:hover": {
+                    color: "text.primary",
+                    borderColor: "rgba(232, 198, 246, 0.26)",
+                    backgroundColor: "rgba(255,255,255,0.05)",
+                  },
+                }}
+              >
+                Back to catalog
+              </Button>
               <Tooltip
                 title={
                   canDeployPublicSite

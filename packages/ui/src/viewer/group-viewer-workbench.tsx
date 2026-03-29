@@ -303,7 +303,7 @@ export function GroupViewerWorkbench({
             flexDirection: "column",
           }}
         >
-          <Box sx={{ minWidth: 0, p: { xs: 1.5, md: 2.25 } }}>
+          <Box sx={{ minWidth: 0, p: { xs: 1, md: 1.5 } }}>
             <Stack
               spacing={1.5}
               sx={{

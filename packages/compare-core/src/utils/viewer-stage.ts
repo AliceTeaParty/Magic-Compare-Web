@@ -46,8 +46,10 @@ export function getFittedStageSize(
     return null;
   }
 
-  const horizontalPadding = viewport.width < 760 ? 8 : 16;
-  const verticalPadding = viewport.height < 760 ? 10 : 18;
+  // Keep a small breathing room around the stage chrome, but avoid wasting too much of the viewer
+  // shell when the surrounding layout already contributes its own padding.
+  const horizontalPadding = viewport.width < 760 ? 4 : 10;
+  const verticalPadding = viewport.height < 760 ? 6 : 12;
   const maxWidth = Math.max(viewport.width - horizontalPadding * 2, 220);
   const maxHeight = Math.max(viewport.height - verticalPadding * 2, 140);
 
