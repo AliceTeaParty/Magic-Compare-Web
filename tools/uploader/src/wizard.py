@@ -33,6 +33,7 @@ from .config import UploaderConfig, ensure_remote_access_config
 from .editor import open_in_editor
 from .naming import build_default_work_dir, build_unique_slug
 from .plan import PreparedCasePlan, build_case_plan, build_flat_source_plan, write_plan_report
+from .scanner import scan_case_directory
 from .source_parser import ParsedSourceGroup, discover_source_group
 from .upload_executor import (
     UploadExecutionSummary,
@@ -451,6 +452,18 @@ def _confirm_editor(path: Path, label: str) -> None:
         raise typer.Abort()
 
 
+def _confirm_new_case_metadata(prepared: PreparedWorkspace) -> None:
+    """Re-open case.yaml until its slug passes local validation so users fix URL-breaking values before the upload stage starts."""
+    while True:
+        _confirm_editor(prepared.case_yaml, "case.yaml")
+        try:
+            scan_case_directory(prepared.work_dir)
+            return
+        except ValueError as error:
+            console.print(f"[red]case.yaml 仍有问题：{error}[/]")
+            console.print("[yellow]请重新编辑 case.yaml，修正 slug 后再继续。[/]")
+
+
 def _show_wizard_intro() -> None:
     """Render the startup identity and support links before any prompts so operators know which tool and support channel they are using."""
     _render_startup_banner()
@@ -534,7 +547,7 @@ def _confirm_workspace_metadata(
             )
         )
     else:
-        _confirm_editor(prepared.case_yaml, "case.yaml")
+        _confirm_new_case_metadata(prepared)
 
     _confirm_editor(prepared.group_yaml, "group.yaml")
 

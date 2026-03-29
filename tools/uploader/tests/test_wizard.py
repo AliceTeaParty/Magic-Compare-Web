@@ -14,6 +14,7 @@ from src.upload_executor import UploadProgressEvent
 from src.wizard import (
     WizardUploadProgressState,
     _choose_case,
+    _confirm_new_case_metadata,
     _discover_source_group,
     _frame_status_line,
     _momentum_status_line,
@@ -141,6 +142,30 @@ class WizardSourcePromptTests(unittest.TestCase):
                 group = _discover_source_group()
 
         self.assertEqual(group.source_root, source_dir.resolve())
+
+
+class WizardMetadataValidationTests(unittest.TestCase):
+    def test_invalid_case_slug_reopens_case_yaml_until_fixed(self) -> None:
+        prepared = mock.Mock()
+        prepared.case_yaml = Path("/tmp/case.yaml")
+        prepared.work_dir = Path("/tmp/work-dir")
+
+        with (
+            mock.patch(
+                "src.wizard._confirm_editor",
+                side_effect=[None, None],
+            ) as confirm_editor,
+            mock.patch(
+                "src.wizard.scan_case_directory",
+                side_effect=[ValueError("case.yaml 的 slug 只能包含小写字母"), mock.Mock()],
+            ),
+            mock.patch("src.wizard.console.print") as print_mock,
+        ):
+            _confirm_new_case_metadata(prepared)
+
+        self.assertEqual(confirm_editor.call_count, 2)
+        printed = "\n".join(str(call.args[0]) for call in print_mock.call_args_list if call.args)
+        self.assertIn("请重新编辑 case.yaml，修正 slug 后再继续。", printed)
 
 
 class WizardCaseSelectionTests(unittest.TestCase):

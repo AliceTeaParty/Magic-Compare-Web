@@ -73,6 +73,9 @@ magic-compare-uploader
 - 显示总体文件进度、当前 frame 和重试/失败统计
 - 按 frame 直传并提交到站点
 
+新建 case 时，如果 `case.yaml` 里的 `slug` 不符合规则，向导不会继续走到上传阶段。
+它会直接提示你重新编辑 `case.yaml`，直到 `slug` 改成只包含小写字母、数字和单个横线为止。
+
 默认文件名后缀识别：
 
 - 原图：`src` / `source` / `ori` / `origin`

@@ -7,6 +7,7 @@ from pathlib import Path
 import yaml
 
 ORDERED_DIRECTORY_RE = re.compile(r"^(?P<order>\d+)-(?P<slug>[a-z0-9-]+)$")
+CASE_SLUG_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 SUPPORTED_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".avif", ".svg"}
 
 
@@ -98,6 +99,30 @@ def _parse_ordered_directory(directory: Path) -> tuple[int, str]:
     return int(match.group("order")), match.group("slug")
 
 
+def validate_case_slug_value(value: object) -> str:
+    """Keep uploader slug validation aligned with the shared schema so invalid case ids bounce back to local editing before upload."""
+    if isinstance(value, bool):
+        raise ValueError("case.yaml 的 slug 不能为空。")
+
+    if isinstance(value, int):
+        slug = str(value)
+    elif isinstance(value, str):
+        slug = value.strip()
+    else:
+        slug = ""
+
+    if not slug:
+        raise ValueError("case.yaml 的 slug 不能为空。")
+    # Case slugs become URLs and remote identifiers, so we reject anything the shared schema would
+    # later refuse instead of letting users finish an upload that can never commit successfully.
+    if not CASE_SLUG_RE.fullmatch(slug):
+        raise ValueError(
+            "case.yaml 的 slug 只能包含小写字母、数字和单个横线，不能以横线开头、结尾或连续出现。"
+        )
+
+    return slug
+
+
 def _find_asset_file(frame_directory: Path, stem: str) -> Path | None:
     for extension in SUPPORTED_EXTENSIONS:
         candidate = frame_directory / f"{stem}{extension}"
@@ -172,6 +197,9 @@ def _discover_assets(frame_directory: Path) -> list[AssetSource]:
 def scan_case_directory(case_root: Path) -> CaseSource:
     case_root = case_root.resolve()
     case_metadata = _load_yaml(case_root / "case.yaml")
+    case_metadata["slug"] = validate_case_slug_value(
+        case_metadata.get("slug", case_root.name.lower())
+    )
     groups_directory = case_root / "groups"
     if not groups_directory.exists():
         raise ValueError(f"{case_root} does not contain a groups/ directory.")
