@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { withApiRoute } from "@/lib/server/api/with-api-route";
 import {
   deployPublicSite,
   getPublicSiteOperationErrorStatus,
@@ -9,16 +10,14 @@ const schema = z.object({
   caseId: z.string().min(1).optional(),
 });
 
-export async function POST(request: Request) {
-  try {
+export const POST = withApiRoute(
+  async (request) => {
     const rawBody = await request.text();
     const payload = schema.parse(rawBody ? JSON.parse(rawBody) : {});
     const result = await deployPublicSite(payload.caseId);
     return NextResponse.json(result);
-  } catch (error) {
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Public deploy failed." },
-      { status: getPublicSiteOperationErrorStatus(error) },
-    );
-  }
-}
+  },
+  {
+    classifyError: (error) => getPublicSiteOperationErrorStatus(error),
+  },
+);
