@@ -22,7 +22,7 @@ export function useViewerMediaPreferences() {
   const showDesktopSidebar = useMediaQuery(theme.breakpoints.up("lg"), {
     noSsr: true,
   });
-  const hideFitControl = useMediaQuery(theme.breakpoints.down("sm"), {
+  const hideStageScrollControl = useMediaQuery(theme.breakpoints.down("sm"), {
     noSsr: true,
   });
   const rotateStage = useMediaQuery(
@@ -42,7 +42,9 @@ export function useViewerMediaPreferences() {
   }, []);
 
   return {
-    resolvedHideFitControl: mediaPreferencesReady ? hideFitControl : false,
+    resolvedHideStageScrollControl: mediaPreferencesReady
+      ? hideStageScrollControl
+      : false,
     resolvedPrefersReducedMotion: mediaPreferencesReady
       ? prefersReducedMotion
       : false,

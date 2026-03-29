@@ -6,7 +6,15 @@ Entries before that date are summarized at release level instead of being recons
 
 ## Unreleased
 
-No unreleased changes yet.
+### Changed
+
+- Group viewer now uses a stage-first scrolling layout: the first screen may only show part of the compare stage, but once the page scrolls to the stage it fits within a single browser viewport while the filmstrip stays below it in normal document flow.
+- The desktop toolbar action formerly labeled `Fit the compare stage to the current viewport` now scrolls the compare stage into the correct viewing position instead of toggling stage sizing.
+
+### Fixed
+
+- A/B inspect zoom is no longer clipped by the smaller contained-media rect after the stage grows wider than the original image fit area; zoomed content now uses the full stage viewport as its crop boundary.
+- Viewer layout no longer allows the filmstrip to overlap the compare stage after viewport-fit interactions or mobile-first height changes.
 
 ## v1.6.2 - 2026-03-28
 

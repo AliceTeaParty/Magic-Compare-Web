@@ -7,6 +7,7 @@ import {
   getViewerPresetTransformScale,
   type ViewerMediaRect,
   type ViewerPanZoomState,
+  type ViewerStageSize,
 } from "@magic-compare/compare-core";
 import type { ViewerAsset } from "@magic-compare/compare-core/viewer-data";
 
@@ -16,6 +17,7 @@ import type { ViewerAsset } from "@magic-compare/compare-core/viewer-data";
  */
 export function useStagePanZoomState({
   activeAsset,
+  clampViewport,
   devicePixelRatio,
   mediaRect,
   panZoomState,
@@ -23,6 +25,7 @@ export function useStagePanZoomState({
   setPanZoomState,
 }: {
   activeAsset: ViewerAsset;
+  clampViewport: ViewerStageSize;
   devicePixelRatio: number;
   mediaRect: ViewerMediaRect;
   panZoomState: ViewerPanZoomState;
@@ -77,12 +80,13 @@ export function useStagePanZoomState({
       panZoomState,
       mediaRect,
       getViewerEffectiveScale(panZoomState, scaleOptions),
+      clampViewport,
     );
 
     if (!isSamePanZoomState(nextState)) {
       setPanZoomState(nextState);
     }
-  }, [mediaRect, panZoomState, scaleOptions, setPanZoomState]);
+  }, [clampViewport, mediaRect, panZoomState, scaleOptions, setPanZoomState]);
 
   /**
    * Reapplies the shared clamp rules so every gesture path respects the same pan bounds.
@@ -93,6 +97,7 @@ export function useStagePanZoomState({
         nextState,
         mediaRect,
         getViewerEffectiveScale(nextState, scaleOptions),
+        clampViewport,
       );
 
       if (isSamePanZoomState(clampedNextState)) {
@@ -101,7 +106,7 @@ export function useStagePanZoomState({
 
       setPanZoomState(clampedNextState);
     },
-    [mediaRect, scaleOptions, setPanZoomState],
+    [clampViewport, mediaRect, scaleOptions, setPanZoomState],
   );
 
   return {

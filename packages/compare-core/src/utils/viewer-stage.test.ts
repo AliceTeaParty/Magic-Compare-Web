@@ -71,6 +71,27 @@ describe("clampViewerPanZoom", () => {
       y: 0,
     });
   });
+
+  it("clamps panning to the stage viewport when it is larger than the base media rect", () => {
+    expect(
+      clampViewerPanZoom(
+        {
+          presetScale: 2,
+          fineScale: VIEWER_MAX_FINE_SCALE,
+          x: 240,
+          y: -180,
+        },
+        { width: 320, height: 180 },
+        3,
+        { width: 960, height: 540 },
+      ),
+    ).toEqual({
+      presetScale: 2,
+      fineScale: VIEWER_MAX_FINE_SCALE,
+      x: 0,
+      y: 0,
+    });
+  });
 });
 
 describe("physical scale helpers", () => {

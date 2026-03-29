@@ -10,13 +10,12 @@ interface ViewerHeaderProps {
   canUseHeatmap: boolean;
   caseTitle: string;
   groupTitle: string;
-  hideFitControl: boolean;
-  isStageFitted: boolean;
+  hideStageScrollControl: boolean;
   mode: ViewerMode;
   onAbSideChange: (side: "before" | "after") => void;
   onModeChange: (mode: ViewerMode) => void;
   onScalePresetChange: (presetScale: number) => void;
-  onToggleFit: () => void;
+  onScrollStageIntoView: () => void;
   onToggleSidebar: () => void;
   sidebarOpen: boolean;
 }
@@ -31,13 +30,12 @@ export function ViewerHeader({
   canUseHeatmap,
   caseTitle,
   groupTitle,
-  hideFitControl,
-  isStageFitted,
+  hideStageScrollControl,
   mode,
   onAbSideChange,
   onModeChange,
   onScalePresetChange,
-  onToggleFit,
+  onScrollStageIntoView,
   onToggleSidebar,
   sidebarOpen,
 }: ViewerHeaderProps) {
@@ -86,13 +84,12 @@ export function ViewerHeader({
         abPresetScale={abPresetScale}
         abSide={abSide}
         canUseHeatmap={canUseHeatmap}
-        hideFitControl={hideFitControl}
-        isStageFitted={isStageFitted}
+        hideStageScrollControl={hideStageScrollControl}
         mode={mode}
         onAbSideChange={onAbSideChange}
         onModeChange={onModeChange}
         onScalePresetChange={onScalePresetChange}
-        onToggleFit={onToggleFit}
+        onScrollStageIntoView={onScrollStageIntoView}
         onToggleSidebar={onToggleSidebar}
         sidebarOpen={sidebarOpen}
       />

@@ -34,6 +34,10 @@ export const VIEWER_MAX_FINE_SCALE = 5 / 3;
 export const VIEWER_MIN_PRESET_SCALE: ViewerPresetScale = 1;
 export const VIEWER_MAX_PRESET_SCALE: ViewerPresetScale = 8;
 
+function normalizeClampedPanOffset(value: number): number {
+  return Object.is(value, -0) ? 0 : value;
+}
+
 export function getFittedStageSize(
   viewport: ViewerStageSize,
   aspectRatio: number,
@@ -90,6 +94,7 @@ export function clampViewerPanZoom(
   state: ViewerPanZoomState,
   mediaRect: ViewerStageSize,
   effectiveScale: number,
+  clampViewport: ViewerStageSize = mediaRect,
 ): ViewerPanZoomState {
   const presetScale = Math.min(
     VIEWER_MAX_PRESET_SCALE,
@@ -107,14 +112,17 @@ export function clampViewerPanZoom(
     };
   }
 
-  const maxX = Math.max(0, (mediaRect.width * scale - mediaRect.width) / 2);
-  const maxY = Math.max(0, (mediaRect.height * scale - mediaRect.height) / 2);
+  const maxX = Math.max(0, (mediaRect.width * scale - clampViewport.width) / 2);
+  const maxY = Math.max(0, (mediaRect.height * scale - clampViewport.height) / 2);
+  // clampViewport defaults to mediaRect for legacy contained-media behavior, but A/B inspect can
+  // opt into the full stage viewport so zoomed content is constrained by the visible stage rather
+  // than the smaller pre-zoom fit box.
 
   return {
     presetScale,
     fineScale,
-    x: Math.min(maxX, Math.max(-maxX, state.x)),
-    y: Math.min(maxY, Math.max(-maxY, state.y)),
+    x: normalizeClampedPanOffset(Math.min(maxX, Math.max(-maxX, state.x))),
+    y: normalizeClampedPanOffset(Math.min(maxY, Math.max(-maxY, state.y))),
   };
 }
 

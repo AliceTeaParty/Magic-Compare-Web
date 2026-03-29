@@ -3,6 +3,7 @@
 import type {
   ViewerMediaRect,
   ViewerPanZoomState,
+  ViewerStageSize,
 } from "@magic-compare/compare-core";
 import type { ViewerAsset } from "@magic-compare/compare-core/viewer-data";
 import { useStagePanZoomInteractions } from "./use-stage-pan-zoom-interactions";
@@ -20,9 +21,11 @@ export function useStagePanZoom({
   panZoomState,
   rotateStage,
   setPanZoomState,
+  clampViewport,
 }: {
   active: boolean;
   activeAsset: ViewerAsset;
+  clampViewport: ViewerStageSize;
   devicePixelRatio: number;
   mediaRect: ViewerMediaRect;
   panZoomState: ViewerPanZoomState;
@@ -32,6 +35,7 @@ export function useStagePanZoom({
   const { effectiveScale, presetTransformScale, applyPanZoom } =
     useStagePanZoomState({
       activeAsset,
+      clampViewport,
       devicePixelRatio,
       mediaRect,
       panZoomState,

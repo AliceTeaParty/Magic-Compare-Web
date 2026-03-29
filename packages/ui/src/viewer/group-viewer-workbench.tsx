@@ -6,15 +6,17 @@ import {
   VIEWER_MAX_PRESET_SCALE,
   VIEWER_MIN_PRESET_SCALE,
   cycleAbSide,
-  getFittedStageSize as getViewerFittedStageSize,
 } from "@magic-compare/compare-core";
 import { useViewerController } from "@magic-compare/compare-core/use-viewer-controller";
 import type { ViewerDataset } from "@magic-compare/compare-core/viewer-data";
 import { clampNumber } from "@magic-compare/shared-utils";
-import { motion } from "motion/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ViewerFilmstrip } from "./workbench/viewer-filmstrip";
 import { ViewerHeader } from "./workbench/viewer-header";
+import {
+  getViewerStageShellHeight,
+  getViewerStageScrollPadding,
+} from "./workbench/viewer-layout";
 import {
   useAbStageOutsideDismiss,
   useViewerKeyboardShortcuts,
@@ -27,8 +29,6 @@ import {
   DEFAULT_PAN_ZOOM,
   HeatmapNotice,
   ViewerStage,
-  getViewerDevicePixelRatio,
-  getViewportSignature,
   getViewportSize,
 } from "./workbench/viewer-stage";
 
@@ -67,18 +67,20 @@ export function GroupViewerWorkbench({
     toggleSidebar,
   } = controller;
   const stageRef = useRef<HTMLDivElement | null>(null);
-  const [viewportSize, setViewportSize] = useState(() => getViewportSize());
-  const [devicePixelRatio, setDevicePixelRatio] = useState(() =>
-    getViewerDevicePixelRatio(),
-  );
-  const [fitViewViewportSignature, setFitViewViewportSignature] = useState<
-    string | null
-  >(null);
+  const stageSlotRef = useRef<HTMLDivElement | null>(null);
+  // Start from a zero viewport on the server and first client paint so hydration never bakes in a
+  // stale desktop/mobile height budget before the real window metrics arrive.
+  const [viewportSize, setViewportSize] = useState(() => ({
+    width: 0,
+    height: 0,
+  }));
+  const [stageSlotWidth, setStageSlotWidth] = useState(0);
+  const [devicePixelRatio, setDevicePixelRatio] = useState(1);
   const [swipePosition, setSwipePosition] = useState(50);
   const [abPanZoomState, setAbPanZoomState] = useState(DEFAULT_PAN_ZOOM);
   const [abStageActive, setAbStageActive] = useState(false);
   const {
-    resolvedHideFitControl,
+    resolvedHideStageScrollControl,
     resolvedPrefersReducedMotion,
     resolvedRotateStage,
     resolvedShowDesktopSidebar,
@@ -92,12 +94,14 @@ export function GroupViewerWorkbench({
   const stageAspectRatio = resolvedRotateStage
     ? 1 / contentAspectRatio
     : contentAspectRatio;
-  const fittedStageSize = useMemo(
+  const stageShellHeight = useMemo(
     () =>
-      fitViewViewportSignature
-        ? getViewerFittedStageSize(viewportSize, stageAspectRatio)
-        : null,
-    [fitViewViewportSignature, stageAspectRatio, viewportSize],
+      getViewerStageShellHeight({
+        viewportSize,
+        availableWidth: stageSlotWidth,
+        aspectRatio: stageAspectRatio,
+      }),
+    [stageAspectRatio, stageSlotWidth, viewportSize],
   );
 
   useViewerPreferencePersistence({
@@ -126,6 +130,32 @@ export function GroupViewerWorkbench({
     setDevicePixelRatio,
     setViewportSize,
   });
+
+  useEffect(() => {
+    const stageSlotNode = stageSlotRef.current;
+    if (!stageSlotNode) {
+      return;
+    }
+
+    /**
+     * Re-measures from the live ref so sidebar toggles and viewport resizes always update the
+     * outer stage shell to the real width-constrained fit result instead of a stale width sample.
+     */
+    function syncStageSlotWidth() {
+      const nextStageSlotNode = stageSlotRef.current;
+      if (!nextStageSlotNode) {
+        return;
+      }
+
+      setStageSlotWidth(nextStageSlotNode.clientWidth);
+    }
+
+    syncStageSlotWidth();
+    const observer = new ResizeObserver(syncStageSlotWidth);
+    observer.observe(stageSlotNode);
+    return () => observer.disconnect();
+  }, []);
+
   useViewerKeyboardShortcuts({
     abSide,
     abStageActive,
@@ -160,19 +190,24 @@ export function GroupViewerWorkbench({
   }
 
   /**
-   * Uses a viewport signature instead of a boolean so repeated clicks toggle fit off only for the
-   * same viewport, while real viewport changes recompute the fitted size.
+   * Scrolls the compare surface into a screen-filling viewing position without changing its size,
+   * which keeps the first screen free to show context while still offering a one-click jump.
    */
-  function toggleFittedStageView() {
-    const nextViewportSize = getViewportSize();
-    const nextSignature = getViewportSignature(nextViewportSize);
+  function scrollStageIntoView() {
+    const stageNode = stageRef.current;
+    if (!stageNode || typeof window === "undefined") {
+      return;
+    }
 
-    setViewportSize(nextViewportSize);
-    setFitViewViewportSignature((previousSignature) =>
-      previousSignature && previousSignature === nextSignature
-        ? null
-        : nextSignature,
-    );
+    const nextViewportSize = getViewportSize();
+    const scrollPadding = getViewerStageScrollPadding(nextViewportSize);
+    const stageTop =
+      window.scrollY + stageNode.getBoundingClientRect().top - scrollPadding;
+
+    window.scrollTo({
+      top: Math.max(0, stageTop),
+      behavior: resolvedPrefersReducedMotion ? "auto" : "smooth",
+    });
   }
 
   return (
@@ -195,8 +230,8 @@ export function GroupViewerWorkbench({
             sidebarOpen && resolvedShowDesktopSidebar
               ? "minmax(0, 1fr) 320px"
               : "1fr",
-          gridTemplateRows: "auto minmax(0, 1fr)",
-          height: {
+          gridTemplateRows: "auto minmax(0, auto)",
+          minHeight: {
             xs: "calc(100svh - 20px)",
             md: "calc(100svh - 36px)",
           },
@@ -214,13 +249,12 @@ export function GroupViewerWorkbench({
           canUseHeatmap={availableModes.includes("heatmap")}
           caseTitle={dataset.caseMeta.title}
           groupTitle={dataset.group.title}
-          hideFitControl={resolvedHideFitControl}
-          isStageFitted={Boolean(fittedStageSize)}
+          hideStageScrollControl={resolvedHideStageScrollControl}
           mode={mode}
           onAbSideChange={setAbSide}
           onModeChange={setMode}
           onScalePresetChange={setAbScalePreset}
-          onToggleFit={toggleFittedStageView}
+          onScrollStageIntoView={scrollStageIntoView}
           onToggleSidebar={toggleSidebar}
           sidebarOpen={sidebarOpen}
         />
@@ -229,31 +263,29 @@ export function GroupViewerWorkbench({
           sx={{
             minWidth: 0,
             minHeight: 0,
-            height: "100%",
-            display: "grid",
-            gridTemplateRows: "minmax(0, 1fr) auto",
+            display: "flex",
+            flexDirection: "column",
           }}
         >
-          <Box sx={{ minHeight: 0, height: "100%", p: { xs: 1.5, md: 2.25 } }}>
+          <Box sx={{ minWidth: 0, p: { xs: 1.5, md: 2.25 } }}>
             <Stack
               spacing={1.5}
               sx={{
                 width: "100%",
                 minWidth: 0,
-                height: "100%",
                 minHeight: 0,
               }}
             >
               {mode === "heatmap" && !heatmapAsset ? <HeatmapNotice /> : null}
 
               <Box
+                ref={stageSlotRef}
                 sx={{
-                  flex: 1,
                   minWidth: 0,
-                  height: "100%",
-                  minHeight: fittedStageSize
-                    ? `${fittedStageSize.height}px`
-                    : 0,
+                  // The viewport budget is only an upper bound. The outer shell must collapse to
+                  // the fitted width-constrained stage height, or portrait mobile screens end up
+                  // with a short stage vertically centered inside an overly tall empty slot.
+                  height: `${stageShellHeight}px`,
                 }}
               >
                 <ViewerStage
@@ -262,7 +294,6 @@ export function GroupViewerWorkbench({
                   afterAsset={afterAsset}
                   beforeAsset={beforeAsset}
                   devicePixelRatio={devicePixelRatio}
-                  fittedStageSize={fittedStageSize}
                   heatmapAsset={heatmapAsset}
                   mode={mode}
                   onCycleAbSide={() => setAbSide(cycleAbSide(abSide))}

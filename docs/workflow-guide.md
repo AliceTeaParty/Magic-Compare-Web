@@ -117,6 +117,7 @@ demo 是仓库内置样本，用于：
 demo 来自：
 
 - `apps/internal-site/prisma/demo-assets/`
+- 根目录 `pnpm debug:viewer-demo` 可直接把这些样本素材挂到本地 `127.0.0.1:9000`，执行一次 `public:export`，再启动一个只针对 viewer/UI 联调的静态 smoke 环境
 
 由以下命令维护：
 
@@ -427,7 +428,9 @@ Docker 用：
 
 - 主舞台尺寸必须自控
 - 胶片带底层必须是真滚动
-- `fit` 必须是原位适配
+- viewer 采用 stage-first 布局；首屏可以看不完整个 stage，但滚动到 stage 区后它必须完整落入一个浏览器 viewport
+- 胶片带必须始终排在 stage 下方，不能靠固定高度壳体、负 margin 或层叠技巧与主舞台抢空间
+- 工具栏里的 `fit`/`Scroll the compare stage into view` 语义是“自动滚动到合适观察位置”，不是再次切换 stage 尺寸
 - heatmap 必须和基底图共享同一 media rect
 
 更详细说明见：

@@ -4,9 +4,11 @@ import { PhotoLibrary } from "@mui/icons-material";
 import { Alert, Box, Stack, Typography } from "@mui/material";
 import {
   getContainedMediaRect,
+  getFittedStageSize,
   getViewerEffectiveScale,
   type ViewerMediaRect,
   type ViewerPanZoomState,
+  type ViewerStageSize,
 } from "@magic-compare/compare-core";
 import type { ViewerMode } from "@magic-compare/content-schema";
 import type { ViewerAsset } from "@magic-compare/compare-core/viewer-data";
@@ -32,13 +34,6 @@ export interface StageSize {
   width: number;
   height: number;
 }
-
-export const DEFAULT_PAN_ZOOM: ViewerPanZoomState = {
-  presetScale: 1,
-  fineScale: 1,
-  x: 0,
-  y: 0,
-};
 
 /**
  * Reads the live viewport instead of relying on CSS breakpoints because fit-to-screen math needs
@@ -67,13 +62,12 @@ export function getViewerDevicePixelRatio(): number {
   return Math.max(1, window.devicePixelRatio || 1);
 }
 
-/**
- * Uses a deterministic string key so fit mode can tell the difference between "same viewport,
- * toggle off" and "new viewport, recompute fit".
- */
-export function getViewportSignature(viewportSize: ViewportSize): string {
-  return `${viewportSize.width}x${viewportSize.height}`;
-}
+export const DEFAULT_PAN_ZOOM: ViewerPanZoomState = {
+  presetScale: 1,
+  fineScale: 1,
+  x: 0,
+  y: 0,
+};
 
 /**
  * Tracks the rendered stage box rather than the viewport because contained-media math must follow
@@ -139,6 +133,7 @@ function buildMediaTransform(
 function PositionedStageMedia({
   asset,
   alt,
+  clipRect,
   mediaRect,
   rotateStage,
   panZoomState = DEFAULT_PAN_ZOOM,
@@ -149,6 +144,7 @@ function PositionedStageMedia({
 }: {
   asset: ViewerAsset;
   alt: string;
+  clipRect?: ViewerMediaRect;
   mediaRect: ViewerMediaRect;
   rotateStage: boolean;
   panZoomState?: ViewerPanZoomState;
@@ -157,21 +153,32 @@ function PositionedStageMedia({
   opacity?: number;
   clipPath?: string;
 }) {
-  if (mediaRect.width <= 0 || mediaRect.height <= 0) {
+  const resolvedClipRect = clipRect ?? mediaRect;
+
+  if (
+    mediaRect.width <= 0 ||
+    mediaRect.height <= 0 ||
+    resolvedClipRect.width <= 0 ||
+    resolvedClipRect.height <= 0
+  ) {
     return null;
   }
 
   const mediaWidth = rotateStage ? mediaRect.height : mediaRect.width;
   const mediaHeight = rotateStage ? mediaRect.width : mediaRect.height;
+  const mediaCenterX =
+    mediaRect.x + mediaRect.width / 2 - resolvedClipRect.x;
+  const mediaCenterY =
+    mediaRect.y + mediaRect.height / 2 - resolvedClipRect.y;
 
   return (
     <Box
       sx={{
         position: "absolute",
-        left: `${mediaRect.x}px`,
-        top: `${mediaRect.y}px`,
-        width: `${mediaRect.width}px`,
-        height: `${mediaRect.height}px`,
+        left: `${resolvedClipRect.x}px`,
+        top: `${resolvedClipRect.y}px`,
+        width: `${resolvedClipRect.width}px`,
+        height: `${resolvedClipRect.height}px`,
         overflow: "hidden",
         clipPath,
         pointerEvents: "none",
@@ -180,8 +187,8 @@ function PositionedStageMedia({
       <Box
         sx={{
           position: "absolute",
-          left: "50%",
-          top: "50%",
+          left: `${mediaCenterX}px`,
+          top: `${mediaCenterY}px`,
           width: `${mediaWidth}px`,
           height: `${mediaHeight}px`,
           transform: buildMediaTransform(
@@ -433,6 +440,7 @@ function SwipeCompareStage({
 function ABCompareStage({
   active,
   activeAsset,
+  viewportSize,
   devicePixelRatio,
   mediaRect,
   onCycleSide,
@@ -443,6 +451,7 @@ function ABCompareStage({
 }: {
   active: boolean;
   activeAsset: ViewerAsset;
+  viewportSize: ViewerStageSize;
   devicePixelRatio: number;
   mediaRect: ViewerMediaRect;
   onCycleSide: () => void;
@@ -460,6 +469,7 @@ function ABCompareStage({
   } = useStagePanZoom({
     active,
     activeAsset,
+    clampViewport: viewportSize,
     devicePixelRatio,
     mediaRect,
     panZoomState,
@@ -505,6 +515,19 @@ function ABCompareStage({
     onCycleSide();
   }
 
+  const clipRect =
+    active && effectiveScale > 1
+      ? {
+          x: 0,
+          y: 0,
+          width: viewportSize.width,
+          height: viewportSize.height,
+        }
+      : mediaRect;
+  // Once inspect mode zooms beyond 1x, the old contained-media rect becomes an accidental inner
+  // mask. Switch clipping to the full stage viewport so wide stages do not reintroduce a hidden
+  // 16:9 crop while panning.
+
   return (
     <Box
       ref={stageSurfaceRef}
@@ -532,6 +555,7 @@ function ABCompareStage({
       <PositionedStageMedia
         asset={activeAsset}
         alt={`${activeAsset.label} preview`}
+        clipRect={clipRect}
         mediaRect={mediaRect}
         rotateStage={rotateStage}
         panZoomState={panZoomState}
@@ -548,16 +572,16 @@ function ABCompareStage({
  */
 function StagePresentationShell({
   children,
-  fittedSize,
+  stageSize,
   inspectActive,
   stageAspectRatio,
 }: {
   children: ReactNode;
-  fittedSize: StageSize | null;
+  stageSize: StageSize | null;
   inspectActive?: boolean;
   stageAspectRatio: number;
 }) {
-  const fitActive = Boolean(fittedSize);
+  const hasMeasuredStageSize = Boolean(stageSize);
 
   return (
     <Box
@@ -565,30 +589,31 @@ function StagePresentationShell({
         position: "relative",
         display: "grid",
         placeItems: "center",
-        width: "100%",
-        maxWidth: fittedSize ? `${fittedSize.width}px` : "100%",
+        width: stageSize ? `${stageSize.width}px` : "100%",
+        height: stageSize ? `${stageSize.height}px` : "100%",
+        maxWidth: "100%",
+        maxHeight: "100%",
         minWidth: 0,
-        aspectRatio: stageAspectRatio,
-        minHeight: fitActive ? 0 : { xs: 80 },
-        maxHeight: fittedSize ? `${fittedSize.height}px` : "100%",
+        aspectRatio: hasMeasuredStageSize ? undefined : stageAspectRatio,
+        minHeight: hasMeasuredStageSize ? 0 : { xs: 80 },
         marginInline: "auto",
         borderRadius: 2.5,
         overflow: "hidden",
         border: "1px solid",
         borderColor: inspectActive
           ? "rgba(232, 198, 246, 0.42)"
-          : fitActive
+          : hasMeasuredStageSize
             ? "rgba(232, 198, 246, 0.36)"
             : "divider",
         background:
           "radial-gradient(circle at top, rgba(232, 198, 246, 0.1), transparent 28%), rgba(13, 24, 54, 0.94)",
         boxShadow: inspectActive
           ? "0 0 0 1px rgba(232, 198, 246, 0.08), 0 18px 44px rgba(8, 15, 35, 0.28)"
-          : fitActive
+          : hasMeasuredStageSize
             ? "0 24px 52px rgba(8, 15, 35, 0.28)"
             : "none",
         transition:
-          "max-width 180ms cubic-bezier(0.22, 1, 0.36, 1), max-height 180ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 180ms cubic-bezier(0.22, 1, 0.36, 1), border-color 180ms cubic-bezier(0.22, 1, 0.36, 1)",
+          "width 180ms cubic-bezier(0.22, 1, 0.36, 1), height 180ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 180ms cubic-bezier(0.22, 1, 0.36, 1), border-color 180ms cubic-bezier(0.22, 1, 0.36, 1)",
       }}
     >
       {children}
@@ -698,6 +723,7 @@ function ViewerStageContent({
           rotateStage={rotateStage}
           setActive={setAbStageActive}
           setPanZoomState={setPanZoomState}
+          viewportSize={viewportSize}
         />
       </Box>
     );
@@ -746,7 +772,6 @@ interface ViewerStageProps {
   afterAsset: ViewerAsset | undefined;
   beforeAsset: ViewerAsset | undefined;
   devicePixelRatio: number;
-  fittedStageSize: StageSize | null;
   heatmapAsset: ViewerAsset | undefined;
   mode: ViewerMode;
   onCycleAbSide: () => void;
@@ -771,7 +796,6 @@ export function ViewerStage({
   afterAsset,
   beforeAsset,
   devicePixelRatio,
-  fittedStageSize,
   heatmapAsset,
   mode,
   onCycleAbSide,
@@ -785,6 +809,13 @@ export function ViewerStage({
   stageRef,
   swipePosition,
 }: ViewerStageProps) {
+  const stageViewportSize = useElementSize(stageRef);
+  const stageSize = useMemo(() => {
+    // The parent workbench already collapsed the slot to the fitted shell height, so the stage can
+    // size directly from the measured box instead of carrying a second viewport-height fallback.
+    return getFittedStageSize(stageViewportSize, stageAspectRatio);
+  }, [stageAspectRatio, stageViewportSize]);
+
   return (
     <Box
       ref={stageRef}
@@ -797,7 +828,7 @@ export function ViewerStage({
       }}
     >
       <StagePresentationShell
-        fittedSize={fittedStageSize}
+        stageSize={stageSize}
         stageAspectRatio={stageAspectRatio}
         inspectActive={mode === "a-b" && abStageActive}
       >

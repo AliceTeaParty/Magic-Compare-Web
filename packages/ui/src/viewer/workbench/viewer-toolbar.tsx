@@ -9,13 +9,12 @@ interface ViewerToolbarProps {
   abPresetScale: number;
   abSide: "before" | "after";
   canUseHeatmap: boolean;
-  hideFitControl: boolean;
-  isStageFitted: boolean;
+  hideStageScrollControl: boolean;
   mode: ViewerMode;
   onAbSideChange: (side: "before" | "after") => void;
   onModeChange: (mode: ViewerMode) => void;
   onScalePresetChange: (presetScale: number) => void;
-  onToggleFit: () => void;
+  onScrollStageIntoView: () => void;
   onToggleSidebar: () => void;
   sidebarOpen: boolean;
 }
@@ -28,13 +27,12 @@ export function ViewerToolbar({
   abPresetScale,
   abSide,
   canUseHeatmap,
-  hideFitControl,
-  isStageFitted,
+  hideStageScrollControl,
   mode,
   onAbSideChange,
   onModeChange,
   onScalePresetChange,
-  onToggleFit,
+  onScrollStageIntoView,
   onToggleSidebar,
   sidebarOpen,
 }: ViewerToolbarProps) {
@@ -118,26 +116,17 @@ export function ViewerToolbar({
         </ToggleButton>
       </ToggleButtonGroup>
 
-      {!hideFitControl ? (
-        <Tooltip
-          title={
-            isStageFitted
-              ? "Restore compare scale"
-              : "Fit the compare stage to the current viewport"
-          }
-        >
+      {!hideStageScrollControl ? (
+        <Tooltip title="Scroll the compare stage into view">
           <IconButton
             size="small"
-            onClick={onToggleFit}
+            aria-label="Scroll the compare stage into view"
+            onClick={onScrollStageIntoView}
             sx={{
               width: 34,
               height: 34,
-              borderColor: isStageFitted
-                ? "rgba(232, 198, 246, 0.4)"
-                : "divider",
-              backgroundColor: isStageFitted
-                ? "rgba(232, 198, 246, 0.12)"
-                : "rgba(255,255,255,0.035)",
+              borderColor: "divider",
+              backgroundColor: "rgba(255,255,255,0.035)",
             }}
           >
             <FitScreen fontSize="small" />
