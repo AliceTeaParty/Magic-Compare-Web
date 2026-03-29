@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "typecheck": "next build",
+    "lint": "eslint .",
     "test": "vitest run --passWithNoTests",
     "db:generate": "DATABASE_URL=${DATABASE_URL:-file:./dev.db} prisma generate --schema prisma/schema.prisma",
     "db:push": "DATABASE_URL=${DATABASE_URL:-file:./dev.db} tsx prisma/init-db.ts",
