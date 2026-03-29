@@ -4,17 +4,22 @@ This project started keeping a structured changelog on 2026-03-21.
 
 Entries before that date are summarized at release level instead of being reconstructed commit by commit.
 
-## Unreleased
+## v1.7.0 - 2026-03-29
 
 ### Changed
 
 - Group viewer now uses a stage-first scrolling layout: the first screen may only show part of the compare stage, but once the page scrolls to the stage it fits within a single browser viewport while the filmstrip stays below it in normal document flow.
 - The desktop toolbar action formerly labeled `Fit the compare stage to the current viewport` now scrolls the compare stage into the correct viewing position instead of toggling stage sizing.
+- Root package metadata and uploader package metadata are now both versioned as `1.7.0`, and the uploader startup banner now reads the main project release line first so local source runs and packaged binaries stay aligned.
+- Uploader help and wizard copy were normalized around `plan` and `sync` as the only primary commands, while low-frequency remote inspection and cleanup commands moved into a separate miscellaneous group.
+- Uploader startup branding now loads its ASCII logo from `tools/uploader/assets/ascii-logo.txt`, keeping source runs and packaged binaries on the same resource path while still tolerating the old root asset path as a fallback during migration.
+- Uploader wizard progress now adds a calm momentum line and a clearer “next step” success note so long uploads feel advancing and the completion state points directly to viewer/workspace follow-up.
 
 ### Fixed
 
 - A/B inspect zoom is no longer clipped by the smaller contained-media rect after the stage grows wider than the original image fit area; zoomed content now uses the full stage viewport as its crop boundary.
 - Viewer layout no longer allows the filmstrip to overlap the compare stage after viewport-fit interactions or mobile-first height changes.
+- Uploader source runs no longer show stale installed package versions in the startup banner, and missing `pykakasi` in the local Python environment now surfaces as an uploader-environment problem instead of being misreported as an invalid source path.
 
 ## v1.6.2 - 2026-03-28
 

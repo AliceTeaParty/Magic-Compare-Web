@@ -115,7 +115,7 @@ class BrandingFallbackTests(unittest.TestCase):
         branding.pyproject_version.cache_clear()
         with (
             mock.patch.object(branding, "project_version", return_value="9.9.9"),
-            mock.patch.object(branding, "pyproject_version", return_value="1.6.2"),
+            mock.patch.object(branding, "pyproject_version", return_value="1.7.0"),
         ):
             self.assertEqual(branding.uploader_version(), "9.9.9")
         branding.uploader_version.cache_clear()
