@@ -39,7 +39,12 @@ function ensureColumns(
  * multiple `active` rows per group, so we cancel stale duplicates before rebuilding that guard.
  */
 function cancelDuplicateActiveUploadJobs(database: DatabaseSync): void {
+  // Both UPDATE statements must be atomic: cancelling children before parents means a crash between
+  // the two would leave GroupUploadJob rows active with already-cancelled children, which would
+  // cause the partial unique index to fail on the next bootstrap run.
   database.exec(`
+BEGIN;
+
 WITH ranked AS (
   SELECT
     "id",
@@ -58,9 +63,7 @@ duplicate_jobs AS (
 UPDATE "FrameUploadJob"
 SET "status" = 'cancelled'
 WHERE "groupUploadJobId" IN (SELECT "id" FROM duplicate_jobs);
-`);
 
-  database.exec(`
 WITH ranked AS (
   SELECT
     "id",
@@ -78,6 +81,8 @@ WHERE "id" IN (
   FROM ranked
   WHERE "rowNumber" > 1
 );
+
+COMMIT;
 `);
 }
 
@@ -193,7 +198,7 @@ CREATE TABLE IF NOT EXISTS "FrameUploadJob" (
   "groupUploadJobId" TEXT NOT NULL,
   "frameOrder" INTEGER NOT NULL,
   "frameSnapshotJson" TEXT NOT NULL,
-  "preparedAssetsJson" TEXT NOT NULL DEFAULT '',
+  "preparedAssetsJson" TEXT NOT NULL DEFAULT '[]',
   "pendingPrefix" TEXT,
   "status" TEXT NOT NULL,
   "committedAt" DATETIME,

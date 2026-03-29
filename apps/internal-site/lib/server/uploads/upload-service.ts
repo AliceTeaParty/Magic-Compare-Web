@@ -174,7 +174,7 @@ export async function completeGroupUpload(rawInput: unknown) {
   const job = await requireActiveUploadJob(input.groupUploadJobId);
 
   if (
-    job.expectedFrameCount !== job.committedFrameCount &&
+    job.expectedFrameCount !== job.committedFrameCount ||
     (await countUncommittedFrameJobs(job.id)) > 0
   ) {
     throw new Error("Not every frame in the upload job has been committed.");
