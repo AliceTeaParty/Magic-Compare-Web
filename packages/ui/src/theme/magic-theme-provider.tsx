@@ -5,6 +5,15 @@ import { CssBaseline, GlobalStyles } from "@mui/material";
 import { ThemeProvider, alpha, createTheme } from "@mui/material/styles";
 import { buildMagicColorTokens } from "./magic-color-tokens";
 
+const DISPLAY_HEADING_FAMILY =
+  "var(--font-display-sc), var(--font-display-jp), serif";
+
+const EASE_OUT = "cubic-bezier(0.22, 1, 0.36, 1)";
+
+/** Builds a unified transition shorthand so interactive overrides stay in sync. */
+const interactiveTransition = (...props: string[]) =>
+  props.map((p) => `${p} 160ms ${EASE_OUT}`).join(", ");
+
 export function MagicThemeProvider({ children }: PropsWithChildren) {
   const tokens = useMemo(() => buildMagicColorTokens(), []);
   const theme = useMemo(
@@ -50,35 +59,35 @@ export function MagicThemeProvider({ children }: PropsWithChildren) {
         typography: {
           fontFamily: "var(--font-body)",
           h1: {
-            fontFamily: "var(--font-display-sc), var(--font-display-jp), serif",
+            fontFamily: DISPLAY_HEADING_FAMILY,
             fontWeight: 600,
             lineHeight: 0.94,
             letterSpacing: "-0.04em",
             fontSize: "clamp(3rem, 5vw, 5.4rem)",
           },
           h2: {
-            fontFamily: "var(--font-display-sc), var(--font-display-jp), serif",
+            fontFamily: DISPLAY_HEADING_FAMILY,
             fontWeight: 600,
             lineHeight: 0.98,
             letterSpacing: "-0.035em",
             fontSize: "clamp(2.4rem, 4vw, 4rem)",
           },
           h3: {
-            fontFamily: "var(--font-display-sc), var(--font-display-jp), serif",
+            fontFamily: DISPLAY_HEADING_FAMILY,
             fontWeight: 580,
             lineHeight: 1,
             letterSpacing: "-0.03em",
             fontSize: "clamp(2rem, 3vw, 3rem)",
           },
           h4: {
-            fontFamily: "var(--font-display-sc), var(--font-display-jp), serif",
+            fontFamily: DISPLAY_HEADING_FAMILY,
             fontWeight: 560,
             lineHeight: 1.05,
             letterSpacing: "-0.025em",
             fontSize: "clamp(1.7rem, 2.4vw, 2.4rem)",
           },
           h5: {
-            fontFamily: "var(--font-display-sc), var(--font-display-jp), serif",
+            fontFamily: DISPLAY_HEADING_FAMILY,
             fontWeight: 560,
             lineHeight: 1.08,
             letterSpacing: "-0.02em",
@@ -129,8 +138,7 @@ export function MagicThemeProvider({ children }: PropsWithChildren) {
                 borderRadius: 999,
                 paddingInline: 17,
                 minHeight: 40,
-                transition:
-                  "transform 160ms cubic-bezier(0.22, 1, 0.36, 1), background-color 160ms cubic-bezier(0.22, 1, 0.36, 1), border-color 160ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 160ms cubic-bezier(0.22, 1, 0.36, 1)",
+                transition: interactiveTransition("transform", "background-color", "border-color", "box-shadow"),
                 "&:hover": {
                   transform: "translateY(-1px)",
                 },
@@ -169,8 +177,7 @@ export function MagicThemeProvider({ children }: PropsWithChildren) {
                 borderRadius: 13,
                 border: `1px solid ${subtleDivider}`,
                 backgroundColor: alpha(tokens.background.elevated, 0.76),
-                transition:
-                  "transform 160ms cubic-bezier(0.22, 1, 0.36, 1), background-color 160ms cubic-bezier(0.22, 1, 0.36, 1), border-color 160ms cubic-bezier(0.22, 1, 0.36, 1)",
+                transition: interactiveTransition("transform", "background-color", "border-color"),
                 "&:hover": {
                   transform: "translateY(-1px)",
                   borderColor: alpha(tokens.primary.main, 0.3),
@@ -223,8 +230,7 @@ export function MagicThemeProvider({ children }: PropsWithChildren) {
                 color: textSecondary,
                 backgroundColor: alpha(tokens.background.elevated, 0.62),
                 paddingInline: 14,
-                transition:
-                  "transform 160ms cubic-bezier(0.22, 1, 0.36, 1), background-color 160ms cubic-bezier(0.22, 1, 0.36, 1), border-color 160ms cubic-bezier(0.22, 1, 0.36, 1), color 160ms cubic-bezier(0.22, 1, 0.36, 1)",
+                transition: interactiveTransition("transform", "background-color", "border-color", "color"),
                 "&:hover": {
                   borderColor: alpha(tokens.secondary.main, 0.36),
                   backgroundColor: alpha(tokens.background.elevated, 0.82),

@@ -32,44 +32,28 @@ export type PreparedUploadAsset = UploadAssetDescriptor & {
   thumbnail: UploadAssetDescriptor["thumbnail"] & { logicalPath: string };
 };
 
-const uploadJobSummarySelect = {
+/** Fields shared by every upload-job query so additions stay consistent. */
+const baseJobFields = {
   id: true,
   inputHash: true,
   expectedFrameCount: true,
   committedFrameCount: true,
   status: true,
   expiresAt: true,
+} as const;
+
+const uploadJobSummarySelect = {
+  ...baseJobFields,
   frameJobs: {
-    select: {
-      frameOrder: true,
-      status: true,
-    },
-    orderBy: {
-      frameOrder: "asc",
-    },
+    select: { frameOrder: true, status: true },
+    orderBy: { frameOrder: "asc" as const },
   },
 } satisfies Prisma.GroupUploadJobSelect;
 
 const uploadJobLifecycleSelect = {
-  id: true,
-  inputHash: true,
-  expectedFrameCount: true,
-  committedFrameCount: true,
-  status: true,
-  expiresAt: true,
-  case: {
-    select: {
-      id: true,
-      slug: true,
-    },
-  },
-  group: {
-    select: {
-      id: true,
-      slug: true,
-      storageRoot: true,
-    },
-  },
+  ...baseJobFields,
+  case: { select: { id: true, slug: true } },
+  group: { select: { id: true, slug: true, storageRoot: true } },
 } satisfies Prisma.GroupUploadJobSelect;
 
 const frameUploadJobSelect = {

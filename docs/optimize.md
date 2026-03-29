@@ -106,12 +106,14 @@ catch (error) {
 
 ### 重复逻辑
 
-| 位置 | 问题 |
-|------|------|
-| `import-service.ts:10-40` vs `upload-service-helpers.ts:114-127` | 存储路径推断 (`inferGroupStorageRoot` / `inferFrameStoragePrefix`) 与路径生成 (`buildGroupStorageRoot` / `buildLogicalStoragePath`) 逻辑相似但分散 |
-| `content/mappers.ts` `asAssetKind()` vs `publish/build-publish-manifest.ts` `asPublishManifestAssetKind()` | 两个相同的 asset kind 映射函数 (before/after/heatmap/crop)，一个可以调用另一个 |
-| `upload-service-helpers.ts:35-86` | 多个 `Prisma.*Select` 常量结构相似，可合并 |
-| 15 个 API route | 完全相同的 try/catch 错误处理 boilerplate，应提取为 `withApiRoute()` wrapper |
+| 位置 | 问题 | 状态 |
+|------|------|------|
+| `import-service.ts:10-40` vs `upload-service-helpers.ts:114-127` | 存储路径推断与路径生成逻辑相似但分散 | 待处理 |
+| ~~`content/mappers.ts` vs `build-publish-manifest.ts`~~ | ~~两个相同的 asset kind 映射函数~~ | **已修复** (8c99be5) |
+| ~~`upload-service-helpers.ts:35-86`~~ | ~~多个 Prisma select 常量结构相似~~ | **已修复** — 提取 `baseJobFields` 基础字段集 |
+| ~~15 个 API route~~ | ~~完全相同的 try/catch 错误处理 boilerplate~~ | **已修复** (83c89bd) — `withApiRoute()` wrapper |
+| ~~两个 app 的 `runtime-config.ts`~~ | ~~`HIDE_DEMO_ENV_NAME` / `PUBLISHED_ROOT_ENV_NAME` 常量重复声明~~ | **已修复** — 提升至 `shared-utils` |
+| ~~`magic-theme-provider.tsx`~~ | ~~transition 字符串重复 3 次、heading fontFamily 重复 5 次~~ | **已修复** — 提取 `interactiveTransition()` + `DISPLAY_HEADING_FAMILY` |
 
 ### 命名混乱
 
@@ -171,15 +173,15 @@ catch (error) {
 
 按 "风险↓ / 收益↓" 排序：
 
-| # | 任务 | 风险 | 收益 | 范围 | 文件 |
-|---|------|------|------|------|------|
-| 1 | 提取 API 路由错误处理为 `withApiRoute()` 高阶函数 | LOW | HIGH | 15 route files | `apps/internal-site/app/api/ops/*/route.ts` |
-| 2 | 合并两个 asset-kind 映射函数为一个 | LOW | LOW | 2 files | `mappers.ts`, `build-publish-manifest.ts` |
-| 3 | 补全 `.env.example` 缺失的 4 个变量 | LOW | MEDIUM | 1 file | `.env.example` |
-| 4 | 删除空 `tools/others/` 目录 | LOW | LOW | 1 dir | `tools/others/` |
-| 5 | 收敛 `subtitle` 弃用注释为单一来源说明 | LOW | LOW | 3 files | `import-service.ts`, `query-service.ts`, `build-publish-manifest.ts` |
-| 6 | 补充 4 个 packages/ 的一行 README 描述 | LOW | LOW | 4 files | `packages/*/README.md` |
-| 7 | 将 `public-site/url.ts` 和 `runtime/commands.ts` 的直接 `process.env` 迁入 `runtime-config.ts` | LOW | LOW | 3 files | 上述路径 |
+| # | 任务 | 风险 | 收益 | 范围 | 文件 | 状态 |
+|---|------|------|------|------|------|------|
+| 1 | ~~提取 API 路由错误处理为 `withApiRoute()`~~ | LOW | HIGH | 15 route files | `apps/internal-site/app/api/ops/*/route.ts` | **已完成** (83c89bd) |
+| 2 | ~~合并两个 asset-kind 映射函数~~ | LOW | LOW | 2 files | `mappers.ts`, `build-publish-manifest.ts` | **已完成** (8c99be5) |
+| 3 | 补全 `.env.example` 缺失的 4 个变量 | LOW | MEDIUM | 1 file | `.env.example` | |
+| 4 | 删除空 `tools/others/` 目录 | LOW | LOW | 1 dir | `tools/others/` | |
+| 5 | ~~收敛 `subtitle` 弃用注释~~ | LOW | LOW | 3 files | `import-service.ts`, `query-service.ts`, `build-publish-manifest.ts` | **已完成** (8c99be5) |
+| 6 | 补充 4 个 packages/ 的一行 README 描述 | LOW | LOW | 4 files | `packages/*/README.md` | |
+| 7 | 将 `public-site/url.ts` 和 `runtime/commands.ts` 的直接 `process.env` 迁入 `runtime-config.ts` | LOW | LOW | 3 files | 上述路径 | |
 
 ---
 
@@ -187,10 +189,10 @@ catch (error) {
 
 按 "收益↓ / 风险↓" 排序：
 
-| # | 任务 | 风险 | 收益 | 范围 | 关键文件 | 注意事项 |
-|---|------|------|------|------|----------|----------|
-| 1 | **Upload 状态机类型化**：用 TypeScript discriminated union 替代字符串字面量状态，Python 端用 Enum 替代 str | MEDIUM | HIGH | ~10 files | `upload-service-helpers.ts`, `upload-service.ts`, `upload_executor.py`, `contracts.ts` | 需同步 TS 和 Python 两端；先加类型约束再逐步迁移 |
-| 2 | **拆分 `viewer-stage.tsx`**：把 SwipeCompareStage、AbCompareStage、PositionedStageMedia 抽为独立文件，各自管理指针逻辑 | MEDIUM | HIGH | 3-5 new files | `packages/ui/src/viewer/workbench/viewer-stage.tsx` | 涉及 public-site 渲染路径，需验证 `public:export` 输出不变 |
+| # | 任务 | 风险 | 收益 | 范围 | 关键文件 | 注意事项 | 状态 |
+|---|------|------|------|------|----------|----------|------|
+| 1 | **Upload 状态机类型化**：用 TypeScript discriminated union 替代字符串字面量状态，Python 端用 Enum 替代 str | MEDIUM | HIGH | ~10 files | `upload-service-helpers.ts`, `upload-service.ts`, `upload_executor.py`, `contracts.ts` | 需同步 TS 和 Python 两端；先加类型约束再逐步迁移 | |
+| 2 | ~~**拆分 `viewer-stage.tsx`**~~ | MEDIUM | HIGH | 3-5 new files | `packages/ui/src/viewer/workbench/viewer-stage.tsx` | 855 → 387 行 | **已完成** (0971aa5) |
 | 3 | **Repository 层实体化**：将 44 条 Prisma 查询收归 repository 方法，services 只调 repository | HIGH | HIGH | ~10 files | `content-repository.ts` + 8 service files | 改动面最大，需逐个迁移并保持测试绿灯；分 4-5 个 PR 推进 |
 | 4 | **拆分 `wizard.py`**：拆为 orchestrator + 独立 stage module（choose_case、confirm_plan、resolve_layout 等） | LOW | MEDIUM | 3-5 new files | `tools/uploader/src/wizard.py` | Python 端相对独立，风险较低；已有 23 个测试文件覆盖 |
 | 5 | **`subtitle` 字段正式下线**：从 schema、seed、import、publish 全链路移除，schema 版本号 bump | MEDIUM | LOW | 14 files | `content-schema/src/index.ts` 起，向上 14 文件 | 需确认无外部消费者依赖此字段；建议先在 PublishManifest 中标为 optional → 下个版本删除 |

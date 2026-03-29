@@ -1,10 +1,12 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { DEMO_CASE_SLUG, parseEnvFlag } from "@magic-compare/shared-utils";
+import {
+  DEMO_CASE_SLUG,
+  HIDE_DEMO_ENV_NAME,
+  parseEnvFlag,
+  PUBLISHED_ROOT_ENV_NAME,
+} from "@magic-compare/shared-utils";
 import { loadWorkspaceEnv } from "./env/load-workspace-env";
-
-export const HIDE_DEMO_ENV_NAME = "MAGIC_COMPARE_HIDE_DEMO";
-export const PUBLISHED_ROOT_ENV_NAME = "MAGIC_COMPARE_PUBLISHED_ROOT";
 export const PUBLIC_EXPORT_DIR_ENV_NAME = "MAGIC_COMPARE_PUBLIC_EXPORT_DIR";
 export const S3_BUCKET_ENV_NAME = "MAGIC_COMPARE_S3_BUCKET";
 export const S3_REGION_ENV_NAME = "MAGIC_COMPARE_S3_REGION";
