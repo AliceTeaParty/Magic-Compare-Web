@@ -18,6 +18,11 @@ dependencies = [
 build = [
   "pyinstaller>=6.16.0"
 ]
+dev = [
+  "mypy>=1.13.0",
+  "ruff>=0.11.0",
+  "pytest>=8.3.5"
+]
 
 [project.scripts]
 magic-compare-uploader = "src.cli:app"
@@ -28,3 +33,45 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src"]
+
+# --- Linting & Formatting ---
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+# E/W = pycodestyle, F = pyflakes, I = isort, UP = pyupgrade, B = bugbear, C4 = comprehensions, SIM = simplify
+# ANN rules excluded — mypy handles type coverage
+select = ["E", "W", "F", "I", "UP", "B", "C4", "SIM"]
+ignore = [
+  "E501",  # line-length is enforced by ruff format, not lint
+  "B008",  # function-call-in-default-argument is the standard Typer pattern
+]
+# F401 auto-fix deletes re-export imports (e.g. auth.py re-exporting config symbols).
+# Keep it as a warning so genuine dead imports stay visible, but never auto-remove.
+unfixable = ["F401"]
+
+[tool.ruff.lint.isort]
+combine-as-imports = true
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "lf"
+
+# --- Type Checking ---
+
+[tool.mypy]
+python_version = "3.11"
+# Full strict is too noisy for pre-existing untyped generics (dict without params).
+# Enable the checks that catch real bugs without requiring full annotation coverage.
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+warn_return_any = true
+warn_unused_ignores = true
+ignore_missing_imports = true
+[[tool.mypy.overrides]]
+module = ["PIL.*", "pykakasi.*", "pypinyin.*", "yaml"]
+ignore_missing_imports = true

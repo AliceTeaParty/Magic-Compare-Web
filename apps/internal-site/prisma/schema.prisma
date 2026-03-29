@@ -21,6 +21,8 @@ model Case {
   createdAt    DateTime @default(now())
   groups       Group[]
   uploadJobs   GroupUploadJob[]
+
+  @@index([updatedAt])
 }
 
 model Group {
@@ -42,6 +44,7 @@ model Group {
 
   @@unique([caseId, slug])
   @@index([caseId, order])
+  @@index([caseId, isPublic])
 }
 
 model Frame {
@@ -91,7 +94,9 @@ model GroupUploadJob {
   group              Group            @relation(fields: [groupId], references: [id], onDelete: Cascade)
   frameJobs          FrameUploadJob[]
 
-  @@index([groupId, status, updatedAt])
+  /// SQLite also enforces "at most one active job per group" through a partial unique index in
+  /// prisma/init-db.ts because Prisma schema cannot express that dialect-specific constraint.
+  @@index([groupId, status, expiresAt, updatedAt])
 }
 
 model FrameUploadJob {
@@ -99,7 +104,7 @@ model FrameUploadJob {
   groupUploadJobId  String
   frameOrder        Int
   frameSnapshotJson String
-  preparedAssetsJson String        @default("")
+  preparedAssetsJson String        @default("[]")
   pendingPrefix     String?
   status            String
   committedAt       DateTime?

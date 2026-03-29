@@ -21,6 +21,8 @@ import {
   buildFramePendingPrefix,
   buildPreparedUploadAssets,
   buildPresignedFiles,
+  cancelExpiredActiveUploadJobs,
+  countUncommittedFrameJobs,
   clearGroupForRestart,
   deleteReplacedFramePrefixes,
   downgradeGroupVisibility,
@@ -29,7 +31,7 @@ import {
   markUploadJobCompleted,
   parsePersistedJson,
   requireActiveUploadJob,
-  requireUploadFrameJob,
+  requireActiveFrameUploadJob,
   summarizeUploadJob,
   type PreparedUploadAsset,
 } from "./upload-service-helpers";
@@ -42,6 +44,7 @@ export async function startGroupUpload(rawInput: unknown) {
   const input = GroupUploadStartInputSchema.parse(rawInput);
   const inputHash = computeGroupUploadInputHash(input);
   const { caseRow, groupRow } = await ensureCaseAndGroup(input);
+  await cancelExpiredActiveUploadJobs(groupRow.id);
   const activeJob = await findActiveUploadJobByGroup(groupRow.id);
 
   if (activeJob && canResumeUploadJob(activeJob, inputHash, input)) {
@@ -85,8 +88,10 @@ export async function startGroupUpload(rawInput: unknown) {
  */
 export async function prepareGroupUploadFrame(rawInput: unknown) {
   const input = GroupUploadFramePrepareInputSchema.parse(rawInput);
-  const job = await requireActiveUploadJob(input.groupUploadJobId);
-  const frameJob = requireUploadFrameJob(job.frameJobs, input.frameOrder);
+  const frameJob = await requireActiveFrameUploadJob(
+    input.groupUploadJobId,
+    input.frameOrder,
+  );
   assertFrameCanPrepare(frameJob);
 
   if (frameJob.pendingPrefix) {
@@ -98,7 +103,7 @@ export async function prepareGroupUploadFrame(rawInput: unknown) {
     "frame upload snapshot",
   );
   const pendingPrefix = buildFramePendingPrefix(
-    job.group.storageRoot,
+    frameJob.groupUploadJob.group.storageRoot,
     frameSnapshot.order,
   );
   const preparedAssets = buildPreparedUploadAssets(pendingPrefix, frameSnapshot);
@@ -114,7 +119,7 @@ export async function prepareGroupUploadFrame(rawInput: unknown) {
   });
 
   return {
-    groupUploadJobId: job.id,
+    groupUploadJobId: frameJob.groupUploadJob.id,
     frameOrder: frameSnapshot.order,
     pendingPrefix,
     files,
@@ -168,7 +173,10 @@ export async function completeGroupUpload(rawInput: unknown) {
   const input = GroupUploadCompleteInputSchema.parse(rawInput);
   const job = await requireActiveUploadJob(input.groupUploadJobId);
 
-  if (!hasCommittedEveryFrame(job.frameJobs)) {
+  if (
+    job.expectedFrameCount !== job.committedFrameCount ||
+    (await countUncommittedFrameJobs(job.id)) > 0
+  ) {
     throw new Error("Not every frame in the upload job has been committed.");
   }
 
@@ -280,12 +288,11 @@ async function resetGroupBeforeUploadStart(params: {
  * later mutation code can stay focused on replacing rows instead of re-validating state.
  */
 async function loadPreparedFrameCommit(groupUploadJobId: string, frameOrder: number) {
-  const job = await requireActiveUploadJob(groupUploadJobId);
-  const frameJob = requireUploadFrameJob(job.frameJobs, frameOrder);
+  const frameJob = await requireActiveFrameUploadJob(groupUploadJobId, frameOrder);
   assertFrameCanCommit(frameJob);
 
   return {
-    job,
+    job: frameJob.groupUploadJob,
     frameJob,
     frameSnapshot: parsePersistedJson<UploadFrameDescriptor>(
       frameJob.frameSnapshotJson,
@@ -417,12 +424,4 @@ function buildCommittedFrameCreateInput(
       })),
     },
   };
-}
-
-/**
- * Group completion stays explicit so the API can reject premature complete calls with one shared
- * definition of what “all frames are done” means.
- */
-function hasCommittedEveryFrame(frameJobs: Array<{ status: string }>): boolean {
-  return frameJobs.every((frameJob) => frameJob.status === COMMITTED_FRAME_STATUS);
 }

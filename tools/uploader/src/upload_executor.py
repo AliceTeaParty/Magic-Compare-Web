@@ -21,8 +21,8 @@ from .api_client import (
 from .config import UploaderConfig
 from .manifest import (
     PreparedGroupUpload,
-    PreparedUploadFrame,
     PreparedUploadFile,
+    PreparedUploadFrame,
     build_group_upload_from_case,
 )
 from .plan import PreparedCasePlan
@@ -627,7 +627,7 @@ def _execute_frame_upload(
     frame_state: str,
     max_workers: int,
     cached_lookahead: PreparedFrameCache | None,
-    next_pending_frame: PreparedFrameUpload | None,
+    next_pending_frame: PreparedUploadFrame | None,
     current_lookahead: PendingLookaheadPrepare | None,
     lookahead_executor: ThreadPoolExecutor,
 ) -> tuple[UploadExecutionSummary | None, PendingLookaheadPrepare | None]:

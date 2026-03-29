@@ -72,7 +72,7 @@ class ParsedSourceGroup:
     title: str
     description: str
     frames: list[ParsedFrame]
-    ignored_files: list["IgnoredSourceFile"]
+    ignored_files: list[IgnoredSourceFile]
 
 
 @dataclass(frozen=True)

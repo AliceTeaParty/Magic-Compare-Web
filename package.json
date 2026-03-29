@@ -9,6 +9,7 @@
     "dev:public": "pnpm --filter @magic-compare/public-site dev",
     "debug:viewer-demo": "./scripts/debug-viewer-demo.sh",
     "typecheck": "pnpm --recursive --if-present typecheck",
+    "lint": "pnpm --recursive --if-present lint",
     "test": "pnpm --recursive --if-present test",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
@@ -39,10 +40,13 @@
     "@types/node": "^24.0.0",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
+    "eslint": "^10.1.0",
+    "eslint-plugin-react-hooks": "^7.0.1",
     "playwright": "^1.58.2",
     "prettier": "^3.8.1",
     "tsx": "^4.20.5",
     "typescript": "^5.8.3",
+    "typescript-eslint": "^8.57.2",
     "vitest": "^3.2.4",
     "wrangler": "^4.49.1"
   }

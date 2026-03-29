@@ -33,7 +33,7 @@ def _cjk_to_latin(text: str) -> str:
     has_kana = any(0x3040 <= ord(ch) <= 0x30FF for ch in text)
     if has_kana:
         try:
-            from pykakasi import kakasi  # type: ignore[import-untyped]
+            from pykakasi import kakasi
 
             kks = kakasi()
             return "".join(
@@ -43,7 +43,7 @@ def _cjk_to_latin(text: str) -> str:
             raise _pykakasi_missing_dependency_error(error) from error
         except FileNotFoundError as error:
             raise _pykakasi_bundle_error(error) from error
-    from pypinyin import Style, lazy_pinyin  # type: ignore[import-untyped]
+    from pypinyin import Style, lazy_pinyin
 
     return "".join(lazy_pinyin(text, style=Style.NORMAL))
 

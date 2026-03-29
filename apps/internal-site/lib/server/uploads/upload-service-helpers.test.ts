@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  cancelExpiredActiveUploadJobs,
   clearGroupForRestart,
   downgradeGroupVisibility,
 } from "./upload-service-helpers";
@@ -7,9 +8,15 @@ import {
 const {
   transaction,
   frameUploadJobUpdateMany,
+  frameUploadJobFindUnique,
+  frameUploadJobCount,
   groupUploadJobUpdateMany,
+  groupUploadJobFindMany,
+  groupUploadJobFindFirst,
+  groupUploadJobFindUnique,
   frameDeleteMany,
   groupUpdate,
+  groupFindMany,
   caseUpdate,
   deletePublishedGroup,
   deleteInternalAssetPrefix,
@@ -18,9 +25,15 @@ const {
 } = vi.hoisted(() => ({
   transaction: vi.fn(),
   frameUploadJobUpdateMany: vi.fn(),
+  frameUploadJobFindUnique: vi.fn(),
+  frameUploadJobCount: vi.fn(),
   groupUploadJobUpdateMany: vi.fn(),
+  groupUploadJobFindMany: vi.fn(),
+  groupUploadJobFindFirst: vi.fn(),
+  groupUploadJobFindUnique: vi.fn(),
   frameDeleteMany: vi.fn(),
   groupUpdate: vi.fn(),
+  groupFindMany: vi.fn(),
   caseUpdate: vi.fn(),
   deletePublishedGroup: vi.fn(),
   deleteInternalAssetPrefix: vi.fn(),
@@ -33,15 +46,21 @@ vi.mock("@/lib/server/db/client", () => ({
     $transaction: transaction,
     frameUploadJob: {
       updateMany: frameUploadJobUpdateMany,
+      findUnique: frameUploadJobFindUnique,
+      count: frameUploadJobCount,
     },
     groupUploadJob: {
       updateMany: groupUploadJobUpdateMany,
+      findMany: groupUploadJobFindMany,
+      findFirst: groupUploadJobFindFirst,
+      findUnique: groupUploadJobFindUnique,
     },
     frame: {
       deleteMany: frameDeleteMany,
     },
     group: {
       update: groupUpdate,
+      findMany: groupFindMany,
     },
     case: {
       update: caseUpdate,
@@ -72,9 +91,15 @@ describe("upload-service-helpers", () => {
   beforeEach(() => {
     transaction.mockReset();
     frameUploadJobUpdateMany.mockReset();
+    frameUploadJobFindUnique.mockReset();
+    frameUploadJobCount.mockReset();
     groupUploadJobUpdateMany.mockReset();
+    groupUploadJobFindMany.mockReset();
+    groupUploadJobFindFirst.mockReset();
+    groupUploadJobFindUnique.mockReset();
     frameDeleteMany.mockReset();
     groupUpdate.mockReset();
+    groupFindMany.mockReset();
     caseUpdate.mockReset();
     deletePublishedGroup.mockReset();
     deleteInternalAssetPrefix.mockReset();
@@ -86,6 +111,7 @@ describe("upload-service-helpers", () => {
     frameDeleteMany.mockReturnValue("deleted-frames");
     groupUpdate.mockReturnValue("updated-group");
     transaction.mockResolvedValue(undefined);
+    groupUploadJobFindMany.mockResolvedValue([]);
     deletePublishedGroup.mockResolvedValue(undefined);
     deleteInternalAssetPrefix.mockResolvedValue(undefined);
     recomputeCaseCoverAsset.mockResolvedValue(undefined);
@@ -132,5 +158,59 @@ describe("upload-service-helpers", () => {
     expect(recomputeCaseCoverAsset).toHaveBeenCalledWith("case-1");
     expect(syncCasePublicationState).toHaveBeenCalledWith("case-1");
     expect(caseUpdate).not.toHaveBeenCalled();
+  });
+
+  it("cancels expired active upload jobs before start resumes work", async () => {
+    groupUploadJobFindMany.mockResolvedValue([{ id: "job-1" }, { id: "job-2" }]);
+
+    await cancelExpiredActiveUploadJobs("group-1", new Date("2026-03-29T10:00:00.000Z"));
+
+    expect(groupUploadJobFindMany).toHaveBeenCalledWith({
+      where: {
+        groupId: "group-1",
+        status: "active",
+        expiresAt: {
+          not: null,
+          lte: new Date("2026-03-29T10:00:00.000Z"),
+        },
+      },
+      select: {
+        id: true,
+      },
+    });
+    expect(transaction).toHaveBeenCalledWith([
+      "frame-upload-jobs",
+      "group-upload-jobs",
+    ]);
+    expect(frameUploadJobUpdateMany).toHaveBeenCalledWith({
+      where: {
+        groupUploadJobId: {
+          in: ["job-1", "job-2"],
+        },
+      },
+      data: {
+        status: "cancelled",
+      },
+    });
+    expect(groupUploadJobUpdateMany).toHaveBeenCalledWith({
+      where: {
+        id: {
+          in: ["job-1", "job-2"],
+        },
+      },
+      data: {
+        status: "cancelled",
+      },
+    });
+  });
+
+  it("skips cancellation work when no expired active jobs exist", async () => {
+    groupUploadJobFindMany.mockResolvedValue([]);
+
+    await cancelExpiredActiveUploadJobs("group-1");
+
+    expect(transaction).not.toHaveBeenCalled();
+    expect(frameUploadJobUpdateMany).not.toHaveBeenCalled();
+    expect(groupUploadJobUpdateMany).not.toHaveBeenCalled();
   });
 });

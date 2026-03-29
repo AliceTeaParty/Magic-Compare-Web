@@ -8,8 +8,8 @@ import typer
 
 from .auth import ENV_API_URL_NAME, ENV_SITE_URL_NAME
 from .commands import (
-    _normalize_path_text,
-    _resolve_source_dir,
+    _normalize_path_text as _normalize_path_text,
+    _resolve_source_dir as _resolve_source_dir,
     console,
     handle_delete_case,
     handle_delete_group,
@@ -47,7 +47,7 @@ app = typer.Typer(
 
 def _handle_top_level_error(error: Exception, *, default_message: str) -> None:
     """Map unexpected command failures to exit code 2 so automation can distinguish runtime errors from plan errors."""
-    console.print(f"[red]{default_message}：{error}[/]")
+    console.print(f"[red] {default_message}:{error}[/]")
     raise typer.Exit(code=2) from error
 
 
@@ -77,7 +77,7 @@ def main(
     try:
         run_wizard(site_url=site_url, api_url=api_url, report_json=report_json)
     except typer.Abort:
-        console.print("[yellow]已取消本次导入。[/]")
+        console.print("[yellow] 已取消本次导入。[/]")
         raise typer.Exit(code=1) from None
     except Exception as error:  # pragma: no cover - user-facing guard
         _handle_top_level_error(error, default_message="导入失败")
@@ -134,7 +134,7 @@ def sync(
             reset_session=reset_session,
         )
     except typer.Abort:
-        console.print("[yellow]已取消本次同步。[/]")
+        console.print("[yellow] 已取消本次同步。[/]")
         raise typer.Exit(code=1) from None
     except Exception as error:
         _handle_top_level_error(error, default_message="同步失败")
@@ -179,7 +179,7 @@ def delete_group_command(
             api_url=api_url,
         )
     except typer.Abort:
-        console.print("[yellow]已取消删除。[/]")
+        console.print("[yellow] 已取消删除。[/]")
         raise typer.Exit(code=1) from None
     except Exception as error:
         _handle_top_level_error(error, default_message="删除失败")
@@ -244,7 +244,7 @@ def list_groups_command(
             api_url=api_url,
         )
     except typer.Abort:
-        console.print("[yellow]已取消查看。[/]")
+        console.print("[yellow] 已取消查看。[/]")
         raise typer.Exit(code=1) from None
     except Exception as error:
         _handle_top_level_error(error, default_message="列出 group 失败")
@@ -280,7 +280,7 @@ def delete_case_command(
             api_url=api_url,
         )
     except typer.Abort:
-        console.print("[yellow]已取消删除。[/]")
+        console.print("[yellow] 已取消删除。[/]")
         raise typer.Exit(code=1) from None
     except Exception as error:
         _handle_top_level_error(error, default_message="删除失败")

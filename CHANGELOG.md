@@ -4,6 +4,29 @@ This project started keeping a structured changelog on 2026-03-21.
 
 Entries before that date are summarized at release level instead of being reconstructed commit by commit.
 
+## Unreleased
+
+SQLite upload/maintenance architecture cleanup focused on making upload-job invariants explicit, narrowing hot-path queries, and documenting the split between Prisma model definitions and SQLite-specific bootstrap constraints.
+
+### Added
+
+- Added targeted internal-site tests covering expired upload-job cancellation, frame-level upload job lookups, narrow case-cover maintenance queries, and additive `init-db` behavior against temporary SQLite databases.
+- Added [docs/reference/database-architecture.zh-CN.md](docs/reference/database-architecture.zh-CN.md) to document SQLite/Prisma responsibility boundaries, upload-job invariants, index rationale, and why SQLite partial unique indexes must be maintained in `prisma/init-db.ts`.
+
+### Changed
+
+- Upload start now cancels expired active jobs before resume decisions, so `expiresAt` is enforced as a real control field instead of passive metadata.
+- Upload prepare/commit now resolve the target frame job directly by `(groupUploadJobId, frameOrder)` instead of loading the full upload job and scanning `frameJobs` in application code.
+- Upload complete now reads only minimal lifecycle metadata and validates remaining non-committed frame rows with a narrow count query before finalizing the job.
+- `recomputeCaseCoverAsset()` now reads only group/frame ordering plus `asset.id`, `asset.kind`, and `asset.isPrimaryDisplay`, avoiding full case-tree hydration on upload-reset and deletion paths.
+- Prisma schema metadata now documents the SQLite-only active-job constraint and adds supporting indexes for `Case(updatedAt)`, `Group(caseId, isPublic)`, and `GroupUploadJob(groupId, status, expiresAt, updatedAt)`.
+- Workflow and docs index navigation now point uploader/database maintenance work to the dedicated database architecture reference.
+
+### Fixed
+
+- `pnpm db:push` now cleans up duplicate historical `active` upload jobs before creating the SQLite partial unique index for “one active job per group”, allowing additive migration of old local databases without forcing a rebuild.
+- SQLite bootstrap now drops the obsolete `GroupUploadJob(groupId, status, updatedAt)` index and replaces it with the expiry-aware variant used by current upload resume and cleanup queries.
+
 ## v1.7.2 - 2026-03-29
 
 Uploader release focused on making source intake more forgiving: invalid case slugs now bounce back to metadata editing, and nested compare folders no longer need to be flattened by hand before import.

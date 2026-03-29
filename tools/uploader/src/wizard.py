@@ -588,11 +588,9 @@ def _should_offer_nonflat_mode(source_dir: Path, error: ValueError) -> bool:
     message = str(error)
     if "根目录没有符合平铺导入命名规则的图片文件" in message:
         return True
-    if "中没有可导入的图片文件" in message and any(
+    return "中没有可导入的图片文件" in message and any(
         path.is_dir() for path in source_dir.iterdir()
-    ):
-        return True
-    return False
+    )
 
 
 def _discover_source_group() -> ParsedSourceGroup:

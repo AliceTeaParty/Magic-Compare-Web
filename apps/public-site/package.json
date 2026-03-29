@@ -7,6 +7,7 @@
     "build": "tsx --tsconfig ../../tsconfig.base.json ../../scripts/sync-published.ts && next build && tsx --tsconfig ../../tsconfig.base.json ../../scripts/write-public-route-aliases.ts",
     "start": "serve out --listen 3001",
     "typecheck": "next build",
+    "lint": "eslint .",
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {

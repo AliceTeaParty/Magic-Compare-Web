@@ -55,7 +55,7 @@ def _load_yaml(path: Path) -> dict:
         return _load_relaxed_simple_mapping(text)
 
 
-def _coerce_relaxed_value(raw_value: str):
+def _coerce_relaxed_value(raw_value: str) -> object:
     if raw_value == "":
         return ""
 
