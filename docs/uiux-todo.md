@@ -30,10 +30,10 @@
 - [x] 统一 internal UI chrome 的产品语言
   统一 `Internal catalog`、`Case workspace`、`Deploy Pages`、`Back to catalog`、`Open workspace` 等公共界面文案的语言策略，不影响内容标题自身语言。
 
-- [ ] 提升 catalog 卡片的信息辨识度
+- [x] 提升 catalog 卡片的信息辨识度
   目前摘要内容重复，导致列表更像样式样张而不是工作台；优先展示最近变更、备注或风险提示等真实工作信息。
 
-- [ ] 给 viewer 的首次使用提示增加可复看入口或常驻弱提示
+- [x] 给 viewer 的首次使用提示增加可复看入口或常驻弱提示
   当前 1 秒轻提示过于瞬时，第一次没看到后几乎没有低打扰的重新发现机制。
 
 ## P3
