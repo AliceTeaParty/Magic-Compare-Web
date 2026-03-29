@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-import sys
 import json
+import sys
+import tomllib
 from functools import lru_cache
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
-import tomllib
 
 REPO_URL = "https://github.com/AliceTeaParty/Magic-Compare-Web"
 ISSUES_URL = f"{REPO_URL}/issues"

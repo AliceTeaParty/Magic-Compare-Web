@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from .scanner import CaseSource, scan_case_directory
+from .scanner import CaseSource, GroupSource, scan_case_directory
 from .thumbnailer import build_thumbnail, image_dimensions
 
 
@@ -111,7 +111,7 @@ def _build_case_payload(case_source: CaseSource) -> dict:
     }
 
 
-def _build_group_payload(group) -> dict:
+def _build_group_payload(group: GroupSource) -> dict[str, object]:
     return {
         "slug": group.slug,
         "title": str(group.metadata.get("title", group.slug.replace("-", " ").title())),

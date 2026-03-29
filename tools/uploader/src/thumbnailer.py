@@ -3,8 +3,9 @@ from __future__ import annotations
 import shutil
 import xml.etree.ElementTree as ET
 from pathlib import Path
+from typing import cast
 
-from PIL import Image, ImageChops, ImageFilter, ImageOps
+from PIL import Image, ImageChops, ImageFilter
 
 
 def _interpolate_color(
@@ -12,9 +13,9 @@ def _interpolate_color(
     right: tuple[int, int, int],
     progress: float,
 ) -> tuple[int, int, int]:
-    return tuple(
-        int(round(left[index] + (right[index] - left[index]) * progress))
-        for index in range(3)
+    return cast(
+        tuple[int, int, int],
+        tuple(int(round(left[index] + (right[index] - left[index]) * progress)) for index in range(3)),
     )
 
 
