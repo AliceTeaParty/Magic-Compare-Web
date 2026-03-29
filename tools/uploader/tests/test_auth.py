@@ -20,11 +20,28 @@ from src.auth import (
 )
 
 
+_UPLOADER_ENV_KEYS = (
+    "MAGIC_COMPARE_SITE_URL",
+    "MAGIC_COMPARE_API_URL",
+    "MAGIC_COMPARE_CF_ACCESS_CLIENT_ID",
+    "MAGIC_COMPARE_CF_ACCESS_CLIENT_SECRET",
+    "MAGIC_COMPARE_UPLOAD_FRAME_WORKERS",
+)
+
+
 class UploaderConfigTests(unittest.TestCase):
     def setUp(self) -> None:
         self.temp_dir = tempfile.TemporaryDirectory()
         self.work_dir = Path(self.temp_dir.name) / "sample-case"
         self.addCleanup(self.temp_dir.cleanup)
+        # Prevent real shell env vars from leaking into config resolution tests.
+        env_patch = mock.patch.dict(
+            os.environ,
+            {k: v for k, v in os.environ.items() if k not in _UPLOADER_ENV_KEYS},
+            clear=True,
+        )
+        env_patch.start()
+        self.addCleanup(env_patch.stop)
 
     def test_resolves_api_url_from_site_url_and_creates_env(self) -> None:
         config = resolve_uploader_config(
