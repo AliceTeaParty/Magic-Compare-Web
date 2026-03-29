@@ -52,6 +52,31 @@ type PublishableCase = {
 
 type PublishManifestAsset = PublishManifest["frames"][number]["assets"][number];
 
+function isRawPublicBucketHost(hostname: string): boolean {
+  const normalized = hostname.toLowerCase();
+  return (
+    normalized.endsWith(".r2.dev") ||
+    normalized.endsWith(".r2.cloudflarestorage.com") ||
+    normalized === "r2.dev" ||
+    normalized === "cloudflarestorage.com"
+  );
+}
+
+function assertPublicAssetDeliveryUrl(url: string): string {
+  const normalized = new URL(url).toString();
+  const hostname = new URL(normalized).hostname;
+
+  // Published bundles are the point where internal assets become publicly discoverable. Reject raw
+  // bucket hosts here so shareable pages do not leak direct object-storage URLs to scrapers.
+  if (process.env.NODE_ENV === "production" && isRawPublicBucketHost(hostname)) {
+    throw new Error(
+      `Published assets must use a Cloudflare-proxied public image hostname, not a raw bucket host (${hostname}).`,
+    );
+  }
+
+  return normalized;
+}
+
 /**
  * Collapses unknown asset kinds to `misc` so publishing stays forward-compatible with importer
  * experiments instead of hard-failing on metadata the public schema does not understand yet.
@@ -80,8 +105,12 @@ function mapManifestAssets(assets: PublishableAsset[]): PublishManifestAsset[] {
     id: asset.id,
     kind: asPublishManifestAssetKind(asset.kind),
     label: asset.label,
-    imageUrl: resolvePublicInternalAssetUrl(asset.imageUrl),
-    thumbUrl: resolvePublicInternalAssetUrl(asset.thumbUrl),
+    imageUrl: assertPublicAssetDeliveryUrl(
+      resolvePublicInternalAssetUrl(asset.imageUrl),
+    ),
+    thumbUrl: assertPublicAssetDeliveryUrl(
+      resolvePublicInternalAssetUrl(asset.thumbUrl),
+    ),
     width: asset.width,
     height: asset.height,
     note: asset.note,
@@ -111,7 +140,9 @@ export function buildPublishManifest(params: {
     schemaVersion: PUBLISH_SCHEMA_VERSION,
     publicSlug,
     generatedAt: publishedAt.toISOString(),
-    assetBasePath: internalAssetPublicGroupBaseUrl(group.storageRoot),
+    assetBasePath: assertPublicAssetDeliveryUrl(
+      internalAssetPublicGroupBaseUrl(group.storageRoot),
+    ),
     case: {
       slug: caseRow.slug,
       title: caseRow.title,

@@ -274,7 +274,9 @@ Docker 用：
 - 已存在的 case metadata 仍以数据库为准；uploader 不会覆盖已有 case 的 title / summary / tags
 - group 默认内部草稿；公开开关不再来自 `case.yaml` / `group.yaml`
 - 浏览器实际访问图片时，会由 internal/public 站点将逻辑路径解析成 `MAGIC_COMPARE_S3_PUBLIC_BASE_URL` 下的公网绝对 URL
+- 生产环境里的 `MAGIC_COMPARE_S3_PUBLIC_BASE_URL` 应指向 Cloudflare 代理的图片域名，不应直接使用裸 `r2.dev` 或 `cloudflarestorage.com` 桶域名
 - public-export/public-deploy 不再打包图片，Pages 只发布静态页面和 manifest
+- `public-site` 公开页默认不应被搜索引擎索引；页面层防爬通过 metadata / `robots.txt` 声明，真正的图片拦截和限流交给 Cloudflare
 - uploader 的 upload session 固定放在工作目录 `.magic-compare/upload-session.json`
 - wizard 当前显示的是**文件级**上传进度：总体文件条 + 当前 frame 状态 + skipped/retried/failed 计数
 - 直接 `sync` 命令仍保持轻量输出，不显示同等复杂的实时进度 UI
