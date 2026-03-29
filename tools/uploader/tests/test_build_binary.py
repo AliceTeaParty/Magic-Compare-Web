@@ -43,6 +43,14 @@ class BuildBinaryTests(unittest.TestCase):
             self.assertIn("%*", content)
             self.assertIn("pause", content.lower())
 
+    def test_branding_asset_args_include_root_logo_file(self) -> None:
+        uploader_root = Path(__file__).resolve().parents[1]
+
+        args = build_binary_module._branding_asset_args(uploader_root, "windows")
+
+        self.assertEqual(args[0], "--add-data")
+        self.assertIn("字符画.txt", args[1])
+
 
 if __name__ == "__main__":
     unittest.main()

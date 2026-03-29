@@ -53,6 +53,16 @@ magic-compare-uploader
 如果你拿到的是 Windows 打包版压缩包，优先双击同目录里的 `.cmd` 启动器，不要直接双击 `.exe`。  
 这样在 internal-site 地址填错、站点没开、网络不通时，错误提示会留在窗口里，不会一闪而过。
 
+启动后会先显示：
+
+- `Magic Compare Uploader` 的字符画 Logo
+- 当前版本
+- GitHub 仓库与 Issues 地址
+- GPLv3 / 问题反馈提示
+
+然后才会进入素材目录输入。  
+如果路径输错，不会直接退出整个向导，而是会在当前步骤提示你重输。
+
 向导会依次做这些事：
 
 - 选择素材目录
@@ -62,6 +72,14 @@ magic-compare-uploader
 - 打开编辑器确认 `case.yaml` / `group.yaml`
 - 显示总体文件进度、当前 frame 和重试/失败统计
 - 按 frame 直传并提交到站点
+
+默认文件名后缀识别：
+
+- 原图：`src` / `source` / `ori` / `origin`
+- 处理后：`out` / `output` / `rip`
+- 热力图：`heatmap`
+
+上传成功后，工具会把 `workspace` 和 `viewer` 链接单独按裸文本输出，便于在终端里直接完整复制 URL。
 
 ---
 

@@ -74,6 +74,23 @@ class DiscoverSourceGroupTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "没有可用的 after 候选"):
             discover_source_group(self.source_dir)
 
+    def test_recognizes_ori_and_origin_as_source_variants(self) -> None:
+        self._touch("24_show_00002_100_ori.png")
+        self._touch("24_show_00002_100_out.png")
+
+        group = discover_source_group(self.source_dir)
+
+        self.assertEqual(group.frames[0].before.variant, "ori")
+        self.assertEqual(group.frames[0].after.variant, "out")
+
+    def test_origin_conflicts_with_other_source_variants(self) -> None:
+        self._touch("24_show_00002_100_origin.png")
+        self._touch("24_show_00002_100_src.png")
+        self._touch("24_show_00002_100_output.png")
+
+        with self.assertRaisesRegex(ValueError, "只能有一个 src/source"):
+            discover_source_group(self.source_dir)
+
     def test_falls_back_to_zero_padded_numeric_titles_when_metadata_is_missing(
         self,
     ) -> None:

@@ -86,6 +86,18 @@ def _pykakasi_data_args(target_platform: str) -> list[str]:
     return add_data_args
 
 
+def _branding_asset_args(
+    uploader_root: Path, target_platform: str
+) -> list[str]:
+    """Bundle the shared ASCII logo explicitly so the frozen wizard keeps the same startup identity as source runs."""
+    branding_asset = uploader_root.parents[1] / "字符画.txt"
+    if not branding_asset.exists():
+        raise RuntimeError(f"未找到 uploader 启动页所需资源：{branding_asset}")
+
+    separator = _pyinstaller_data_separator(target_platform)
+    return ["--add-data", f"{branding_asset}{separator}."]
+
+
 def _build_binary(
     uploader_root: Path,
     *,
@@ -100,7 +112,10 @@ def _build_binary(
     shutil.rmtree(build_root, ignore_errors=True)
     dist_dir.mkdir(parents=True, exist_ok=True)
     build_flag = "--onefile" if layout == "onefile" else "--onedir"
-    pyinstaller_extra_args = _pykakasi_data_args(target_platform)
+    pyinstaller_extra_args = [
+        *_pykakasi_data_args(target_platform),
+        *_branding_asset_args(uploader_root, target_platform),
+    ]
 
     with tempfile.TemporaryDirectory(
         prefix="magic-compare-uploader-build-"
