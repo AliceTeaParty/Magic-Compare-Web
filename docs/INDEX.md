@@ -13,6 +13,7 @@
 | 提交/分支规范 | [commit-guide.md](commit-guide.md) |
 | MCP 工具使用优先级 | [mcp-usage-guide.md](mcp-usage-guide.md) |
 | 跟踪当前 Web 站点 UI/UX 待办 | [uiux-todo.md](uiux-todo.md) |
+| 代码质量体检报告与重构追踪 | [optimize.md](optimize.md) |
 | Uploader 操作说明（面向组员） | [uploader/README.md](uploader/README.md) |
 | 从 VSEditor 平铺目录开始上传 | [uploader/vseditor-workflow.zh-CN.md](uploader/vseditor-workflow.zh-CN.md) |
 | Uploader 与网站边界划分 | [uploader/boundaries-and-env-split.zh-CN.md](uploader/boundaries-and-env-split.zh-CN.md) |
@@ -28,6 +29,7 @@
 - [commit-guide.md](commit-guide.md) — 提交粒度、分支规则、message 格式
 - [mcp-usage-guide.md](mcp-usage-guide.md) — MCP 工具分工与使用原则
 - [uiux-todo.md](uiux-todo.md) — 当前 Web 站点 UI/UX 审计后的可勾选待办清单
+- [optimize.md](optimize.md) — 代码质量体检报告，按风险/收益排序的重构任务追踪
 
 ### 时效性参考（需随代码同步更新）
 
