@@ -6,26 +6,29 @@ Entries before that date are summarized at release level instead of being recons
 
 ## Unreleased
 
-SQLite upload/maintenance architecture cleanup focused on making upload-job invariants explicit, narrowing hot-path queries, and documenting the split between Prisma model definitions and SQLite-specific bootstrap constraints.
+## v1.7.3 - 2026-03-31
+
+Code quality refresh focused on refactoring, API robustness, and comprehensive testing.
 
 ### Added
 
-- Added targeted internal-site tests covering expired upload-job cancellation, frame-level upload job lookups, narrow case-cover maintenance queries, and additive `init-db` behavior against temporary SQLite databases.
-- Added [docs/reference/database-architecture.zh-CN.md](docs/reference/database-architecture.zh-CN.md) to document SQLite/Prisma responsibility boundaries, upload-job invariants, index rationale, and why SQLite partial unique indexes must be maintained in `prisma/init-db.ts`.
+- Added comprehensive API endpoint tests for `case-publish`, `public-export`, `public-deploy`, `frame-reorder`, `group-reorder`, and `group-upload-frame-commit` routes (78+ new test cases).
+- Added `withApiRoute()` wrapper to centralize error handling, authentication, validation, and response formatting across all 15 `/api/ops/*` routes.
+- Added package-level READMEs for `@magic-compare/compare-core`, `@magic-compare/content-schema`, `@magic-compare/shared-utils`, and `@magic-compare/ui`.
+- Added [docs/optimize.md](docs/optimize.md) to document code quality audit results, refactoring priorities, and resolved technical debt.
 
 ### Changed
 
-- Upload start now cancels expired active jobs before resume decisions, so `expiresAt` is enforced as a real control field instead of passive metadata.
-- Upload prepare/commit now resolve the target frame job directly by `(groupUploadJobId, frameOrder)` instead of loading the full upload job and scanning `frameJobs` in application code.
-- Upload complete now reads only minimal lifecycle metadata and validates remaining non-committed frame rows with a narrow count query before finalizing the job.
-- `recomputeCaseCoverAsset()` now reads only group/frame ordering plus `asset.id`, `asset.kind`, and `asset.isPrimaryDisplay`, avoiding full case-tree hydration on upload-reset and deletion paths.
-- Prisma schema metadata now documents the SQLite-only active-job constraint and adds supporting indexes for `Case(updatedAt)`, `Group(caseId, isPublic)`, and `GroupUploadJob(groupId, status, expiresAt, updatedAt)`.
-- Workflow and docs index navigation now point uploader/database maintenance work to the dedicated database architecture reference.
+- Refactored `viewer-stage.tsx` from 855 lines into focused domain components (`ab-compare-stage.tsx`, `swipe-compare-stage.tsx`, `positioned-stage-media.tsx`), improving maintainability and testability.
+- Unified theme transition logic, Prisma select patterns, and runtime environment access across internal/public sites to eliminate duplication.
+- Consolidated asset-kind mapping, environment variable access patterns, and eliminated stale code comments across import and upload services.
+- Updated API route type contracts to correctly classify error categories (validation vs. operational errors).
 
 ### Fixed
 
-- `pnpm db:push` now cleans up duplicate historical `active` upload jobs before creating the SQLite partial unique index for “one active job per group”, allowing additive migration of old local databases without forcing a rebuild.
-- SQLite bootstrap now drops the obsolete `GroupUploadJob(groupId, status, updatedAt)` index and replaces it with the expiry-aware variant used by current upload resume and cleanup queries.
+- Corrected `withApiRoute()` typing to properly distinguish between sync and async handlers.
+- Fixed error classification in all API routes to align with PR #10 review feedback.
+- Enhanced stale error comment cleanup and improved API response consistency.
 
 ## v1.7.2 - 2026-03-29
 
