@@ -70,21 +70,9 @@ Magic-Compare-Web (~28K LOC, monorepo)
 - 各 stage 函数直接变异共享 `UploaderConfig`，与 `rich` 终端 UI 紧耦合
 - `source_parser.py` 有 4 层帧匹配逻辑
 
-### 4. API 路由错误处理模板（风险 MEDIUM / 收益 MEDIUM / 改动范围 SMALL）
+### 4. ~~API 路由错误处理模板~~（**已修复**）
 
-15 个 `/api/ops/*/route.ts` 全部使用同一 catch 模式：
-```typescript
-catch (error) {
-  return NextResponse.json(
-    { error: error instanceof Error ? error.message : "Generic fallback." },
-    { status: 400 },
-  );
-}
-```
-- 所有错误一律返回 400，不区分验证错误 vs 运行时异常 vs 资源不存在
-- 部分路由 (`group-upload-start` 等) 额外处理了 ZodError → 400，但 500 级错误也被吞为 400
-- 无服务端日志记录错误上下文
-- 客户端无法区分可重试 vs 永久性失败
+~~15 个 `/api/ops/*/route.ts` 全部使用同一 catch 模式~~ → **已提取 `withApiRoute()` wrapper (83c89bd)，实现 ZodError→400 / `classifyError` 自定义分级 / fallback→500 + 服务端日志。public-export/deploy 路由使用 `PublicSiteOperationConflictError` → 409。所有 15 个路由已覆盖测试。**
 
 ### 5. Publish 管线 + content-repository 伪抽象层（风险 MEDIUM / 收益 MEDIUM / 改动范围 LARGE）
 
@@ -177,11 +165,11 @@ catch (error) {
 |---|------|------|------|------|------|------|
 | 1 | ~~提取 API 路由错误处理为 `withApiRoute()`~~ | LOW | HIGH | 15 route files | `apps/internal-site/app/api/ops/*/route.ts` | **已完成** (83c89bd) |
 | 2 | ~~合并两个 asset-kind 映射函数~~ | LOW | LOW | 2 files | `mappers.ts`, `build-publish-manifest.ts` | **已完成** (8c99be5) |
-| 3 | 补全 `.env.example` 缺失的 4 个变量 | LOW | MEDIUM | 1 file | `.env.example` | |
-| 4 | 删除空 `tools/others/` 目录 | LOW | LOW | 1 dir | `tools/others/` | |
+| 3 | ~~补全 `.env.example` 缺失的 4 个变量~~ | LOW | MEDIUM | 1 file | `.env.example` | **已完成** — 变量已存在 |
+| 4 | ~~删除空 `tools/others/` 目录~~ | LOW | LOW | 1 dir | `tools/others/` | **已完成** — 目录已移除 |
 | 5 | ~~收敛 `subtitle` 弃用注释~~ | LOW | LOW | 3 files | `import-service.ts`, `query-service.ts`, `build-publish-manifest.ts` | **已完成** (8c99be5) |
 | 6 | 补充 4 个 packages/ 的一行 README 描述 | LOW | LOW | 4 files | `packages/*/README.md` | |
-| 7 | 将 `public-site/url.ts` 和 `runtime/commands.ts` 的直接 `process.env` 迁入 `runtime-config.ts` | LOW | LOW | 3 files | 上述路径 | |
+| 7 | ~~将 `public-site/url.ts` 和 `runtime/commands.ts` 的直接 `process.env` 迁入 `runtime-config.ts`~~ | LOW | LOW | 3 files | 上述路径 | **已完成** — 已通过 `runtime-config` 访问 |
 
 ---
 
@@ -196,7 +184,7 @@ catch (error) {
 | 3 | **Repository 层实体化**：将 44 条 Prisma 查询收归 repository 方法，services 只调 repository | HIGH | HIGH | ~10 files | `content-repository.ts` + 8 service files | 改动面最大，需逐个迁移并保持测试绿灯；分 4-5 个 PR 推进 |
 | 4 | **拆分 `wizard.py`**：拆为 orchestrator + 独立 stage module（choose_case、confirm_plan、resolve_layout 等） | LOW | MEDIUM | 3-5 new files | `tools/uploader/src/wizard.py` | Python 端相对独立，风险较低；已有 23 个测试文件覆盖 |
 | 5 | **`subtitle` 字段正式下线**：从 schema、seed、import、publish 全链路移除，schema 版本号 bump | MEDIUM | LOW | 14 files | `content-schema/src/index.ts` 起，向上 14 文件 | 需确认无外部消费者依赖此字段；建议先在 PublishManifest 中标为 optional → 下个版本删除 |
-| 6 | **API 错误分级**：区分 400 (validation) / 404 (not found) / 409 (conflict) / 500 (runtime)，增加服务端错误日志 | MEDIUM | MEDIUM | 15 route files + 共享 error types | `apps/internal-site/app/api/ops/*/route.ts` | 与任务 5.1 (`withApiRoute` 提取) 配合做 |
+| 6 | ~~**API 错误分级**：区分 400 (validation) / 404 (not found) / 409 (conflict) / 500 (runtime)，增加服务端错误日志~~ | MEDIUM | MEDIUM | 15 route files + 共享 error types | `apps/internal-site/app/api/ops/*/route.ts` | **已完成** — `withApiRoute()` 已实现 ZodError→400 / classifyError / fallback→500 分级，public-export/deploy 使用 409 冲突码 |
 
 ---
 
