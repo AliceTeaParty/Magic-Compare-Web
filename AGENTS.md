@@ -149,6 +149,7 @@ Full scenario → document map: `@docs/INDEX.md`
 | Overall workflow, constraints, known gotchas | `@docs/workflow-guide.md` |
 | API integration or uploader development | `@docs/reference/api-endpoints.zh-CN.md` |
 | Demo vs. real import flow differences | `@docs/reference/demo-vs-real.zh-CN.md` |
+| Code quality audit and refactoring tracker | `@docs/optimize.md` |
 | Commit/branch conventions | `@docs/commit-guide.md` |
 | MCP tool priority and principles | `@docs/mcp-usage-guide.md` |
 | Uploader usage (for group members) | `@docs/uploader/README.md` |

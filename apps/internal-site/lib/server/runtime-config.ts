@@ -1,10 +1,12 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { DEMO_CASE_SLUG, parseEnvFlag } from "@magic-compare/shared-utils";
+import {
+  DEMO_CASE_SLUG,
+  HIDE_DEMO_ENV_NAME,
+  parseEnvFlag,
+  PUBLISHED_ROOT_ENV_NAME,
+} from "@magic-compare/shared-utils";
 import { loadWorkspaceEnv } from "./env/load-workspace-env";
-
-export const HIDE_DEMO_ENV_NAME = "MAGIC_COMPARE_HIDE_DEMO";
-export const PUBLISHED_ROOT_ENV_NAME = "MAGIC_COMPARE_PUBLISHED_ROOT";
 export const PUBLIC_EXPORT_DIR_ENV_NAME = "MAGIC_COMPARE_PUBLIC_EXPORT_DIR";
 export const S3_BUCKET_ENV_NAME = "MAGIC_COMPARE_S3_BUCKET";
 export const S3_REGION_ENV_NAME = "MAGIC_COMPARE_S3_REGION";
@@ -117,6 +119,16 @@ export function getInternalAssetStorageConfig(): InternalAssetStorageConfig {
     forcePathStyle: parseEnvFlag(process.env[S3_FORCE_PATH_STYLE_ENV_NAME]),
     objectPrefix: process.env[S3_INTERNAL_PREFIX_ENV_NAME]?.trim() || "",
   };
+}
+
+export function getCfPagesProjectName(): string | null {
+  loadWorkspaceEnv();
+  return process.env[CF_PAGES_PROJECT_NAME_ENV_NAME]?.trim() || null;
+}
+
+export function getCfPagesBranch(): string | null {
+  loadWorkspaceEnv();
+  return process.env[CF_PAGES_BRANCH_ENV_NAME]?.trim() || null;
 }
 
 export function isCloudflarePagesDeployConfigured(): boolean {

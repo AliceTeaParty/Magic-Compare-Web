@@ -1,17 +1,16 @@
 import { NextResponse } from "next/server";
+import { withApiRoute } from "@/lib/server/api/with-api-route";
 import {
   exportPublicSite,
   getPublicSiteOperationErrorStatus,
 } from "@/lib/server/public-site/runtime";
 
-export async function POST() {
-  try {
+export const POST = withApiRoute(
+  async () => {
     const result = await exportPublicSite();
     return NextResponse.json(result);
-  } catch (error) {
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Public export failed." },
-      { status: getPublicSiteOperationErrorStatus(error) },
-    );
-  }
-}
+  },
+  {
+    classifyError: (error) => getPublicSiteOperationErrorStatus(error),
+  },
+);

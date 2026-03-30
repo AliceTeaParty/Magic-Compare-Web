@@ -1,4 +1,6 @@
 export const DEMO_CASE_SLUG = "demo-grain-study";
+export const HIDE_DEMO_ENV_NAME = "MAGIC_COMPARE_HIDE_DEMO";
+export const PUBLISHED_ROOT_ENV_NAME = "MAGIC_COMPARE_PUBLISHED_ROOT";
 
 export interface FooterConfig {
   author: string;

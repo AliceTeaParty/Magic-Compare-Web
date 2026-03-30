@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { withApiRoute } from "@/lib/server/api/with-api-route";
 import { reorderFrames } from "@/lib/server/repositories/content-repository";
 
 const schema = z.object({
@@ -7,15 +8,13 @@ const schema = z.object({
   frameIds: z.array(z.string().min(1)).min(1),
 });
 
-export async function POST(request: Request) {
-  try {
+export const POST = withApiRoute(
+  async (request: Request) => {
     const payload = schema.parse(await request.json());
     await reorderFrames(payload.groupId, payload.frameIds);
     return NextResponse.json({ ok: true });
-  } catch (error) {
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Reorder failed." },
-      { status: 400 },
-    );
-  }
-}
+  },
+  {
+    classifyError: () => 400,
+  },
+);

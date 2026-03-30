@@ -1,6 +1,6 @@
 import {
-  CF_PAGES_PROJECT_NAME_ENV_NAME,
   PUBLIC_SITE_BASE_URL_ENV_NAME,
+  getCfPagesProjectName,
   getOptionalAbsoluteUrlEnv,
 } from "../runtime-config";
 
@@ -14,7 +14,7 @@ export function resolvePublishedGroupUrl(publicSlug: string | null | undefined):
     return new URL(`/g/${publicSlug}`, configuredPublicSiteUrl).toString();
   }
 
-  const projectName = process.env[CF_PAGES_PROJECT_NAME_ENV_NAME]?.trim();
+  const projectName = getCfPagesProjectName();
 
   if (!projectName) {
     return null;
