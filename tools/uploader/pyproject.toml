@@ -1,6 +1,6 @@
 [project]
 name = "magic-compare-uploader"
-version = "1.7.2"
+version = "1.7.3"
 description = "Local CLI importer for Magic Compare Web"
 requires-python = ">=3.11"
 dependencies = [
@@ -11,18 +11,12 @@ dependencies = [
   "rich>=14.1.0",
   "typer>=0.15.4",
   "pypinyin>=0.55.0",
-  "pykakasi>=2.3.0"
+  "pykakasi>=2.3.0",
 ]
 
 [project.optional-dependencies]
-build = [
-  "pyinstaller>=6.16.0"
-]
-dev = [
-  "mypy>=1.13.0",
-  "ruff>=0.11.0",
-  "pytest>=8.3.5"
-]
+build = ["pyinstaller>=6.16.0"]
+dev = ["mypy>=1.13.0", "ruff>=0.11.0", "pytest>=8.3.5"]
 
 [project.scripts]
 magic-compare-uploader = "src.cli:app"
@@ -45,8 +39,8 @@ line-length = 100
 # ANN rules excluded — mypy handles type coverage
 select = ["E", "W", "F", "I", "UP", "B", "C4", "SIM"]
 ignore = [
-  "E501",  # line-length is enforced by ruff format, not lint
-  "B008",  # function-call-in-default-argument is the standard Typer pattern
+  "E501", # line-length is enforced by ruff format, not lint
+  "B008", # function-call-in-default-argument is the standard Typer pattern
 ]
 # F401 auto-fix deletes re-export imports (e.g. auth.py re-exporting config symbols).
 # Keep it as a warning so genuine dead imports stay visible, but never auto-remove.
