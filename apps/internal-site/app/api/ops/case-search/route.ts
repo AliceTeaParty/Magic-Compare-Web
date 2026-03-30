@@ -8,7 +8,7 @@ const CaseSearchRequestSchema = z.object({
   limit: z.number().int().positive().max(20).default(8),
 });
 
-export const POST = withApiRoute(async (request) => {
+export const POST = withApiRoute(async (request: Request) => {
   const payload = CaseSearchRequestSchema.parse(await request.json());
   const cases = await searchCases(payload.query, payload.limit);
   return NextResponse.json({ cases });

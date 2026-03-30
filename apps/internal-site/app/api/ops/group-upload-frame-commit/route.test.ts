@@ -36,4 +36,26 @@ describe("POST /api/ops/group-upload-frame-commit", () => {
       frameOrder: 0,
     });
   });
+
+  it("keeps expected upload-state errors in the 400 range", async () => {
+    commitGroupUploadFrame.mockRejectedValue(new Error("Frame is not ready to commit."));
+
+    const response = await POST(
+      new Request("http://localhost:3000/api/ops/group-upload-frame-commit", {
+        method: "POST",
+        body: JSON.stringify({
+          groupUploadJobId: "job-1",
+          frameOrder: 0,
+        }),
+        headers: {
+          "content-type": "application/json",
+        },
+      }),
+    );
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({
+      error: "Frame is not ready to commit.",
+    });
+  });
 });

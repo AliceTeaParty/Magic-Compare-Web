@@ -7,7 +7,7 @@ const schema = z.object({
   caseSlug: z.string().min(1),
 });
 
-export const POST = withApiRoute(async (request) => {
+export const POST = withApiRoute(async (request: Request) => {
   const payload = schema.parse(await request.json());
   const workspace = await getCaseWorkspace(payload.caseSlug);
 

@@ -7,8 +7,13 @@ const schema = z.object({
   caseSlug: z.string().min(1),
 });
 
-export const POST = withApiRoute(async (request) => {
-  const payload = schema.parse(await request.json());
-  const result = await deleteCase(payload.caseSlug);
-  return NextResponse.json(result);
-});
+export const POST = withApiRoute(
+  async (request: Request) => {
+    const payload = schema.parse(await request.json());
+    const result = await deleteCase(payload.caseSlug);
+    return NextResponse.json(result);
+  },
+  {
+    classifyError: () => 400,
+  },
+);

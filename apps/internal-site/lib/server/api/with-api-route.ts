@@ -1,22 +1,37 @@
 import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 
-type RouteHandler = (request: Request) => Promise<NextResponse>;
+type WrappedRouteHandler<TArgs extends unknown[]> = (...args: TArgs) => Promise<NextResponse>;
+type NextRouteHandler = (request: Request, context?: unknown) => Promise<NextResponse>;
+type RouteHandler<TArgs extends unknown[]> = WrappedRouteHandler<TArgs> & NextRouteHandler;
+
+type WithApiRouteOptions = {
+  /** Maps domain-specific error classes to HTTP status codes before the generic fallback runs. */
+  classifyError?: (error: unknown) => number | null;
+};
 
 /**
- * Wraps an API route handler with consistent error classification and logging so individual route
- * files stay focused on business logic instead of repeating identical try/catch boilerplate.
+ * Wraps an API route handler with consistent error classification and 5xx logging so individual
+ * route files stay focused on business logic instead of repeating identical try/catch boilerplate.
  */
 export function withApiRoute(
-  handler: (request: Request) => Promise<NextResponse>,
-  options?: {
-    /** Maps domain-specific error classes to HTTP status codes before the generic fallback runs. */
-    classifyError?: (error: unknown) => number | null;
-  },
-): RouteHandler {
-  return async (request: Request) => {
+  handler: () => Promise<NextResponse>,
+  options?: WithApiRouteOptions,
+): RouteHandler<[]>;
+export function withApiRoute<TContext extends unknown[]>(
+  handler: (request: Request, ...args: TContext) => Promise<NextResponse>,
+  options?: WithApiRouteOptions,
+): RouteHandler<[Request, ...TContext]>;
+export function withApiRoute<TArgs extends unknown[]>(
+  handler: (...args: TArgs) => Promise<NextResponse>,
+  options?: WithApiRouteOptions,
+): RouteHandler<TArgs> {
+  return (async (...args: unknown[]) => {
+    const maybeRequest = args[0];
+    const request = maybeRequest instanceof Request ? maybeRequest : undefined;
+
     try {
-      return await handler(request);
+      return await handler(...(args as TArgs));
     } catch (error) {
       if (error instanceof ZodError) {
         return NextResponse.json({ error: error.flatten() }, { status: 400 });
@@ -34,5 +49,5 @@ export function withApiRoute(
       console.error(`[API] ${request?.url ?? "unknown"}:`, error);
       return NextResponse.json({ error: message }, { status: 500 });
     }
-  };
+  }) as RouteHandler<TArgs>;
 }

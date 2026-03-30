@@ -11,7 +11,7 @@ const schema = z.object({
 });
 
 export const POST = withApiRoute(
-  async (request) => {
+  async (request: Request) => {
     const rawBody = await request.text();
     const payload = schema.parse(rawBody ? JSON.parse(rawBody) : {});
     const result = await deployPublicSite(payload.caseId);

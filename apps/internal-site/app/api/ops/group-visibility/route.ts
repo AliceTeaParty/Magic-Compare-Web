@@ -9,8 +9,13 @@ const schema = z.object({
   isPublic: z.boolean(),
 });
 
-export const POST = withApiRoute(async (request) => {
-  const payload = schema.parse(await request.json());
-  const result = await setGroupVisibility(payload.caseSlug, payload.groupSlug, payload.isPublic);
-  return NextResponse.json(result);
-});
+export const POST = withApiRoute(
+  async (request: Request) => {
+    const payload = schema.parse(await request.json());
+    const result = await setGroupVisibility(payload.caseSlug, payload.groupSlug, payload.isPublic);
+    return NextResponse.json(result);
+  },
+  {
+    classifyError: () => 400,
+  },
+);

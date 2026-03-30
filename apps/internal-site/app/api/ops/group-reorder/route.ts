@@ -8,8 +8,13 @@ const schema = z.object({
   groupIds: z.array(z.string().min(1)).min(1),
 });
 
-export const POST = withApiRoute(async (request) => {
-  const payload = schema.parse(await request.json());
-  await reorderGroups(payload.caseId, payload.groupIds);
-  return NextResponse.json({ ok: true });
-});
+export const POST = withApiRoute(
+  async (request: Request) => {
+    const payload = schema.parse(await request.json());
+    await reorderGroups(payload.caseId, payload.groupIds);
+    return NextResponse.json({ ok: true });
+  },
+  {
+    classifyError: () => 400,
+  },
+);
