@@ -11,7 +11,6 @@
 
 - **next-js_docs**：查询 Next.js 官方文档。凡是路由、App Router、静态生成、Server Actions、构建、部署、缓存等问题，优先查这里。
 - **context7**：查询最新第三方库文档。用于 React、MUI、Prisma、Zod、dnd-kit、Motion 等实现细节。
-- **mcp-vector-search**：搜索当前代码库。先查现有目录、组件、命名、已有模式，再决定新增或修改方案。（结果为空/error 时尝试 `mcp-vector-search index`）
 - **cloudflare_api**: These MCP servers allow your MCP client to read configurations from your Cloudflare account, process information, make suggestions based on data, and even make those suggested changes for you.
 
 ## 根脚本快捷方式
@@ -26,11 +25,10 @@
 
 ## 使用原则
 
-1. **先搜代码，再写代码**。先用 `mcp-vector-search` 确认仓库已有结构、命名和复用点。
-2. **先查官方，再下结论**。Next.js 优先 `next-js_docs`；Cloudflare 优先 `cloudflare_api`；其他库优先 `context7`。
-3. **避免凭记忆实现框架细节**。
-4. **优先复用现有模式**。已有组件、schema、工具函数优先延用，不重复造轮子。
-5. **把查询结果转成实现约束**。查到的信息要落实到代码结构、类型、路由、API 约定中。
+1. **先查官方，再下结论**。Next.js 优先 `next-js_docs`；Cloudflare 优先 `cloudflare_api`；其他库优先 `context7`。
+2. **避免凭记忆实现框架细节**。
+3. **优先复用现有模式**。已有组件、schema、工具函数优先延用，不重复造轮子。
+4. **把查询结果转成实现约束**。查到的信息要落实到代码结构、类型、路由、API 约定中。
 
 ## 禁止事项
 
