@@ -73,13 +73,14 @@ export function ViewerToolbar({
       flexWrap="wrap"
       useFlexGap
     >
-      <AbInspectControls
-        abScale={abScale}
-        abSide={abSide}
-        onAbSideChange={handleAbSideChange}
-        onScaleChange={handleScaleChange}
-        showControls={mode === "a-b"}
-      />
+      {mode === "a-b" ? (
+        <AbInspectControls
+          abScale={abScale}
+          abSide={abSide}
+          onAbSideChange={handleAbSideChange}
+          onScaleChange={handleScaleChange}
+        />
+      ) : null}
 
       <ToggleButtonGroup
         exclusive

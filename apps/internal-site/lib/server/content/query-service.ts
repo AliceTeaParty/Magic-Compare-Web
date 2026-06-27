@@ -146,8 +146,8 @@ export async function getCaseWorkspace(
 }
 
 /**
- * Loads the full viewer payload for the internal route and rejects hidden demo slugs early so the
- * caller gets a clean `null` instead of learning about filtered data through group lookups.
+ * Loads only the current group's frame payload while keeping sibling groups as lightweight
+ * navigation rows, so large cases do not serialize every group's assets into the viewer route.
  */
 export async function getViewerDataset(
   caseSlug: string,
@@ -157,27 +157,69 @@ export async function getViewerDataset(
     return null;
   }
 
-  const caseRow = await prisma.case.findUnique({
-    where: { slug: caseSlug },
-    include: {
-      groups: {
-        include: {
-          frames: {
-            include: {
-              assets: true,
-            },
-            orderBy: { order: "asc" },
-          },
+  const currentGroup = await prisma.group.findFirst({
+    where: {
+      slug: groupSlug,
+      case: {
+        is: {
+          slug: caseSlug,
+        },
+      },
+    },
+    select: {
+      id: true,
+      slug: true,
+      publicSlug: true,
+      title: true,
+      description: true,
+      defaultMode: true,
+      tagsJson: true,
+      isPublic: true,
+      frames: {
+        select: {
+          id: true,
+          title: true,
+          caption: true,
+          order: true,
+          assets: true,
         },
         orderBy: { order: "asc" },
+      },
+      case: {
+        select: {
+          id: true,
+          slug: true,
+          title: true,
+          summary: true,
+          status: true,
+          tagsJson: true,
+          publishedAt: true,
+        },
       },
     },
   });
 
-  if (!caseRow) {
+  if (!currentGroup) {
     return null;
   }
 
-  const currentGroup = caseRow.groups.find((group) => group.slug === groupSlug);
-  return currentGroup ? buildViewerDataset(caseRow, currentGroup) : null;
+  const siblingGroups = await prisma.group.findMany({
+    where: {
+      caseId: currentGroup.case.id,
+    },
+    select: {
+      id: true,
+      slug: true,
+      title: true,
+      order: true,
+    },
+    orderBy: { order: "asc" },
+  });
+
+  const caseRow = {
+    ...currentGroup.case,
+    groups: siblingGroups,
+  };
+
+  return buildViewerDataset(caseRow, currentGroup);
 }

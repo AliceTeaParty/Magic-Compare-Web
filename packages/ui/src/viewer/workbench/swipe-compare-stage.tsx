@@ -3,7 +3,13 @@
 import { Box } from "@mui/material";
 import type { ViewerMediaRect } from "@magic-compare/compare-core";
 import type { ViewerAsset } from "@magic-compare/compare-core/viewer-data";
-import { useRef, type PointerEvent as ReactPointerEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  type CSSProperties,
+  type PointerEvent as ReactPointerEvent,
+} from "react";
 import { clampNumber } from "@magic-compare/shared-utils";
 import { PositionedStageMedia } from "./positioned-stage-media";
 
@@ -28,36 +34,132 @@ export function SwipeCompareStage({
 }) {
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const activePointerIdRef = useRef<number | null>(null);
+  const animationFrameRef = useRef<number | null>(null);
+  const pendingSwipePositionRef = useRef(swipePosition);
+  const transientSwipePositionRef = useRef(swipePosition);
+
+  const clampedSwipePosition = clampNumber(swipePosition, 0, 100);
+  const swipeAxisLength = rotateStage ? mediaRect.height : mediaRect.width;
+  const swipeCssVariables = {
+    "--swipe-position": `${clampedSwipePosition}%`,
+    "--swipe-ratio": `${clampedSwipePosition / 100}`,
+    "--swipe-offset": `${(swipeAxisLength * clampedSwipePosition) / 100}px`,
+  } as CSSProperties;
+
+  /**
+   * Swipe drag feedback is DOM-adjacent transient state; writing CSS variables through one helper
+   * keeps pointermove out of React while still letting reset/frame changes resync from props.
+   */
+  const writeSwipeCssVariables = useCallback(
+    (nextPosition: number) => {
+      const viewport = viewportRef.current;
+      if (!viewport) {
+        return;
+      }
+
+      const clampedPosition = clampNumber(nextPosition, 0, 100);
+      const ratio = clampedPosition / 100;
+      const offset = (swipeAxisLength * clampedPosition) / 100;
+      viewport.style.setProperty("--swipe-position", `${clampedPosition}%`);
+      viewport.style.setProperty("--swipe-ratio", `${ratio}`);
+      viewport.style.setProperty("--swipe-offset", `${offset}px`);
+    },
+    [swipeAxisLength],
+  );
+
+  /**
+   * Batches drag-time CSS writes to the next animation frame so dense pointer streams do not force
+   * a React render or multiple style writes inside one frame.
+   */
+  function scheduleSwipeCssWrite(nextPosition: number) {
+    pendingSwipePositionRef.current = nextPosition;
+
+    if (animationFrameRef.current !== null) {
+      return;
+    }
+
+    animationFrameRef.current = window.requestAnimationFrame(() => {
+      animationFrameRef.current = null;
+      writeSwipeCssVariables(pendingSwipePositionRef.current);
+    });
+  }
+
+  useEffect(() => {
+    transientSwipePositionRef.current = clampedSwipePosition;
+    pendingSwipePositionRef.current = clampedSwipePosition;
+
+    if (animationFrameRef.current !== null) {
+      window.cancelAnimationFrame(animationFrameRef.current);
+      animationFrameRef.current = null;
+    }
+
+    writeSwipeCssVariables(clampedSwipePosition);
+  }, [clampedSwipePosition, writeSwipeCssVariables]);
+
+  useEffect(() => {
+    return () => {
+      if (animationFrameRef.current !== null) {
+        window.cancelAnimationFrame(animationFrameRef.current);
+      }
+    };
+  }, []);
 
   /**
    * Uses the rotated axis when portrait auto-rotation is active so the handle follows the divider
    * users actually see on screen instead of preserving the old horizontal math.
    */
-  function updateSwipePosition(clientX: number, clientY: number) {
+  function resolveSwipePosition(clientX: number, clientY: number) {
     const viewport = viewportRef.current;
     if (!viewport) {
-      return;
+      return null;
     }
 
     const rect = viewport.getBoundingClientRect();
 
     if (rotateStage) {
       if (mediaRect.height <= 0) {
-        return;
+        return null;
       }
 
       // Rotated portrait mode presents the compare split vertically stacked, so swipe must follow Y.
       const localY = clientY - rect.top - mediaRect.y;
-      setSwipePosition(clampNumber((localY / mediaRect.height) * 100, 0, 100));
-      return;
+      return clampNumber((localY / mediaRect.height) * 100, 0, 100);
     }
 
     if (mediaRect.width <= 0) {
-      return;
+      return null;
     }
 
     const localX = clientX - rect.left - mediaRect.x;
-    setSwipePosition(clampNumber((localX / mediaRect.width) * 100, 0, 100));
+    return clampNumber((localX / mediaRect.width) * 100, 0, 100);
+  }
+
+  /**
+   * Updates the transient swipe value and either writes immediately for pointer down/up or queues a
+   * frame-batched CSS update for high-frequency pointermove events.
+   */
+  function updateTransientSwipePosition({
+    clientX,
+    clientY,
+    immediate,
+  }: {
+    clientX: number;
+    clientY: number;
+    immediate: boolean;
+  }) {
+    const nextPosition = resolveSwipePosition(clientX, clientY);
+    if (nextPosition === null) {
+      return;
+    }
+
+    transientSwipePositionRef.current = nextPosition;
+
+    if (immediate) {
+      writeSwipeCssVariables(nextPosition);
+      return;
+    }
+
+    scheduleSwipeCssWrite(nextPosition);
   }
 
   /**
@@ -71,7 +173,11 @@ export function SwipeCompareStage({
 
     activePointerIdRef.current = event.pointerId;
     event.currentTarget.setPointerCapture(event.pointerId);
-    updateSwipePosition(event.clientX, event.clientY);
+    updateTransientSwipePosition({
+      clientX: event.clientX,
+      clientY: event.clientY,
+      immediate: true,
+    });
   }
 
   /**
@@ -82,7 +188,11 @@ export function SwipeCompareStage({
       return;
     }
 
-    updateSwipePosition(event.clientX, event.clientY);
+    updateTransientSwipePosition({
+      clientX: event.clientX,
+      clientY: event.clientY,
+      immediate: false,
+    });
   }
 
   /**
@@ -99,6 +209,14 @@ export function SwipeCompareStage({
     }
 
     activePointerIdRef.current = null;
+
+    if (animationFrameRef.current !== null) {
+      window.cancelAnimationFrame(animationFrameRef.current);
+      animationFrameRef.current = null;
+    }
+
+    writeSwipeCssVariables(transientSwipePositionRef.current);
+    setSwipePosition(transientSwipePositionRef.current);
   }
 
   return (
@@ -109,6 +227,7 @@ export function SwipeCompareStage({
       onPointerUp={finishPointerDrag}
       onPointerCancel={finishPointerDrag}
       onDragStart={(event) => event.preventDefault()}
+      style={swipeCssVariables}
       sx={{
         position: "relative",
         width: "100%",
@@ -124,30 +243,34 @@ export function SwipeCompareStage({
         alt={`${beforeAsset.label} preview`}
         mediaRect={mediaRect}
         rotateStage={rotateStage}
+        loading="eager"
+        decoding="async"
+        fetchPriority="high"
       />
       <PositionedStageMedia
         asset={afterAsset}
         alt={`${afterAsset.label} preview`}
         mediaRect={mediaRect}
         rotateStage={rotateStage}
+        loading="eager"
+        decoding="async"
+        fetchPriority="high"
         clipPath={
           rotateStage
-            ? `inset(0 0 ${100 - swipePosition}% 0)`
-            : `inset(0 ${100 - swipePosition}% 0 0)`
+            ? "inset(0 0 calc(100% - var(--swipe-position)) 0)"
+            : "inset(0 calc(100% - var(--swipe-position)) 0 0)"
         }
       />
       <Box
         sx={{
           position: "absolute",
-          top: rotateStage
-            ? `${mediaRect.y + (mediaRect.height * swipePosition) / 100}px`
-            : `${mediaRect.y}px`,
+          top: `${mediaRect.y}px`,
           height: rotateStage ? 2 : `${mediaRect.height}px`,
-          left: rotateStage
-            ? `${mediaRect.x}px`
-            : `${mediaRect.x + (mediaRect.width * swipePosition) / 100}px`,
+          left: `${mediaRect.x}px`,
           width: rotateStage ? `${mediaRect.width}px` : 2,
-          transform: rotateStage ? "translateY(-1px)" : "translateX(-1px)",
+          transform: rotateStage
+            ? "translateY(var(--swipe-offset)) translateY(-1px)"
+            : "translateX(var(--swipe-offset)) translateX(-1px)",
           backgroundColor: "rgba(248, 245, 255, 0.88)",
           boxShadow:
             "0 0 14px rgba(228, 194, 242, 0.24), 0 0 36px rgba(242, 235, 201, 0.12)",
@@ -159,11 +282,13 @@ export function SwipeCompareStage({
           position: "absolute",
           left: rotateStage
             ? `${mediaRect.x + mediaRect.width / 2}px`
-            : `${mediaRect.x + (mediaRect.width * swipePosition) / 100}px`,
+            : `${mediaRect.x}px`,
           top: rotateStage
-            ? `${mediaRect.y + (mediaRect.height * swipePosition) / 100}px`
+            ? `${mediaRect.y}px`
             : `${mediaRect.y + mediaRect.height / 2}px`,
-          transform: "translate(-50%, -50%)",
+          transform: rotateStage
+            ? "translate(-50%, -50%) translateY(var(--swipe-offset))"
+            : "translate(-50%, -50%) translateX(var(--swipe-offset))",
           width: 42,
           height: 42,
           borderRadius: "999px",

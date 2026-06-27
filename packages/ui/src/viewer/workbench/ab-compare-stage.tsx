@@ -139,6 +139,9 @@ export function ABCompareStage({
         panZoomState={panZoomState}
         effectiveScale={effectiveScale}
         imageRendering="pixelated"
+        loading="eager"
+        decoding="async"
+        fetchPriority="high"
       />
     </Box>
   );

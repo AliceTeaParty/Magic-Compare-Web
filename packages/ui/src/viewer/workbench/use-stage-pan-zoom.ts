@@ -32,22 +32,20 @@ export function useStagePanZoom({
   rotateStage: boolean;
   setPanZoomState: (nextState: ViewerPanZoomState) => void;
 }) {
-  const { effectiveScale, presetTransformScale, applyPanZoom } =
-    useStagePanZoomState({
-      activeAsset,
-      clampViewport,
-      devicePixelRatio,
-      mediaRect,
-      panZoomState,
-      rotateStage,
-      setPanZoomState,
-    });
+  const { effectiveScale, applyPanZoom } = useStagePanZoomState({
+    activeAsset,
+    clampViewport,
+    devicePixelRatio,
+    mediaRect,
+    panZoomState,
+    rotateStage,
+    setPanZoomState,
+  });
   const interactions = useStagePanZoomInteractions({
     active,
     applyPanZoom,
     effectiveScale,
     panZoomState,
-    presetTransformScale,
   });
 
   return {

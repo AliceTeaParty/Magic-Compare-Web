@@ -272,12 +272,18 @@ function ViewerStageContent({
           alt={`${afterAsset.label} base`}
           mediaRect={mediaRect}
           rotateStage={rotateStage}
+          loading="eager"
+          decoding="async"
+          fetchPriority="high"
         />
         <PositionedStageMedia
           asset={heatmapAsset}
           alt={heatmapAsset.label}
           mediaRect={mediaRect}
           rotateStage={rotateStage}
+          loading="eager"
+          decoding="async"
+          fetchPriority="auto"
           opacity={overlayOpacity / 100}
         />
       </Box>

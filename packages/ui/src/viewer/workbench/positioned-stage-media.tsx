@@ -47,6 +47,9 @@ export function PositionedStageMedia({
   panZoomState = DEFAULT_PAN_ZOOM,
   effectiveScale = 1,
   imageRendering,
+  loading,
+  decoding,
+  fetchPriority,
   opacity = 1,
   clipPath,
 }: {
@@ -58,6 +61,9 @@ export function PositionedStageMedia({
   panZoomState?: ViewerPanZoomState;
   effectiveScale?: number;
   imageRendering?: CSSProperties["imageRendering"];
+  loading?: "eager" | "lazy";
+  decoding?: "async" | "auto" | "sync";
+  fetchPriority?: "high" | "low" | "auto";
   opacity?: number;
   clipPath?: string;
 }) {
@@ -114,6 +120,9 @@ export function PositionedStageMedia({
           src={asset.imageUrl}
           alt={alt}
           draggable={false}
+          loading={loading}
+          decoding={decoding}
+          fetchPriority={fetchPriority}
           sx={{
             width: "100%",
             height: "100%",

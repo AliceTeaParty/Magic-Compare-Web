@@ -219,6 +219,7 @@ export function mapCaseWorkspaceData(caseRow: {
  */
 export function buildViewerDataset(
   caseRow: {
+    id: string;
     slug: string;
     title: string;
     summary: string;
@@ -228,20 +229,8 @@ export function buildViewerDataset(
     groups: Array<{
       id: string;
       slug: string;
-      publicSlug: string | null;
       title: string;
-      description: string;
-      defaultMode: string;
-      tagsJson: string;
-      isPublic: boolean;
       order: number;
-      frames: Array<{
-        id: string;
-        title: string;
-        caption: string;
-        order: number;
-        assets: Asset[];
-      }>;
     }>;
   },
   currentGroup: {

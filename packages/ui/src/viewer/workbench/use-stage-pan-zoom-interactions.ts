@@ -30,13 +30,11 @@ export function useStagePanZoomInteractions({
   applyPanZoom,
   effectiveScale,
   panZoomState,
-  presetTransformScale,
 }: {
   active: boolean;
   applyPanZoom: (nextState: ViewerPanZoomState) => void;
   effectiveScale: number;
   panZoomState: ViewerPanZoomState;
-  presetTransformScale: number;
 }) {
   const panGestureRef = useRef<StagePanGesture | null>(null);
   const touchGestureRef = useRef<StageTouchGesture | null>(null);
@@ -128,7 +126,6 @@ export function useStagePanZoomInteractions({
   function handleTouchStart(event: ReactTouchEvent<HTMLDivElement>) {
     startTouchPinch({
       active,
-      effectiveScale,
       event,
       panZoomStateRef,
       suppressStageClickRef,
@@ -145,7 +142,6 @@ export function useStagePanZoomInteractions({
       active,
       applyPanZoom,
       event,
-      presetTransformScale,
       touchGestureRef,
     });
   }
@@ -157,7 +153,6 @@ export function useStagePanZoomInteractions({
   function handleTouchEnd(event: ReactTouchEvent<HTMLDivElement>) {
     finishTouchPinch({
       clearSuppressedClickTimerRef,
-      effectiveScale,
       event,
       panZoomStateRef,
       suppressStageClickRef,

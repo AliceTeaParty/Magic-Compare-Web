@@ -12,19 +12,17 @@ interface AbInspectControlsProps {
   abSide: "before" | "after";
   onAbSideChange: (side: "before" | "after") => void;
   onScaleChange: (nextScale: number) => void;
-  showControls: boolean;
 }
 
 /**
- * Keeps the A/B-only controls together so the toolbar can reserve their layout space without
- * mixing mode-specific rendering details into the shared viewer action row.
+ * Keeps the A/B-only controls together so the toolbar renders this compact inspect cluster only in
+ * the mode where the side selector and scale buttons are meaningful.
  */
 export function AbInspectControls({
   abScale,
   abSide,
   onAbSideChange,
   onScaleChange,
-  showControls,
 }: AbInspectControlsProps) {
   const isAtMinScale = abScale <= VIEWER_MIN_PRESET_SCALE;
   const isAtMaxScale = abScale >= VIEWER_MAX_PRESET_SCALE;
@@ -55,14 +53,11 @@ export function AbInspectControls({
         sx={{
           width: 104,
           minHeight: compactControlHeight,
-          visibility: showControls ? "visible" : "hidden",
-          pointerEvents: showControls ? "auto" : "none",
         }}
       >
         <FormControl
           size="small"
           fullWidth
-          disabled={!showControls}
           sx={{
             "& .MuiOutlinedInput-root": {
               height: compactControlHeight,
@@ -96,8 +91,6 @@ export function AbInspectControls({
         sx={{
           width: 168,
           minHeight: compactControlHeight,
-          visibility: showControls ? "visible" : "hidden",
-          pointerEvents: showControls ? "auto" : "none",
         }}
       >
         <Stack
@@ -111,7 +104,7 @@ export function AbInspectControls({
           <IconButton
             size="small"
             aria-label="Decrease A/B scale"
-            disabled={!showControls || isAtMinScale}
+            disabled={isAtMinScale}
             onClick={() =>
               onScaleChange(
                 Math.max(VIEWER_MIN_PRESET_SCALE, Math.floor(abScale - 0.001)),
@@ -153,7 +146,7 @@ export function AbInspectControls({
           <IconButton
             size="small"
             aria-label="Increase A/B scale"
-            disabled={!showControls || isAtMaxScale}
+            disabled={isAtMaxScale}
             onClick={() =>
               onScaleChange(
                 Math.min(VIEWER_MAX_PRESET_SCALE, Math.ceil(abScale + 0.001)),

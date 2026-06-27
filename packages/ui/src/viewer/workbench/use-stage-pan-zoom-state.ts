@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useRef } from "react";
 import {
   clampViewerPanZoom,
   getViewerEffectiveScale,
-  getViewerPresetTransformScale,
   type ViewerMediaRect,
   type ViewerPanZoomState,
   type ViewerStageSize,
@@ -66,10 +65,6 @@ export function useStagePanZoomState({
       rotateStage,
     ],
   );
-  const presetTransformScale = useMemo(
-    () => getViewerPresetTransformScale(panZoomState.presetScale, scaleOptions),
-    [panZoomState.presetScale, scaleOptions],
-  );
   const effectiveScale = useMemo(
     () => getViewerEffectiveScale(panZoomState, scaleOptions),
     [panZoomState, scaleOptions],
@@ -111,7 +106,6 @@ export function useStagePanZoomState({
 
   return {
     effectiveScale,
-    presetTransformScale,
     applyPanZoom,
   };
 }

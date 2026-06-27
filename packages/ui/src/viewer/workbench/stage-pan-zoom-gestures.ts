@@ -8,7 +8,6 @@ import type {
 import {
   getViewerDisplayedScale,
   normalizeViewerDisplayedScale,
-  VIEWER_MAX_FINE_SCALE,
   type ViewerPanZoomState,
 } from "@magic-compare/compare-core";
 import { clampNumber } from "@magic-compare/shared-utils";
@@ -33,7 +32,6 @@ export interface StagePanGesture {
 }
 
 export interface StageTouchGesture {
-  baseEffectiveScale: number;
   baseState: ViewerPanZoomState;
   center: PointerSample;
   distance: number;
@@ -248,14 +246,12 @@ export function applyWheelZoom({
  */
 export function startTouchPinch({
   active,
-  effectiveScale,
   event,
   panZoomStateRef,
   suppressStageClickRef,
   touchGestureRef,
 }: {
   active: boolean;
-  effectiveScale: number;
   event: ReactTouchEvent<HTMLDivElement>;
   panZoomStateRef: MutableRefObject<ViewerPanZoomState>;
   suppressStageClickRef: MutableRefObject<boolean>;
@@ -272,7 +268,6 @@ export function startTouchPinch({
 
   suppressStageClickRef.current = true;
   touchGestureRef.current = {
-    baseEffectiveScale: effectiveScale,
     baseState: panZoomStateRef.current,
     center: getGestureCenter(firstSample, secondSample),
     distance: getPointerDistance(firstSample, secondSample),
@@ -287,13 +282,11 @@ export function moveTouchPinch({
   active,
   applyPanZoom,
   event,
-  presetTransformScale,
   touchGestureRef,
 }: {
   active: boolean;
   applyPanZoom: (nextState: ViewerPanZoomState) => void;
   event: ReactTouchEvent<HTMLDivElement>;
-  presetTransformScale: number;
   touchGestureRef: MutableRefObject<StageTouchGesture | null>;
 }) {
   if (!active || event.touches.length !== 2) {
@@ -309,22 +302,20 @@ export function moveTouchPinch({
   const firstSample = getTouchSample(event.touches[0]);
   const secondSample = getTouchSample(event.touches[1]);
   const center = getGestureCenter(firstSample, secondSample);
-  const nextEffectiveScale =
-    gesture.baseEffectiveScale *
-    (getPointerDistance(firstSample, secondSample) /
-      Math.max(gesture.distance, 1));
-  const nextFineScale = clampNumber(
-    nextEffectiveScale / Math.max(presetTransformScale, 0.01),
+  const nextDisplayedScale = clampNumber(
+    getViewerDisplayedScale(gesture.baseState) *
+      (getPointerDistance(firstSample, secondSample) /
+        Math.max(gesture.distance, 1)),
     1,
-    VIEWER_MAX_FINE_SCALE,
+    8,
   );
 
-  applyPanZoom({
-    presetScale: gesture.baseState.presetScale,
-    fineScale: nextFineScale,
-    x: gesture.baseState.x + (center.x - gesture.center.x),
-    y: gesture.baseState.y + (center.y - gesture.center.y),
-  });
+  applyPanZoom(
+    normalizeViewerDisplayedScale(nextDisplayedScale, {
+      x: gesture.baseState.x + (center.x - gesture.center.x),
+      y: gesture.baseState.y + (center.y - gesture.center.y),
+    }),
+  );
 }
 
 /**
@@ -333,14 +324,12 @@ export function moveTouchPinch({
  */
 export function finishTouchPinch({
   clearSuppressedClickTimerRef,
-  effectiveScale,
   event,
   panZoomStateRef,
   suppressStageClickRef,
   touchGestureRef,
 }: {
   clearSuppressedClickTimerRef: MutableRefObject<number | null>;
-  effectiveScale: number;
   event: ReactTouchEvent<HTMLDivElement>;
   panZoomStateRef: MutableRefObject<ViewerPanZoomState>;
   suppressStageClickRef: MutableRefObject<boolean>;
@@ -350,7 +339,6 @@ export function finishTouchPinch({
     const firstSample = getTouchSample(event.touches[0]);
     const secondSample = getTouchSample(event.touches[1]);
     touchGestureRef.current = {
-      baseEffectiveScale: effectiveScale,
       baseState: panZoomStateRef.current,
       distance: getPointerDistance(firstSample, secondSample),
       center: getGestureCenter(firstSample, secondSample),
