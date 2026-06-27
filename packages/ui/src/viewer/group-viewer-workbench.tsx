@@ -22,6 +22,12 @@ import { useViewerImagePreloader } from "./workbench/viewer-image-preloader";
 import { useAbInspectState } from "./workbench/use-ab-inspect-state";
 import { useViewerStageShellState } from "./workbench/use-viewer-stage-shell-state";
 import { viewerTokens } from "./workbench/viewer-tokens";
+import { ViewerGuidePanel } from "./workbench/viewer-guide-panel";
+import {
+  readViewerGuideState,
+  writeViewerGuideState,
+} from "./workbench/viewer-guide-storage";
+import { ViewerOnboardingNudge } from "./workbench/viewer-onboarding-nudge";
 
 interface GroupViewerWorkbenchProps {
   dataset: ViewerDataset;
@@ -66,7 +72,8 @@ export function GroupViewerWorkbench({
   }));
   const [devicePixelRatio, setDevicePixelRatio] = useState(1);
   const [swipePosition, setSwipePosition] = useState(50);
-  const [showAbInspectHint, setShowAbInspectHint] = useState(false);
+  const [guideOpen, setGuideOpen] = useState(false);
+  const [showGuideNudge, setShowGuideNudge] = useState(false);
   const abInspect = useAbInspectState();
   const {
     displayedScale: abDisplayedScale,
@@ -128,6 +135,10 @@ export function GroupViewerWorkbench({
     setViewportSize,
   });
 
+  useEffect(() => {
+    setShowGuideNudge(readViewerGuideState() === null);
+  }, []);
+
   /**
    * Restores the compare surface to its default inspection state so keyboard recovery and mode
    * switches share the same reset path after an accidental pan, zoom, or swipe move.
@@ -137,11 +148,40 @@ export function GroupViewerWorkbench({
     resetAbInspect();
   }, [resetAbInspect]);
 
+  /**
+   * Opens the guide from explicit user intent; it remains replayable after first-run state is saved.
+   */
+  const openViewerGuide = useCallback(() => {
+    setGuideOpen(true);
+  }, []);
+
+  /**
+   * Persists a completed guide decision while keeping an in-memory fallback for blocked storage.
+   */
+  const completeViewerGuide = useCallback(() => {
+    writeViewerGuideState("completed");
+    setShowGuideNudge(false);
+    setGuideOpen(false);
+  }, []);
+
+  /**
+   * Persists a skip decision so the first-run prompt does not interrupt future inspections.
+   */
+  const dismissViewerGuideNudge = useCallback(() => {
+    writeViewerGuideState("dismissed");
+    setShowGuideNudge(false);
+  }, []);
+
+  const toggleViewerGuide = useCallback(() => {
+    setGuideOpen((currentOpen) => !currentOpen);
+  }, []);
+
   useViewerKeyboardShortcuts({
     abSide,
     abStageActive,
     mode,
     onResetView: resetViewerView,
+    onToggleGuide: toggleViewerGuide,
     setAbSide,
     setAbStageActive,
     setMode,
@@ -154,30 +194,6 @@ export function GroupViewerWorkbench({
     setAbStageActive,
     stageRef: stageShell.stageRef,
   });
-
-  useEffect(() => {
-    if (mode !== "a-b" || typeof window === "undefined") {
-      return;
-    }
-
-    const hintStorageKey = "magic-compare-ab-inspect-hint";
-
-    try {
-      if (window.sessionStorage.getItem(hintStorageKey) === "1") {
-        return;
-      }
-
-      // This hint is intentionally brief and session-scoped so first-time users learn that A/B
-      // inspect is interactive without adding persistent chrome once they already know the gesture.
-      window.sessionStorage.setItem(hintStorageKey, "1");
-    } catch {
-      // Ignore storage errors; the fallback is simply showing the hint for this page load.
-    }
-
-    setShowAbInspectHint(true);
-    const timeoutId = window.setTimeout(() => setShowAbInspectHint(false), 1000);
-    return () => window.clearTimeout(timeoutId);
-  }, [mode]);
 
   return (
     <Box
@@ -215,10 +231,12 @@ export function GroupViewerWorkbench({
           abSide={abSide}
           canUseHeatmap={availableModes.includes("heatmap")}
           caseTitle={dataset.caseMeta.title}
+          guideOpen={guideOpen}
           groupTitle={dataset.group.title}
           hideStageScrollControl={resolvedHideStageScrollControl}
           mode={mode}
           onAbSideChange={setAbSide}
+          onOpenGuide={openViewerGuide}
           onModeChange={setMode}
           onScaleChange={setAbScale}
           onScrollStageIntoView={stageShell.scrollStageIntoView}
@@ -244,6 +262,12 @@ export function GroupViewerWorkbench({
               }}
             >
               {mode === "heatmap" && !heatmapAsset ? <HeatmapNotice /> : null}
+              {showGuideNudge ? (
+                <ViewerOnboardingNudge
+                  onDismiss={dismissViewerGuideNudge}
+                  onOpenGuide={openViewerGuide}
+                />
+              ) : null}
 
               <Box
                 ref={stageShell.stageSlotRef}
@@ -256,35 +280,6 @@ export function GroupViewerWorkbench({
                   height: `${stageShell.shellHeight}px`,
                 }}
               >
-                <Box
-                  aria-hidden={!showAbInspectHint}
-                  sx={{
-                    position: "absolute",
-                    top: { xs: 10, md: 14 },
-                    left: "50%",
-                    zIndex: 1,
-                    px: 1.3,
-                    py: 0.65,
-                    borderRadius: 999,
-                    border: viewerTokens.workbench.hintBorder,
-                    backgroundColor: viewerTokens.workbench.hintSurface,
-                    color: "text.secondary",
-                    fontSize: "0.77rem",
-                    fontWeight: 600,
-                    letterSpacing: "0.01em",
-                    whiteSpace: "nowrap",
-                    pointerEvents: "none",
-                    boxShadow: viewerTokens.workbench.hintShadow,
-                    transform: showAbInspectHint
-                      ? "translate(-50%, 0)"
-                      : "translate(-50%, -6px)",
-                    opacity: showAbInspectHint ? 1 : 0,
-                    transition:
-                      "opacity 180ms cubic-bezier(0.22, 1, 0.36, 1), transform 180ms cubic-bezier(0.22, 1, 0.36, 1)",
-                  }}
-                >
-                  Click or press Enter/Space to inspect. Press R to reset.
-                </Box>
                 <ViewerStage
                   abSide={abSide}
                   abStageActive={abStageActive}
@@ -359,6 +354,11 @@ export function GroupViewerWorkbench({
           closeSidebar={closeSidebar}
           variant={variant}
           onGroupIntent={imagePreloader.preloadGroupHint}
+        />
+        <ViewerGuidePanel
+          open={guideOpen}
+          onClose={() => setGuideOpen(false)}
+          onComplete={completeViewerGuide}
         />
       </Paper>
     </Box>

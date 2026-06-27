@@ -17,7 +17,7 @@ interface AbInspectControlsProps {
 
 /**
  * Keeps the A/B-only controls together so the toolbar renders this compact inspect cluster only in
- * the mode where the side selector and scale buttons are meaningful.
+ * the mode where the side selector and zoom buttons are meaningful.
  */
 export function AbInspectControls({
   abScale,
@@ -33,11 +33,11 @@ export function AbInspectControls({
   const compactIconButtonSize = { xs: 42, md: 40 };
 
   /**
-   * Toolbar buttons still move between whole-number checkpoints, but the displayed scale can now
-   * live between them after ctrl+wheel or pinch input.
+   * The internal zoom state is multiplier-based, but the UI presents it as a percentage because
+   * percentages are easier to scan and avoid exposing implementation terminology.
    */
-  function formatScaleLabel(scale: number) {
-    return `${Number(scale.toFixed(2)).toString()}x Scale`;
+  function formatZoomPercentage(scale: number) {
+    return `${Math.round(scale * 100)}%`;
   }
 
   /**
@@ -89,7 +89,7 @@ export function AbInspectControls({
           <Select
             value={abSide}
             onChange={(event) => handleAbSideChange(event.target.value)}
-            inputProps={{ "aria-label": "Choose A/B side" }}
+            inputProps={{ "aria-label": "选择 A/B 侧" }}
           >
             <MenuItem value="before">Before</MenuItem>
             <MenuItem value="after">After</MenuItem>
@@ -112,7 +112,7 @@ export function AbInspectControls({
         >
           <IconButton
             size="small"
-            aria-label="Decrease A/B scale"
+            aria-label="缩小 A/B 视图"
             disabled={isAtMinScale}
             onClick={() =>
               onScaleChange(
@@ -150,11 +150,11 @@ export function AbInspectControls({
               borderColor: "divider",
             }}
           >
-            {formatScaleLabel(abScale)}
+            {formatZoomPercentage(abScale)}
           </Box>
           <IconButton
             size="small"
-            aria-label="Increase A/B scale"
+            aria-label="放大 A/B 视图"
             disabled={isAtMaxScale}
             onClick={() =>
               onScaleChange(

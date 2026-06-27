@@ -1,6 +1,6 @@
 "use client";
 
-import { FitScreen, ViewSidebar } from "@mui/icons-material";
+import { FitScreen, HelpOutline, ViewSidebar } from "@mui/icons-material";
 import { IconButton, Stack, ToggleButton, ToggleButtonGroup, Tooltip } from "@mui/material";
 import type { ViewerMode } from "@magic-compare/content-schema";
 import { AbInspectControls } from "./ab-inspect-controls";
@@ -9,9 +9,11 @@ interface ViewerToolbarProps {
   abScale: number;
   abSide: "before" | "after";
   canUseHeatmap: boolean;
+  guideOpen: boolean;
   hideStageScrollControl: boolean;
   mode: ViewerMode;
   onAbSideChange: (side: "before" | "after") => void;
+  onOpenGuide: () => void;
   onModeChange: (mode: ViewerMode) => void;
   onScaleChange: (nextScale: number) => void;
   onScrollStageIntoView: () => void;
@@ -27,9 +29,11 @@ export function ViewerToolbar({
   abScale,
   abSide,
   canUseHeatmap,
+  guideOpen,
   hideStageScrollControl,
   mode,
   onAbSideChange,
+  onOpenGuide,
   onModeChange,
   onScaleChange,
   onScrollStageIntoView,
@@ -123,10 +127,10 @@ export function ViewerToolbar({
       </ToggleButtonGroup>
 
       {!hideStageScrollControl ? (
-        <Tooltip title="Scroll the compare stage into view">
+        <Tooltip title="滚动到对比主图">
           <IconButton
             size="small"
-            aria-label="Scroll the compare stage into view"
+            aria-label="滚动到对比主图"
             onClick={onScrollStageIntoView}
             sx={{
               width: compactIconButtonSize,
@@ -140,9 +144,29 @@ export function ViewerToolbar({
         </Tooltip>
       ) : null}
 
-      <Tooltip title={sidebarOpen ? "Close details (I)" : "Open details (I)"}>
+      <Tooltip title="查看引导 (?)">
         <IconButton
           size="small"
+          aria-label="查看引导"
+          aria-pressed={guideOpen}
+          color={guideOpen ? "primary" : "default"}
+          onClick={onOpenGuide}
+          sx={{
+            width: compactIconButtonSize,
+            height: compactIconButtonSize,
+            "& .MuiSvgIcon-root": {
+              fontSize: 18,
+            },
+          }}
+        >
+          <HelpOutline />
+        </IconButton>
+      </Tooltip>
+
+      <Tooltip title={sidebarOpen ? "关闭详情 (I)" : "打开详情 (I)"}>
+        <IconButton
+          size="small"
+          aria-label={sidebarOpen ? "关闭详情" : "打开详情"}
           onClick={onToggleSidebar}
           sx={{
             width: compactIconButtonSize,

@@ -144,6 +144,7 @@ export function useViewerKeyboardShortcuts(params: {
   abStageActive: boolean;
   mode: ViewerMode;
   onResetView: () => void;
+  onToggleGuide: () => void;
   setAbSide: (side: "before" | "after") => void;
   setAbStageActive: (nextActive: boolean) => void;
   setMode: (mode: ViewerMode) => void;
@@ -155,6 +156,7 @@ export function useViewerKeyboardShortcuts(params: {
     abStageActive,
     mode,
     onResetView,
+    onToggleGuide,
     setAbSide,
     setAbStageActive,
     setMode,
@@ -236,12 +238,18 @@ export function useViewerKeyboardShortcuts(params: {
         event.preventDefault();
         onResetView();
       }
+
+      if (event.key === "?") {
+        event.preventDefault();
+        onToggleGuide();
+      }
     }
 
     window.addEventListener("keydown", handleKeydown);
     return () => window.removeEventListener("keydown", handleKeydown);
   }, [
     onResetView,
+    onToggleGuide,
     setAbSide,
     setAbStageActive,
     setMode,

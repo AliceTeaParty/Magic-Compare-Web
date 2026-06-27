@@ -51,4 +51,9 @@ export const viewerTokens = {
     hintSurface: "rgba(5, 13, 34, 0.72)",
     hintShadow: "0 10px 24px rgba(0, 0, 0, 0.18)",
   },
+  guide: {
+    actionSurface: "rgba(232, 198, 246, 0.12)",
+    panelSurface: "rgba(9, 19, 43, 0.98)",
+    subtleSurface: "rgba(255,255,255,0.045)",
+  },
 } as const;

@@ -9,10 +9,12 @@ interface ViewerHeaderProps {
   abSide: "before" | "after";
   canUseHeatmap: boolean;
   caseTitle: string;
+  guideOpen: boolean;
   groupTitle: string;
   hideStageScrollControl: boolean;
   mode: ViewerMode;
   onAbSideChange: (side: "before" | "after") => void;
+  onOpenGuide: () => void;
   onModeChange: (mode: ViewerMode) => void;
   onScaleChange: (nextScale: number) => void;
   onScrollStageIntoView: () => void;
@@ -29,10 +31,12 @@ export function ViewerHeader({
   abSide,
   canUseHeatmap,
   caseTitle,
+  guideOpen,
   groupTitle,
   hideStageScrollControl,
   mode,
   onAbSideChange,
+  onOpenGuide,
   onModeChange,
   onScaleChange,
   onScrollStageIntoView,
@@ -84,9 +88,11 @@ export function ViewerHeader({
         abScale={abScale}
         abSide={abSide}
         canUseHeatmap={canUseHeatmap}
+        guideOpen={guideOpen}
         hideStageScrollControl={hideStageScrollControl}
         mode={mode}
         onAbSideChange={onAbSideChange}
+        onOpenGuide={onOpenGuide}
         onModeChange={onModeChange}
         onScaleChange={onScaleChange}
         onScrollStageIntoView={onScrollStageIntoView}

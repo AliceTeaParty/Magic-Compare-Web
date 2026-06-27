@@ -6,6 +6,32 @@ Entries before that date are summarized at release level instead of being recons
 
 ## Unreleased
 
+### Added
+
+- Added a lightweight Chinese first-run guide to the shared group viewer, with a toolbar help button, `?` shortcut, replayable Drawer guide, and local dismissed/completed state.
+- Added a stage image preloader with bounded concurrency, adjacent-frame and group-intent prefetching, stage image load caching, and a local skeleton fallback for slow or missing images.
+- Added `previewUrl` support in viewer asset data and publish manifest tests so future generated preview images can improve perceived switching speed while older data remains compatible.
+- Added package-level lint scripts and ESLint configuration for `@magic-compare/ui` and `@magic-compare/compare-core`.
+- Added `PRODUCT.md` product-context guidance for the viewer workbench and refreshed the MCP usage guide with the current `mcp-vector-search` command surface.
+
+### Changed
+
+- Reworked A/B, Swipe, and Heatmap stage rendering so stage images use explicit loading/decoding/fetch-priority hints and heatmap overlays do not compete for high-priority image fetches.
+- Changed Swipe dragging and filmstrip dragging to keep transient pointer movement out of React state by using refs, `requestAnimationFrame`, CSS variables, and transforms.
+- Split internal viewer data loading so the current group fetches full frames/assets while sibling groups only carry navigation and preload-hint fields.
+- Replaced the old A/B-only session hint with the unified viewer guide, and localized viewer toolbar hover/aria copy while keeping visible mode/control names such as `Swipe`, `A/B`, `Heatmap`, `Details`, and `Reset`.
+- Changed A/B zoom display from multiplier text such as `1x Scale` to percentage text such as `100%`.
+- Moved repeated viewer colors into local `viewerTokens` so stage, filmstrip, swipe, and guide surfaces share semantic styling.
+
+### Fixed
+
+- Fixed mobile pinch zoom in A/B inspect mode so it normalizes through displayed scale and no longer stalls around `1.67x`.
+- Fixed hidden A/B toolbar controls reserving space outside A/B mode and squeezing the title/mobile header.
+- Fixed stage-image switching behavior so skeletons are only the fallback while the requested image is unavailable, avoiding blurred or incorrect preview swaps.
+- Fixed A/B stage keyboard accessibility with focusable activation and Enter/Space handling.
+- Fixed preloader lifecycle bookkeeping so queued/loading URL state is not evicted by the loaded/error result cache.
+- Fixed filmstrip scrollbar affordance by making the custom thumb interactive instead of showing a non-draggable visual scrollbar.
+
 ## v1.7.3 - 2026-03-31
 
 Code quality refresh focused on refactoring, API robustness, and comprehensive testing.
