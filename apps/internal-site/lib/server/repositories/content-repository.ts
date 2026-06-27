@@ -12,6 +12,8 @@ export {
   reorderFrames,
   reorderGroups,
   setGroupVisibility,
+  updateCaseSummary,
+  updateGroupMetadata,
 } from "../content/mutation-service";
 export {
   getCaseWorkspace,

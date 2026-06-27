@@ -1,19 +1,18 @@
 import { Box, Stack, Typography } from "@mui/material";
 
 /**
- * Keeps the catalog opening minimal and editorial. The earlier right-hand workflow explainer added
- * noise without helping repeat users, so the header now stays as a single narrative block.
+ * Keeps the catalog opening compact so repeat operators reach the case list without rereading
+ * workflow prose that is already expressed by the case cards and page actions.
  */
 export function InternalCatalogHeader() {
   return (
-    <Stack spacing={1.8} sx={{ width: "100%" }}>
+    <Stack spacing={1.55} sx={{ width: "100%" }}>
       <Typography variant="overline" color="primary.main">
         Magic Compare Web / Internal
       </Typography>
       <Box
         sx={{
           display: "grid",
-          gap: 1.4,
           pb: { xs: 2.75, md: 3.4 },
           borderBottom: "1px solid",
           borderColor: "divider",
@@ -32,15 +31,6 @@ export function InternalCatalogHeader() {
       >
         <Typography variant="h2" component="h1">
           Internal catalog
-        </Typography>
-        <Typography
-          variant="body1"
-          color="text.secondary"
-          sx={{ maxWidth: 700, lineHeight: 1.72 }}
-        >
-          Browse draft, internal, and published compare cases. Viewer pages
-          stay focused on inspection, while import and publish operations remain
-          explicit.
         </Typography>
       </Box>
     </Stack>

@@ -31,6 +31,12 @@ export interface WorkspaceGroupMutationContext
   ) => void;
 }
 
+export interface WorkspaceCaseMetadataMutationContext
+  extends WorkspaceMutationContext {
+  setCaseSummary: (nextSummary: string) => void;
+  summaryRef: MutableRefObject<string>;
+}
+
 /**
  * Normalizes JSON POST handling so workspace actions surface API errors with the same message
  * shape regardless of which operation triggered them.
@@ -250,6 +256,124 @@ export function toggleWorkspaceGroupVisibility(
       }),
     context,
   });
+}
+
+/**
+ * Case summary edits are optimistic because the value is a single text field and can be restored
+ * exactly if the server rejects the update.
+ */
+export function updateWorkspaceCaseSummary(
+  nextSummary: string,
+  context: WorkspaceCaseMetadataMutationContext,
+) {
+  const previousSummary = context.summaryRef.current;
+  const normalizedSummary = nextSummary.trim();
+
+  context.summaryRef.current = normalizedSummary;
+  context.setCaseSummary(normalizedSummary);
+  context.notifications.showWorkspaceSavingNotification();
+
+  return (async () => {
+    try {
+      const result = await postJson("/api/ops/case-update", {
+        caseSlug: context.data.slug,
+        summary: normalizedSummary,
+      });
+      const savedSummary =
+        result && typeof result.summary === "string"
+          ? result.summary
+          : normalizedSummary;
+
+      context.summaryRef.current = savedSummary;
+      context.setCaseSummary(savedSummary);
+      context.notifications.pushNotification("Case 描述已保存。", "success");
+    } catch (error) {
+      context.summaryRef.current = previousSummary;
+      context.setCaseSummary(previousSummary);
+      pushWorkspaceError(
+        context.notifications,
+        error,
+        "保存 Case 描述失败。",
+      );
+    } finally {
+      context.notifications.dismissWorkspaceSavingNotification();
+    }
+  })();
+}
+
+/**
+ * Group metadata edits update the row immediately but keep slug/order/publish fields intact; a
+ * failed request restores the exact previous group snapshot.
+ */
+export function updateWorkspaceGroupMetadata(
+  targetGroup: GroupItem,
+  metadata: { title: string; description: string },
+  context: WorkspaceGroupMutationContext,
+) {
+  const title = metadata.title.trim();
+  const description = metadata.description.trim();
+
+  if (!title) {
+    context.notifications.pushNotification("Group 标题不能为空。", "error");
+    return Promise.resolve();
+  }
+
+  const previousGroups = context.groupsRef.current;
+  const nextGroups = previousGroups.map((group) =>
+    group.id === targetGroup.id
+      ? {
+          ...group,
+          title,
+          description,
+        }
+      : group,
+  );
+
+  replaceWorkspaceGroups(context.groupsRef, context.setGroups, nextGroups);
+  context.notifications.showWorkspaceSavingNotification();
+
+  return (async () => {
+    try {
+      const result = await postJson("/api/ops/group-update", {
+        caseSlug: context.data.slug,
+        groupSlug: targetGroup.slug,
+        title,
+        description,
+      });
+      const savedTitle =
+        result && typeof result.title === "string" ? result.title : title;
+      const savedDescription =
+        result && typeof result.description === "string"
+          ? result.description
+          : description;
+      const savedGroups = context.groupsRef.current.map((group) =>
+        group.id === targetGroup.id
+          ? {
+              ...group,
+              title: savedTitle,
+              description: savedDescription,
+            }
+          : group,
+      );
+
+      replaceWorkspaceGroups(context.groupsRef, context.setGroups, savedGroups);
+      context.notifications.pushNotification(
+        targetGroup.isPublic
+          ? "元数据已保存。发布 Case 后会更新公开页面。"
+          : "Group 元数据已保存。",
+        "success",
+      );
+    } catch (error) {
+      replaceWorkspaceGroups(
+        context.groupsRef,
+        context.setGroups,
+        previousGroups,
+      );
+      pushWorkspaceError(context.notifications, error, "保存 Group 元数据失败。");
+    } finally {
+      context.notifications.dismissWorkspaceSavingNotification();
+    }
+  })();
 }
 
 /**

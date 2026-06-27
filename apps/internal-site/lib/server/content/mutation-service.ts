@@ -138,6 +138,69 @@ export async function setGroupVisibility(
 }
 
 /**
+ * Updates the workspace-facing case description only; slug/title/publication state remain outside
+ * this endpoint so metadata editing cannot accidentally change routing or publishing behavior.
+ */
+export async function updateCaseSummary(caseSlug: string, summary: string) {
+  const trimmedSummary = summary.trim();
+  const caseRow = await prisma.case.update({
+    where: { slug: caseSlug },
+    data: { summary: trimmedSummary },
+    select: {
+      slug: true,
+      summary: true,
+    },
+  });
+
+  return {
+    caseSlug: caseRow.slug,
+    summary: caseRow.summary,
+  };
+}
+
+/**
+ * Updates group display metadata after resolving the group through its case, preserving slugs and
+ * all publish/upload fields so existing viewer and public URLs remain stable.
+ */
+export async function updateGroupMetadata(
+  caseSlug: string,
+  groupSlug: string,
+  metadata: { title: string; description: string },
+) {
+  const title = metadata.title.trim();
+  const description = metadata.description.trim();
+
+  if (!title) {
+    throw new Error("Group title is required.");
+  }
+
+  const caseRow = await requireCaseWithGroups(caseSlug, {
+    id: true,
+    slug: true,
+  });
+  const targetGroup = requireTargetGroup(caseRow.groups, groupSlug);
+  const groupRow = await prisma.group.update({
+    where: { id: targetGroup.id },
+    data: {
+      title,
+      description,
+    },
+    select: {
+      slug: true,
+      title: true,
+      description: true,
+    },
+  });
+
+  return {
+    caseSlug: caseRow.slug,
+    groupSlug: groupRow.slug,
+    title: groupRow.title,
+    description: groupRow.description,
+  };
+}
+
+/**
  * Deletes the group from both internal storage and published output, and downgrades the case back
  * to `internal` when that deletion removed the last public group.
  */

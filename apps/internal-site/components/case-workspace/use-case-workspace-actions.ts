@@ -11,29 +11,35 @@ type GroupItem = CaseWorkspaceData["groups"][number];
  * stay aligned across reorder/publish/deploy/visibility flows.
  */
 export function useCaseWorkspaceActions({
+  caseSummary,
   data,
   groups,
   setGroups,
+  setCaseSummary,
   refresh,
   notifications,
   startTransition,
 }: {
+  caseSummary: string;
   data: CaseWorkspaceData;
   groups: GroupItem[];
   setGroups: (
     updater: GroupItem[] | ((current: GroupItem[]) => GroupItem[]),
   ) => void;
+  setCaseSummary: (nextSummary: string) => void;
   refresh: () => void;
   notifications: NotificationApi;
   startTransition: TransitionStartFunction;
 }) {
   const [isDeployingPublicSite, setIsDeployingPublicSite] = useState(false);
   const actionHandlers = useWorkspaceActionHandlers({
+    caseSummary,
     data,
     groups,
     isDeployingPublicSite,
     notifications,
     refresh,
+    setCaseSummary,
     setGroups,
     setIsDeployingPublicSite,
     startTransition,

@@ -1,5 +1,8 @@
 import {
+  Check,
+  Close,
   DragIndicator,
+  EditOutlined,
   LockOutlined,
   OpenInNew,
   Public,
@@ -24,7 +27,16 @@ import type {
   MouseEvent as ReactMouseEvent,
   PointerEvent as ReactPointerEvent,
 } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { CaseWorkspaceData } from "@/lib/server/repositories/content-repository";
+
+type GroupItem = CaseWorkspaceData["groups"][number];
+const GROUP_TITLE_MAX_LENGTH = 16;
+const GROUP_DESCRIPTION_MAX_LENGTH = 40;
+
+function limitText(value: string, maxLength: number) {
+  return value.slice(0, maxLength);
+}
 
 /**
  * Keeps each workspace row self-contained so drag handles, visibility controls, and the internal
@@ -35,19 +47,81 @@ export function SortableGroupRow({
   group,
   caseSlug,
   isPending,
+  onUpdateMetadata,
   onToggleVisibility,
 }: {
-  group: CaseWorkspaceData["groups"][number];
+  group: GroupItem;
   caseSlug: string;
   isPending: boolean;
-  onToggleVisibility: (group: CaseWorkspaceData["groups"][number]) => void;
+  onUpdateMetadata: (
+    group: GroupItem,
+    metadata: { title: string; description: string },
+  ) => Promise<void>;
+  onToggleVisibility: (group: GroupItem) => void;
 }) {
   // Workspace rows do a lot of work on mobile, so drag, visibility, and open controls share a
   // single 40px+ baseline instead of the older mixed 32/36px targets.
   const compactControlHeight = { xs: 42, md: 40 };
   const compactHandleSize = { xs: 42, md: 40 };
+  const visibilityButtonHeight = { xs: 36, md: 34 };
+  const visibilityButtonSx = {
+    minHeight: visibilityButtonHeight,
+    px: "8px",
+    py: 0,
+    border: "0 !important",
+    boxShadow: "none",
+    color: "text.secondary",
+    fontSize: "0.84rem",
+    backgroundColor: "transparent",
+    "&:hover": {
+      backgroundColor: "rgba(255,255,255,0.055)",
+    },
+    "&.Mui-selected": {
+      color: "text.primary",
+      backgroundColor: "rgba(232, 198, 246, 0.15)",
+      boxShadow: "inset 0 0 0 1px rgba(232, 198, 246, 0.34)",
+    },
+    "&.Mui-selected:hover": {
+      backgroundColor: "rgba(232, 198, 246, 0.18)",
+    },
+    "&.Mui-disabled": {
+      color: "text.secondary",
+      opacity: 0.6,
+    },
+    "&.Mui-selected.Mui-disabled": {
+      color: "text.primary",
+      backgroundColor: "rgba(232, 198, 246, 0.13)",
+      boxShadow: "inset 0 0 0 1px rgba(232, 198, 246, 0.28)",
+      opacity: 1,
+    },
+  };
+  const [isEditing, setIsEditing] = useState(false);
+  const [draftTitle, setDraftTitle] = useState(
+    limitText(group.title, GROUP_TITLE_MAX_LENGTH),
+  );
+  const [draftDescription, setDraftDescription] = useState(
+    limitText(group.description, GROUP_DESCRIPTION_MAX_LENGTH),
+  );
+  const titleEditorRef = useRef<HTMLElement | null>(null);
+  const descriptionEditorRef = useRef<HTMLElement | null>(null);
+  const titleError = draftTitle.trim() ? null : "标题不能为空。";
   const { attributes, listeners, setNodeRef, transform, transition } =
     useSortable({ id: group.id });
+
+  useEffect(() => {
+    if (!isEditing) {
+      setDraftTitle(limitText(group.title, GROUP_TITLE_MAX_LENGTH));
+      setDraftDescription(
+        limitText(group.description, GROUP_DESCRIPTION_MAX_LENGTH),
+      );
+    }
+  }, [group.description, group.title, isEditing]);
+
+  useEffect(() => {
+    if (isEditing) {
+      titleEditorRef.current?.focus();
+    }
+  }, [isEditing]);
 
   /**
    * Ignores the ToggleButtonGroup "clear selection" null case because a group must always be either
@@ -82,6 +156,134 @@ export function SortableGroupRow({
     event.stopPropagation();
   }
 
+  /**
+   * Rehydrates drafts from the current row before editing so an earlier cancelled or failed save
+   * cannot leak stale text into the inline editor.
+   */
+  function startMetadataEdit() {
+    setDraftTitle(limitText(group.title, GROUP_TITLE_MAX_LENGTH));
+    setDraftDescription(
+      limitText(group.description, GROUP_DESCRIPTION_MAX_LENGTH),
+    );
+    setIsEditing(true);
+  }
+
+  /**
+   * Cancelling mirrors startMetadataEdit for the same reason: the row should return to the last
+   * committed metadata snapshot, not whatever contentEditable currently contains.
+   */
+  function cancelMetadataEdit() {
+    setDraftTitle(limitText(group.title, GROUP_TITLE_MAX_LENGTH));
+    setDraftDescription(
+      limitText(group.description, GROUP_DESCRIPTION_MAX_LENGTH),
+    );
+    setIsEditing(false);
+  }
+
+  /**
+   * Group title is part of the row's primary identity, so client validation mirrors the API rule
+   * before scheduling an optimistic metadata save.
+   */
+  function saveMetadataEdit() {
+    if (titleError) {
+      return;
+    }
+
+    void onUpdateMetadata(group, {
+      title: limitText(
+        titleEditorRef.current?.textContent ?? draftTitle,
+        GROUP_TITLE_MAX_LENGTH,
+      ),
+      description: limitText(
+        descriptionEditorRef.current?.textContent ?? draftDescription,
+        GROUP_DESCRIPTION_MAX_LENGTH,
+      ),
+    });
+    setIsEditing(false);
+  }
+
+  function handleOpenClick(event: ReactMouseEvent<HTMLElement>) {
+    stopClickPropagation(event);
+    if (isPending || isEditing) {
+      event.preventDefault();
+    }
+  }
+
+  /**
+   * Keeps the visible editor text and React draft state in lockstep while enforcing compact row
+   * limits; contentEditable does not provide native maxLength semantics.
+   */
+  function syncEditableText(
+    editor: HTMLElement | null,
+    maxLength: number,
+    updateDraft: (value: string) => void,
+  ) {
+    if (!editor) {
+      return;
+    }
+
+    const text = editor.textContent ?? "";
+    const limitedText = limitText(text, maxLength);
+
+    if (text !== limitedText) {
+      editor.textContent = limitedText;
+      const selection = window.getSelection();
+      const range = document.createRange();
+      range.selectNodeContents(editor);
+      range.collapse(false);
+      selection?.removeAllRanges();
+      selection?.addRange(range);
+    }
+
+    updateDraft(limitedText);
+  }
+
+  /**
+   * Summary and group metadata use the same underline affordance, so the active state is drawn with
+   * a pseudo-element instead of changing border metrics and nudging text during edit.
+   */
+  function inlineEditTextSx(isTitle: boolean, isActive: boolean) {
+    const baseSx = {
+      display: "block",
+      maxWidth: "100%",
+      outline: 0,
+      pb: "2px",
+      position: "relative",
+      whiteSpace: "pre-wrap",
+      width: "fit-content",
+      "&::after": {
+        position: "absolute",
+        right: 0,
+        bottom: 0,
+        left: 0,
+        height: "1px",
+        content: '""',
+        backgroundColor: isActive ? "currentColor" : "transparent",
+      },
+      "&:empty::before": {
+        color: "text.disabled",
+        content: "attr(data-placeholder)",
+      },
+    };
+
+    return isTitle
+      ? {
+          ...baseSx,
+          cursor: isActive ? "text" : "inherit",
+          fontWeight: 600,
+          lineHeight: 1.15,
+          minWidth: "4ch",
+        }
+      : {
+          ...baseSx,
+          cursor: isActive ? "text" : "inherit",
+          lineHeight: 1.6,
+          minHeight: "1.6em",
+          minWidth: "6ch",
+          mt: 0.6,
+        };
+  }
+
   return (
     <ListItem
       ref={setNodeRef}
@@ -107,10 +309,11 @@ export function SortableGroupRow({
           spacing={{ xs: 1.15, md: 1.4 }}
           alignItems="stretch"
         >
-          <Tooltip title="Drag to reorder within this case">
+          <Tooltip title="拖动调整此 Case 内的顺序。">
             <IconButton
               {...attributes}
               {...listeners}
+              disabled={isPending || isEditing}
               sx={{
                 // A dedicated narrow handle column makes the draggable region obvious without
                 // turning the whole row into an accidental drag target.
@@ -140,28 +343,66 @@ export function SortableGroupRow({
           >
             <Box sx={{ minWidth: 0 }}>
               <Typography
+                ref={titleEditorRef}
+                component="span"
                 variant="subtitle1"
-                sx={{ fontWeight: 600, lineHeight: 1.15 }}
+                role={isEditing ? "textbox" : undefined}
+                aria-label={isEditing ? "Group 标题" : undefined}
+                contentEditable={isEditing && !isPending}
+                data-placeholder="Group 标题"
+                suppressContentEditableWarning
+                onInput={
+                  isEditing
+                    ? () =>
+                        syncEditableText(
+                          titleEditorRef.current,
+                          GROUP_TITLE_MAX_LENGTH,
+                          setDraftTitle,
+                        )
+                    : undefined
+                }
+                sx={inlineEditTextSx(true, isEditing)}
               >
-                {group.title}
+                {isEditing ? draftTitle : group.title}
               </Typography>
               <Typography
+                ref={descriptionEditorRef}
+                component="span"
                 variant="body2"
+                role={isEditing ? "textbox" : undefined}
+                aria-label={isEditing ? "Group 描述" : undefined}
                 color="text.secondary"
-                noWrap
-                sx={{ mt: 0.6, lineHeight: 1.6, minHeight: "1.6em" }}
+                contentEditable={isEditing && !isPending}
+                data-placeholder="暂无 Group 描述。"
+                suppressContentEditableWarning
+                onInput={
+                  isEditing
+                    ? () =>
+                        syncEditableText(
+                          descriptionEditorRef.current,
+                          GROUP_DESCRIPTION_MAX_LENGTH,
+                          setDraftDescription,
+                        )
+                    : undefined
+                }
+                noWrap={!isEditing}
+                sx={inlineEditTextSx(false, isEditing)}
               >
-                {group.description || "No group description yet."}
+                {isEditing
+                  ? draftDescription
+                  : group.description || "暂无 Group 描述。"}
               </Typography>
             </Box>
             <Stack
-              direction={{ xs: "column", lg: "row" }}
-              spacing={{ xs: 1.05, lg: 1.2 }}
+              direction={{ xs: "column", sm: "row" }}
+              spacing={{ xs: 1.05, sm: 1.2 }}
               justifyContent="space-between"
-              alignItems={{ xs: "stretch", lg: "center" }}
+              alignItems={{ xs: "stretch", sm: "center" }}
+              flexWrap="wrap"
+              useFlexGap
             >
-              {/* Only rejoin metadata and actions into a single row when there is enough width to
-                  preserve scan order; smaller screens keep the two groups stacked for clarity. */}
+              {/* Let metadata and actions share one line as soon as there is enough physical room;
+                  a fixed lg cutoff made medium-width workspaces wrap long before they needed to. */}
               <Stack
                 direction="row"
                 spacing={0.85}
@@ -197,53 +438,110 @@ export function SortableGroupRow({
                   onPointerDown={stopPointerPropagation}
                   onClick={stopClickPropagation}
                   sx={{
+                    alignItems: "center",
+                    gap: 0.15,
                     minHeight: compactControlHeight,
+                    overflow: "visible",
                     px: 0.25,
                     py: 0.25,
                     borderRadius: 999,
                     border: "1px solid",
                     borderColor: "divider",
-                    backgroundColor: "rgba(255,255,255,0.04)",
+                    backgroundColor: "rgba(255,255,255,0.035)",
+                    "& .MuiToggleButtonGroup-grouped": {
+                      m: 0,
+                      border: 0,
+                      borderRadius: 999,
+                      "&:not(:first-of-type)": {
+                        borderLeft: 0,
+                        ml: 0,
+                      },
+                    },
                   }}
                   value={group.isPublic ? "public" : "internal"}
                   onChange={handleVisibilityChange}
                 >
                   <ToggleButton
                     value="internal"
-                    disabled={isPending}
-                    sx={{
-                      minHeight: compactControlHeight,
-                      px: "10px",
-                      py: "2px",
-                      fontSize: "0.84rem",
-                    }}
+                    disabled={isPending || isEditing}
+                    sx={visibilityButtonSx}
                   >
                     <LockOutlined sx={{ mr: 0.55, fontSize: 14.5 }} />
                     Internal
                   </ToggleButton>
                   <ToggleButton
                     value="public"
-                    disabled={isPending}
-                    sx={{
-                      minHeight: compactControlHeight,
-                      px: "10px",
-                      py: "2px",
-                      fontSize: "0.84rem",
-                    }}
+                    disabled={isPending || isEditing}
+                    sx={visibilityButtonSx}
                   >
                     <Public sx={{ mr: 0.55, fontSize: 14.5 }} />
                     Public
                   </ToggleButton>
                 </ToggleButtonGroup>
+                {isEditing ? (
+                  <Stack direction="row" spacing={0.25} alignItems="center">
+                    <IconButton
+                      size="small"
+                      aria-label="保存 Group 元数据"
+                      disabled={isPending || Boolean(titleError)}
+                      onPointerDown={stopPointerPropagation}
+                      onClick={(event) => {
+                        stopClickPropagation(event);
+                        saveMetadataEdit();
+                      }}
+                      sx={{
+                        width: compactControlHeight,
+                        height: compactControlHeight,
+                        borderRadius: 999,
+                      }}
+                    >
+                      <Check fontSize="small" />
+                    </IconButton>
+                    <IconButton
+                      size="small"
+                      aria-label="取消编辑 Group 元数据"
+                      disabled={isPending}
+                      onPointerDown={stopPointerPropagation}
+                      onClick={(event) => {
+                        stopClickPropagation(event);
+                        cancelMetadataEdit();
+                      }}
+                      sx={{
+                        width: compactControlHeight,
+                        height: compactControlHeight,
+                        borderRadius: 999,
+                      }}
+                    >
+                      <Close fontSize="small" />
+                    </IconButton>
+                  </Stack>
+                ) : (
+                  <Button
+                    variant="text"
+                    size="small"
+                    startIcon={<EditOutlined />}
+                    disabled={isPending}
+                    onPointerDown={stopPointerPropagation}
+                    onClick={(event) => {
+                      stopClickPropagation(event);
+                      startMetadataEdit();
+                    }}
+                    sx={{ minHeight: compactControlHeight, px: 1.15 }}
+                  >
+                    Edit
+                  </Button>
+                )}
                 <Button
                   component={Link}
                   href={`/cases/${caseSlug}/groups/${group.slug}`}
                   variant="text"
                   size="small"
                   endIcon={<OpenInNew />}
+                  disabled={isPending || isEditing}
+                  aria-disabled={isPending || isEditing}
                   onPointerDown={stopPointerPropagation}
-                  onClick={stopClickPropagation}
-                  sx={{ minHeight: compactControlHeight, px: 1.45 }}
+                  onClick={handleOpenClick}
+                  sx={{ minHeight: compactControlHeight, px: 1.15 }}
                 >
                   Open
                 </Button>

@@ -1,11 +1,18 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
-import { ArrowBack, CloudUpload } from "@mui/icons-material";
+import { useEffect, useRef, useState, useTransition } from "react";
+import {
+  ArrowBack,
+  Check,
+  Close,
+  CloudUpload,
+  EditOutlined,
+} from "@mui/icons-material";
 import {
   Box,
   Button,
   Chip,
+  IconButton,
   List,
   Paper,
   Stack,
@@ -28,6 +35,12 @@ import { SortableGroupRow } from "./case-workspace/sortable-group-row";
 import { useCaseWorkspaceActions } from "./case-workspace/use-case-workspace-actions";
 import { useWorkspaceNotifications } from "./case-workspace/use-workspace-notifications";
 
+const CASE_SUMMARY_MAX_LENGTH = 160;
+
+function limitCaseSummary(value: string) {
+  return value.slice(0, CASE_SUMMARY_MAX_LENGTH);
+}
+
 /**
  * Keeps workspace-level publish/deploy controls alongside sortable group rows so operators can
  * reorder and publish from one surface without desynchronizing local optimistic state.
@@ -44,6 +57,15 @@ export function CaseWorkspaceBoard({
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
   );
   const [groups, setGroups] = useState(data.groups);
+  const [caseSummary, setCaseSummary] = useState(limitCaseSummary(data.summary));
+  const [caseSummaryDraft, setCaseSummaryDraft] = useState(
+    limitCaseSummary(data.summary),
+  );
+  const [lastServerSummary, setLastServerSummary] = useState(
+    limitCaseSummary(data.summary),
+  );
+  const [isEditingCaseSummary, setIsEditingCaseSummary] = useState(false);
+  const caseSummaryEditorRef = useRef<HTMLElement | null>(null);
   const [isPending, startTransition] = useTransition();
   const workspaceNotifications = useWorkspaceNotifications();
   const { dismissNotification, notifications, pushNotification } =
@@ -54,9 +76,13 @@ export function CaseWorkspaceBoard({
     toggleGroupVisibility,
     deployPublicSite,
     reorderCaseGroups,
+    updateCaseSummary,
+    updateGroupMetadata,
   } = useCaseWorkspaceActions({
+    caseSummary,
     data,
     groups,
+    setCaseSummary,
     setGroups,
     refresh: () => router.refresh(),
     notifications: workspaceNotifications,
@@ -68,6 +94,26 @@ export function CaseWorkspaceBoard({
   useEffect(() => {
     setGroups(data.groups);
   }, [data.groups]);
+
+  useEffect(() => {
+    const nextSummary = limitCaseSummary(data.summary);
+
+    if (nextSummary === lastServerSummary) {
+      return;
+    }
+
+    setLastServerSummary(nextSummary);
+    setCaseSummary(nextSummary);
+    if (!isEditingCaseSummary) {
+      setCaseSummaryDraft(nextSummary);
+    }
+  }, [data.summary, isEditingCaseSummary, lastServerSummary]);
+
+  useEffect(() => {
+    if (isEditingCaseSummary) {
+      caseSummaryEditorRef.current?.focus();
+    }
+  }, [isEditingCaseSummary]);
 
   useEffect(() => {
     if (publicGroupCount === 0) {
@@ -98,6 +144,55 @@ export function CaseWorkspaceBoard({
     router.push("/");
   }
 
+  /**
+   * Case summary edits stay local after the API save returns; refreshing the full route would
+   * replay the workspace entrance motion and make unrelated controls flash.
+   */
+  function saveCaseSummary() {
+    void updateCaseSummary(
+      limitCaseSummary(
+        caseSummaryEditorRef.current?.textContent ?? caseSummaryDraft,
+      ),
+    );
+    setIsEditingCaseSummary(false);
+  }
+
+  /**
+   * Restores the draft from the last committed summary so cancel never leaves contentEditable DOM
+   * text ahead of the actual workspace state.
+   */
+  function cancelCaseSummaryEdit() {
+    setCaseSummaryDraft(caseSummary);
+    setIsEditingCaseSummary(false);
+  }
+
+  /**
+   * Enforces the 160-character product limit inside contentEditable itself because browser editing
+   * can otherwise leave extra DOM text until the next React render.
+   */
+  function handleCaseSummaryInput() {
+    const editor = caseSummaryEditorRef.current;
+
+    if (!editor) {
+      return;
+    }
+
+    const text = editor.textContent ?? "";
+    const limitedText = limitCaseSummary(text);
+
+    if (text !== limitedText) {
+      editor.textContent = limitedText;
+      const selection = window.getSelection();
+      const range = document.createRange();
+      range.selectNodeContents(editor);
+      range.collapse(false);
+      selection?.removeAllRanges();
+      selection?.addRange(range);
+    }
+
+    setCaseSummaryDraft(limitedText);
+  }
+
   return (
     <Stack spacing={{ xs: 2.6, md: 3.3 }}>
       <Box
@@ -107,9 +202,6 @@ export function CaseWorkspaceBoard({
         transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
       >
         <Stack spacing={1.9} sx={{ width: "100%" }}>
-          <Typography variant="overline" color="primary.main">
-            Case workspace
-          </Typography>
           <Box
             sx={{
               display: "grid",
@@ -126,17 +218,131 @@ export function CaseWorkspaceBoard({
               borderColor: "divider",
             }}
           >
-            <Stack spacing={1.7} sx={{ minWidth: 0, pr: { xl: 2.6 } }}>
-              <Typography variant="h2" component="h1" sx={{ lineHeight: 0.98 }}>
+            <Stack spacing={1.15} sx={{ minWidth: 0, pr: { xl: 2.6 } }}>
+              <Typography
+                variant="h2"
+                component="h1"
+                sx={{ lineHeight: 1, textWrap: "balance" }}
+              >
                 {data.title}
               </Typography>
-              <Typography
-                variant="body1"
-                color="text.secondary"
-                sx={{ maxWidth: 820 }}
+              <Box
+                sx={{
+                  alignItems: "center",
+                  display: "flex",
+                  flexWrap: "wrap",
+                  gap: 0.7,
+                  maxWidth: 860,
+                  color: "text.secondary",
+                }}
               >
-                {data.summary || "No summary yet."}
-              </Typography>
+                <Typography
+                  ref={caseSummaryEditorRef}
+                  component="span"
+                  variant="body1"
+                  role={isEditingCaseSummary ? "textbox" : undefined}
+                  aria-label={isEditingCaseSummary ? "Case 描述" : undefined}
+                  aria-multiline={isEditingCaseSummary ? "true" : undefined}
+                  contentEditable={isEditingCaseSummary && !isPending}
+                  data-placeholder="暂无 Case 描述。"
+                  suppressContentEditableWarning
+                  onInput={
+                    isEditingCaseSummary ? handleCaseSummaryInput : undefined
+                  }
+                  sx={{
+                    display: "block",
+                    cursor: isEditingCaseSummary ? "text" : "inherit",
+                    lineHeight: 1.65,
+                    minWidth: "8ch",
+                    outline: 0,
+                    pb: "2px",
+                    position: "relative",
+                    whiteSpace: "pre-wrap",
+                    width: "fit-content",
+                    "&::after": {
+                      position: "absolute",
+                      right: 0,
+                      bottom: 0,
+                      left: 0,
+                      height: "1px",
+                      content: '""',
+                      backgroundColor: isEditingCaseSummary
+                        ? "currentColor"
+                        : "transparent",
+                    },
+                    "&:empty::before": {
+                      color: "text.disabled",
+                      content: "attr(data-placeholder)",
+                    },
+                  }}
+                >
+                  {isEditingCaseSummary
+                    ? caseSummaryDraft
+                    : caseSummary || "暂无 Case 描述。"}
+                </Typography>
+                <Box
+                  sx={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 0.25,
+                    color: "text.primary",
+                  }}
+                >
+                  {isEditingCaseSummary ? (
+                    <>
+                      <IconButton
+                        size="small"
+                        aria-label="保存描述"
+                        disabled={isPending}
+                        onClick={saveCaseSummary}
+                        sx={{
+                          width: 30,
+                          height: 30,
+                          borderRadius: 999,
+                          border: 0,
+                          backgroundColor: "transparent",
+                        }}
+                      >
+                        <Check fontSize="small" />
+                      </IconButton>
+                      <IconButton
+                        size="small"
+                        aria-label="取消编辑描述"
+                        disabled={isPending}
+                        onClick={cancelCaseSummaryEdit}
+                        sx={{
+                          width: 30,
+                          height: 30,
+                          borderRadius: 999,
+                          border: 0,
+                          backgroundColor: "transparent",
+                        }}
+                      >
+                        <Close fontSize="small" />
+                      </IconButton>
+                    </>
+                  ) : (
+                    <IconButton
+                      aria-label="编辑描述"
+                      size="small"
+                      disabled={isPending}
+                      onClick={() => {
+                        setCaseSummaryDraft(caseSummary);
+                        setIsEditingCaseSummary(true);
+                      }}
+                      sx={{
+                        ml: 0.65,
+                        mt: -0.35,
+                        width: 32,
+                        height: 32,
+                        verticalAlign: "middle",
+                      }}
+                    >
+                      <EditOutlined fontSize="small" />
+                    </IconButton>
+                  )}
+                </Box>
+              </Box>
               <Stack
                 direction="row"
                 spacing={0.9}
@@ -268,11 +474,13 @@ export function CaseWorkspaceBoard({
                 color="text.secondary"
                 sx={{ maxWidth: 720, lineHeight: 1.72 }}
               >
-                Drag to define case order. Group pages open in the viewer
-                workbench.
+                拖动调整此 Case 内的顺序。
               </Typography>
             </Stack>
             <DndContext
+              // dnd-kit derives aria-describedby ids from this value; keeping it stable avoids
+              // Next.js hydration mismatches after SSR or repeated dev hot reloads.
+              id={`case-workspace-${data.slug}-groups`}
               sensors={sensors}
               collisionDetection={closestCenter}
               onDragEnd={(event) => {
@@ -300,6 +508,7 @@ export function CaseWorkspaceBoard({
                       group={group}
                       caseSlug={data.slug}
                       isPending={isPending}
+                      onUpdateMetadata={updateGroupMetadata}
                       onToggleVisibility={toggleGroupVisibility}
                     />
                   ))}

@@ -6,7 +6,10 @@ import {
   type NotificationApi,
   reorderWorkspaceGroups,
   toggleWorkspaceGroupVisibility,
+  updateWorkspaceCaseSummary,
+  updateWorkspaceGroupMetadata,
   type WorkspaceGroupMutationContext,
+  type WorkspaceCaseMetadataMutationContext,
   type WorkspaceMutationContext,
 } from "./workspace-action-helpers";
 
@@ -17,20 +20,24 @@ type GroupItem = CaseWorkspaceData["groups"][number];
  * hook can stay focused on the state it actually owns.
  */
 export function useWorkspaceActionHandlers({
+  caseSummary,
   data,
   groups,
   isDeployingPublicSite,
   notifications,
   refresh,
+  setCaseSummary,
   setGroups,
   setIsDeployingPublicSite,
   startTransition,
 }: {
+  caseSummary: string;
   data: CaseWorkspaceData;
   groups: GroupItem[];
   isDeployingPublicSite: boolean;
   notifications: NotificationApi;
   refresh: () => void;
+  setCaseSummary: (nextSummary: string) => void;
   setGroups: (
     updater: GroupItem[] | ((current: GroupItem[]) => GroupItem[]),
   ) => void;
@@ -38,10 +45,12 @@ export function useWorkspaceActionHandlers({
   startTransition: TransitionStartFunction;
 }) {
   const groupsRef = useRef(groups);
+  const summaryRef = useRef(caseSummary);
 
   // Async mutation handlers can outlive the render that scheduled them, so they need access to the
   // latest optimistic group list instead of whatever array the closure captured initially.
   groupsRef.current = groups;
+  summaryRef.current = caseSummary;
 
   const publicGroupCount = useMemo(
     () => groups.filter((group) => group.isPublic).length,
@@ -57,6 +66,12 @@ export function useWorkspaceActionHandlers({
     ...mutationContext,
     groupsRef,
     setGroups,
+  };
+
+  const caseMetadataMutationContext: WorkspaceCaseMetadataMutationContext = {
+    ...mutationContext,
+    setCaseSummary,
+    summaryRef,
   };
 
   /**
@@ -87,10 +102,27 @@ export function useWorkspaceActionHandlers({
     reorderWorkspaceGroups(activeId, overId, groupMutationContext);
   }
 
+  function updateCaseSummary(nextSummary: string) {
+    return updateWorkspaceCaseSummary(nextSummary, caseMetadataMutationContext);
+  }
+
+  function updateGroupMetadata(
+    targetGroup: GroupItem,
+    metadata: { title: string; description: string },
+  ) {
+    return updateWorkspaceGroupMetadata(
+      targetGroup,
+      metadata,
+      groupMutationContext,
+    );
+  }
+
   return {
     publicGroupCount,
     toggleGroupVisibility,
     deployPublicSite,
     reorderCaseGroups,
+    updateCaseSummary,
+    updateGroupMetadata,
   };
 }
