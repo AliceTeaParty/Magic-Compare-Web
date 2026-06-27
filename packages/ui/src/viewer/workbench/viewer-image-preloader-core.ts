@@ -21,6 +21,7 @@ export interface ViewerPreloadQueueOptions {
 }
 
 const DEFAULT_MAX_CACHE_ENTRIES = 96;
+type ViewerPreloadResultStatus = Extract<ViewerPreloadStatus, "loaded" | "error">;
 
 function sortQueue(left: ViewerPreloadQueueItem, right: ViewerPreloadQueueItem): number {
   if (left.priority !== right.priority) {
@@ -35,13 +36,14 @@ function sortQueue(left: ViewerPreloadQueueItem, right: ViewerPreloadQueueItem):
  * to React state or component render timing.
  */
 export class ViewerImagePreloadQueue {
-  readonly statusByUrl = new Map<string, ViewerPreloadStatus>();
-
   private readonly connectionLimit: () => number;
   private readonly createImage: () => ViewerPreloadImageHandle;
+  private readonly loadingUrls = new Set<string>();
   private readonly maxCacheEntries: number;
   private readonly onLoad?: (url: string) => void;
   private readonly queue: ViewerPreloadQueueItem[] = [];
+  private readonly queuedUrls = new Set<string>();
+  private readonly resultCache = new Map<string, ViewerPreloadResultStatus>();
   private activeCount = 0;
   private order = 0;
 
@@ -60,12 +62,30 @@ export class ViewerImagePreloadQueue {
     return this.queue.length;
   }
 
+  get statusByUrl(): ReadonlyMap<string, ViewerPreloadStatus> {
+    const statuses = new Map<string, ViewerPreloadStatus>();
+
+    for (const url of this.queuedUrls) {
+      statuses.set(url, "queued");
+    }
+
+    for (const url of this.loadingUrls) {
+      statuses.set(url, "loading");
+    }
+
+    for (const [url, status] of this.resultCache) {
+      statuses.set(url, status);
+    }
+
+    return statuses;
+  }
+
   enqueue(url: string | undefined | null, priority: number): void {
     if (!url) {
       return;
     }
 
-    const status = this.statusByUrl.get(url);
+    const status = this.getStatus(url);
     if (status === "queued") {
       this.raiseQueuedPriority(url, priority);
       return;
@@ -75,7 +95,8 @@ export class ViewerImagePreloadQueue {
       return;
     }
 
-    this.statusByUrl.set(url, "queued");
+    this.resultCache.delete(url);
+    this.queuedUrls.add(url);
     this.queue.push({
       url,
       priority,
@@ -102,12 +123,14 @@ export class ViewerImagePreloadQueue {
         return;
       }
 
-      const status = this.statusByUrl.get(item.url);
+      this.queuedUrls.delete(item.url);
+      const status = this.getStatus(item.url);
       if (status === "loaded" || status === "loading") {
         continue;
       }
 
-      this.statusByUrl.set(item.url, "loading");
+      this.resultCache.delete(item.url);
+      this.loadingUrls.add(item.url);
       this.activeCount += 1;
 
       const image = this.createImage();
@@ -118,24 +141,50 @@ export class ViewerImagePreloadQueue {
     }
   }
 
-  private finish(url: string, status: ViewerPreloadStatus): void {
-    this.statusByUrl.set(url, status);
-    if (status === "loaded") {
-      this.onLoad?.(url);
+  private getStatus(url: string): ViewerPreloadStatus | undefined {
+    if (this.queuedUrls.has(url)) {
+      return "queued";
     }
+
+    if (this.loadingUrls.has(url)) {
+      return "loading";
+    }
+
+    const resultStatus = this.resultCache.get(url);
+    if (resultStatus) {
+      return resultStatus;
+    }
+
+    return undefined;
+  }
+
+  private finish(url: string, status: ViewerPreloadResultStatus): void {
+    this.loadingUrls.delete(url);
+
+    if (status === "loaded") {
+      this.resultCache.delete(url);
+      this.resultCache.set(url, status);
+      this.onLoad?.(url);
+    } else if (status === "error") {
+      this.resultCache.delete(url);
+      this.resultCache.set(url, status);
+    }
+
     this.trimCache();
     this.activeCount = Math.max(0, this.activeCount - 1);
     this.pump();
   }
 
   private trimCache(): void {
-    while (this.statusByUrl.size > this.maxCacheEntries) {
-      const oldestKey = this.statusByUrl.keys().next().value as string | undefined;
+    while (this.resultCache.size > this.maxCacheEntries) {
+      const oldestKey = this.resultCache.keys().next().value as
+        | string
+        | undefined;
       if (!oldestKey) {
         return;
       }
 
-      this.statusByUrl.delete(oldestKey);
+      this.resultCache.delete(oldestKey);
     }
   }
 }

@@ -197,6 +197,8 @@ describe("fine-scale bounds", () => {
 describe("getFilmstripScrollbarMetrics", () => {
   it("derives a stable thumb width and offset from scroll state", () => {
     expect(getFilmstripScrollbarMetrics(420, 1260, 210)).toEqual({
+      maxScrollLeft: 840,
+      scrollLeft: 210,
       visible: true,
       thumbWidth: 140,
       thumbOffset: 70,

@@ -7,9 +7,14 @@ import type {
   ViewerStageSize,
 } from "@magic-compare/compare-core";
 import type { ViewerAsset } from "@magic-compare/compare-core/viewer-data";
-import { useEffect, useRef } from "react";
+import {
+  useEffect,
+  useRef,
+  type KeyboardEvent as ReactKeyboardEvent,
+} from "react";
 import { PositionedStageMedia } from "./positioned-stage-media";
 import { useStagePanZoom } from "./use-stage-pan-zoom";
+import { viewerTokens } from "./viewer-tokens";
 
 /**
  * Wraps A/B inspect mode so activation, side cycling, and pan/zoom all stay tied to the same stage
@@ -99,6 +104,20 @@ export function ABCompareStage({
     onCycleSide();
   }
 
+  /**
+   * Mirrors click activation for keyboard users while preventing Space from scrolling the page and
+   * leaking into the viewer's document-level shortcut handling.
+   */
+  function handleKeyDown(event: ReactKeyboardEvent<HTMLDivElement>) {
+    if (event.key !== "Enter" && event.key !== " ") {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    handleClick();
+  }
+
   const clipRect =
     active && effectiveScale > 1
       ? {
@@ -116,7 +135,16 @@ export function ABCompareStage({
     <Box
       ref={stageSurfaceRef}
       {...stageHandlers}
+      role="button"
+      tabIndex={0}
+      aria-pressed={active}
+      aria-label={
+        active
+          ? `A/B inspect stage. Showing ${side}. Press Enter or Space to switch sides.`
+          : "A/B inspect stage. Press Enter or Space to activate inspection."
+      }
       onClick={handleClick}
+      onKeyDown={handleKeyDown}
       sx={{
         position: "relative",
         width: "100%",
@@ -126,14 +154,14 @@ export function ABCompareStage({
         cursor: active ? (effectiveScale > 1 ? "grab" : "pointer") : "pointer",
         userSelect: "none",
         borderRadius: 2.25,
-        outline: active
-          ? "1px solid rgba(232, 198, 246, 0.48)"
-          : "1px solid transparent",
-        boxShadow: active
-          ? "0 0 0 1px rgba(232, 198, 246, 0.08), 0 0 22px rgba(228, 194, 242, 0.14)"
-          : "none",
+        outline: active ? viewerTokens.abStage.activeOutline : "1px solid transparent",
+        boxShadow: active ? viewerTokens.abStage.activeShadow : "none",
         transition:
           "outline-color 180ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 180ms cubic-bezier(0.22, 1, 0.36, 1)",
+        "&:focus-visible": {
+          outline: viewerTokens.abStage.activeOutline,
+          boxShadow: viewerTokens.abStage.activeShadow,
+        },
       }}
     >
       {[

@@ -1,9 +1,11 @@
 "use client";
 
 import {
+  useCallback,
   useEffect,
   useRef,
   useState,
+  type RefObject,
   type PointerEvent as ReactPointerEvent,
 } from "react";
 import {
@@ -22,15 +24,18 @@ export function useFilmstripGestureSession({
   frameCount,
   onSelectFrame,
   prefersReducedMotion,
+  stripRef,
 }: {
   frameCount: number;
   onSelectFrame: (frameId: string) => void;
   prefersReducedMotion: boolean;
+  stripRef: RefObject<HTMLDivElement | null>;
 }) {
-  const [edgeOffset, setEdgeOffset] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
   const dragStateRef = useRef<FilmstripDragState | null>(null);
+  const edgeOffsetFrameRef = useRef<number | null>(null);
   const inertiaFrameRef = useRef<number | null>(null);
+  const pendingEdgeOffsetRef = useRef(0);
   const reboundFrameRef = useRef<number | null>(null);
   const velocityRef = useRef(0);
   const edgeOffsetRef = useRef(0);
@@ -46,21 +51,45 @@ export function useFilmstripGestureSession({
   });
   const motionRefs = motionRefsRef.current;
 
-  // Animation frames must be cancelled manually because inertia can outlive the component tree that
-  // started it.
+  const writeEdgeOffset = useCallback(
+    (nextOffset: number) => {
+      stripRef.current?.style.setProperty(
+        "--filmstrip-edge-offset",
+        `${nextOffset}px`,
+      );
+    },
+    [stripRef],
+  );
+
+  /**
+   * Gesture and rebound frames can outlive the render that created them, so all browser animation
+   * work is cancelled explicitly during unmount.
+   */
   useEffect(() => {
     return () => {
       cancelFilmstripMotion(motionRefs);
+      if (edgeOffsetFrameRef.current !== null) {
+        window.cancelAnimationFrame(edgeOffsetFrameRef.current);
+      }
     };
   }, [motionRefs]);
 
   /**
-   * Edge offset has to update the ref and state together because rebound physics read the ref
-   * outside React while the component still needs the rendered offset for visuals.
+   * Edge offset updates stay outside React renders; the ref feeds rebound physics while one
+   * rAF-batched CSS variable write feeds the visual transform.
    */
   function syncEdgeOffset(nextOffset: number) {
     edgeOffsetRef.current = nextOffset;
-    setEdgeOffset(nextOffset);
+    pendingEdgeOffsetRef.current = nextOffset;
+
+    if (edgeOffsetFrameRef.current !== null) {
+      return;
+    }
+
+    edgeOffsetFrameRef.current = window.requestAnimationFrame(() => {
+      edgeOffsetFrameRef.current = null;
+      writeEdgeOffset(pendingEdgeOffsetRef.current);
+    });
   }
 
   /**
@@ -162,7 +191,6 @@ export function useFilmstripGestureSession({
   }
 
   return {
-    edgeOffset,
     isDragging,
     handleFrameSelection,
     viewportHandlers: {

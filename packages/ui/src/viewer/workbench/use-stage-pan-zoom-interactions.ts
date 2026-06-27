@@ -42,6 +42,14 @@ export function useStagePanZoomInteractions({
   const suppressStageClickRef = useRef(false);
   const clearSuppressedClickTimerRef = useRef<number | null>(null);
 
+  const clearSuppressedClickTimer = useCallback(() => {
+    const timerId = clearSuppressedClickTimerRef.current;
+    if (timerId !== null) {
+      window.clearTimeout(timerId);
+      clearSuppressedClickTimerRef.current = null;
+    }
+  }, []);
+
   // Gesture handlers outlive a single render, so they read the latest pan/zoom state from refs
   // instead of closing over stale React values mid-interaction.
   useEffect(() => {
@@ -58,13 +66,7 @@ export function useStagePanZoomInteractions({
     suppressStageClickRef.current = false;
   }, [active]);
 
-  useEffect(() => {
-    return () => {
-      if (clearSuppressedClickTimerRef.current !== null) {
-        window.clearTimeout(clearSuppressedClickTimerRef.current);
-      }
-    };
-  }, []);
+  useEffect(() => clearSuppressedClickTimer, [clearSuppressedClickTimer]);
 
   /**
    * Mouse dragging only starts once the image is actually zoomed in; otherwise dragging would fight

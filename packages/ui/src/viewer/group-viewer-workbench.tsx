@@ -21,6 +21,7 @@ import { HeatmapNotice, ViewerStage } from "./workbench/viewer-stage";
 import { useViewerImagePreloader } from "./workbench/viewer-image-preloader";
 import { useAbInspectState } from "./workbench/use-ab-inspect-state";
 import { useViewerStageShellState } from "./workbench/use-viewer-stage-shell-state";
+import { viewerTokens } from "./workbench/viewer-tokens";
 
 interface GroupViewerWorkbenchProps {
   dataset: ViewerDataset;
@@ -68,6 +69,15 @@ export function GroupViewerWorkbench({
   const [showAbInspectHint, setShowAbInspectHint] = useState(false);
   const abInspect = useAbInspectState();
   const {
+    displayedScale: abDisplayedScale,
+    panZoomState: abPanZoomState,
+    reset: resetAbInspect,
+    setPanZoomState: setAbPanZoomState,
+    setScale: setAbScale,
+    setStageActive: setAbStageActive,
+    stageActive: abStageActive,
+  } = abInspect;
+  const {
     resolvedHideStageScrollControl,
     resolvedPrefersReducedMotion,
     resolvedRotateStage,
@@ -103,15 +113,15 @@ export function GroupViewerWorkbench({
   // Pan/swipe state belongs to a single frame; carrying it over to another frame feels broken.
   useEffect(() => {
     setSwipePosition(50);
-    abInspect.reset();
-  }, [abInspect.reset, currentFrame?.id]);
+    resetAbInspect();
+  }, [currentFrame?.id, resetAbInspect]);
 
   // Leaving A/B mode should reset inspect state so returning to it starts from a predictable baseline.
   useEffect(() => {
     if (mode !== "a-b") {
-      abInspect.reset();
+      resetAbInspect();
     }
-  }, [abInspect.reset, mode]);
+  }, [mode, resetAbInspect]);
 
   useViewerViewportMetrics({
     setDevicePixelRatio,
@@ -124,24 +134,24 @@ export function GroupViewerWorkbench({
    */
   const resetViewerView = useCallback(() => {
     setSwipePosition(50);
-    abInspect.reset();
-  }, [abInspect.reset]);
+    resetAbInspect();
+  }, [resetAbInspect]);
 
   useViewerKeyboardShortcuts({
     abSide,
-    abStageActive: abInspect.stageActive,
+    abStageActive,
     mode,
     onResetView: resetViewerView,
     setAbSide,
-    setAbStageActive: abInspect.setStageActive,
+    setAbStageActive,
     setMode,
     stepFrame,
     toggleSidebar,
   });
   useAbStageOutsideDismiss({
-    abStageActive: abInspect.stageActive,
+    abStageActive,
     mode,
-    setAbStageActive: abInspect.setStageActive,
+    setAbStageActive,
     stageRef: stageShell.stageRef,
   });
 
@@ -175,8 +185,7 @@ export function GroupViewerWorkbench({
         minHeight: "100svh",
         px: { xs: 1.25, md: 2.5 },
         py: { xs: 1.25, md: 2.25 },
-        background:
-          "linear-gradient(180deg, rgba(255,255,255,0.02) 0%, rgba(255,255,255,0) 22%), transparent",
+        background: viewerTokens.workbench.pageWash,
       }}
     >
       <Paper
@@ -198,12 +207,11 @@ export function GroupViewerWorkbench({
           border: "1px solid",
           borderColor: "divider",
           borderRadius: 3,
-          background:
-            "linear-gradient(180deg, rgba(31, 51, 97, 0.94) 0%, rgba(12, 25, 56, 0.92) 100%)",
+          background: viewerTokens.workbench.panelSurface,
         }}
       >
         <ViewerHeader
-          abScale={abInspect.displayedScale}
+          abScale={abDisplayedScale}
           abSide={abSide}
           canUseHeatmap={availableModes.includes("heatmap")}
           caseTitle={dataset.caseMeta.title}
@@ -212,7 +220,7 @@ export function GroupViewerWorkbench({
           mode={mode}
           onAbSideChange={setAbSide}
           onModeChange={setMode}
-          onScaleChange={abInspect.setScale}
+          onScaleChange={setAbScale}
           onScrollStageIntoView={stageShell.scrollStageIntoView}
           onToggleSidebar={toggleSidebar}
           sidebarOpen={sidebarOpen}
@@ -258,15 +266,15 @@ export function GroupViewerWorkbench({
                     px: 1.3,
                     py: 0.65,
                     borderRadius: 999,
-                    border: "1px solid rgba(232, 198, 246, 0.28)",
-                    backgroundColor: "rgba(5, 13, 34, 0.72)",
+                    border: viewerTokens.workbench.hintBorder,
+                    backgroundColor: viewerTokens.workbench.hintSurface,
                     color: "text.secondary",
                     fontSize: "0.77rem",
                     fontWeight: 600,
                     letterSpacing: "0.01em",
                     whiteSpace: "nowrap",
                     pointerEvents: "none",
-                    boxShadow: "0 10px 24px rgba(0, 0, 0, 0.18)",
+                    boxShadow: viewerTokens.workbench.hintShadow,
                     transform: showAbInspectHint
                       ? "translate(-50%, 0)"
                       : "translate(-50%, -6px)",
@@ -275,11 +283,11 @@ export function GroupViewerWorkbench({
                       "opacity 180ms cubic-bezier(0.22, 1, 0.36, 1), transform 180ms cubic-bezier(0.22, 1, 0.36, 1)",
                   }}
                 >
-                  Select the stage, then drag, scroll, or pinch. Press R to reset.
+                  Click or press Enter/Space to inspect. Press R to reset.
                 </Box>
                 <ViewerStage
                   abSide={abSide}
-                  abStageActive={abInspect.stageActive}
+                  abStageActive={abStageActive}
                   afterAsset={afterAsset}
                   beforeAsset={beforeAsset}
                   devicePixelRatio={devicePixelRatio}
@@ -287,11 +295,11 @@ export function GroupViewerWorkbench({
                   mode={mode}
                   onCycleAbSide={() => setAbSide(cycleAbSide(abSide))}
                   overlayOpacity={overlayOpacity}
-                  panZoomState={abInspect.panZoomState}
+                  panZoomState={abPanZoomState}
                   prefersReducedMotion={resolvedPrefersReducedMotion}
                   rotateStage={resolvedRotateStage}
-                  setAbStageActive={abInspect.setStageActive}
-                  setPanZoomState={abInspect.setPanZoomState}
+                  setAbStageActive={setAbStageActive}
+                  setPanZoomState={setAbPanZoomState}
                   setSwipePosition={setSwipePosition}
                   stageAspectRatio={stageAspectRatio}
                   stageRef={stageShell.stageRef}

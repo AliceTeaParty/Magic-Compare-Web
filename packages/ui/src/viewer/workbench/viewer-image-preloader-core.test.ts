@@ -103,6 +103,46 @@ describe("ViewerImagePreloadQueue", () => {
     expect(handles.map((handle) => handle.src)).toEqual(["/a.png", "/a.png"]);
   });
 
+  it("does not evict queued or loading lifecycle state when the result cache is trimmed", () => {
+    let limit = 6;
+    const { handles, queue } = createControllableQueue(() => limit);
+
+    queue.enqueue("/active.png", 100);
+
+    for (let index = 0; index < 5; index += 1) {
+      queue.enqueue(`/loaded-${index}.png`, 10);
+    }
+
+    limit = 0;
+    queue.enqueue("/queued.png", 90);
+
+    expect(queue.statusByUrl.get("/active.png")).toBe("loading");
+    expect(queue.statusByUrl.get("/queued.png")).toBe("queued");
+    expect(handles.map((handle) => handle.src)).toEqual([
+      "/active.png",
+      "/loaded-0.png",
+      "/loaded-1.png",
+      "/loaded-2.png",
+      "/loaded-3.png",
+      "/loaded-4.png",
+    ]);
+
+    handles[1]?.onload?.();
+    handles[2]?.onload?.();
+    handles[3]?.onload?.();
+    handles[4]?.onload?.();
+    handles[5]?.onload?.();
+
+    expect(queue.statusByUrl.get("/active.png")).toBe("loading");
+    expect(queue.statusByUrl.get("/queued.png")).toBe("queued");
+
+    limit = 6;
+    handles[0]?.onload?.();
+
+    expect(handles[6]?.src).toBe("/queued.png");
+    expect(queue.statusByUrl.get("/queued.png")).toBe("loading");
+  });
+
   it("notifies successful loads so rendered stage images can skip fallback", () => {
     const onLoad = vi.fn();
     const handles: ViewerPreloadImageHandle[] = [];

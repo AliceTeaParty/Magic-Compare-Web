@@ -18,6 +18,8 @@ export interface ViewerPanZoomState {
 }
 
 export interface FilmstripScrollbarMetrics {
+  maxScrollLeft: number;
+  scrollLeft: number;
   visible: boolean;
   thumbWidth: number;
   thumbOffset: number;
@@ -229,6 +231,8 @@ export function getFilmstripScrollbarMetrics(
 ): FilmstripScrollbarMetrics {
   if (clientWidth <= 0 || scrollWidth <= clientWidth) {
     return {
+      maxScrollLeft: 0,
+      scrollLeft: 0,
       visible: false,
       thumbWidth: clientWidth,
       thumbOffset: 0,
@@ -239,9 +243,12 @@ export function getFilmstripScrollbarMetrics(
   const thumbWidth = Math.max(44, clientWidth * ratio);
   const maxThumbOffset = Math.max(0, clientWidth - thumbWidth);
   const maxScrollLeft = Math.max(1, scrollWidth - clientWidth);
-  const thumbOffset = (scrollLeft / maxScrollLeft) * maxThumbOffset;
+  const normalizedScrollLeft = Math.min(maxScrollLeft, Math.max(0, scrollLeft));
+  const thumbOffset = (normalizedScrollLeft / maxScrollLeft) * maxThumbOffset;
 
   return {
+    maxScrollLeft,
+    scrollLeft: normalizedScrollLeft,
     visible: true,
     thumbWidth,
     thumbOffset,

@@ -11,6 +11,7 @@ import {
   getSwipeCssValues,
 } from "./swipe-compare-geometry";
 import { useSwipeCompareDrag } from "./use-swipe-compare-drag";
+import { viewerTokens } from "./viewer-tokens";
 
 /** Draws the visible compare boundary using transform-only movement during drag. */
 function SwipeDivider({
@@ -31,9 +32,8 @@ function SwipeDivider({
         transform: isVertical
           ? "translateY(var(--swipe-offset)) translateY(-1px)"
           : "translateX(var(--swipe-offset)) translateX(-1px)",
-        backgroundColor: "rgba(248, 245, 255, 0.88)",
-        boxShadow:
-          "0 0 14px rgba(228, 194, 242, 0.24), 0 0 36px rgba(242, 235, 201, 0.12)",
+        backgroundColor: viewerTokens.swipe.dividerSurface,
+        boxShadow: viewerTokens.swipe.dividerShadow,
         pointerEvents: "none",
       }}
     />
@@ -64,12 +64,11 @@ function SwipeHandle({
         width: 42,
         height: 42,
         borderRadius: "999px",
-        border: "1px solid rgba(248, 245, 255, 0.22)",
-        backgroundColor: "rgba(22, 37, 76, 0.34)",
+        border: viewerTokens.swipe.handleBorder,
+        backgroundColor: viewerTokens.swipe.handleSurface,
         backdropFilter: "blur(10px)",
         WebkitBackdropFilter: "blur(10px)",
-        boxShadow:
-          "0 10px 24px rgba(10, 18, 42, 0.18), 0 0 18px rgba(228, 194, 242, 0.18)",
+        boxShadow: viewerTokens.swipe.handleShadow,
         display: "grid",
         placeItems: "center",
         pointerEvents: "none",
@@ -78,9 +77,9 @@ function SwipeHandle({
           position: "absolute",
           width: 8,
           height: 8,
-          borderTop: "2px solid rgba(248, 245, 255, 0.72)",
-          borderRight: "2px solid rgba(248, 245, 255, 0.72)",
-          filter: "drop-shadow(0 0 5px rgba(10, 18, 42, 0.2))",
+          borderTop: viewerTokens.swipe.handleChevronBorder,
+          borderRight: viewerTokens.swipe.handleChevronBorder,
+          filter: viewerTokens.swipe.handleChevronShadow,
         },
         "&::before": {
           ...(isVertical

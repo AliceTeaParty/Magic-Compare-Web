@@ -20,6 +20,7 @@ import {
 import { ABCompareStage } from "./ab-compare-stage";
 import { PositionedStageMedia } from "./positioned-stage-media";
 import { SwipeCompareStage } from "./swipe-compare-stage";
+import { viewerTokens } from "./viewer-tokens";
 
 export { DEFAULT_PAN_ZOOM } from "./positioned-stage-media";
 
@@ -133,16 +134,15 @@ function StagePresentationShell({
         overflow: "hidden",
         border: "1px solid",
         borderColor: inspectActive
-          ? "rgba(232, 198, 246, 0.42)"
+          ? viewerTokens.stage.activeBorder
           : hasMeasuredStageSize
-            ? "rgba(232, 198, 246, 0.36)"
+            ? viewerTokens.stage.measuredBorder
             : "divider",
-        background:
-          "radial-gradient(circle at top, rgba(232, 198, 246, 0.1), transparent 28%), rgba(13, 24, 54, 0.94)",
+        background: viewerTokens.stage.surface,
         boxShadow: inspectActive
-          ? "0 0 0 1px rgba(232, 198, 246, 0.08), 0 18px 44px rgba(8, 15, 35, 0.28)"
+          ? viewerTokens.stage.activeShadow
           : hasMeasuredStageSize
-            ? "0 24px 52px rgba(8, 15, 35, 0.28)"
+            ? viewerTokens.stage.measuredShadow
             : "none",
         transition:
           "width 180ms cubic-bezier(0.22, 1, 0.36, 1), height 180ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 180ms cubic-bezier(0.22, 1, 0.36, 1), border-color 180ms cubic-bezier(0.22, 1, 0.36, 1)",
@@ -163,7 +163,7 @@ export function HeatmapNotice() {
       severity="info"
       sx={{
         borderRadius: 2.5,
-        bgcolor: "rgba(232, 198, 246, 0.12)",
+        bgcolor: viewerTokens.heatmapNotice.surface,
         color: "text.primary",
       }}
     >

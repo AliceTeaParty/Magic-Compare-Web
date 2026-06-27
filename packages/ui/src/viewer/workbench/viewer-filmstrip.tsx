@@ -3,8 +3,9 @@
 import { PhotoLibrary } from "@mui/icons-material";
 import { Box, Button, Stack, Typography } from "@mui/material";
 import type { ViewerFrame } from "@magic-compare/compare-core/viewer-data";
-import type { DragEvent as ReactDragEvent } from "react";
+import type { CSSProperties, DragEvent as ReactDragEvent } from "react";
 import { useFilmstripDrag } from "./use-filmstrip-drag";
+import { viewerTokens } from "./viewer-tokens";
 
 /** Chooses a stable representative thumbnail for each frame without affecting main-stage loading. */
 function resolveThumbnailAsset(frame: ViewerFrame) {
@@ -55,8 +56,10 @@ function ThumbnailButton({
         borderRadius: 2.25,
         border: "1px solid",
         borderColor: isActive ? "primary.main" : "divider",
-        backgroundColor: isActive ? "rgba(232, 198, 246, 0.1)" : "rgba(255, 255, 255, 0.018)",
-        boxShadow: isActive ? "inset 0 0 0 1px rgba(232, 198, 246, 0.18)" : "none",
+        backgroundColor: isActive
+          ? viewerTokens.filmstrip.activeCardSurface
+          : viewerTokens.filmstrip.inactiveCardSurface,
+        boxShadow: isActive ? viewerTokens.filmstrip.activeCardInset : "none",
         p: 1.1,
         transition:
           "transform 180ms cubic-bezier(0.22, 1, 0.36, 1), border-color 180ms cubic-bezier(0.22, 1, 0.36, 1), background-color 180ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 180ms cubic-bezier(0.22, 1, 0.36, 1)",
@@ -69,7 +72,7 @@ function ThumbnailButton({
         sx={{
           borderRadius: 2,
           overflow: "hidden",
-          backgroundColor: "rgba(255,255,255,0.035)",
+          backgroundColor: viewerTokens.filmstrip.thumbnailSurface,
           aspectRatio: "16 / 9",
         }}
       >
@@ -139,9 +142,10 @@ export function ViewerFilmstrip({
   onSelectFrame,
 }: ViewerFilmstripProps) {
   const {
-    edgeOffset,
     isDragging,
+    scrollbarHandlers,
     scrollbarMetrics,
+    stripRef,
     viewportHandlers,
     viewportRef,
     handleFrameSelection,
@@ -171,11 +175,12 @@ export function ViewerFilmstrip({
         borderTop: "1px solid",
         borderBottom: "1px solid",
         borderColor: "divider",
-        backgroundColor: "rgba(255,255,255,0.014)",
+        backgroundColor: viewerTokens.filmstrip.shellSurface,
         position: "relative",
       }}
     >
       <Box
+        id="viewer-filmstrip-scrollport"
         ref={viewportRef}
         {...viewportHandlers}
         onDragStart={handleViewportDragStart}
@@ -198,6 +203,12 @@ export function ViewerFilmstrip({
         }}
       >
         <Box
+          ref={stripRef}
+          style={
+            {
+              "--filmstrip-edge-offset": "0px",
+            } as CSSProperties
+          }
           sx={{
             display: "flex",
             gap: 1.25,
@@ -206,7 +217,7 @@ export function ViewerFilmstrip({
             pt: 0.35,
             pb: 0.75,
             pr: 0.25,
-            transform: `translate3d(${edgeOffset}px, 0, 0)`,
+            transform: "translate3d(var(--filmstrip-edge-offset), 0, 0)",
             transition:
               isDragging || prefersReducedMotion
                 ? "none"
@@ -230,34 +241,62 @@ export function ViewerFilmstrip({
 
       {scrollbarMetrics.visible ? (
         <Box
-          aria-hidden
+          {...scrollbarHandlers}
+          role="scrollbar"
+          tabIndex={0}
+          aria-label="Frame strip horizontal scroll"
+          aria-controls="viewer-filmstrip-scrollport"
+          aria-orientation="horizontal"
+          aria-valuemin={0}
+          aria-valuemax={Math.round(scrollbarMetrics.maxScrollLeft)}
+          aria-valuenow={Math.round(scrollbarMetrics.scrollLeft)}
           sx={{
             position: "absolute",
-            left: { xs: 20, md: 28 },
-            right: { xs: 20, md: 28 },
-            bottom: { xs: 10, md: 12 },
-            height: 6,
+            left: { xs: 12, md: 18 },
+            right: { xs: 12, md: 18 },
+            bottom: { xs: 4, md: 7 },
+            height: { xs: 18, md: 16 },
             borderRadius: 999,
-            backgroundColor: "rgba(255,255,255,0.08)",
-            overflow: "hidden",
-            pointerEvents: "none",
+            display: "flex",
+            alignItems: "center",
+            cursor: "grab",
+            touchAction: "none",
+            "&:active": {
+              cursor: "grabbing",
+            },
+            "&:focus-visible": {
+              outline: "2px solid",
+              outlineColor: "primary.main",
+              outlineOffset: 4,
+            },
           }}
         >
           <Box
+            aria-hidden
             sx={{
-              width: `${scrollbarMetrics.thumbWidth}px`,
-              height: "100%",
+              width: "100%",
+              height: 6,
               borderRadius: 999,
-              background:
-                "linear-gradient(90deg, rgba(232, 198, 246, 0.42) 0%, rgba(242, 235, 201, 0.5) 100%)",
-              transform: `translate3d(${scrollbarMetrics.thumbOffset}px, 0, 0)`,
-              transition:
-                isDragging || prefersReducedMotion
-                  ? "none"
-                  : "transform 180ms cubic-bezier(0.22, 1, 0.36, 1), width 180ms cubic-bezier(0.22, 1, 0.36, 1)",
-              boxShadow: "0 0 0 1px rgba(255,255,255,0.08)",
+              backgroundColor: viewerTokens.filmstrip.scrollbarTrack,
+              overflow: "hidden",
+              pointerEvents: "none",
             }}
-          />
+          >
+            <Box
+              sx={{
+                width: `${scrollbarMetrics.thumbWidth}px`,
+                height: "100%",
+                borderRadius: 999,
+                background: viewerTokens.filmstrip.scrollbarThumb,
+                transform: `translate3d(${scrollbarMetrics.thumbOffset}px, 0, 0)`,
+                transition:
+                  isDragging || prefersReducedMotion
+                    ? "none"
+                    : "transform 180ms cubic-bezier(0.22, 1, 0.36, 1), width 180ms cubic-bezier(0.22, 1, 0.36, 1)",
+                boxShadow: viewerTokens.filmstrip.scrollbarThumbRing,
+              }}
+            />
+          </Box>
         </Box>
       ) : null}
     </Box>

@@ -6,6 +6,7 @@ import {
   VIEWER_MAX_PRESET_SCALE,
   VIEWER_MIN_PRESET_SCALE,
 } from "@magic-compare/compare-core";
+import { viewerTokens } from "./viewer-tokens";
 
 interface AbInspectControlsProps {
   abScale: number;
@@ -37,6 +38,16 @@ export function AbInspectControls({
    */
   function formatScaleLabel(scale: number) {
     return `${Number(scale.toFixed(2)).toString()}x Scale`;
+  }
+
+  /**
+   * MUI Select values arrive as strings at runtime, so keep the union guard explicit instead of
+   * relying on a cast that would hide a future option mismatch.
+   */
+  function handleAbSideChange(value: unknown) {
+    if (value === "before" || value === "after") {
+      onAbSideChange(value);
+    }
   }
 
   return (
@@ -77,9 +88,7 @@ export function AbInspectControls({
         >
           <Select
             value={abSide}
-            onChange={(event) =>
-              onAbSideChange(String(event.target.value) as "before" | "after")
-            }
+            onChange={(event) => handleAbSideChange(event.target.value)}
             inputProps={{ "aria-label": "Choose A/B side" }}
           >
             <MenuItem value="before">Before</MenuItem>
@@ -118,8 +127,8 @@ export function AbInspectControls({
               borderRadius: 999,
               "&.Mui-disabled": {
                 color: "text.disabled",
-                borderColor: "rgba(255,255,255,0.12)",
-                backgroundColor: "rgba(255,255,255,0.02)",
+                borderColor: viewerTokens.control.disabledBorder,
+                backgroundColor: viewerTokens.control.disabledSurface,
               },
             }}
           >
@@ -160,8 +169,8 @@ export function AbInspectControls({
               borderRadius: 999,
               "&.Mui-disabled": {
                 color: "text.disabled",
-                borderColor: "rgba(255,255,255,0.12)",
-                backgroundColor: "rgba(255,255,255,0.02)",
+                borderColor: viewerTokens.control.disabledBorder,
+                backgroundColor: viewerTokens.control.disabledSurface,
               },
             }}
           >

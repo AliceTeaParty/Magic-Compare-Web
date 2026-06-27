@@ -9,6 +9,7 @@
     "./use-viewer-controller": "./src/state/use-viewer-controller.ts"
   },
   "scripts": {
+    "lint": "eslint .",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run --passWithNoTests"
   },
