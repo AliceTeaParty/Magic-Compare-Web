@@ -244,18 +244,19 @@ function ViewerStageContent({
   }
 
   if (mode === "a-b") {
-    const visibleAsset = abSide === "before" ? beforeAsset : afterAsset;
     return (
       <Box ref={stageViewportRef} sx={{ width: "100%", height: "100%" }}>
         <ABCompareStage
           active={abStageActive}
-          activeAsset={visibleAsset}
+          afterAsset={afterAsset}
+          beforeAsset={beforeAsset}
           devicePixelRatio={devicePixelRatio}
           mediaRect={mediaRect}
           onCycleSide={onCycleAbSide}
           panZoomState={panZoomState}
           prefersReducedMotion={prefersReducedMotion}
           rotateStage={rotateStage}
+          side={abSide}
           setActive={setAbStageActive}
           setPanZoomState={setPanZoomState}
           viewportSize={viewportSize}

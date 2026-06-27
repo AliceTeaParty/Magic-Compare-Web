@@ -1,4 +1,10 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import {
+  clearViewerStageImageLoadCacheForTest,
+  getViewerStageImageLoadCacheSizeForTest,
+  isViewerStageImageLoaded,
+  markViewerStageImageLoaded,
+} from "./stage-image-load-cache";
 import {
   ViewerImagePreloadQueue,
   type ViewerPreloadImageHandle,
@@ -95,5 +101,42 @@ describe("ViewerImagePreloadQueue", () => {
     queue.enqueue("/a.png", 10);
 
     expect(handles.map((handle) => handle.src)).toEqual(["/a.png", "/a.png"]);
+  });
+
+  it("notifies successful loads so rendered stage images can skip fallback", () => {
+    const onLoad = vi.fn();
+    const handles: ViewerPreloadImageHandle[] = [];
+    const queue = new ViewerImagePreloadQueue({
+      connectionLimit: () => 1,
+      createImage: () => {
+        const handle: ViewerPreloadImageHandle = {
+          src: "",
+          onload: null,
+          onerror: null,
+        };
+        handles.push(handle);
+        return handle;
+      },
+      onLoad,
+    });
+
+    queue.enqueue("/loaded.png", 10);
+    handles[0]?.onload?.();
+
+    expect(onLoad).toHaveBeenCalledWith("/loaded.png");
+  });
+});
+
+describe("stage image load cache", () => {
+  it("keeps the most recent loaded image URLs bounded", () => {
+    clearViewerStageImageLoadCacheForTest();
+
+    for (let index = 0; index < 140; index += 1) {
+      markViewerStageImageLoaded(`/frame-${index}.png`);
+    }
+
+    expect(getViewerStageImageLoadCacheSizeForTest()).toBe(128);
+    expect(isViewerStageImageLoaded("/frame-0.png")).toBe(false);
+    expect(isViewerStageImageLoaded("/frame-139.png")).toBe(true);
   });
 });

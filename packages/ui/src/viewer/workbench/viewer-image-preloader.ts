@@ -11,6 +11,7 @@ import {
   ViewerImagePreloadQueue,
   type ViewerPreloadImageHandle,
 } from "./viewer-image-preloader-core";
+import { markViewerStageImageLoaded } from "./stage-image-load-cache";
 
 const FRAME_PRELOAD_RADIUS = 2;
 
@@ -138,6 +139,7 @@ export function useViewerImagePreloader({
     queueRef.current = new ViewerImagePreloadQueue({
       connectionLimit: getConnectionLimit,
       createImage: createBrowserImage,
+      onLoad: markViewerStageImageLoaded,
     });
   }
 

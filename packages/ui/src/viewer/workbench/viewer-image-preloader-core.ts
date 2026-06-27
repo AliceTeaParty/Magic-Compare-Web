@@ -17,6 +17,7 @@ export interface ViewerPreloadQueueOptions {
   connectionLimit: () => number;
   createImage: () => ViewerPreloadImageHandle;
   maxCacheEntries?: number;
+  onLoad?: (url: string) => void;
 }
 
 const DEFAULT_MAX_CACHE_ENTRIES = 96;
@@ -39,6 +40,7 @@ export class ViewerImagePreloadQueue {
   private readonly connectionLimit: () => number;
   private readonly createImage: () => ViewerPreloadImageHandle;
   private readonly maxCacheEntries: number;
+  private readonly onLoad?: (url: string) => void;
   private readonly queue: ViewerPreloadQueueItem[] = [];
   private activeCount = 0;
   private order = 0;
@@ -47,6 +49,7 @@ export class ViewerImagePreloadQueue {
     this.connectionLimit = options.connectionLimit;
     this.createImage = options.createImage;
     this.maxCacheEntries = options.maxCacheEntries ?? DEFAULT_MAX_CACHE_ENTRIES;
+    this.onLoad = options.onLoad;
   }
 
   get activeRequestCount(): number {
@@ -117,6 +120,9 @@ export class ViewerImagePreloadQueue {
 
   private finish(url: string, status: ViewerPreloadStatus): void {
     this.statusByUrl.set(url, status);
+    if (status === "loaded") {
+      this.onLoad?.(url);
+    }
     this.trimCache();
     this.activeCount = Math.max(0, this.activeCount - 1);
     this.pump();

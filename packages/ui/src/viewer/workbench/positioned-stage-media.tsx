@@ -6,7 +6,9 @@ import type {
   ViewerPanZoomState,
 } from "@magic-compare/compare-core";
 import type { ViewerAsset } from "@magic-compare/compare-core/viewer-data";
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { type CSSProperties } from "react";
+import { StageImageFallback } from "./stage-image-fallback";
+import { useStageImageLoadState } from "./use-stage-image-load-state";
 
 export const DEFAULT_PAN_ZOOM: ViewerPanZoomState = {
   presetScale: 1,
@@ -53,6 +55,8 @@ export function PositionedStageMedia({
   opacity = 1,
   clipPath,
   prefersReducedMotion = false,
+  showFallback = true,
+  animateOpacity = true,
 }: {
   asset: ViewerAsset;
   alt: string;
@@ -68,26 +72,11 @@ export function PositionedStageMedia({
   opacity?: number;
   clipPath?: string;
   prefersReducedMotion?: boolean;
+  showFallback?: boolean;
+  animateOpacity?: boolean;
 }) {
-  const imageRef = useRef<HTMLImageElement | null>(null);
-  const [loadState, setLoadState] = useState<{
-    imageUrl: string | null;
-    status: "loaded" | "error";
-  }>({
-    imageUrl: null,
-    status: "error",
-  });
-
-  useEffect(() => {
-    const image = imageRef.current;
-    if (!image) {
-      return;
-    }
-
-    if (image.complete && image.naturalWidth > 0) {
-      setLoadState({ imageUrl: asset.imageUrl, status: "loaded" });
-    }
-  }, [asset.imageUrl]);
+  const { imageRef, markErrored, markLoaded, showImage } =
+    useStageImageLoadState(asset.imageUrl);
 
   const resolvedClipRect = clipRect ?? mediaRect;
 
@@ -106,8 +95,6 @@ export function PositionedStageMedia({
     mediaRect.x + mediaRect.width / 2 - resolvedClipRect.x;
   const mediaCenterY =
     mediaRect.y + mediaRect.height / 2 - resolvedClipRect.y;
-  const showImage =
-    loadState.imageUrl === asset.imageUrl && loadState.status === "loaded";
 
   return (
     <Box
@@ -135,66 +122,26 @@ export function PositionedStageMedia({
             effectiveScale,
           ),
           transformOrigin: "center center",
-          transition: "opacity 180ms cubic-bezier(0.22, 1, 0.36, 1)",
           willChange: "transform",
         }}
       >
-        {!showImage ? (
-          <Box
-            aria-hidden
-            sx={{
-              position: "absolute",
-              inset: 0,
-              overflow: "hidden",
-              opacity,
-              background:
-                "linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.025))",
-              "&::before": {
-                content: '""',
-                position: "absolute",
-                inset: 0,
-                backgroundImage: [
-                  "linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.08) 48%, transparent 96%)",
-                  "linear-gradient(90deg, rgba(255,255,255,0.12) 0 18%, transparent 18% 24%, rgba(255,255,255,0.08) 24% 52%, transparent 52% 59%, rgba(255,255,255,0.1) 59% 82%, transparent 82%)",
-                  "linear-gradient(90deg, rgba(255,255,255,0.08) 0 28%, transparent 28% 34%, rgba(255,255,255,0.11) 34% 64%, transparent 64% 70%, rgba(255,255,255,0.07) 70% 100%)",
-                  "linear-gradient(90deg, rgba(255,255,255,0.1) 0 38%, transparent 38% 45%, rgba(255,255,255,0.08) 45% 74%, transparent 74%)",
-                ].join(", "),
-                backgroundSize:
-                  "42% 100%, 100% 18%, 100% 24%, 100% 16%",
-                backgroundPosition:
-                  "-60% 0, 0 18%, 0 48%, 0 78%",
-                backgroundRepeat: "no-repeat",
-                animation: prefersReducedMotion
-                  ? "none"
-                  : "magic-stage-skeleton-sweep 1250ms cubic-bezier(0.22, 1, 0.36, 1) infinite",
-              },
-              "@keyframes magic-stage-skeleton-sweep": {
-                "0%": {
-                  backgroundPosition:
-                    "-60% 0, 0 18%, 0 48%, 0 78%",
-                },
-                "100%": {
-                  backgroundPosition:
-                    "160% 0, 0 18%, 0 48%, 0 78%",
-                },
-              },
-            }}
+        {!showImage && showFallback ? (
+          <StageImageFallback
+            opacity={opacity}
+            prefersReducedMotion={prefersReducedMotion}
           />
         ) : null}
         <Box
           component="img"
+          ref={imageRef}
           src={asset.imageUrl}
           alt={alt}
           draggable={false}
           loading={loading}
           decoding={decoding}
           fetchPriority={fetchPriority}
-          onLoad={() =>
-            setLoadState({ imageUrl: asset.imageUrl, status: "loaded" })
-          }
-          onError={() =>
-            setLoadState({ imageUrl: asset.imageUrl, status: "error" })
-          }
+          onLoad={markLoaded}
+          onError={markErrored}
           sx={{
             width: "100%",
             height: "100%",
@@ -205,7 +152,7 @@ export function PositionedStageMedia({
             pointerEvents: "none",
             userSelect: "none",
             WebkitUserDrag: "none",
-            transition: prefersReducedMotion
+            transition: prefersReducedMotion || !animateOpacity
               ? "none"
               : "opacity 160ms cubic-bezier(0.22, 1, 0.36, 1)",
           }}

@@ -2,23 +2,13 @@
 
 import { Tune } from "@mui/icons-material";
 import { Box, Paper, Slider, Stack, Typography } from "@mui/material";
-import {
-  getViewerDisplayedScale,
-  normalizeViewerDisplayedScale,
-  VIEWER_MAX_PRESET_SCALE,
-  VIEWER_MIN_PRESET_SCALE,
-  cycleAbSide,
-} from "@magic-compare/compare-core";
+import { cycleAbSide } from "@magic-compare/compare-core";
 import { useViewerController } from "@magic-compare/compare-core/use-viewer-controller";
 import type { ViewerDataset } from "@magic-compare/compare-core/viewer-data";
 import { clampNumber } from "@magic-compare/shared-utils";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ViewerFilmstrip } from "./workbench/viewer-filmstrip";
 import { ViewerHeader } from "./workbench/viewer-header";
-import {
-  getViewerStageShellHeight,
-  getViewerStageScrollPadding,
-} from "./workbench/viewer-layout";
 import {
   useAbStageOutsideDismiss,
   useViewerKeyboardShortcuts,
@@ -27,13 +17,10 @@ import {
   useViewerViewportMetrics,
 } from "./workbench/use-group-viewer-workbench-effects";
 import { ViewerSidebar } from "./workbench/viewer-sidebar";
-import {
-  DEFAULT_PAN_ZOOM,
-  HeatmapNotice,
-  ViewerStage,
-  getViewportSize,
-} from "./workbench/viewer-stage";
+import { HeatmapNotice, ViewerStage } from "./workbench/viewer-stage";
 import { useViewerImagePreloader } from "./workbench/viewer-image-preloader";
+import { useAbInspectState } from "./workbench/use-ab-inspect-state";
+import { useViewerStageShellState } from "./workbench/use-viewer-stage-shell-state";
 
 interface GroupViewerWorkbenchProps {
   dataset: ViewerDataset;
@@ -70,20 +57,16 @@ export function GroupViewerWorkbench({
     stepFrame,
     toggleSidebar,
   } = controller;
-  const stageRef = useRef<HTMLDivElement | null>(null);
-  const stageSlotRef = useRef<HTMLDivElement | null>(null);
   // Start from a zero viewport on the server and first client paint so hydration never bakes in a
   // stale desktop/mobile height budget before the real window metrics arrive.
   const [viewportSize, setViewportSize] = useState(() => ({
     width: 0,
     height: 0,
   }));
-  const [stageSlotWidth, setStageSlotWidth] = useState(0);
   const [devicePixelRatio, setDevicePixelRatio] = useState(1);
   const [swipePosition, setSwipePosition] = useState(50);
-  const [abPanZoomState, setAbPanZoomState] = useState(DEFAULT_PAN_ZOOM);
-  const [abStageActive, setAbStageActive] = useState(false);
   const [showAbInspectHint, setShowAbInspectHint] = useState(false);
+  const abInspect = useAbInspectState();
   const {
     resolvedHideStageScrollControl,
     resolvedPrefersReducedMotion,
@@ -99,19 +82,11 @@ export function GroupViewerWorkbench({
   const stageAspectRatio = resolvedRotateStage
     ? 1 / contentAspectRatio
     : contentAspectRatio;
-  const stageShellHeight = useMemo(
-    () =>
-      getViewerStageShellHeight({
-        viewportSize,
-        availableWidth: stageSlotWidth,
-        aspectRatio: stageAspectRatio,
-      }),
-    [stageAspectRatio, stageSlotWidth, viewportSize],
-  );
-  const abDisplayedScale = useMemo(
-    () => getViewerDisplayedScale(abPanZoomState),
-    [abPanZoomState],
-  );
+  const stageShell = useViewerStageShellState({
+    aspectRatio: stageAspectRatio,
+    prefersReducedMotion: resolvedPrefersReducedMotion,
+    viewportSize,
+  });
   const imagePreloader = useViewerImagePreloader({
     currentFrameIndex,
     frames,
@@ -128,112 +103,47 @@ export function GroupViewerWorkbench({
   // Pan/swipe state belongs to a single frame; carrying it over to another frame feels broken.
   useEffect(() => {
     setSwipePosition(50);
-    setAbPanZoomState(DEFAULT_PAN_ZOOM);
-    setAbStageActive(false);
-  }, [currentFrame?.id]);
+    abInspect.reset();
+  }, [abInspect.reset, currentFrame?.id]);
 
   // Leaving A/B mode should reset inspect state so returning to it starts from a predictable baseline.
   useEffect(() => {
     if (mode !== "a-b") {
-      setAbPanZoomState(DEFAULT_PAN_ZOOM);
-      setAbStageActive(false);
+      abInspect.reset();
     }
-  }, [mode]);
+  }, [abInspect.reset, mode]);
 
   useViewerViewportMetrics({
     setDevicePixelRatio,
     setViewportSize,
   });
 
-  useEffect(() => {
-    const stageSlotNode = stageSlotRef.current;
-    if (!stageSlotNode) {
-      return;
-    }
-
-    /**
-     * Re-measures from the live ref so sidebar toggles and viewport resizes always update the
-     * outer stage shell to the real width-constrained fit result instead of a stale width sample.
-     */
-    function syncStageSlotWidth() {
-      const nextStageSlotNode = stageSlotRef.current;
-      if (!nextStageSlotNode) {
-        return;
-      }
-
-      setStageSlotWidth(nextStageSlotNode.clientWidth);
-    }
-
-    syncStageSlotWidth();
-    const observer = new ResizeObserver(syncStageSlotWidth);
-    observer.observe(stageSlotNode);
-    return () => observer.disconnect();
-  }, []);
+  /**
+   * Restores the compare surface to its default inspection state so keyboard recovery and mode
+   * switches share the same reset path after an accidental pan, zoom, or swipe move.
+   */
+  const resetViewerView = useCallback(() => {
+    setSwipePosition(50);
+    abInspect.reset();
+  }, [abInspect.reset]);
 
   useViewerKeyboardShortcuts({
     abSide,
-    abStageActive,
+    abStageActive: abInspect.stageActive,
     mode,
     onResetView: resetViewerView,
     setAbSide,
-    setAbStageActive,
+    setAbStageActive: abInspect.setStageActive,
     setMode,
     stepFrame,
     toggleSidebar,
   });
   useAbStageOutsideDismiss({
-    abStageActive,
+    abStageActive: abInspect.stageActive,
     mode,
-    setAbStageActive,
-    stageRef,
+    setAbStageActive: abInspect.setStageActive,
+    stageRef: stageShell.stageRef,
   });
-
-  /**
-   * Snaps preset zoom to the compare-core bounds so toolbar controls cannot drift from stage math.
-   */
-  function setAbScale(nextScale: number) {
-    setAbPanZoomState((currentState) =>
-      normalizeViewerDisplayedScale(
-        clampNumber(
-          nextScale,
-          VIEWER_MIN_PRESET_SCALE,
-          VIEWER_MAX_PRESET_SCALE,
-        ),
-        currentState,
-      ),
-    );
-  }
-
-  /**
-   * Restores the compare surface to its default inspection state so keyboard recovery and mode
-   * switches share the same reset path after an accidental pan, zoom, or swipe move.
-   */
-  function resetViewerView() {
-    setSwipePosition(50);
-    setAbPanZoomState(DEFAULT_PAN_ZOOM);
-    setAbStageActive(false);
-  }
-
-  /**
-   * Scrolls the compare surface into a screen-filling viewing position without changing its size,
-   * which keeps the first screen free to show context while still offering a one-click jump.
-   */
-  function scrollStageIntoView() {
-    const stageNode = stageRef.current;
-    if (!stageNode || typeof window === "undefined") {
-      return;
-    }
-
-    const nextViewportSize = getViewportSize();
-    const scrollPadding = getViewerStageScrollPadding(nextViewportSize);
-    const stageTop =
-      window.scrollY + stageNode.getBoundingClientRect().top - scrollPadding;
-
-    window.scrollTo({
-      top: Math.max(0, stageTop),
-      behavior: resolvedPrefersReducedMotion ? "auto" : "smooth",
-    });
-  }
 
   useEffect(() => {
     if (mode !== "a-b" || typeof window === "undefined") {
@@ -293,7 +203,7 @@ export function GroupViewerWorkbench({
         }}
       >
         <ViewerHeader
-          abScale={abDisplayedScale}
+          abScale={abInspect.displayedScale}
           abSide={abSide}
           canUseHeatmap={availableModes.includes("heatmap")}
           caseTitle={dataset.caseMeta.title}
@@ -302,8 +212,8 @@ export function GroupViewerWorkbench({
           mode={mode}
           onAbSideChange={setAbSide}
           onModeChange={setMode}
-          onScaleChange={setAbScale}
-          onScrollStageIntoView={scrollStageIntoView}
+          onScaleChange={abInspect.setScale}
+          onScrollStageIntoView={stageShell.scrollStageIntoView}
           onToggleSidebar={toggleSidebar}
           sidebarOpen={sidebarOpen}
         />
@@ -328,14 +238,14 @@ export function GroupViewerWorkbench({
               {mode === "heatmap" && !heatmapAsset ? <HeatmapNotice /> : null}
 
               <Box
-                ref={stageSlotRef}
+                ref={stageShell.stageSlotRef}
                 sx={{
                   position: "relative",
                   minWidth: 0,
                   // The viewport budget is only an upper bound. The outer shell must collapse to
                   // the fitted width-constrained stage height, or portrait mobile screens end up
                   // with a short stage vertically centered inside an overly tall empty slot.
-                  height: `${stageShellHeight}px`,
+                  height: `${stageShell.shellHeight}px`,
                 }}
               >
                 <Box
@@ -369,7 +279,7 @@ export function GroupViewerWorkbench({
                 </Box>
                 <ViewerStage
                   abSide={abSide}
-                  abStageActive={abStageActive}
+                  abStageActive={abInspect.stageActive}
                   afterAsset={afterAsset}
                   beforeAsset={beforeAsset}
                   devicePixelRatio={devicePixelRatio}
@@ -377,14 +287,14 @@ export function GroupViewerWorkbench({
                   mode={mode}
                   onCycleAbSide={() => setAbSide(cycleAbSide(abSide))}
                   overlayOpacity={overlayOpacity}
-                  panZoomState={abPanZoomState}
+                  panZoomState={abInspect.panZoomState}
                   prefersReducedMotion={resolvedPrefersReducedMotion}
                   rotateStage={resolvedRotateStage}
-                  setAbStageActive={setAbStageActive}
-                  setPanZoomState={setAbPanZoomState}
+                  setAbStageActive={abInspect.setStageActive}
+                  setPanZoomState={abInspect.setPanZoomState}
                   setSwipePosition={setSwipePosition}
                   stageAspectRatio={stageAspectRatio}
-                  stageRef={stageRef}
+                  stageRef={stageShell.stageRef}
                   swipePosition={swipePosition}
                 />
               </Box>

@@ -17,19 +17,22 @@ import { useStagePanZoom } from "./use-stage-pan-zoom";
  */
 export function ABCompareStage({
   active,
-  activeAsset,
+  afterAsset,
   viewportSize,
+  beforeAsset,
   devicePixelRatio,
   mediaRect,
   onCycleSide,
   panZoomState,
   prefersReducedMotion,
   rotateStage,
+  side,
   setActive,
   setPanZoomState,
 }: {
   active: boolean;
-  activeAsset: ViewerAsset;
+  afterAsset: ViewerAsset;
+  beforeAsset: ViewerAsset;
   viewportSize: ViewerStageSize;
   devicePixelRatio: number;
   mediaRect: ViewerMediaRect;
@@ -37,6 +40,7 @@ export function ABCompareStage({
   panZoomState: ViewerPanZoomState;
   prefersReducedMotion: boolean;
   rotateStage: boolean;
+  side: "before" | "after";
   setActive: (nextActive: boolean) => void;
   setPanZoomState: (nextState: ViewerPanZoomState) => void;
 }) {
@@ -48,7 +52,7 @@ export function ABCompareStage({
     stageHandlers,
   } = useStagePanZoom({
     active,
-    activeAsset,
+    activeAsset: side === "before" ? beforeAsset : afterAsset,
     clampViewport: viewportSize,
     devicePixelRatio,
     mediaRect,
@@ -132,20 +136,33 @@ export function ABCompareStage({
           "outline-color 180ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 180ms cubic-bezier(0.22, 1, 0.36, 1)",
       }}
     >
-      <PositionedStageMedia
-        asset={activeAsset}
-        alt={`${activeAsset.label} image`}
-        clipRect={clipRect}
-        mediaRect={mediaRect}
-        rotateStage={rotateStage}
-        panZoomState={panZoomState}
-        effectiveScale={effectiveScale}
-        imageRendering="pixelated"
-        loading="eager"
-        decoding="async"
-        fetchPriority="high"
-        prefersReducedMotion={prefersReducedMotion}
-      />
+      {[
+        { asset: beforeAsset, side: "before" as const },
+        { asset: afterAsset, side: "after" as const },
+      ].map((layer) => {
+        const isVisibleLayer = layer.side === side;
+
+        return (
+          <PositionedStageMedia
+            key={layer.side}
+            asset={layer.asset}
+            alt={`${layer.asset.label} image`}
+            clipRect={clipRect}
+            mediaRect={mediaRect}
+            rotateStage={rotateStage}
+            panZoomState={panZoomState}
+            effectiveScale={effectiveScale}
+            imageRendering="pixelated"
+            loading="eager"
+            decoding="async"
+            fetchPriority={isVisibleLayer ? "high" : "auto"}
+            opacity={isVisibleLayer ? 1 : 0}
+            prefersReducedMotion={prefersReducedMotion}
+            showFallback={isVisibleLayer}
+            animateOpacity={false}
+          />
+        );
+      })}
     </Box>
   );
 }
