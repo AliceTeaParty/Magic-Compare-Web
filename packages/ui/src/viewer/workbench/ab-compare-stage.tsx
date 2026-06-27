@@ -23,6 +23,7 @@ export function ABCompareStage({
   mediaRect,
   onCycleSide,
   panZoomState,
+  prefersReducedMotion,
   rotateStage,
   setActive,
   setPanZoomState,
@@ -34,6 +35,7 @@ export function ABCompareStage({
   mediaRect: ViewerMediaRect;
   onCycleSide: () => void;
   panZoomState: ViewerPanZoomState;
+  prefersReducedMotion: boolean;
   rotateStage: boolean;
   setActive: (nextActive: boolean) => void;
   setPanZoomState: (nextState: ViewerPanZoomState) => void;
@@ -132,7 +134,7 @@ export function ABCompareStage({
     >
       <PositionedStageMedia
         asset={activeAsset}
-        alt={`${activeAsset.label} preview`}
+        alt={`${activeAsset.label} image`}
         clipRect={clipRect}
         mediaRect={mediaRect}
         rotateStage={rotateStage}
@@ -142,6 +144,7 @@ export function ABCompareStage({
         loading="eager"
         decoding="async"
         fetchPriority="high"
+        prefersReducedMotion={prefersReducedMotion}
       />
     </Box>
   );

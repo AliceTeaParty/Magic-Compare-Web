@@ -148,8 +148,7 @@ describe("buildPublishManifest", () => {
   });
 
   it("rejects raw bucket hosts when publishing in production", () => {
-    const originalNodeEnv = process.env.NODE_ENV;
-    process.env.NODE_ENV = "production";
+    vi.stubEnv("NODE_ENV", "production");
     resolvePublicInternalAssetUrl.mockImplementation(
       (assetUrl: string) => `https://bucket.example.r2.dev${assetUrl}`,
     );
@@ -157,72 +156,74 @@ describe("buildPublishManifest", () => {
       (storageRoot: string) => `https://bucket.example.r2.dev${storageRoot}`,
     );
 
-    expect(() =>
-      buildPublishManifest({
-        caseRow: {
-          slug: "2026",
-          title: "Case",
-          subtitle: "",
-          summary: "Summary",
-          tagsJson: "[]",
-        },
-        group: {
-          id: "group-1",
-          slug: "group-1",
-          storageRoot: "/groups/group-1",
-          title: "Group 1",
-          description: "",
-          defaultMode: "before-after",
-          tagsJson: "[]",
-          frames: [
-            {
-              id: "frame-1",
-              title: "Frame 1",
-              caption: "",
-              order: 0,
-              isPublic: true,
-              assets: [
-                {
-                  id: "before-1",
-                  kind: "before",
-                  label: "Before",
-                  imageUrl: "/internal-assets/2026/group-1/frame-1-before.png",
-                  thumbUrl:
-                    "/internal-assets/2026/group-1/frame-1-before-thumb.png",
-                  width: 1920,
-                  height: 1080,
-                  note: "",
-                  isPublic: true,
-                  isPrimaryDisplay: true,
-                },
-                {
-                  id: "after-1",
-                  kind: "after",
-                  label: "After",
-                  imageUrl: "/internal-assets/2026/group-1/frame-1-after.png",
-                  thumbUrl:
-                    "/internal-assets/2026/group-1/frame-1-after-thumb.png",
-                  width: 1920,
-                  height: 1080,
-                  note: "",
-                  isPublic: true,
-                  isPrimaryDisplay: true,
-                },
-              ],
-            },
-          ],
-        },
-        publicSlug: "2026--group-1",
-        publishedAt: new Date("2026-03-21T10:00:00.000Z"),
-      }),
-    ).toThrow(/Cloudflare-proxied public image hostname/);
-
-    resolvePublicInternalAssetUrl.mockImplementation(
-      (assetUrl: string) => `https://assets.example.com${assetUrl}`,
-    );
-    internalAssetPublicGroupBaseUrl.mockImplementation(
-      (storageRoot: string) => `https://assets.example.com${storageRoot}`,
-    );
-    process.env.NODE_ENV = originalNodeEnv;
+    try {
+      expect(() =>
+        buildPublishManifest({
+          caseRow: {
+            slug: "2026",
+            title: "Case",
+            subtitle: "",
+            summary: "Summary",
+            tagsJson: "[]",
+          },
+          group: {
+            id: "group-1",
+            slug: "group-1",
+            storageRoot: "/groups/group-1",
+            title: "Group 1",
+            description: "",
+            defaultMode: "before-after",
+            tagsJson: "[]",
+            frames: [
+              {
+                id: "frame-1",
+                title: "Frame 1",
+                caption: "",
+                order: 0,
+                isPublic: true,
+                assets: [
+                  {
+                    id: "before-1",
+                    kind: "before",
+                    label: "Before",
+                    imageUrl: "/internal-assets/2026/group-1/frame-1-before.png",
+                    thumbUrl:
+                      "/internal-assets/2026/group-1/frame-1-before-thumb.png",
+                    width: 1920,
+                    height: 1080,
+                    note: "",
+                    isPublic: true,
+                    isPrimaryDisplay: true,
+                  },
+                  {
+                    id: "after-1",
+                    kind: "after",
+                    label: "After",
+                    imageUrl: "/internal-assets/2026/group-1/frame-1-after.png",
+                    thumbUrl:
+                      "/internal-assets/2026/group-1/frame-1-after-thumb.png",
+                    width: 1920,
+                    height: 1080,
+                    note: "",
+                    isPublic: true,
+                    isPrimaryDisplay: true,
+                  },
+                ],
+              },
+            ],
+          },
+          publicSlug: "2026--group-1",
+          publishedAt: new Date("2026-03-21T10:00:00.000Z"),
+        }),
+      ).toThrow(/Cloudflare-proxied public image hostname/);
+    } finally {
+      resolvePublicInternalAssetUrl.mockImplementation(
+        (assetUrl: string) => `https://assets.example.com${assetUrl}`,
+      );
+      internalAssetPublicGroupBaseUrl.mockImplementation(
+        (storageRoot: string) => `https://assets.example.com${storageRoot}`,
+      );
+      vi.unstubAllEnvs();
+    }
   });
 });

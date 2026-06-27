@@ -188,6 +188,7 @@ function ViewerStageContent({
   onCycleAbSide,
   overlayOpacity,
   panZoomState,
+  prefersReducedMotion,
   rotateStage,
   setAbStageActive,
   setPanZoomState,
@@ -204,6 +205,7 @@ function ViewerStageContent({
   onCycleAbSide: () => void;
   overlayOpacity: number;
   panZoomState: ViewerPanZoomState;
+  prefersReducedMotion: boolean;
   rotateStage: boolean;
   setAbStageActive: (nextActive: boolean) => void;
   setPanZoomState: (nextState: ViewerPanZoomState) => void;
@@ -252,6 +254,7 @@ function ViewerStageContent({
           mediaRect={mediaRect}
           onCycleSide={onCycleAbSide}
           panZoomState={panZoomState}
+          prefersReducedMotion={prefersReducedMotion}
           rotateStage={rotateStage}
           setActive={setAbStageActive}
           setPanZoomState={setPanZoomState}
@@ -275,6 +278,7 @@ function ViewerStageContent({
           loading="eager"
           decoding="async"
           fetchPriority="high"
+          prefersReducedMotion={prefersReducedMotion}
         />
         <PositionedStageMedia
           asset={heatmapAsset}
@@ -285,6 +289,7 @@ function ViewerStageContent({
           decoding="async"
           fetchPriority="auto"
           opacity={overlayOpacity / 100}
+          prefersReducedMotion={prefersReducedMotion}
         />
       </Box>
     );
@@ -297,6 +302,7 @@ function ViewerStageContent({
         afterAsset={afterAsset}
         mediaRect={mediaRect}
         rotateStage={rotateStage}
+        prefersReducedMotion={prefersReducedMotion}
         setSwipePosition={setSwipePosition}
         swipePosition={swipePosition}
       />
@@ -315,6 +321,7 @@ interface ViewerStageProps {
   onCycleAbSide: () => void;
   overlayOpacity: number;
   panZoomState: ViewerPanZoomState;
+  prefersReducedMotion: boolean;
   rotateStage: boolean;
   setAbStageActive: (nextActive: boolean) => void;
   setPanZoomState: (nextState: ViewerPanZoomState) => void;
@@ -339,6 +346,7 @@ export function ViewerStage({
   onCycleAbSide,
   overlayOpacity,
   panZoomState,
+  prefersReducedMotion,
   rotateStage,
   setAbStageActive,
   setPanZoomState,
@@ -381,6 +389,7 @@ export function ViewerStage({
           onCycleAbSide={onCycleAbSide}
           overlayOpacity={overlayOpacity}
           panZoomState={panZoomState}
+          prefersReducedMotion={prefersReducedMotion}
           rotateStage={rotateStage}
           setAbStageActive={setAbStageActive}
           setPanZoomState={setPanZoomState}

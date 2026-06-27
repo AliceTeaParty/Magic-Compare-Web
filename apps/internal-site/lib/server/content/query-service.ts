@@ -212,6 +212,25 @@ export async function getViewerDataset(
       slug: true,
       title: true,
       order: true,
+      frames: {
+        select: {
+          assets: {
+            where: {
+              isPrimaryDisplay: true,
+              kind: {
+                in: ["before", "after"],
+              },
+            },
+            select: {
+              imageUrl: true,
+              kind: true,
+              isPrimaryDisplay: true,
+            },
+          },
+        },
+        orderBy: { order: "asc" },
+        take: 1,
+      },
     },
     orderBy: { order: "asc" },
   });

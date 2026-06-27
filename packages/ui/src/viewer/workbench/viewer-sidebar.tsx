@@ -14,6 +14,7 @@ import {
   Typography,
 } from "@mui/material";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
 import { formatUtcDate } from "@magic-compare/shared-utils";
 import type {
@@ -30,10 +31,23 @@ import type {
 function GroupLinks({
   currentGroup,
   groups,
+  onGroupIntent,
 }: {
   currentGroup: ViewerGroup;
   groups: ViewerDataset["siblingGroups"];
+  onGroupIntent: (assets: ViewerDataset["siblingGroups"][number]["preloadAssets"]) => void;
 }) {
+  const router = useRouter();
+
+  /**
+   * Uses hover/focus/touch as explicit navigation intent: route data can be prefetched immediately
+   * while only the target group's small first-frame hint is handed to the image preloader.
+   */
+  function handleGroupIntent(group: ViewerDataset["siblingGroups"][number]) {
+    router.prefetch(group.href);
+    onGroupIntent(group.preloadAssets);
+  }
+
   return (
     <Stack spacing={1}>
       {groups.map((group) => (
@@ -42,6 +56,9 @@ function GroupLinks({
           component={Link}
           href={group.href}
           underline="none"
+          onFocus={() => handleGroupIntent(group)}
+          onMouseEnter={() => handleGroupIntent(group)}
+          onTouchStart={() => handleGroupIntent(group)}
           sx={{
             color: group.isCurrent ? "primary.main" : "text.secondary",
             fontWeight: group.isCurrent ? 700 : 500,
@@ -70,6 +87,7 @@ function ViewerSidebarContent({
   currentFrame,
   groups,
   heatmapAsset,
+  onGroupIntent,
   publishStatus,
   variant,
 }: {
@@ -78,6 +96,7 @@ function ViewerSidebarContent({
   currentFrame: ViewerFrame | undefined;
   groups: ViewerDataset["siblingGroups"];
   heatmapAsset: ViewerAsset | undefined;
+  onGroupIntent: (assets: ViewerDataset["siblingGroups"][number]["preloadAssets"]) => void;
   publishStatus: ViewerDataset["publishStatus"];
   variant: "public" | "internal";
 }) {
@@ -110,7 +129,11 @@ function ViewerSidebarContent({
             >
               Back to workspace
             </Button>
-            <GroupLinks currentGroup={currentGroup} groups={groups} />
+            <GroupLinks
+              currentGroup={currentGroup}
+              groups={groups}
+              onGroupIntent={onGroupIntent}
+            />
           </Stack>
           <Divider />
         </>
@@ -214,6 +237,7 @@ interface ViewerSidebarProps {
   currentGroup: ViewerGroup;
   groups: ViewerDataset["siblingGroups"];
   heatmapAsset: ViewerAsset | undefined;
+  onGroupIntent: (assets: ViewerDataset["siblingGroups"][number]["preloadAssets"]) => void;
   publishStatus: ViewerDataset["publishStatus"];
   showDesktopSidebar: boolean;
   sidebarOpen: boolean;
@@ -231,6 +255,7 @@ export function ViewerSidebar({
   currentGroup,
   groups,
   heatmapAsset,
+  onGroupIntent,
   publishStatus,
   showDesktopSidebar,
   sidebarOpen,
@@ -243,6 +268,7 @@ export function ViewerSidebar({
     currentGroup,
     groups,
     heatmapAsset,
+    onGroupIntent,
     publishStatus,
     variant,
   };

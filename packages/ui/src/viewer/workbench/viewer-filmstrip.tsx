@@ -6,10 +6,7 @@ import type { ViewerFrame } from "@magic-compare/compare-core/viewer-data";
 import type { DragEvent as ReactDragEvent } from "react";
 import { useFilmstripDrag } from "./use-filmstrip-drag";
 
-/**
- * Follows the same "after first, then before" thumbnail preference as the main viewer so the
- * selected frame strip matches the image users expect to inspect.
- */
+/** Chooses a stable representative thumbnail for each frame without affecting main-stage loading. */
 function resolveThumbnailAsset(frame: ViewerFrame) {
   return (
     frame.assets.find((asset) => asset.kind === "after" && asset.isPrimaryDisplay) ??
@@ -27,11 +24,13 @@ function ThumbnailButton({
   isActive,
   isNearActive,
   onClick,
+  onIntent,
 }: {
   frame: ViewerFrame;
   isActive: boolean;
   isNearActive: boolean;
   onClick: () => void;
+  onIntent: () => void;
 }) {
   const thumbAsset = resolveThumbnailAsset(frame);
 
@@ -39,6 +38,9 @@ function ThumbnailButton({
     <Button
       data-frame-id={frame.id}
       onClick={onClick}
+      onFocus={onIntent}
+      onMouseEnter={onIntent}
+      onPointerDown={onIntent}
       sx={{
         // This gives the browser permission to skip painting far-off thumbnails until they scroll
         // closer to view, which trims initial work without changing the drag model.
@@ -121,6 +123,7 @@ interface ViewerFilmstripProps {
   currentFrameId: string | undefined;
   frames: ViewerFrame[];
   prefersReducedMotion: boolean;
+  onFrameIntent: (frame: ViewerFrame) => void;
   onSelectFrame: (frameId: string) => void;
 }
 
@@ -132,6 +135,7 @@ export function ViewerFilmstrip({
   currentFrameId,
   frames,
   prefersReducedMotion,
+  onFrameIntent,
   onSelectFrame,
 }: ViewerFilmstripProps) {
   const {
@@ -218,6 +222,7 @@ export function ViewerFilmstrip({
                 activeIndex === -1 || Math.abs(index - activeIndex) <= 8
               }
               onClick={() => handleFrameSelection(frame.id)}
+              onIntent={() => onFrameIntent(frame)}
             />
           ))}
         </Box>

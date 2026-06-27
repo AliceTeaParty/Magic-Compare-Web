@@ -108,6 +108,37 @@ export function mapFrameAssets(assets: Asset[]) {
 }
 
 /**
+ * Keeps sibling navigation lightweight by exposing only first-frame primary image hints for
+ * explicit cross-group intent instead of serializing every sibling frame and asset into the route.
+ */
+function mapGroupPreloadAssets(
+  group: {
+    frames?: Array<{
+      assets: Array<{
+        kind: string;
+        imageUrl: string;
+        isPrimaryDisplay: boolean;
+      }>;
+    }>;
+  },
+) {
+  const firstFrame = group.frames?.[0];
+  if (!firstFrame) {
+    return [];
+  }
+
+  return firstFrame.assets
+    .filter(
+      (asset) =>
+        asset.isPrimaryDisplay &&
+        (asset.kind === "before" || asset.kind === "after"),
+    )
+    .map((asset) => ({
+      imageUrl: resolvePublicInternalAssetUrl(asset.imageUrl),
+    }));
+}
+
+/**
  * Produces the catalog card shape directly from the database row so list and search results share a
  * stable summary model instead of duplicating status/tag counting logic in multiple places.
  */
@@ -231,6 +262,13 @@ export function buildViewerDataset(
       slug: string;
       title: string;
       order: number;
+      frames?: Array<{
+        assets: Array<{
+          kind: string;
+          imageUrl: string;
+          isPrimaryDisplay: boolean;
+        }>;
+      }>;
     }>;
   },
   currentGroup: {
@@ -282,6 +320,8 @@ export function buildViewerDataset(
       title: group.title,
       href: `/cases/${caseRow.slug}/groups/${group.slug}`,
       isCurrent: group.id === currentGroup.id,
+      preloadAssets:
+        group.id === currentGroup.id ? [] : mapGroupPreloadAssets(group),
     })),
     publishStatus: {
       status: asCaseStatus(caseRow.status),

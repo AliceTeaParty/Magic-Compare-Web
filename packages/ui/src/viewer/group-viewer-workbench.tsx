@@ -33,6 +33,7 @@ import {
   ViewerStage,
   getViewportSize,
 } from "./workbench/viewer-stage";
+import { useViewerImagePreloader } from "./workbench/viewer-image-preloader";
 
 interface GroupViewerWorkbenchProps {
   dataset: ViewerDataset;
@@ -54,6 +55,7 @@ export function GroupViewerWorkbench({
     availableModes,
     beforeAsset,
     closeSidebar,
+    currentFrameIndex,
     currentFrame,
     frames,
     heatmapAsset,
@@ -110,6 +112,11 @@ export function GroupViewerWorkbench({
     () => getViewerDisplayedScale(abPanZoomState),
     [abPanZoomState],
   );
+  const imagePreloader = useViewerImagePreloader({
+    currentFrameIndex,
+    frames,
+    mode,
+  });
 
   useViewerPreferencePersistence({
     mode,
@@ -371,6 +378,7 @@ export function GroupViewerWorkbench({
                   onCycleAbSide={() => setAbSide(cycleAbSide(abSide))}
                   overlayOpacity={overlayOpacity}
                   panZoomState={abPanZoomState}
+                  prefersReducedMotion={resolvedPrefersReducedMotion}
                   rotateStage={resolvedRotateStage}
                   setAbStageActive={setAbStageActive}
                   setPanZoomState={setAbPanZoomState}
@@ -416,6 +424,7 @@ export function GroupViewerWorkbench({
             currentFrameId={currentFrame?.id}
             frames={frames}
             prefersReducedMotion={resolvedPrefersReducedMotion}
+            onFrameIntent={imagePreloader.preloadFrame}
             onSelectFrame={selectFrame}
           />
         </Box>
@@ -431,6 +440,7 @@ export function GroupViewerWorkbench({
           sidebarOpen={sidebarOpen}
           closeSidebar={closeSidebar}
           variant={variant}
+          onGroupIntent={imagePreloader.preloadGroupHint}
         />
       </Paper>
     </Box>

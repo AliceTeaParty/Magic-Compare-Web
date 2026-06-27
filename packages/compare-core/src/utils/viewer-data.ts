@@ -33,6 +33,11 @@ export interface ViewerGroupLink {
   title: string;
   href: string;
   isCurrent?: boolean;
+  preloadAssets?: ViewerAssetPreloadHint[];
+}
+
+export interface ViewerAssetPreloadHint {
+  imageUrl: string;
 }
 
 export interface ViewerGroup {
@@ -158,6 +163,7 @@ export function createViewerDatasetFromPublishManifest(
         title: manifest.group.title,
         href: `/g/${manifest.publicSlug}`,
         isCurrent: true,
+        preloadAssets: [],
       },
     ],
     publishStatus: {

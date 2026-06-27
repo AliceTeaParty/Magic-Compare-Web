@@ -21,6 +21,7 @@ export function SwipeCompareStage({
   beforeAsset,
   afterAsset,
   mediaRect,
+  prefersReducedMotion,
   rotateStage,
   setSwipePosition,
   swipePosition,
@@ -28,6 +29,7 @@ export function SwipeCompareStage({
   beforeAsset: ViewerAsset;
   afterAsset: ViewerAsset;
   mediaRect: ViewerMediaRect;
+  prefersReducedMotion: boolean;
   rotateStage: boolean;
   setSwipePosition: (value: number) => void;
   swipePosition: number;
@@ -240,21 +242,23 @@ export function SwipeCompareStage({
     >
       <PositionedStageMedia
         asset={beforeAsset}
-        alt={`${beforeAsset.label} preview`}
+        alt={`${beforeAsset.label} image`}
         mediaRect={mediaRect}
         rotateStage={rotateStage}
         loading="eager"
         decoding="async"
         fetchPriority="high"
+        prefersReducedMotion={prefersReducedMotion}
       />
       <PositionedStageMedia
         asset={afterAsset}
-        alt={`${afterAsset.label} preview`}
+        alt={`${afterAsset.label} image`}
         mediaRect={mediaRect}
         rotateStage={rotateStage}
         loading="eager"
         decoding="async"
         fetchPriority="high"
+        prefersReducedMotion={prefersReducedMotion}
         clipPath={
           rotateStage
             ? "inset(0 0 calc(100% - var(--swipe-position)) 0)"
