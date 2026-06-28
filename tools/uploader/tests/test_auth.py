@@ -11,6 +11,7 @@ from src.auth import (
     ENV_ACCESS_CLIENT_SECRET_NAME,
     ENV_SITE_URL_NAME,
     ENV_UPLOAD_FRAME_WORKERS_NAME,
+    ENV_UPLOAD_PROXY_NAME,
     build_request_headers,
     ensure_remote_access_config,
     ensure_work_dir_env,
@@ -19,13 +20,13 @@ from src.auth import (
     uploader_env_example_path,
 )
 
-
 _UPLOADER_ENV_KEYS = (
     "MAGIC_COMPARE_SITE_URL",
     "MAGIC_COMPARE_API_URL",
     "MAGIC_COMPARE_CF_ACCESS_CLIENT_ID",
     "MAGIC_COMPARE_CF_ACCESS_CLIENT_SECRET",
     "MAGIC_COMPARE_UPLOAD_FRAME_WORKERS",
+    "MAGIC_COMPARE_UPLOAD_PROXY",
 )
 
 
@@ -201,6 +202,32 @@ class UploaderConfigTests(unittest.TestCase):
         env_text = (self.work_dir / ".env").read_text(encoding="utf-8")
         self.assertIn(f"{ENV_UPLOAD_FRAME_WORKERS_NAME}=6", env_text)
         self.assertEqual(config.upload_frame_workers, 6)
+
+    def test_resolves_upload_proxy_from_env(self) -> None:
+        env_path = ensure_work_dir_env(self.work_dir)
+        env_path.write_text(
+            "\n".join(
+                [
+                    "MAGIC_COMPARE_SITE_URL=http://localhost:3000",
+                    f"{ENV_UPLOAD_PROXY_NAME}=http://127.0.0.1:7890",
+                    "",
+                ]
+            ),
+            encoding="utf-8",
+        )
+
+        config = resolve_uploader_config(self.work_dir)
+
+        self.assertEqual(config.upload_proxy_url, "http://127.0.0.1:7890")
+
+    def test_persists_upload_proxy_override_to_work_dir_env(self) -> None:
+        config = resolve_uploader_config(self.work_dir)
+
+        persist_config_overrides(config, upload_proxy_url=" socks5://127.0.0.1:7891 ")
+
+        env_text = (self.work_dir / ".env").read_text(encoding="utf-8")
+        self.assertIn(f"{ENV_UPLOAD_PROXY_NAME}=socks5://127.0.0.1:7891", env_text)
+        self.assertEqual(config.upload_proxy_url, "socks5://127.0.0.1:7891")
 
     def test_invalid_upload_frame_workers_env_raises_runtime_error(self) -> None:
         env_path = ensure_work_dir_env(self.work_dir)

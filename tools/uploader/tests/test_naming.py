@@ -3,7 +3,7 @@ from __future__ import annotations
 import unittest
 from unittest import mock
 
-from src.naming import kebab_case, _cjk_to_latin
+from src.naming import _cjk_to_latin, kebab_case
 
 
 class CjkToLatinTests(unittest.TestCase):
@@ -25,14 +25,16 @@ class CjkToLatinTests(unittest.TestCase):
         self.assertTrue(result.isascii(), f"Expected ASCII hepburn, got: {result!r}")
 
     def test_missing_pykakasi_data_raises_friendly_error(self) -> None:
-        with mock.patch(
-            "pykakasi.kakasi",
-            side_effect=FileNotFoundError(
-                "pykakasi/data/kanwadict4.db is missing from the bundle"
+        with (
+            mock.patch(
+                "pykakasi.kakasi",
+                side_effect=FileNotFoundError(
+                    "pykakasi/data/kanwadict4.db is missing from the bundle"
+                ),
             ),
+            self.assertRaisesRegex(RuntimeError, "v1.6.1") as context,
         ):
-            with self.assertRaisesRegex(RuntimeError, "v1.6.1") as context:
-                _cjk_to_latin("マジカル")
+            _cjk_to_latin("マジカル")
 
         self.assertIn("pykakasi", str(context.exception))
 
@@ -83,6 +85,5 @@ class KebabCaseTests(unittest.TestCase):
 
     def test_url_safe_output(self) -> None:
         # Slug must only contain lowercase letters, digits and hyphens
-        import re
         slug = kebab_case("SPY×FAMILY 间谍过家家")
         self.assertRegex(slug, r"^[a-z0-9-]+$")

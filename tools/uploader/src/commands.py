@@ -59,6 +59,7 @@ def _prepare_runtime_config(
     site_url: str | None,
     api_url: str | None,
     frame_workers: int | None,
+    upload_proxy: str | None,
 ) -> UploaderConfig:
     """Persist explicit CLI overrides so resumed runs keep targeting the same site and endpoint."""
     config = resolve_uploader_config(
@@ -66,14 +67,16 @@ def _prepare_runtime_config(
         site_url_override=site_url,
         api_url_override=api_url,
         upload_frame_workers_override=frame_workers,
+        upload_proxy_override=upload_proxy,
     )
 
-    if site_url or api_url or frame_workers is not None:
+    if site_url or api_url or frame_workers is not None or upload_proxy is not None:
         persist_config_overrides(
             config,
             site_url=site_url,
             api_url=api_url,
             upload_frame_workers=frame_workers,
+            upload_proxy_url=upload_proxy,
         )
 
     return config
@@ -216,6 +219,7 @@ def handle_sync(
     site_url: str | None,
     api_url: str | None,
     frame_workers: int | None = None,
+    upload_proxy: str | None = None,
     report_json: Path | None = None,
     dry_run: bool = False,
     reset_session: bool = False,
@@ -234,6 +238,7 @@ def handle_sync(
         site_url=site_url,
         api_url=api_url,
         frame_workers=frame_workers,
+        upload_proxy=upload_proxy,
     )
     ensure_remote_access_config(config)
 
@@ -437,6 +442,7 @@ def handle_delete_group(
         site_url=site_url,
         api_url=api_url,
         frame_workers=None,
+        upload_proxy=None,
     )
     ensure_remote_access_config(config)
 
@@ -489,6 +495,7 @@ def handle_list_cases(
         site_url=site_url,
         api_url=api_url,
         frame_workers=None,
+        upload_proxy=None,
     )
     ensure_remote_access_config(config)
 
@@ -512,6 +519,7 @@ def handle_list_groups(
         site_url=site_url,
         api_url=api_url,
         frame_workers=None,
+        upload_proxy=None,
     )
     ensure_remote_access_config(config)
     selected_case = _resolve_case_for_delete(config, case_slug)
@@ -536,6 +544,7 @@ def handle_delete_case(
         site_url=site_url,
         api_url=api_url,
         frame_workers=None,
+        upload_proxy=None,
     )
     ensure_remote_access_config(config)
     selected_case = _resolve_case_for_delete(config, case_slug)

@@ -22,7 +22,6 @@ from .config import UploaderConfig
 from .manifest import (
     PreparedGroupUpload,
     PreparedUploadFile,
-    PreparedUploadFrame,
     build_group_upload_from_case,
 )
 from .plan import PreparedCasePlan
@@ -751,7 +750,7 @@ def execute_upload_plan(
 
     with (
         TemporaryDirectory(prefix="magic-compare-frame-upload-") as thumbnail_dir,
-        create_upload_http_client() as upload_client,
+        create_upload_http_client(config.upload_proxy_url) as upload_client,
     ):
         runtime = _create_runtime_state(
             plan,

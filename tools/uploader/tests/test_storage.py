@@ -5,10 +5,21 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from src.storage import upload_file_to_presigned_url
+from src.storage import create_upload_http_client, upload_file_to_presigned_url
 
 
 class StorageUploadTests(unittest.TestCase):
+    @mock.patch("src.storage.httpx.Client")
+    def test_create_upload_http_client_accepts_manual_proxy(
+        self, client_class: mock.Mock
+    ) -> None:
+        create_upload_http_client("http://127.0.0.1:7890")
+
+        client_class.assert_called_once_with(
+            timeout=120.0,
+            proxy="http://127.0.0.1:7890",
+        )
+
     def test_upload_file_to_presigned_url_uses_shared_client_and_streams_file(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             source_path = Path(temp_dir) / "frame.png"

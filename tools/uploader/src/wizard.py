@@ -810,6 +810,7 @@ def run_wizard(
     *,
     site_url: str | None,
     api_url: str | None,
+    upload_proxy: str | None,
     report_json: Path | None = None,
 ) -> None:
     """Run the interactive uploader flow with an upfront plan step before any remote upload starts."""
@@ -824,6 +825,7 @@ def run_wizard(
         site_url=site_url,
         api_url=api_url,
         frame_workers=None,
+        upload_proxy=upload_proxy,
     )
 
     _render_stage_header(2, "确认目标站点后，再复用已有 case 或创建新 case。")

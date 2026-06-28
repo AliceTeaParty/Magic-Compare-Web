@@ -6,7 +6,7 @@ from pathlib import Path
 
 import typer
 
-from .auth import ENV_API_URL_NAME, ENV_SITE_URL_NAME
+from .auth import ENV_API_URL_NAME, ENV_SITE_URL_NAME, ENV_UPLOAD_PROXY_NAME
 from .commands import (
     _normalize_path_text as _normalize_path_text,
     _resolve_source_dir as _resolve_source_dir,
@@ -69,13 +69,23 @@ def main(
         "--report-json",
         help="把预演或同步结果写成 JSON 报告。",
     ),
+    upload_proxy: str | None = typer.Option(
+        None,
+        "--upload-proxy",
+        help=f"仅用于 R2 直传 PUT 的代理，例如 http://127.0.0.1:7890；优先读取 {ENV_UPLOAD_PROXY_NAME}。",
+    ),
 ) -> None:
     """不带子命令时进入中文向导。"""
     if ctx.invoked_subcommand is not None:
         return
 
     try:
-        run_wizard(site_url=site_url, api_url=api_url, report_json=report_json)
+        run_wizard(
+            site_url=site_url,
+            api_url=api_url,
+            upload_proxy=upload_proxy,
+            report_json=report_json,
+        )
     except typer.Abort:
         console.print("[yellow] 已取消本次导入。[/]")
         raise typer.Exit(code=1) from None
@@ -123,6 +133,11 @@ def sync(
         max=8,
         help="frame 级上传并发数；1 到 8，留空时自动按待处理 frame 数调整。",
     ),
+    upload_proxy: str | None = typer.Option(
+        None,
+        "--upload-proxy",
+        help=f"仅用于 R2 直传 PUT 的代理，例如 http://127.0.0.1:7890；优先读取 {ENV_UPLOAD_PROXY_NAME}。",
+    ),
     dry_run: bool = typer.Option(
         False, "--dry-run", help="只跑预演，不上传，也不调用 remote 接口。"
     ),
@@ -137,6 +152,7 @@ def sync(
             site_url=site_url,
             api_url=api_url,
             frame_workers=frame_workers,
+            upload_proxy=upload_proxy,
             report_json=report_json,
             dry_run=dry_run,
             reset_session=reset_session,

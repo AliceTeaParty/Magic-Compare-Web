@@ -25,8 +25,12 @@ def _iter_file_chunks(source_path: Path) -> Iterator[bytes]:
             yield chunk
 
 
-def create_upload_http_client() -> httpx.Client:
+def create_upload_http_client(upload_proxy_url: str | None = None) -> httpx.Client:
     """Reuse one HTTP client across frame workers so repeated presigned PUTs share connection pools."""
+    if upload_proxy_url:
+        # The proxy is intentionally scoped to presigned object PUTs; internal-site API requests
+        # still follow the operator's normal network path and Cloudflare Access settings.
+        return httpx.Client(timeout=_UPLOAD_TIMEOUT_SECONDS, proxy=upload_proxy_url)
     return httpx.Client(timeout=_UPLOAD_TIMEOUT_SECONDS)
 
 

@@ -7,8 +7,8 @@ from unittest import mock
 
 from PIL import Image
 
-from src.commands import handle_sync
 from src.api_client import CaseGroupsResult, CaseListResult, CaseWorkspaceGroup
+from src.commands import handle_sync
 
 
 class CommandFlowTests(unittest.TestCase):
@@ -78,6 +78,31 @@ class CommandFlowTests(unittest.TestCase):
 
         ensure_remote_access_config.assert_called_once()
         self.assertEqual(execute_upload_plan.call_args.kwargs["frame_workers"], 5)
+
+    @mock.patch("src.commands._render_execution_summary")
+    @mock.patch("src.commands.ensure_remote_access_config")
+    @mock.patch("src.commands.execute_upload_plan")
+    def test_handle_sync_passes_upload_proxy_to_executor_config(
+        self,
+        execute_upload_plan: mock.Mock,
+        ensure_remote_access_config: mock.Mock,
+        _render_execution_summary: mock.Mock,
+    ) -> None:
+        execute_upload_plan.return_value = mock.Mock(
+            succeeded=True,
+            completion_result={"caseSlug": "2026", "groupSlug": "test-group"},
+        )
+
+        handle_sync(
+            self.case_root,
+            site_url=None,
+            api_url=None,
+            upload_proxy="http://127.0.0.1:7890",
+        )
+
+        ensure_remote_access_config.assert_called_once()
+        config = execute_upload_plan.call_args.args[1]
+        self.assertEqual(config.upload_proxy_url, "http://127.0.0.1:7890")
 
     @mock.patch("src.commands._render_all_case_table")
     @mock.patch("src.commands.list_cases")

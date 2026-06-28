@@ -19,8 +19,8 @@ from src.wizard import (
     _frame_status_line,
     _momentum_status_line,
     _render_completion_links,
-    _render_upload_progress,
     _render_startup_banner,
+    _render_upload_progress,
 )
 
 

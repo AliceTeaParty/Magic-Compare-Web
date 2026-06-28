@@ -15,6 +15,7 @@ ENV_API_URL_NAME = "MAGIC_COMPARE_API_URL"
 ENV_ACCESS_CLIENT_ID_NAME = "MAGIC_COMPARE_CF_ACCESS_CLIENT_ID"
 ENV_ACCESS_CLIENT_SECRET_NAME = "MAGIC_COMPARE_CF_ACCESS_CLIENT_SECRET"
 ENV_UPLOAD_FRAME_WORKERS_NAME = "MAGIC_COMPARE_UPLOAD_FRAME_WORKERS"
+ENV_UPLOAD_PROXY_NAME = "MAGIC_COMPARE_UPLOAD_PROXY"
 
 PERSISTED_UPLOADER_ENV_KEYS = (
     ENV_SITE_URL_NAME,
@@ -22,6 +23,7 @@ PERSISTED_UPLOADER_ENV_KEYS = (
     ENV_ACCESS_CLIENT_ID_NAME,
     ENV_ACCESS_CLIENT_SECRET_NAME,
     ENV_UPLOAD_FRAME_WORKERS_NAME,
+    ENV_UPLOAD_PROXY_NAME,
 )
 
 FALLBACK_SITE_URL = "http://localhost:3000"
@@ -37,6 +39,7 @@ class UploaderConfig:
     service_token_client_id: str | None = None
     service_token_client_secret: str | None = None
     upload_frame_workers: int | None = None
+    upload_proxy_url: str | None = None
 
     @property
     def is_local_site(self) -> bool:
@@ -76,6 +79,8 @@ def _default_env_example_text() -> str:
             f"{ENV_ACCESS_CLIENT_SECRET_NAME}=",
             "# Optional frame-level upload concurrency. Leave blank to auto-adapt within 1-8.",
             f"{ENV_UPLOAD_FRAME_WORKERS_NAME}=",
+            "# Optional proxy for direct R2 object PUT uploads only, e.g. http://127.0.0.1:7890.",
+            f"{ENV_UPLOAD_PROXY_NAME}=",
             "",
         ]
     )
@@ -164,6 +169,15 @@ def _parse_upload_frame_workers(value: str | None) -> int | None:
     return parsed
 
 
+def _parse_upload_proxy(value: str | None) -> str | None:
+    """Normalize the manual direct-upload proxy once so env and CLI values behave identically."""
+    if value is None:
+        return None
+
+    normalized = value.strip()
+    return normalized or None
+
+
 def internal_site_base_url(api_url: str) -> str:
     marker = "/api/ops/"
     normalized = _normalize_url(api_url)
@@ -182,6 +196,7 @@ def resolve_uploader_config(
     api_url_override: str | None = None,
     site_url_override: str | None = None,
     upload_frame_workers_override: int | None = None,
+    upload_proxy_override: str | None = None,
 ) -> UploaderConfig:
     """Resolve uploader config with a self-contained work-dir env while still allowing explicit host overrides."""
     launcher_env_path = _launcher_env_path()
@@ -216,6 +231,7 @@ def resolve_uploader_config(
         ENV_API_URL_NAME,
         ENV_ACCESS_CLIENT_ID_NAME,
         ENV_ACCESS_CLIENT_SECRET_NAME,
+        ENV_UPLOAD_PROXY_NAME,
     ):
         if key in os.environ and os.environ[key]:
             merged_values[key] = os.environ[key]
@@ -230,6 +246,11 @@ def resolve_uploader_config(
         else _parse_upload_frame_workers(
             merged_values.get(ENV_UPLOAD_FRAME_WORKERS_NAME, "")
         )
+    )
+    upload_proxy_url = (
+        _parse_upload_proxy(upload_proxy_override)
+        if upload_proxy_override is not None
+        else _parse_upload_proxy(merged_values.get(ENV_UPLOAD_PROXY_NAME, ""))
     )
 
     if not raw_site_url and raw_api_url:
@@ -252,6 +273,7 @@ def resolve_uploader_config(
             merged_values.get(ENV_ACCESS_CLIENT_SECRET_NAME, "") or None
         ),
         upload_frame_workers=upload_frame_workers,
+        upload_proxy_url=upload_proxy_url,
     )
 
 
@@ -261,6 +283,7 @@ def persist_config_overrides(
     site_url: str | None = None,
     api_url: str | None = None,
     upload_frame_workers: int | None = None,
+    upload_proxy_url: str | None = None,
 ) -> None:
     """Persist CLI overrides back into the uploader-owned env so resumed runs stay consistent."""
     if not config.env_path:
@@ -292,6 +315,15 @@ def persist_config_overrides(
             quote_mode="never",
         )
         config.upload_frame_workers = upload_frame_workers
+    if upload_proxy_url is not None:
+        normalized_upload_proxy = _parse_upload_proxy(upload_proxy_url)
+        set_key(
+            str(config.env_path),
+            ENV_UPLOAD_PROXY_NAME,
+            normalized_upload_proxy or "",
+            quote_mode="never",
+        )
+        config.upload_proxy_url = normalized_upload_proxy
 
 
 def ensure_remote_access_config(config: UploaderConfig) -> None:
