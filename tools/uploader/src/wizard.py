@@ -150,6 +150,7 @@ def _render_startup_banner() -> None:
     console.print(Text(load_logo_text(), style="bright_black"))
     console.print(Text("Magic Compare Uploader", style="bold white"))
     console.print(Text(f"Version {uploader_version()}", style="cyan"))
+    console.print(Text("FINAL / 已弃用：桌面 uploader 仅保留旧流程，后续上传能力转向 Web。", style="yellow"))
     console.print(Text(f"GitHub: {REPO_URL}", style="bright_blue"))
     console.print(Text(f"Issues: {ISSUES_URL}", style="bright_blue"))
     console.print(Text("License: GPLv3 · Copyright notices in repository license", style="bright_black"))

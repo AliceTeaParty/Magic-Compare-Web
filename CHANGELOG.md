@@ -6,8 +6,14 @@ Entries before that date are summarized at release level instead of being recons
 
 ## Unreleased
 
+## v1.8.0 - 2026-06-28
+
+Web feature expansion release focused on the compare viewer, Case workspace editing, and a final legacy uploader maintenance patch before upload work moves to the cross-platform Web flow.
+
 ### Added
 
+- Added Case workspace metadata editing for Case summaries and Group titles/descriptions, including internal ops routes, repository mutations, optimistic UI updates, and Chinese editing copy.
+- Added manual uploader object-upload proxy support through `--upload-proxy` and `MAGIC_COMPARE_UPLOAD_PROXY`, scoped to presigned R2/S3 PUT requests so internal-site API calls keep using the normal route.
 - Added a lightweight Chinese first-run guide to the shared group viewer, with a toolbar help button, `?` shortcut, replayable Drawer guide, and local dismissed/completed state.
 - Added a stage image preloader with bounded concurrency, adjacent-frame and group-intent prefetching, stage image load caching, and a local skeleton fallback for slow or missing images.
 - Added `previewUrl` support in viewer asset data and publish manifest tests so future generated preview images can improve perceived switching speed while older data remains compatible.
@@ -16,6 +22,9 @@ Entries before that date are summarized at release level instead of being recons
 
 ### Changed
 
+- Marked the Python uploader binary line as `FINAL / 已弃用`; v1.8.0 keeps existing legacy import flows available, but future upload capability is expected to move to the Web workspace.
+- Refined Case workspace layout and inline editing behavior so text edits stay in place, reduce route refresh flicker, and avoid the overlapping editor layout introduced during the Web editing pass.
+- Removed redundant workspace/catalog helper copy and localized the Case group reorder hint to `拖动调整此 Case 内的顺序。`.
 - Reworked A/B, Swipe, and Heatmap stage rendering so stage images use explicit loading/decoding/fetch-priority hints and heatmap overlays do not compete for high-priority image fetches.
 - Changed Swipe dragging and filmstrip dragging to keep transient pointer movement out of React state by using refs, `requestAnimationFrame`, CSS variables, and transforms.
 - Split internal viewer data loading so the current group fetches full frames/assets while sibling groups only carry navigation and preload-hint fields.
@@ -25,6 +34,9 @@ Entries before that date are summarized at release level instead of being recons
 
 ### Fixed
 
+- Fixed Case workspace hydration instability from dnd-kit described-by IDs by disabling sortable SSR until the client is mounted.
+- Fixed Case workspace save/edit flicker caused by remounting and full route refreshes during metadata updates.
+- Fixed group row editing density, button wrapping, nested border emphasis, and public/internal badge alignment regressions from the first inline editor iteration.
 - Fixed mobile pinch zoom in A/B inspect mode so it normalizes through displayed scale and no longer stalls around `1.67x`.
 - Fixed hidden A/B toolbar controls reserving space outside A/B mode and squeezing the title/mobile header.
 - Fixed stage-image switching behavior so skeletons are only the fallback while the requested image is unavailable, avoiding blurred or incorrect preview swaps.
