@@ -4,9 +4,6 @@ run-name: Uploader Binaries • ${{ github.event_name }} • ${{ github.ref_name
 
 on:
   workflow_dispatch:
-  push:
-    tags:
-      - "v*"
 
 permissions:
   contents: read
