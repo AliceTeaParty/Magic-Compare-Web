@@ -42,6 +42,10 @@ function limitCaseSummary(value: string) {
   return value.slice(0, CASE_SUMMARY_MAX_LENGTH);
 }
 
+function isOverLimit(value: string, maxLength: number) {
+  return value.length > maxLength;
+}
+
 /**
  * Keeps workspace-level publish/deploy controls alongside sortable group rows so operators can
  * reorder and publish from one surface without desynchronizing local optimistic state.
@@ -66,6 +70,10 @@ export function CaseWorkspaceBoard({
     limitCaseSummary(data.summary),
   );
   const [isEditingCaseSummary, setIsEditingCaseSummary] = useState(false);
+  const isCaseSummaryOverLimit = isOverLimit(
+    caseSummaryDraft,
+    CASE_SUMMARY_MAX_LENGTH,
+  );
   const caseSummaryEditorRef = useRef<HTMLElement | null>(null);
   const caseSummaryEditSeedRef = useRef(limitCaseSummary(data.summary));
   const [isPending, startTransition] = useTransition();
@@ -166,11 +174,12 @@ export function CaseWorkspaceBoard({
    * replay the workspace entrance motion and make unrelated controls flash.
    */
   function saveCaseSummary() {
-    void updateCaseSummary(
-      limitCaseSummary(
-        caseSummaryEditorRef.current?.textContent ?? caseSummaryDraft,
-      ),
-    );
+    const nextSummary = caseSummaryEditorRef.current?.textContent ?? caseSummaryDraft;
+    if (isOverLimit(nextSummary, CASE_SUMMARY_MAX_LENGTH)) {
+      return;
+    }
+
+    void updateCaseSummary(nextSummary);
     setIsEditingCaseSummary(false);
   }
 
@@ -184,8 +193,8 @@ export function CaseWorkspaceBoard({
   }
 
   /**
-   * Enforces the 160-character product limit inside contentEditable itself because browser editing
-   * can otherwise leave extra DOM text until the next React render.
+   * Mirrors contentEditable text into React state without trimming so users can see how far they
+   * overshot the product limit, then delete or rewrite instead of being blocked mid-thought.
    */
   function handleCaseSummaryInput() {
     const editor = caseSummaryEditorRef.current;
@@ -194,20 +203,7 @@ export function CaseWorkspaceBoard({
       return;
     }
 
-    const text = editor.textContent ?? "";
-    const limitedText = limitCaseSummary(text);
-
-    if (text !== limitedText) {
-      editor.textContent = limitedText;
-      const selection = window.getSelection();
-      const range = document.createRange();
-      range.selectNodeContents(editor);
-      range.collapse(false);
-      selection?.removeAllRanges();
-      selection?.addRange(range);
-    }
-
-    setCaseSummaryDraft(limitedText);
+    setCaseSummaryDraft(editor.textContent ?? "");
   }
 
   return (
@@ -273,6 +269,21 @@ export function CaseWorkspaceBoard({
                 >
                   {isEditingCaseSummary ? null : caseSummary || "暂无 Case 描述。"}
                 </Typography>
+                {isEditingCaseSummary ? (
+                  <Typography
+                    component="span"
+                    variant="caption"
+                    aria-live="polite"
+                    sx={{
+                      color: isCaseSummaryOverLimit ? "error.main" : "text.secondary",
+                      fontVariantNumeric: "tabular-nums",
+                      lineHeight: 1,
+                      minWidth: 54,
+                    }}
+                  >
+                    {caseSummaryDraft.length}/{CASE_SUMMARY_MAX_LENGTH}
+                  </Typography>
+                ) : null}
                 <Box
                   sx={{
                     display: "inline-flex",
@@ -290,7 +301,7 @@ export function CaseWorkspaceBoard({
                       <IconButton
                         size="small"
                         aria-label="保存描述"
-                        disabled={isPending}
+                        disabled={isPending || isCaseSummaryOverLimit}
                         onClick={saveCaseSummary}
                         sx={{
                           width: 32,

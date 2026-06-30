@@ -70,3 +70,4 @@ tools/uploader/.build/
 dist/
 docker-data/
 internal-site.readonly.db
+.agents/skills/

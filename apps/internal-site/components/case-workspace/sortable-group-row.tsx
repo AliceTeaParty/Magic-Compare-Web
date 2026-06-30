@@ -39,6 +39,10 @@ function limitText(value: string, maxLength: number) {
   return value.slice(0, maxLength);
 }
 
+function isOverLimit(value: string, maxLength: number) {
+  return value.length > maxLength;
+}
+
 /**
  * Keeps each workspace row self-contained so drag handles, visibility controls, and the internal
  * viewer link can evolve without bloating the board container again. The row is now split into a
@@ -109,7 +113,14 @@ export function SortableGroupRow({
     title: limitText(group.title, GROUP_TITLE_MAX_LENGTH),
     description: limitText(group.description, GROUP_DESCRIPTION_MAX_LENGTH),
   });
+  const isTitleOverLimit = isOverLimit(draftTitle, GROUP_TITLE_MAX_LENGTH);
+  const isDescriptionOverLimit = isOverLimit(
+    draftDescription,
+    GROUP_DESCRIPTION_MAX_LENGTH,
+  );
   const titleError = draftTitle.trim() ? null : "标题不能为空。";
+  const hasMetadataError =
+    Boolean(titleError) || isTitleOverLimit || isDescriptionOverLimit;
   const { attributes, listeners, setNodeRef, transform, transition } =
     useSortable({ id: group.id });
 
@@ -215,19 +226,21 @@ export function SortableGroupRow({
    * before scheduling an optimistic metadata save.
    */
   function saveMetadataEdit() {
-    if (titleError) {
+    const titleText = titleEditorRef.current?.textContent ?? draftTitle;
+    const descriptionText =
+      descriptionEditorRef.current?.textContent ?? draftDescription;
+
+    if (
+      !titleText.trim() ||
+      isOverLimit(titleText, GROUP_TITLE_MAX_LENGTH) ||
+      isOverLimit(descriptionText, GROUP_DESCRIPTION_MAX_LENGTH)
+    ) {
       return;
     }
 
     void onUpdateMetadata(group, {
-      title: limitText(
-        titleEditorRef.current?.textContent ?? draftTitle,
-        GROUP_TITLE_MAX_LENGTH,
-      ),
-      description: limitText(
-        descriptionEditorRef.current?.textContent ?? draftDescription,
-        GROUP_DESCRIPTION_MAX_LENGTH,
-      ),
+      title: titleText,
+      description: descriptionText,
     });
     setIsEditing(false);
   }
@@ -240,32 +253,18 @@ export function SortableGroupRow({
   }
 
   /**
-   * Keeps the visible editor text and React draft state in lockstep while enforcing compact row
-   * limits; contentEditable does not provide native maxLength semantics.
+   * Keeps the visible editor text and React draft state in lockstep without trimming so the
+   * character counter can guide users back under the limit instead of blocking input.
    */
   function syncEditableText(
     editor: HTMLElement | null,
-    maxLength: number,
     updateDraft: (value: string) => void,
   ) {
     if (!editor) {
       return;
     }
 
-    const text = editor.textContent ?? "";
-    const limitedText = limitText(text, maxLength);
-
-    if (text !== limitedText) {
-      editor.textContent = limitedText;
-      const selection = window.getSelection();
-      const range = document.createRange();
-      range.selectNodeContents(editor);
-      range.collapse(false);
-      selection?.removeAllRanges();
-      selection?.addRange(range);
-    }
-
-    updateDraft(limitedText);
+    updateDraft(editor.textContent ?? "");
   }
 
   return (
@@ -326,57 +325,101 @@ export function SortableGroupRow({
             }}
           >
             <Box sx={{ minWidth: 0 }}>
-              <Typography
-                ref={titleEditorRef}
-                component="span"
-                variant="subtitle1"
-                role={isEditing ? "textbox" : undefined}
-                aria-label={isEditing ? "Group 标题" : undefined}
-                contentEditable={isEditing && !isPending}
-                data-placeholder="Group 标题"
-                suppressContentEditableWarning
-                onInput={
-                  isEditing
-                    ? () =>
-                        syncEditableText(
-                          titleEditorRef.current,
-                          GROUP_TITLE_MAX_LENGTH,
-                          setDraftTitle,
-                        )
-                    : undefined
-                }
-                sx={inlineEditTextSx({ active: isEditing, kind: "title" })}
+              <Box
+                sx={{
+                  display: "flex",
+                  alignItems: "baseline",
+                  gap: 0.75,
+                  maxWidth: "100%",
+                  flexWrap: "wrap",
+                }}
               >
-                {isEditing ? null : group.title}
-              </Typography>
-              <Typography
-                ref={descriptionEditorRef}
-                component="span"
-                variant="body2"
-                role={isEditing ? "textbox" : undefined}
-                aria-label={isEditing ? "Group 描述" : undefined}
-                color="text.secondary"
-                contentEditable={isEditing && !isPending}
-                data-placeholder="暂无 Group 描述。"
-                suppressContentEditableWarning
-                onInput={
-                  isEditing
-                    ? () =>
-                        syncEditableText(
-                          descriptionEditorRef.current,
-                          GROUP_DESCRIPTION_MAX_LENGTH,
-                          setDraftDescription,
-                        )
-                    : undefined
-                }
-                noWrap={!isEditing}
-                sx={inlineEditTextSx({
-                  active: isEditing,
-                  kind: "description",
-                })}
+                <Typography
+                  ref={titleEditorRef}
+                  component="span"
+                  variant="subtitle1"
+                  role={isEditing ? "textbox" : undefined}
+                  aria-label={isEditing ? "Group 标题" : undefined}
+                  contentEditable={isEditing && !isPending}
+                  data-placeholder="Group 标题"
+                  suppressContentEditableWarning
+                  onInput={
+                    isEditing
+                      ? () => syncEditableText(titleEditorRef.current, setDraftTitle)
+                      : undefined
+                  }
+                  sx={inlineEditTextSx({ active: isEditing, kind: "title" })}
+                >
+                  {isEditing ? null : group.title}
+                </Typography>
+                {isEditing ? (
+                  <Typography
+                    component="span"
+                    variant="caption"
+                    aria-live="polite"
+                    sx={{
+                      color: isTitleOverLimit ? "error.main" : "text.secondary",
+                      fontVariantNumeric: "tabular-nums",
+                      lineHeight: 1,
+                    }}
+                  >
+                    {draftTitle.length}/{GROUP_TITLE_MAX_LENGTH}
+                  </Typography>
+                ) : null}
+              </Box>
+              <Box
+                sx={{
+                  display: "flex",
+                  alignItems: "baseline",
+                  gap: 0.75,
+                  maxWidth: "100%",
+                  flexWrap: "wrap",
+                }}
               >
-                {isEditing ? null : group.description || "暂无 Group 描述。"}
-              </Typography>
+                <Typography
+                  ref={descriptionEditorRef}
+                  component="span"
+                  variant="body2"
+                  role={isEditing ? "textbox" : undefined}
+                  aria-label={isEditing ? "Group 描述" : undefined}
+                  color="text.secondary"
+                  contentEditable={isEditing && !isPending}
+                  data-placeholder="暂无 Group 描述。"
+                  suppressContentEditableWarning
+                  onInput={
+                    isEditing
+                      ? () =>
+                          syncEditableText(
+                            descriptionEditorRef.current,
+                            setDraftDescription,
+                          )
+                      : undefined
+                  }
+                  noWrap={!isEditing}
+                  sx={inlineEditTextSx({
+                    active: isEditing,
+                    kind: "description",
+                  })}
+                >
+                  {isEditing ? null : group.description || "暂无 Group 描述。"}
+                </Typography>
+                {isEditing ? (
+                  <Typography
+                    component="span"
+                    variant="caption"
+                    aria-live="polite"
+                    sx={{
+                      color: isDescriptionOverLimit
+                        ? "error.main"
+                        : "text.secondary",
+                      fontVariantNumeric: "tabular-nums",
+                      lineHeight: 1,
+                    }}
+                  >
+                    {draftDescription.length}/{GROUP_DESCRIPTION_MAX_LENGTH}
+                  </Typography>
+                ) : null}
+              </Box>
             </Box>
             <Stack
               direction={{ xs: "column", sm: "row" }}
@@ -478,7 +521,7 @@ export function SortableGroupRow({
                     <IconButton
                       size="small"
                       aria-label="保存 Group 元数据"
-                      disabled={isPending || Boolean(titleError)}
+                      disabled={isPending || hasMetadataError}
                       onPointerDown={stopPointerPropagation}
                       onClick={(event) => {
                         stopClickPropagation(event);
