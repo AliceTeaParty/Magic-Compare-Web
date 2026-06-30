@@ -39,6 +39,10 @@ function limitText(value: string, maxLength: number) {
   return value.slice(0, maxLength);
 }
 
+/**
+ * Lets the editor show temporary overflow while keeping save validation strict, which is easier to
+ * correct than silently rejecting keystrokes in a contentEditable field.
+ */
 function isOverLimit(value: string, maxLength: number) {
   return value.length > maxLength;
 }
@@ -369,6 +373,8 @@ export function SortableGroupRow({
               </Box>
               <Box
                 sx={{
+                  // This must stay a block-level flex row; inline-flex makes title and description
+                  // containers participate in the same text line and collapses the row hierarchy.
                   display: "flex",
                   alignItems: "baseline",
                   gap: 0.75,
@@ -511,6 +517,8 @@ export function SortableGroupRow({
                     display: "inline-flex",
                     justifyContent: "flex-start",
                     alignItems: "center",
+                    // Reserving the control slot keeps Internal/Public/Open from shifting when
+                    // the row switches between the Edit button and save/cancel icon pair.
                     minWidth: { xs: 84, md: 80 },
                     height: compactControlHeight,
                     lineHeight: 0,

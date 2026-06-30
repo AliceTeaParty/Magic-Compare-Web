@@ -42,6 +42,10 @@ function limitCaseSummary(value: string) {
   return value.slice(0, CASE_SUMMARY_MAX_LENGTH);
 }
 
+/**
+ * Keeps the over-limit check explicit because inline editing now permits temporary overflow so
+ * users can revise long text instead of being blocked at the exact character boundary.
+ */
 function isOverLimit(value: string, maxLength: number) {
   return value.length > maxLength;
 }
@@ -291,6 +295,8 @@ export function CaseWorkspaceBoard({
                     justifyContent: "flex-start",
                     gap: 0,
                     color: "text.primary",
+                    // A fixed action slot prevents Edit -> save/cancel icon swaps from nudging
+                    // the summary, status chips, or page actions during rapid editing.
                     width: 64,
                     height: 32,
                     lineHeight: 0,
