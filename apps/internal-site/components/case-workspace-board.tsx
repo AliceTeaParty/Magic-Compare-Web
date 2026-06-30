@@ -30,6 +30,7 @@ import { SortableContext, rectSortingStrategy } from "@dnd-kit/sortable";
 import { useRouter } from "next/navigation";
 import { motion } from "motion/react";
 import type { CaseWorkspaceData } from "@/lib/server/repositories/content-repository";
+import { inlineEditTextSx } from "./case-workspace/inline-edit-text-sx";
 import { WorkspaceNotifications } from "./case-workspace/notifications";
 import { SortableGroupRow } from "./case-workspace/sortable-group-row";
 import { useCaseWorkspaceActions } from "./case-workspace/use-case-workspace-actions";
@@ -229,10 +230,10 @@ export function CaseWorkspaceBoard({
               <Box
                 sx={{
                   alignItems: "center",
-                  display: "flex",
+                  display: "inline-flex",
                   flexWrap: "wrap",
-                  gap: 0.7,
-                  maxWidth: 860,
+                  gap: 0.65,
+                  maxWidth: "min(860px, 100%)",
                   color: "text.secondary",
                 }}
               >
@@ -249,32 +250,10 @@ export function CaseWorkspaceBoard({
                   onInput={
                     isEditingCaseSummary ? handleCaseSummaryInput : undefined
                   }
-                  sx={{
-                    display: "block",
-                    cursor: isEditingCaseSummary ? "text" : "inherit",
-                    lineHeight: 1.65,
-                    minWidth: "8ch",
-                    outline: 0,
-                    pb: "2px",
-                    position: "relative",
-                    whiteSpace: "pre-wrap",
-                    width: "fit-content",
-                    "&::after": {
-                      position: "absolute",
-                      right: 0,
-                      bottom: 0,
-                      left: 0,
-                      height: "1px",
-                      content: '""',
-                      backgroundColor: isEditingCaseSummary
-                        ? "currentColor"
-                        : "transparent",
-                    },
-                    "&:empty::before": {
-                      color: "text.disabled",
-                      content: "attr(data-placeholder)",
-                    },
-                  }}
+                  sx={inlineEditTextSx({
+                    active: isEditingCaseSummary,
+                    kind: "summary",
+                  })}
                 >
                   {isEditingCaseSummary
                     ? caseSummaryDraft
@@ -284,8 +263,12 @@ export function CaseWorkspaceBoard({
                   sx={{
                     display: "inline-flex",
                     alignItems: "center",
-                    gap: 0.25,
+                    justifyContent: "flex-start",
+                    gap: 0,
                     color: "text.primary",
+                    width: 64,
+                    height: 32,
+                    lineHeight: 0,
                   }}
                 >
                   {isEditingCaseSummary ? (
@@ -296,8 +279,8 @@ export function CaseWorkspaceBoard({
                         disabled={isPending}
                         onClick={saveCaseSummary}
                         sx={{
-                          width: 30,
-                          height: 30,
+                          width: 32,
+                          height: 32,
                           borderRadius: 999,
                           border: 0,
                           backgroundColor: "transparent",
@@ -311,8 +294,8 @@ export function CaseWorkspaceBoard({
                         disabled={isPending}
                         onClick={cancelCaseSummaryEdit}
                         sx={{
-                          width: 30,
-                          height: 30,
+                          width: 32,
+                          height: 32,
                           borderRadius: 999,
                           border: 0,
                           backgroundColor: "transparent",
@@ -331,8 +314,6 @@ export function CaseWorkspaceBoard({
                         setIsEditingCaseSummary(true);
                       }}
                       sx={{
-                        ml: 0.65,
-                        mt: -0.35,
                         width: 32,
                         height: 32,
                         verticalAlign: "middle",

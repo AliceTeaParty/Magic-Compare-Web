@@ -29,6 +29,7 @@ import type {
 } from "react";
 import { useEffect, useRef, useState } from "react";
 import type { CaseWorkspaceData } from "@/lib/server/repositories/content-repository";
+import { inlineEditTextSx } from "./inline-edit-text-sx";
 
 type GroupItem = CaseWorkspaceData["groups"][number];
 const GROUP_TITLE_MAX_LENGTH = 16;
@@ -238,52 +239,6 @@ export function SortableGroupRow({
     updateDraft(limitedText);
   }
 
-  /**
-   * Summary and group metadata use the same underline affordance, so the active state is drawn with
-   * a pseudo-element instead of changing border metrics and nudging text during edit.
-   */
-  function inlineEditTextSx(isTitle: boolean, isActive: boolean) {
-    const baseSx = {
-      display: "block",
-      maxWidth: "100%",
-      outline: 0,
-      pb: "2px",
-      position: "relative",
-      whiteSpace: "pre-wrap",
-      width: "fit-content",
-      "&::after": {
-        position: "absolute",
-        right: 0,
-        bottom: 0,
-        left: 0,
-        height: "1px",
-        content: '""',
-        backgroundColor: isActive ? "currentColor" : "transparent",
-      },
-      "&:empty::before": {
-        color: "text.disabled",
-        content: "attr(data-placeholder)",
-      },
-    };
-
-    return isTitle
-      ? {
-          ...baseSx,
-          cursor: isActive ? "text" : "inherit",
-          fontWeight: 600,
-          lineHeight: 1.15,
-          minWidth: "4ch",
-        }
-      : {
-          ...baseSx,
-          cursor: isActive ? "text" : "inherit",
-          lineHeight: 1.6,
-          minHeight: "1.6em",
-          minWidth: "6ch",
-          mt: 0.6,
-        };
-  }
-
   return (
     <ListItem
       ref={setNodeRef}
@@ -361,7 +316,7 @@ export function SortableGroupRow({
                         )
                     : undefined
                 }
-                sx={inlineEditTextSx(true, isEditing)}
+                sx={inlineEditTextSx({ active: isEditing, kind: "title" })}
               >
                 {isEditing ? draftTitle : group.title}
               </Typography>
@@ -386,7 +341,10 @@ export function SortableGroupRow({
                     : undefined
                 }
                 noWrap={!isEditing}
-                sx={inlineEditTextSx(false, isEditing)}
+                sx={inlineEditTextSx({
+                  active: isEditing,
+                  kind: "description",
+                })}
               >
                 {isEditing
                   ? draftDescription
@@ -478,8 +436,18 @@ export function SortableGroupRow({
                     Public
                   </ToggleButton>
                 </ToggleButtonGroup>
-                {isEditing ? (
-                  <Stack direction="row" spacing={0.25} alignItems="center">
+                <Box
+                  sx={{
+                    display: "inline-flex",
+                    justifyContent: "flex-start",
+                    alignItems: "center",
+                    minWidth: { xs: 84, md: 80 },
+                    height: compactControlHeight,
+                    lineHeight: 0,
+                  }}
+                >
+                  {isEditing ? (
+                    <>
                     <IconButton
                       size="small"
                       aria-label="保存 Group 元数据"
@@ -514,23 +482,28 @@ export function SortableGroupRow({
                     >
                       <Close fontSize="small" />
                     </IconButton>
-                  </Stack>
-                ) : (
-                  <Button
-                    variant="text"
-                    size="small"
-                    startIcon={<EditOutlined />}
-                    disabled={isPending}
-                    onPointerDown={stopPointerPropagation}
-                    onClick={(event) => {
-                      stopClickPropagation(event);
-                      startMetadataEdit();
-                    }}
-                    sx={{ minHeight: compactControlHeight, px: 1.15 }}
-                  >
-                    Edit
-                  </Button>
-                )}
+                    </>
+                  ) : (
+                    <Button
+                      variant="text"
+                      size="small"
+                      startIcon={<EditOutlined />}
+                      disabled={isPending}
+                      onPointerDown={stopPointerPropagation}
+                      onClick={(event) => {
+                        stopClickPropagation(event);
+                        startMetadataEdit();
+                      }}
+                      sx={{
+                        minHeight: compactControlHeight,
+                        minWidth: { xs: 84, md: 80 },
+                        px: 1.15,
+                      }}
+                    >
+                      Edit
+                    </Button>
+                  )}
+                </Box>
                 <Button
                   component={Link}
                   href={`/cases/${caseSlug}/groups/${group.slug}`}

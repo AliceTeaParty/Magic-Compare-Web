@@ -10,6 +10,14 @@
 - 如果实现中发现原问题判断有误，先更新该条描述，再进入开发
 - 新增 UI/UX 问题时，按优先级插入本清单，不另起散落文档
 
+## 前端细节修复经验
+
+- Inline edit 不应在编辑态改变真实盒模型。下划线、焦点线这类 affordance 优先用伪元素绘制，并在非编辑态预留相同空间，避免 `border` / `padding` 切换造成 1px 位移。
+- 同一位置的按钮状态切换必须固定控制槽尺寸。`Edit` 切换为保存/取消图标时，按钮组宽高、行高和对齐方式应保持稳定，避免文本、chips、页面按钮和下方列表一起抖动。
+- `contentEditable` 更像“文档正文”而不是表单控件。Case summary 和 Group metadata 应复用同一套文本 affordance，限制长度和同步 draft 状态放在逻辑层，视觉层保持自然 inline。
+- 验证布局位移时要等页面入场动画结束后再量坐标。否则会把 motion 动画误判为编辑态布局回流。
+- 保存动作不应触发整页刷新或 replay 入口动画，除非确实需要重新拉取服务端数据。局部 optimistic state 能覆盖的元数据编辑应优先局部更新。
+
 ## P1
 
 - [ ] Catalog 增加 `search + status filter + updated sort`
