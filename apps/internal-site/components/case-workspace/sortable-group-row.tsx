@@ -27,7 +27,7 @@ import type {
   MouseEvent as ReactMouseEvent,
   PointerEvent as ReactPointerEvent,
 } from "react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { CaseWorkspaceData } from "@/lib/server/repositories/content-repository";
 import { inlineEditTextSx } from "./inline-edit-text-sx";
 
@@ -105,6 +105,10 @@ export function SortableGroupRow({
   );
   const titleEditorRef = useRef<HTMLElement | null>(null);
   const descriptionEditorRef = useRef<HTMLElement | null>(null);
+  const editSeedRef = useRef({
+    title: limitText(group.title, GROUP_TITLE_MAX_LENGTH),
+    description: limitText(group.description, GROUP_DESCRIPTION_MAX_LENGTH),
+  });
   const titleError = draftTitle.trim() ? null : "标题不能为空。";
   const { attributes, listeners, setNodeRef, transform, transition } =
     useSortable({ id: group.id });
@@ -118,10 +122,28 @@ export function SortableGroupRow({
     }
   }, [group.description, group.title, isEditing]);
 
-  useEffect(() => {
-    if (isEditing) {
-      titleEditorRef.current?.focus();
+  useLayoutEffect(() => {
+    if (!isEditing) {
+      return;
     }
+
+    const titleEditor = titleEditorRef.current;
+    const descriptionEditor = descriptionEditorRef.current;
+    if (!titleEditor || !descriptionEditor) {
+      return;
+    }
+
+    // Keep React out of the live contentEditable text path; otherwise every draft update can
+    // recreate text nodes and move the caret back to the start.
+    titleEditor.textContent = editSeedRef.current.title;
+    descriptionEditor.textContent = editSeedRef.current.description;
+    titleEditor.focus();
+    const selection = window.getSelection();
+    const range = document.createRange();
+    range.selectNodeContents(titleEditor);
+    range.collapse(false);
+    selection?.removeAllRanges();
+    selection?.addRange(range);
   }, [isEditing]);
 
   /**
@@ -162,10 +184,17 @@ export function SortableGroupRow({
    * cannot leak stale text into the inline editor.
    */
   function startMetadataEdit() {
-    setDraftTitle(limitText(group.title, GROUP_TITLE_MAX_LENGTH));
-    setDraftDescription(
-      limitText(group.description, GROUP_DESCRIPTION_MAX_LENGTH),
+    const nextTitle = limitText(group.title, GROUP_TITLE_MAX_LENGTH);
+    const nextDescription = limitText(
+      group.description,
+      GROUP_DESCRIPTION_MAX_LENGTH,
     );
+    editSeedRef.current = {
+      title: nextTitle,
+      description: nextDescription,
+    };
+    setDraftTitle(nextTitle);
+    setDraftDescription(nextDescription);
     setIsEditing(true);
   }
 
@@ -318,7 +347,7 @@ export function SortableGroupRow({
                 }
                 sx={inlineEditTextSx({ active: isEditing, kind: "title" })}
               >
-                {isEditing ? draftTitle : group.title}
+                {isEditing ? null : group.title}
               </Typography>
               <Typography
                 ref={descriptionEditorRef}
@@ -346,9 +375,7 @@ export function SortableGroupRow({
                   kind: "description",
                 })}
               >
-                {isEditing
-                  ? draftDescription
-                  : group.description || "暂无 Group 描述。"}
+                {isEditing ? null : group.description || "暂无 Group 描述。"}
               </Typography>
             </Box>
             <Stack

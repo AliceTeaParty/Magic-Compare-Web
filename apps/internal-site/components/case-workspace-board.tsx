@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, useTransition } from "react";
 import {
   ArrowBack,
   Check,
@@ -67,6 +67,7 @@ export function CaseWorkspaceBoard({
   );
   const [isEditingCaseSummary, setIsEditingCaseSummary] = useState(false);
   const caseSummaryEditorRef = useRef<HTMLElement | null>(null);
+  const caseSummaryEditSeedRef = useRef(limitCaseSummary(data.summary));
   const [isPending, startTransition] = useTransition();
   const workspaceNotifications = useWorkspaceNotifications();
   const { dismissNotification, notifications, pushNotification } =
@@ -110,10 +111,25 @@ export function CaseWorkspaceBoard({
     }
   }, [data.summary, isEditingCaseSummary, lastServerSummary]);
 
-  useEffect(() => {
-    if (isEditingCaseSummary) {
-      caseSummaryEditorRef.current?.focus();
+  useLayoutEffect(() => {
+    if (!isEditingCaseSummary) {
+      return;
     }
+
+    const editor = caseSummaryEditorRef.current;
+    if (!editor) {
+      return;
+    }
+
+    // React must not control contentEditable children during typing; seed the DOM once instead.
+    editor.textContent = caseSummaryEditSeedRef.current;
+    editor.focus();
+    const selection = window.getSelection();
+    const range = document.createRange();
+    range.selectNodeContents(editor);
+    range.collapse(false);
+    selection?.removeAllRanges();
+    selection?.addRange(range);
   }, [isEditingCaseSummary]);
 
   useEffect(() => {
@@ -255,9 +271,7 @@ export function CaseWorkspaceBoard({
                     kind: "summary",
                   })}
                 >
-                  {isEditingCaseSummary
-                    ? caseSummaryDraft
-                    : caseSummary || "暂无 Case 描述。"}
+                  {isEditingCaseSummary ? null : caseSummary || "暂无 Case 描述。"}
                 </Typography>
                 <Box
                   sx={{
@@ -310,7 +324,9 @@ export function CaseWorkspaceBoard({
                       size="small"
                       disabled={isPending}
                       onClick={() => {
-                        setCaseSummaryDraft(caseSummary);
+                        const nextDraft = limitCaseSummary(caseSummary);
+                        caseSummaryEditSeedRef.current = nextDraft;
+                        setCaseSummaryDraft(nextDraft);
                         setIsEditingCaseSummary(true);
                       }}
                       sx={{
