@@ -1,6 +1,10 @@
 import { createHash } from "node:crypto";
 import { z } from "zod";
-import { AssetKindSchema, ViewerModeSchema } from "@magic-compare/content-schema";
+import {
+  AssetKindSchema,
+  SlugSchema,
+  ViewerModeSchema,
+} from "@magic-compare/content-schema";
 
 const Sha256Schema = z.string().regex(/^[a-f0-9]{64}$/i);
 const ExtensionSchema = z.string().regex(/^\.[a-z0-9]+$/i);
@@ -33,14 +37,14 @@ export const UploadFrameDescriptorSchema = z.object({
 
 export const GroupUploadStartInputSchema = z.object({
   case: z.object({
-    slug: z.string().min(1),
+    slug: SlugSchema,
     title: z.string().min(1),
     summary: z.string().default(""),
     tags: z.array(z.string().min(1)).default([]),
     coverAssetLabel: z.string().min(1).nullable().default(null),
   }),
   group: z.object({
-    slug: z.string().min(1),
+    slug: SlugSchema,
     title: z.string().min(1),
     description: z.string().default(""),
     order: z.number().int().nonnegative(),

@@ -23,7 +23,7 @@ export const CaseStatusSchema = z.enum(CASE_STATUSES);
 export const ViewerModeSchema = z.enum(VIEWER_MODES);
 export const AssetKindSchema = z.enum(ASSET_KINDS);
 
-const SlugSchema = z
+export const SlugSchema = z
   .string()
   .min(1)
   .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/);

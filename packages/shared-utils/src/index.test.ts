@@ -6,6 +6,10 @@ describe("shared slug helpers", () => {
     expect(kebabCase(" Demo Grain Study ")).toBe("demo-grain-study");
   });
 
+  it("collapses repeated separators so public slug delimiters stay reserved", () => {
+    expect(kebabCase("bad--case")).toBe("bad-case");
+  });
+
   it("preserves the double-hyphen separator for public group slugs", () => {
     expect(buildPublicGroupSlug("demo-grain-study", "banding-check")).toBe(
       "demo-grain-study--banding-check",
