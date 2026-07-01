@@ -21,7 +21,7 @@ export default function NotFoundPage() {
           <Typography variant="body1" color="text.secondary">
             Public galleries are link-only. This address does not map to a published compare group.
           </Typography>
-          <Button href="https://example.com" variant="outlined" disabled>
+          <Button variant="outlined" disabled>
             Link required
           </Button>
         </Stack>
