@@ -44,7 +44,7 @@ export function InternalCatalogHeader() {
           startIcon={<CloudUpload />}
           sx={{ justifySelf: { xs: "start", md: "end" }, minHeight: 42 }}
         >
-          上传 Group
+          上传对比
         </Button>
       </Box>
     </Stack>

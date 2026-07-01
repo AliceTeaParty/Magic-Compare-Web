@@ -1,7 +1,7 @@
 "use client";
 
 import {
-  ChangeEvent,
+  type ChangeEvent,
   useEffect,
   useMemo,
   useRef,
@@ -9,22 +9,17 @@ import {
 } from "react";
 import {
   ArrowBack,
-  CheckCircle,
   CloudUpload,
   FolderOpen,
   OpenInNew,
   Pause,
   Refresh,
-  WarningAmber,
 } from "@mui/icons-material";
 import {
-  Alert,
   Box,
   Button,
-  Checkbox,
   Chip,
   FormControl,
-  FormControlLabel,
   InputLabel,
   LinearProgress,
   MenuItem,
@@ -39,49 +34,34 @@ import { kebabCase } from "@magic-compare/shared-utils";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { CaseCatalogItem } from "@/lib/server/repositories/content-repository";
+import { AppNotifications } from "../notifications/app-notifications";
+import { useAppNotifications } from "../notifications/use-app-notifications";
 import { generateUploadFrames, type GenerationProgress } from "./asset-generator";
 import { scanBrowserUploadFiles } from "./source-scanner";
 import { WebUploadRunner } from "./upload-runner";
+import { PairingPreviewPanel } from "./web-upload-pairing-preview";
 import type {
   BrowserUploadFile,
   GeneratedUploadFrame,
   UploadRunnerSnapshot,
   WebUploadPlan,
 } from "./web-upload-types";
+import {
+  buildPlanView,
+  reorderUploadPlan,
+  type PlanView,
+} from "./web-upload-view-model";
 
 const DEFAULT_NEW_CASE_SLUG = "new-case";
 const DEFAULT_NEW_CASE_TITLE = "New Case";
 const INPUT_HASH_STORAGE_PREFIX = "magic_compare_web_upload:";
+const UPLOAD_QUEUE_VISIBLE_LIMIT = 12;
+const BROWSER_RECOMMENDATION_MESSAGE = "推荐使用 Chrome / Edge 选择整个目录上传。";
+const UPLOAD_PRIMARY_TEXT = "rgba(24, 15, 31, 0.92)";
 
 interface WebUploadWorkbenchProps {
   cases: CaseCatalogItem[];
   initialCaseSlug: string | null;
-}
-
-interface FramePreviewRow {
-  order: number;
-  title: string;
-  beforePath: string;
-  afterPath: string;
-  heatmapPath: string | null;
-  miscCount: number;
-}
-
-interface PlanView {
-  sourceRootName: string;
-  suggestedGroupSlug: string;
-  suggestedGroupTitle: string;
-  frames: FramePreviewRow[];
-  ignoredCount: number;
-  warningCount: number;
-  errorCount: number;
-  issues: Array<{ severity: "warning" | "error"; message: string; path: string }>;
-}
-
-interface PreviewPair {
-  title: string;
-  beforeUrl: string;
-  afterUrl: string;
 }
 
 type BrowserDirectoryHandle = {
@@ -95,6 +75,24 @@ type BrowserFileSystemHandle =
 
 type DirectoryPickerWindow = Window & {
   showDirectoryPicker?: () => Promise<BrowserDirectoryHandle>;
+};
+
+const panelSx = {
+  p: { xs: 1.7, md: 2 },
+  borderRadius: 3,
+  border: "1px solid",
+  borderColor: "divider",
+  background:
+    "linear-gradient(180deg, rgba(255,255,255,0.055) 0%, rgba(255,255,255,0.02) 100%)",
+};
+
+const uploadFieldSx = {
+  "& .MuiOutlinedInput-root": {
+    borderRadius: 1.5,
+  },
+  "& .MuiOutlinedInput-root.MuiInputBase-multiline": {
+    borderRadius: 1.5,
+  },
 };
 
 function normalizeSlug(value: string, fallback = "uploaded-group") {
@@ -118,30 +116,6 @@ function buildInitialSnapshot(): UploadRunnerSnapshot {
   };
 }
 
-function buildPlanView(plan: WebUploadPlan): PlanView {
-  return {
-    sourceRootName: plan.sourceRootName,
-    suggestedGroupSlug: plan.suggestedGroupSlug,
-    suggestedGroupTitle: plan.suggestedGroupTitle,
-    frames: plan.frames.map((frame) => ({
-      order: frame.order,
-      title: frame.title,
-      beforePath: frame.before.source.relativePath,
-      afterPath: frame.after.source.relativePath,
-      heatmapPath: frame.heatmap?.source.relativePath ?? null,
-      miscCount: frame.misc.length,
-    })),
-    ignoredCount: plan.ignoredFiles.length,
-    warningCount: plan.issues.filter((issue) => issue.severity === "warning").length,
-    errorCount: plan.issues.filter((issue) => issue.severity === "error").length,
-    issues: plan.issues.map((issue) => ({
-      severity: issue.severity,
-      message: issue.message,
-      path: issue.path,
-    })),
-  };
-}
-
 function guessCaseTitle(slug: string) {
   return slug
     .split("-")
@@ -150,11 +124,11 @@ function guessCaseTitle(slug: string) {
     .join(" ");
 }
 
-function getCaseInput(cases: CaseCatalogItem[], selectedCaseSlug: string, newCase: {
-  slug: string;
-  title: string;
-  summary: string;
-}) {
+function getCaseInput(
+  cases: CaseCatalogItem[],
+  selectedCaseSlug: string,
+  newCase: { slug: string; title: string; summary: string },
+) {
   const existing = cases.find((item) => item.slug === selectedCaseSlug);
   if (existing) {
     return {
@@ -212,14 +186,6 @@ function filesFromInput(fileList: FileList): BrowserUploadFile[] {
   }));
 }
 
-function createPreviewPairs(plan: WebUploadPlan) {
-  return plan.frames.slice(0, 5).map((frame) => ({
-    title: frame.title,
-    beforeUrl: URL.createObjectURL(frame.before.source.file),
-    afterUrl: URL.createObjectURL(frame.after.source.file),
-  }));
-}
-
 /**
  * Upload resume hints are helpful but optional; blocked storage must not break the live upload
  * runner after frames have already been generated.
@@ -243,150 +209,39 @@ function StatChip({ label, value }: { label: string; value: string | number }) {
     <Chip
       label={`${label} ${value}`}
       variant="outlined"
-      sx={{ height: 34, "& .MuiChip-label": { px: 1.35 } }}
+      sx={{ height: 32, "& .MuiChip-label": { px: 1.2 } }}
     />
   );
 }
 
-function PreviewStrip({ pairs }: { pairs: PreviewPair[] }) {
-  if (pairs.length === 0) {
-    return null;
+function stageLabel(stage: UploadRunnerSnapshot["stage"]) {
+  if (stage === "generating") {
+    return "生成中";
   }
-
-  return (
-    <Box
-      sx={{
-        display: "grid",
-        gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))",
-        gap: 1.1,
-      }}
-    >
-      {pairs.map((pair) => (
-        <Box
-          key={pair.title}
-          sx={{
-            border: "1px solid",
-            borderColor: "divider",
-            borderRadius: 2,
-            overflow: "hidden",
-            backgroundColor: "rgba(255,255,255,0.035)",
-          }}
-        >
-          <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr" }}>
-            <Box
-              component="img"
-              src={pair.beforeUrl}
-              alt={`${pair.title} before preview`}
-              sx={{ width: "100%", aspectRatio: "4 / 3", objectFit: "cover" }}
-            />
-            <Box
-              component="img"
-              src={pair.afterUrl}
-              alt={`${pair.title} after preview`}
-              sx={{ width: "100%", aspectRatio: "4 / 3", objectFit: "cover" }}
-            />
-          </Box>
-          <Typography
-            variant="caption"
-            sx={{ display: "block", px: 1, py: 0.75, color: "text.secondary" }}
-          >
-            {pair.title}
-          </Typography>
-        </Box>
-      ))}
-    </Box>
-  );
-}
-
-function PairingTable({ rows }: { rows: FramePreviewRow[] }) {
-  if (rows.length === 0) {
-    return (
-      <Typography color="text.secondary" sx={{ py: 3 }}>
-        选择文件夹后会显示 before / after 配对结果。
-      </Typography>
-    );
+  if (stage === "uploading") {
+    return "上传中";
   }
-
-  return (
-    <Box
-      sx={{
-        display: "grid",
-        maxHeight: 430,
-        overflow: "auto",
-        border: "1px solid",
-        borderColor: "divider",
-        borderRadius: 2,
-      }}
-    >
-      <Box
-        sx={{
-          display: "grid",
-          gridTemplateColumns: "74px minmax(0, 1fr) minmax(0, 1fr) minmax(116px, 0.45fr)",
-          gap: 1,
-          px: 1.35,
-          py: 1,
-          position: "sticky",
-          top: 0,
-          zIndex: 1,
-          color: "text.secondary",
-          backgroundColor: "rgba(10, 24, 51, 0.96)",
-          borderBottom: "1px solid",
-          borderColor: "divider",
-          fontSize: 13,
-        }}
-      >
-        <span>索引</span>
-        <span>before</span>
-        <span>after</span>
-        <span>heatmap</span>
-      </Box>
-      {rows.map((row) => (
-        <Box
-          key={row.order}
-          sx={{
-            display: "grid",
-            gridTemplateColumns: "74px minmax(0, 1fr) minmax(0, 1fr) minmax(116px, 0.45fr)",
-            gap: 1,
-            px: 1.35,
-            py: 1.1,
-            borderBottom: "1px solid",
-            borderColor: "rgba(255,255,255,0.075)",
-            contentVisibility: "auto",
-            containIntrinsicSize: "56px",
-            alignItems: "center",
-            "&:last-of-type": { borderBottom: 0 },
-          }}
-        >
-          <Typography variant="body2" color="text.secondary">
-            {String(row.order + 1).padStart(3, "0")}
-          </Typography>
-          <Typography variant="body2" noWrap title={row.beforePath}>
-            {row.beforePath}
-          </Typography>
-          <Typography variant="body2" noWrap title={row.afterPath}>
-            {row.afterPath}
-          </Typography>
-          <Typography variant="body2" color="text.secondary" noWrap>
-            {row.heatmapPath ? "显式文件" : "浏览器生成"}
-          </Typography>
-        </Box>
-      ))}
-    </Box>
-  );
+  if (stage === "completed") {
+    return "完成";
+  }
+  if (stage === "failed") {
+    return "失败";
+  }
+  return "待上传";
 }
 
 function UploadQueue({ snapshot }: { snapshot: UploadRunnerSnapshot }) {
   if (snapshot.frames.length === 0) {
     return (
-      <Typography color="text.secondary" sx={{ py: 2 }}>
-        上传开始后会显示每个 frame 的进度。
+      <Typography color="text.secondary" sx={{ py: 1.2 }}>
+        等待上传。
       </Typography>
     );
   }
 
   return (
     <Stack spacing={0.75}>
-      {snapshot.frames.slice(0, 12).map((frame) => {
+      {snapshot.frames.slice(0, UPLOAD_QUEUE_VISIBLE_LIMIT).map((frame) => {
         const progress =
           frame.totalFiles > 0 ? (frame.completedFiles / frame.totalFiles) * 100 : 0;
         return (
@@ -396,13 +251,13 @@ function UploadQueue({ snapshot }: { snapshot: UploadRunnerSnapshot }) {
               display: "grid",
               gridTemplateColumns: {
                 xs: "1fr",
-                sm: "minmax(0, 1fr) 88px minmax(120px, 0.55fr)",
+                sm: "minmax(0, 1fr) 78px minmax(105px, 0.5fr)",
               },
-              gap: 1,
+              gap: 0.9,
               alignItems: "center",
-              px: 1.2,
-              py: 0.9,
-              borderRadius: 1.5,
+              px: 1,
+              py: 0.8,
+              borderRadius: 1.25,
               backgroundColor: "rgba(255,255,255,0.035)",
             }}
           >
@@ -430,18 +285,69 @@ function UploadQueue({ snapshot }: { snapshot: UploadRunnerSnapshot }) {
           </Box>
         );
       })}
-      {snapshot.frames.length > 12 ? (
+      {snapshot.frames.length > UPLOAD_QUEUE_VISIBLE_LIMIT ? (
         <Typography variant="caption" color="text.secondary">
-          仅显示前 12 项；其余 frame 会继续上传。
+          仅显示前 {UPLOAD_QUEUE_VISIBLE_LIMIT} 项；其余{" "}
+          {snapshot.frames.length - UPLOAD_QUEUE_VISIBLE_LIMIT} 个 frame 会继续上传。
         </Typography>
       ) : null}
     </Stack>
   );
 }
 
+function UploadProgress({
+  generationProgress,
+  overallProgress,
+  snapshot,
+}: {
+  generationProgress: GenerationProgress | null;
+  overallProgress: number;
+  snapshot: UploadRunnerSnapshot;
+}) {
+  return (
+    <Stack spacing={1.35}>
+      {generationProgress ? (
+        <Box>
+          <Stack direction="row" justifyContent="space-between" spacing={1}>
+            <Typography variant="body2">{generationProgress.label}</Typography>
+            <Typography variant="body2" color="text.secondary">
+              {generationProgress.completed}/{generationProgress.total}
+            </Typography>
+          </Stack>
+          <LinearProgress
+            variant="determinate"
+            value={(generationProgress.completed / generationProgress.total) * 100}
+            sx={{ mt: 0.8, height: 7, borderRadius: 999 }}
+          />
+        </Box>
+      ) : null}
+
+      {snapshot.totalFiles > 0 ? (
+        <Box>
+          <Stack direction="row" justifyContent="space-between" spacing={1}>
+            <Typography variant="body2">
+              {snapshot.completedFrames}/{snapshot.totalFrames} frames committed
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              {Math.round(overallProgress)}%
+            </Typography>
+          </Stack>
+          <LinearProgress
+            variant="determinate"
+            value={overallProgress}
+            sx={{ mt: 0.8, height: 7, borderRadius: 999 }}
+          />
+        </Box>
+      ) : null}
+
+      <UploadQueue snapshot={snapshot} />
+    </Stack>
+  );
+}
+
 /**
- * Presents upload as a focused workbench: files and metadata on the left, pairing and queue state
- * on the right. Heavy File/Blob data stays in refs and the upload runner.
+ * Presents upload as a focused workbench. Heavy File/Blob data stays in refs and the upload runner;
+ * React only keeps compact render models so large directories do not become component state.
  */
 export function WebUploadWorkbench({
   cases,
@@ -453,6 +359,8 @@ export function WebUploadWorkbench({
   const generatedFramesRef = useRef<GeneratedUploadFrame[] | null>(null);
   const runnerRef = useRef<WebUploadRunner | null>(null);
   const unsubscribeRunnerRef = useRef<(() => void) | null>(null);
+  const { dismissNotification, notifications, pushNotification } =
+    useAppNotifications();
   const [selectedCaseSlug, setSelectedCaseSlug] = useState(() => {
     if (initialCaseSlug && cases.some((item) => item.slug === initialCaseSlug)) {
       return initialCaseSlug;
@@ -471,13 +379,12 @@ export function WebUploadWorkbench({
     defaultMode: "before-after" as ViewerMode,
   });
   const [planView, setPlanView] = useState<PlanView | null>(null);
-  const [previewPairs, setPreviewPairs] = useState<PreviewPair[]>([]);
   const [generationProgress, setGenerationProgress] =
     useState<GenerationProgress | null>(null);
+  const [expandedFrameId, setExpandedFrameId] = useState<string | null>(null);
   const [snapshot, setSnapshot] = useState<UploadRunnerSnapshot>(() =>
     buildInitialSnapshot(),
   );
-  const [message, setMessage] = useState("推荐使用 Chrome / Edge 选择整个目录上传。");
 
   const isLocked =
     snapshot.stage === "generating" ||
@@ -498,13 +405,10 @@ export function WebUploadWorkbench({
   );
 
   useEffect(() => {
-    return () => {
-      for (const pair of previewPairs) {
-        URL.revokeObjectURL(pair.beforeUrl);
-        URL.revokeObjectURL(pair.afterUrl);
-      }
-    };
-  }, [previewPairs]);
+    pushNotification(BROWSER_RECOMMENDATION_MESSAGE, "info", {
+      key: "web-upload-browser-recommendation",
+    });
+  }, [pushNotification]);
 
   useEffect(() => {
     return () => {
@@ -515,7 +419,7 @@ export function WebUploadWorkbench({
 
   /**
    * Runs the scanner and stores the heavy plan outside React state; the component receives only a
-   * compact render model and short-lived object URLs for the first few previews.
+   * compact render model. Row previews create object URLs lazily inside the expanded row.
    */
   function applyScannedFiles(entries: BrowserUploadFile[], sourceRootName: string) {
     const plan = scanBrowserUploadFiles(entries, sourceRootName);
@@ -527,6 +431,7 @@ export function WebUploadWorkbench({
     unsubscribeRunnerRef.current = null;
     setSnapshot({ ...buildInitialSnapshot(), stage: "scanned" });
     setGenerationProgress(null);
+    setExpandedFrameId(null);
     setGroupMeta((current) => ({
       ...current,
       slug: current.slug === "uploaded-group" ? plan.suggestedGroupSlug : current.slug,
@@ -534,17 +439,12 @@ export function WebUploadWorkbench({
         current.title === "Uploaded Group" ? plan.suggestedGroupTitle : current.title,
     }));
     setPlanView(buildPlanView(plan));
-    setPreviewPairs((current) => {
-      for (const pair of current) {
-        URL.revokeObjectURL(pair.beforeUrl);
-        URL.revokeObjectURL(pair.afterUrl);
-      }
-      return createPreviewPairs(plan);
-    });
-    setMessage(
+    pushNotification(
       plan.issues.some((issue) => issue.severity === "error")
         ? "预演发现阻塞问题，请先修正文件夹。"
         : "预演完成，可以开始上传。",
+      plan.issues.some((issue) => issue.severity === "error") ? "warning" : "success",
+      { key: "web-upload-scan-result" },
     );
   }
 
@@ -567,7 +467,11 @@ export function WebUploadWorkbench({
       if (error instanceof DOMException && error.name === "AbortError") {
         return;
       }
-      setMessage(error instanceof Error ? error.message : "读取目录失败。");
+      pushNotification(
+        error instanceof Error ? error.message : "读取目录失败。",
+        "error",
+        { key: "web-upload-directory-error" },
+      );
     }
   }
 
@@ -595,9 +499,13 @@ export function WebUploadWorkbench({
     }
 
     setSnapshot({ ...buildInitialSnapshot(), stage: "generating", message: "正在生成资源。" });
-    const frames = await generateUploadFrames(plan.frames, (progress) => {
-      setGenerationProgress(progress);
-    });
+    const frames = await generateUploadFrames(
+      plan.frames,
+      (progress) => {
+        setGenerationProgress(progress);
+      },
+      { generateMissingHeatmap: true },
+    );
     generatedFramesRef.current = frames;
     setSnapshot({ ...buildInitialSnapshot(), stage: "ready", message: "资源生成完成。" });
     return frames;
@@ -641,6 +549,9 @@ export function WebUploadWorkbench({
 
       await runner.start();
     } catch (error) {
+      pushNotification(error instanceof Error ? error.message : "上传失败。", "error", {
+        key: "web-upload-runner-error",
+      });
       setSnapshot({
         ...buildInitialSnapshot(),
         stage: "failed",
@@ -662,401 +573,271 @@ export function WebUploadWorkbench({
     router.push(`/cases/${result.caseSlug}/groups/${result.groupSlug}`);
   }
 
+  function reorderPairingRows(activeFrameId: string, overFrameId: string | null) {
+    if (snapshot.stage !== "scanned") {
+      return;
+    }
+
+    const plan = planRef.current;
+    if (!plan) {
+      return;
+    }
+
+    const reorderedPlan = reorderUploadPlan(plan, activeFrameId, overFrameId);
+    if (!reorderedPlan) {
+      return;
+    }
+
+    planRef.current = reorderedPlan;
+    // Generated blobs embed frame order in upload descriptors, so any pre-upload reorder must
+    // invalidate cached generation output before the user starts the final upload.
+    generatedFramesRef.current = null;
+    setPlanView(buildPlanView(reorderedPlan));
+  }
+
   return (
-    <Stack spacing={{ xs: 2.4, md: 3 }}>
-      <Stack
-        direction={{ xs: "column", md: "row" }}
-        justifyContent="space-between"
-        alignItems={{ xs: "stretch", md: "flex-start" }}
-        spacing={1.5}
-      >
-        <Stack spacing={0.8}>
-          <Typography variant="h2" component="h1" sx={{ lineHeight: 1.02 }}>
-            上传 Group
+    <>
+      <Stack spacing={{ xs: 1.8, md: 2 }}>
+        <Stack
+          direction={{ xs: "column", sm: "row" }}
+          justifyContent="space-between"
+          alignItems={{ xs: "stretch", sm: "center" }}
+          spacing={1.2}
+        >
+          <Typography
+            variant="h4"
+            component="h1"
+            sx={{ lineHeight: 1.05, fontSize: { xs: "2rem", md: "2.35rem" } }}
+          >
+            上传对比
           </Typography>
-          <Typography color="text.secondary" sx={{ maxWidth: 720 }}>
-            从本地 before / after 图片目录创建 internal Group。不会自动发布公开站点。
-          </Typography>
+          <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+            <Button component={Link} href="/" variant="text" startIcon={<ArrowBack />}>
+              返回
+            </Button>
+            {snapshot.stage === "uploading" ? (
+              <Button variant="outlined" startIcon={<Pause />} onClick={pauseUpload}>
+                暂停
+              </Button>
+            ) : (
+              <Button
+                variant="contained"
+                startIcon={snapshot.stage === "failed" ? <Refresh /> : <CloudUpload />}
+                disabled={
+                  !canStart ||
+                  snapshot.stage === "generating" ||
+                  snapshot.stage === "completed"
+                }
+                onClick={startOrResumeUpload}
+                sx={{
+                  color: UPLOAD_PRIMARY_TEXT,
+                  fontWeight: 650,
+                  "&.Mui-disabled": {
+                    color: "rgba(24, 15, 31, 0.46)",
+                  },
+                }}
+              >
+                {snapshot.stage === "paused" || snapshot.stage === "failed"
+                  ? "继续上传"
+                  : "开始上传"}
+              </Button>
+            )}
+            {snapshot.stage === "completed" ? (
+              <Button variant="outlined" endIcon={<OpenInNew />} onClick={openCompletedGroup}>
+                打开 Group
+              </Button>
+            ) : null}
+          </Stack>
         </Stack>
-        <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-          <Button component={Link} href="/" variant="text" startIcon={<ArrowBack />}>
-            Back to catalog
-          </Button>
-          {snapshot.stage === "uploading" ? (
-            <Button variant="outlined" startIcon={<Pause />} onClick={pauseUpload}>
-              暂停
-            </Button>
-          ) : (
-            <Button
-              variant="contained"
-              startIcon={snapshot.stage === "failed" ? <Refresh /> : <CloudUpload />}
-              disabled={!canStart || snapshot.stage === "generating" || snapshot.stage === "completed"}
-              onClick={startOrResumeUpload}
-            >
-              {snapshot.stage === "paused" || snapshot.stage === "failed" ? "继续上传" : "开始上传"}
-            </Button>
-          )}
-          {snapshot.stage === "completed" ? (
-            <Button variant="outlined" endIcon={<OpenInNew />} onClick={openCompletedGroup}>
-              打开 Group
-            </Button>
-          ) : null}
-        </Stack>
-      </Stack>
 
-      <Alert
-        severity={hasBlockingIssues || snapshot.stage === "failed" ? "warning" : "info"}
-        icon={hasBlockingIssues ? <WarningAmber /> : undefined}
-        sx={{ borderRadius: 2 }}
-      >
-        {snapshot.stage === "idle" || snapshot.stage === "scanned" ? message : snapshot.message}
-      </Alert>
-
-      <Box
-        sx={{
-          display: "grid",
-          gridTemplateColumns: { xs: "1fr", lg: "minmax(310px, 0.82fr) minmax(0, 1.58fr)" },
-          gap: { xs: 1.6, md: 2 },
-          alignItems: "start",
-        }}
-      >
-        <Paper
-          elevation={0}
+        <Box
           sx={{
-            p: { xs: 2, md: 2.45 },
-            borderRadius: 3,
-            border: "1px solid",
-            borderColor: "divider",
-            background:
-              "linear-gradient(180deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.025) 100%)",
+            display: "grid",
+            gridTemplateColumns: { xs: "1fr", lg: "minmax(320px, 0.72fr) minmax(0, 1.7fr)" },
+            gap: { xs: 1.4, md: 1.6 },
+            alignItems: "start",
           }}
         >
-          <Stack spacing={2.1}>
-            <Stack spacing={0.7}>
-              <Typography variant="h6">目标与元数据</Typography>
-              <Typography variant="body2" color="text.secondary">
-                上传期间会锁定 Case 和源目录，防止任务输入变化。
-              </Typography>
-            </Stack>
+          <Stack spacing={1.4}>
+            <Paper elevation={0} sx={panelSx}>
+              <Stack spacing={1.45} sx={uploadFieldSx}>
+                <Typography variant="h6">对比信息</Typography>
 
-            <FormControl fullWidth size="small">
-              <InputLabel id="web-upload-case-label">目标 Case</InputLabel>
-              <Select
-                labelId="web-upload-case-label"
-                label="目标 Case"
-                value={selectedCaseSlug}
-                disabled={isLocked}
-                onChange={(event) => setSelectedCaseSlug(event.target.value)}
-              >
-                {caseOptions.map((option) => (
-                  <MenuItem key={option.slug} value={option.slug}>
-                    {option.label}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
+                <FormControl fullWidth size="small">
+                  <InputLabel id="web-upload-case-label">目标 Case</InputLabel>
+                  <Select
+                    labelId="web-upload-case-label"
+                    label="目标 Case"
+                    value={selectedCaseSlug}
+                    disabled={isLocked}
+                    onChange={(event) => setSelectedCaseSlug(event.target.value)}
+                  >
+                    {caseOptions.map((option) => (
+                      <MenuItem key={option.slug} value={option.slug}>
+                        {option.label}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
 
-            {!selectedCaseExists ? (
-              <Stack spacing={1.15}>
+                {!selectedCaseExists ? (
+                  <Stack spacing={1.1}>
+                    <TextField
+                      label="Case slug"
+                      size="small"
+                      value={newCase.slug}
+                      disabled={isLocked}
+                      onChange={(event) =>
+                        setNewCase((current) => ({
+                          ...current,
+                          slug: normalizeSlug(event.target.value, DEFAULT_NEW_CASE_SLUG),
+                        }))
+                      }
+                    />
+                    <TextField
+                      label="Case 标题"
+                      size="small"
+                      value={newCase.title}
+                      disabled={isLocked}
+                      onChange={(event) =>
+                        setNewCase((current) => ({ ...current, title: event.target.value }))
+                      }
+                    />
+                    <TextField
+                      label="Case 描述"
+                      size="small"
+                      multiline
+                      minRows={2}
+                      value={newCase.summary}
+                      disabled={isLocked}
+                      onChange={(event) =>
+                        setNewCase((current) => ({ ...current, summary: event.target.value }))
+                      }
+                    />
+                  </Stack>
+                ) : null}
+
                 <TextField
-                  label="Case slug"
+                  label="Group slug"
                   size="small"
-                  value={newCase.slug}
+                  value={groupMeta.slug}
                   disabled={isLocked}
                   onChange={(event) =>
-                    setNewCase((current) => ({
+                    setGroupMeta((current) => ({
                       ...current,
-                      slug: normalizeSlug(event.target.value, DEFAULT_NEW_CASE_SLUG),
+                      slug: normalizeSlug(event.target.value),
                     }))
                   }
                 />
                 <TextField
-                  label="Case 标题"
+                  label="Group 标题"
                   size="small"
-                  value={newCase.title}
+                  value={groupMeta.title}
                   disabled={isLocked}
                   onChange={(event) =>
-                    setNewCase((current) => ({ ...current, title: event.target.value }))
+                    setGroupMeta((current) => ({ ...current, title: event.target.value }))
                   }
                 />
                 <TextField
-                  label="Case 描述"
+                  label="Group 描述"
                   size="small"
                   multiline
                   minRows={2}
-                  value={newCase.summary}
+                  value={groupMeta.description}
                   disabled={isLocked}
                   onChange={(event) =>
-                    setNewCase((current) => ({ ...current, summary: event.target.value }))
+                    setGroupMeta((current) => ({
+                      ...current,
+                      description: event.target.value,
+                    }))
                   }
                 />
+                <FormControl fullWidth size="small">
+                  <InputLabel id="web-upload-mode-label">默认对比模式</InputLabel>
+                  <Select
+                    labelId="web-upload-mode-label"
+                    label="默认对比模式"
+                    value={groupMeta.defaultMode}
+                    disabled={isLocked}
+                    onChange={(event) => {
+                      const value = event.target.value;
+                      if (value === "before-after" || value === "a-b" || value === "heatmap") {
+                        setGroupMeta((current) => ({ ...current, defaultMode: value }));
+                      }
+                    }}
+                  >
+                    {(["before-after", "a-b", "heatmap"] as ViewerMode[]).map((mode) => (
+                      <MenuItem key={mode} value={mode}>
+                        <ModeLabel value={mode} />
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
               </Stack>
-            ) : null}
+            </Paper>
 
-            <Stack spacing={1.15}>
-              <TextField
-                label="Group slug"
-                size="small"
-                value={groupMeta.slug}
-                disabled={isLocked}
-                onChange={(event) =>
-                  setGroupMeta((current) => ({
-                    ...current,
-                    slug: normalizeSlug(event.target.value),
-                  }))
-                }
-              />
-              <TextField
-                label="Group 标题"
-                size="small"
-                value={groupMeta.title}
-                disabled={isLocked}
-                onChange={(event) =>
-                  setGroupMeta((current) => ({ ...current, title: event.target.value }))
-                }
-              />
-              <TextField
-                label="Group 描述"
-                size="small"
-                multiline
-                minRows={2}
-                value={groupMeta.description}
-                disabled={isLocked}
-                onChange={(event) =>
-                  setGroupMeta((current) => ({
-                    ...current,
-                    description: event.target.value,
-                  }))
-                }
-              />
-              <FormControl fullWidth size="small">
-                <InputLabel id="web-upload-mode-label">默认对比模式</InputLabel>
-                <Select
-                  labelId="web-upload-mode-label"
-                  label="默认对比模式"
-                  value={groupMeta.defaultMode}
-                  disabled={isLocked}
-                  onChange={(event) => {
-                    const value = event.target.value;
-                    if (value === "before-after" || value === "a-b" || value === "heatmap") {
-                      setGroupMeta((current) => ({ ...current, defaultMode: value }));
+            <Paper elevation={0} sx={panelSx}>
+              <Stack spacing={1.35}>
+                <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1}>
+                  <Typography variant="h6">上传详情</Typography>
+                  <Chip
+                    label={stageLabel(snapshot.stage)}
+                    color={
+                      snapshot.stage === "completed"
+                        ? "primary"
+                        : snapshot.stage === "failed"
+                          ? "warning"
+                          : "default"
                     }
-                  }}
+                    sx={{ height: 32 }}
+                  />
+                </Stack>
+
+                <Button
+                  variant="outlined"
+                  startIcon={<FolderOpen />}
+                  disabled={isLocked}
+                  onClick={chooseDirectory}
+                  sx={{ borderRadius: 999 }}
                 >
-                  {(["before-after", "a-b", "heatmap"] as ViewerMode[]).map((mode) => (
-                    <MenuItem key={mode} value={mode}>
-                      <ModeLabel value={mode} />
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            </Stack>
-
-            <Stack spacing={1.15}>
-              <Button
-                variant="outlined"
-                startIcon={<FolderOpen />}
-                disabled={isLocked}
-                onClick={chooseDirectory}
-              >
-                选择文件夹
-              </Button>
-              <Typography variant="caption" color="text.secondary">
-                优先使用 Chromium 的目录选择；不支持时退回 webkitdirectory。
-              </Typography>
-              <input
-                ref={inputRef}
-                type="file"
-                multiple
-                hidden
-                onChange={handleFallbackInput}
-                {...({ webkitdirectory: "", directory: "" } as Record<string, string>)}
-              />
-            </Stack>
-
-            <FormControlLabel
-              control={
-                <Checkbox
-                  checked
-                  disabled
+                  选择文件夹
+                </Button>
+                <input
+                  ref={inputRef}
+                  type="file"
+                  multiple
+                  hidden
+                  onChange={handleFallbackInput}
+                  {...({ webkitdirectory: "", directory: "" } as Record<string, string>)}
                 />
-              }
-              label="缺少显式 heatmap 时由浏览器生成"
-            />
 
-            <Stack direction="row" spacing={0.8} useFlexGap flexWrap="wrap">
-              <StatChip label="Frames" value={planView?.frames.length ?? 0} />
-              <StatChip label="忽略" value={planView?.ignoredCount ?? 0} />
-              <StatChip label="问题" value={planView?.errorCount ?? 0} />
-            </Stack>
+                <Stack direction="row" spacing={0.8} useFlexGap flexWrap="wrap">
+                  <StatChip label="Frames" value={planView?.frames.length ?? 0} />
+                  <StatChip label="忽略" value={planView?.ignoredCount ?? 0} />
+                  <StatChip label="问题" value={planView?.errorCount ?? 0} />
+                </Stack>
+
+                <UploadProgress
+                  generationProgress={generationProgress}
+                  overallProgress={overallProgress}
+                  snapshot={snapshot}
+                />
+              </Stack>
+            </Paper>
           </Stack>
-        </Paper>
 
-        <Stack spacing={1.6}>
-          <Paper
-            elevation={0}
-            sx={{
-              p: { xs: 2, md: 2.35 },
-              borderRadius: 3,
-              border: "1px solid",
-              borderColor: "divider",
-              background:
-                "linear-gradient(180deg, rgba(255,255,255,0.055) 0%, rgba(255,255,255,0.02) 100%)",
-            }}
-          >
-            <Stack spacing={1.7}>
-              <Stack
-                direction={{ xs: "column", sm: "row" }}
-                justifyContent="space-between"
-                spacing={1}
-              >
-                <Stack spacing={0.35}>
-                  <Typography variant="h6">配对预演</Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    {planView
-                      ? `${planView.sourceRootName} · ${planView.frames.length} 对图片`
-                      : "支持 flat 目录或 before / after / heatmap / misc 分层目录。"}
-                  </Typography>
-                </Stack>
-                {planView ? (
-                  <Stack direction="row" spacing={0.8} useFlexGap flexWrap="wrap">
-                    <Chip
-                      icon={hasBlockingIssues ? <WarningAmber /> : <CheckCircle />}
-                      label={hasBlockingIssues ? "需要修正" : "可上传"}
-                      color={hasBlockingIssues ? "warning" : "primary"}
-                      sx={{ height: 34 }}
-                    />
-                  </Stack>
-                ) : null}
-              </Stack>
-
-              <PairingTable rows={planView?.frames ?? []} />
-              {planView?.issues.length ? (
-                <Stack spacing={0.7}>
-                  {planView.issues.slice(0, 5).map((issue, index) => (
-                    <Alert key={`${issue.path}-${index}`} severity={issue.severity} sx={{ py: 0.6 }}>
-                      {issue.message}
-                      <Typography variant="caption" sx={{ display: "block", opacity: 0.75 }}>
-                        {issue.path}
-                      </Typography>
-                    </Alert>
-                  ))}
-                  {planView.issues.length > 5 ? (
-                    <Typography variant="caption" color="text.secondary">
-                      还有 {planView.issues.length - 5} 个问题未显示。
-                    </Typography>
-                  ) : null}
-                </Stack>
-              ) : null}
-            </Stack>
-          </Paper>
-
-          <Paper
-            elevation={0}
-            sx={{
-              p: { xs: 2, md: 2.35 },
-              borderRadius: 3,
-              border: "1px solid",
-              borderColor: "divider",
-              background:
-                "linear-gradient(180deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.02) 100%)",
-            }}
-          >
-            <Stack spacing={1.6}>
-              <Stack
-                direction={{ xs: "column", sm: "row" }}
-                justifyContent="space-between"
-                spacing={1}
-              >
-                <Stack spacing={0.35}>
-                  <Typography variant="h6">生成与上传队列</Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    缩略图、heatmap 和 SHA-256 在 Worker 中生成；commit 保持串行。
-                  </Typography>
-                </Stack>
-                <Chip
-                  label={
-                    snapshot.stage === "generating"
-                      ? "生成中"
-                      : snapshot.stage === "uploading"
-                        ? "上传中"
-                        : snapshot.stage === "completed"
-                          ? "完成"
-                          : snapshot.stage === "failed"
-                            ? "失败"
-                            : "待上传"
-                  }
-                  color={
-                    snapshot.stage === "completed"
-                      ? "primary"
-                      : snapshot.stage === "failed"
-                        ? "warning"
-                        : "default"
-                  }
-                  sx={{ height: 34 }}
-                />
-              </Stack>
-
-              {generationProgress ? (
-                <Box>
-                  <Stack direction="row" justifyContent="space-between" spacing={1}>
-                    <Typography variant="body2">{generationProgress.label}</Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      {generationProgress.completed}/{generationProgress.total}
-                    </Typography>
-                  </Stack>
-                  <LinearProgress
-                    variant="determinate"
-                    value={(generationProgress.completed / generationProgress.total) * 100}
-                    sx={{ mt: 0.8, height: 7, borderRadius: 999 }}
-                  />
-                </Box>
-              ) : null}
-
-              {snapshot.totalFiles > 0 ? (
-                <Box>
-                  <Stack direction="row" justifyContent="space-between" spacing={1}>
-                    <Typography variant="body2">
-                      {snapshot.completedFrames}/{snapshot.totalFrames} frames committed
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      {Math.round(overallProgress)}%
-                    </Typography>
-                  </Stack>
-                  <LinearProgress
-                    variant="determinate"
-                    value={overallProgress}
-                    sx={{ mt: 0.8, height: 7, borderRadius: 999 }}
-                  />
-                </Box>
-              ) : null}
-
-              <UploadQueue snapshot={snapshot} />
-            </Stack>
-          </Paper>
-
-          <Paper
-            elevation={0}
-            sx={{
-              p: { xs: 2, md: 2.35 },
-              borderRadius: 3,
-              border: "1px solid",
-              borderColor: "divider",
-              background: "rgba(255,255,255,0.025)",
-            }}
-          >
-            <Stack spacing={1.5}>
-              <Typography variant="h6">前几组预览</Typography>
-              <PreviewStrip pairs={previewPairs} />
-              {previewPairs.length === 0 ? (
-                <Typography color="text.secondary">
-                  扫描后会显示最多 5 组 before / after 预览。
-                </Typography>
-              ) : null}
-            </Stack>
-          </Paper>
-        </Stack>
-      </Box>
-    </Stack>
+          <PairingPreviewPanel
+            plan={planRef.current}
+            planView={planView}
+            canReorder={snapshot.stage === "scanned"}
+            expandedFrameId={expandedFrameId}
+            hasBlockingIssues={hasBlockingIssues}
+            onExpandedFrameChange={setExpandedFrameId}
+            onReorder={reorderPairingRows}
+          />
+        </Box>
+      </Stack>
+      <AppNotifications notifications={notifications} onDismiss={dismissNotification} />
+    </>
   );
 }

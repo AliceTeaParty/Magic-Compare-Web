@@ -448,7 +448,7 @@ export function CaseWorkspaceBoard({
                     },
                   }}
                 >
-                  上传 Group
+                  上传对比
                 </Button>
                 <Tooltip
                   title={
