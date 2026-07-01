@@ -7,6 +7,7 @@ import {
   Close,
   CloudUpload,
   EditOutlined,
+  UploadFile,
 } from "@mui/icons-material";
 import {
   Box,
@@ -28,6 +29,7 @@ import {
 } from "@dnd-kit/core";
 import { SortableContext, rectSortingStrategy } from "@dnd-kit/sortable";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { motion } from "motion/react";
 import type { CaseWorkspaceData } from "@/lib/server/repositories/content-repository";
 import { inlineEditTextSx } from "./case-workspace/inline-edit-text-sx";
@@ -431,6 +433,22 @@ export function CaseWorkspaceBoard({
                   }}
                 >
                   Back to catalog
+                </Button>
+                <Button
+                  component={Link}
+                  href={`/upload?case=${encodeURIComponent(data.slug)}`}
+                  variant="outlined"
+                  startIcon={<UploadFile />}
+                  disabled={isPending || isDeployingPublicSite}
+                  sx={{
+                    borderColor: "transparent",
+                    backgroundColor: "rgba(255,255,255,0.04)",
+                    "&:hover": {
+                      borderColor: "rgba(232, 198, 246, 0.26)",
+                    },
+                  }}
+                >
+                  上传 Group
                 </Button>
                 <Tooltip
                   title={
