@@ -242,9 +242,9 @@ function afterPriority(candidate: SourceCandidate) {
 function assetPlan(kind: WebUploadAssetPlan["kind"], candidate: SourceCandidate): WebUploadAssetPlan {
   const label =
     kind === "before"
-      ? "Before"
+      ? "基准图"
       : kind === "after"
-        ? "After"
+        ? "对比方案"
         : kind === "heatmap"
           ? "Heatmap"
           : candidate.variant || "Misc";
@@ -263,7 +263,7 @@ function buildFrameFromCandidates(order: number, candidates: SourceCandidate[], 
       code: "before-count",
       severity: "error",
       path: candidates[0]?.entry.relativePath ?? "",
-      message: `${candidates[0]?.title ?? "frame"} 需要且只能有一个 before/source 文件，当前找到 ${beforeCandidates.length} 个。`,
+      message: `${candidates[0]?.title ?? "frame"} 需要且只能有一个基准图 before/source 文件，当前找到 ${beforeCandidates.length} 个。`,
     };
   }
 
@@ -283,7 +283,7 @@ function buildFrameFromCandidates(order: number, candidates: SourceCandidate[], 
       code: "after-missing",
       severity: "error",
       path: candidates[0].entry.relativePath,
-      message: `${candidates[0].title} 没有可用的 after 文件。`,
+      message: `${candidates[0].title} 没有可用的对比方案 after/output 文件。`,
     };
   }
 
@@ -463,7 +463,7 @@ function buildNestedPlan(sourceRootName: string, entries: BrowserUploadFile[], i
         code: "duplicate-before",
         severity: "error",
         path: candidates[0].entry.relativePath,
-        message: `before 文件无法唯一配对：${key}`,
+        message: `基准图文件无法唯一配对：${key}`,
       });
     }
   }
@@ -484,7 +484,7 @@ function buildNestedPlan(sourceRootName: string, entries: BrowserUploadFile[], i
         code: "unmatched-before",
         severity: "error",
         path: before.entry.relativePath,
-        message: `${before.originalName} 没有匹配到 after 文件。`,
+        message: `${before.originalName} 没有匹配到对比方案文件。`,
       });
       continue;
     }

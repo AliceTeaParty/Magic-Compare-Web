@@ -63,6 +63,26 @@ describe("scanBrowserUploadFiles", () => {
     );
   });
 
+  it("keeps extra after candidates as alternate comparison assets", () => {
+    const plan = scanBrowserUploadFiles(
+      [
+        image("sample/frame-001_before.png"),
+        image("sample/frame-001_out.png"),
+        image("sample/frame-001_after.png"),
+        image("sample/frame-001_rip.png"),
+      ],
+      "sample",
+    );
+
+    expect(plan.frames).toHaveLength(1);
+    expect(plan.frames[0].after.source.relativePath).toBe("frame-001_out.png");
+    expect(plan.frames[0].misc.map((asset) => asset.source.relativePath)).toEqual([
+      "frame-001_after.png",
+      "frame-001_rip.png",
+    ]);
+  });
+
+
   it("ignores common sidecar and system files", () => {
     const plan = scanBrowserUploadFiles(
       [

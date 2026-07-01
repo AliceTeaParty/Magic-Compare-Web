@@ -33,6 +33,10 @@ export interface GenerationProgress {
   label: string;
 }
 
+export interface GenerateUploadFrameOptions {
+  generateMissingHeatmap?: boolean;
+}
+
 function workerUploadFileToGenerated(file: WorkerUploadFile): GeneratedUploadFile {
   return {
     blob: file.blob,
@@ -153,11 +157,14 @@ function generatedHeatmapAsset(
 export async function generateUploadFrames(
   frames: WebUploadFramePlan[],
   onProgress: (progress: GenerationProgress) => void,
+  options: GenerateUploadFrameOptions = {},
 ) {
+  const generateMissingHeatmap = options.generateMissingHeatmap ?? true;
   const worker = new WebUploadAssetWorkerClient();
   const generatedFrames: GeneratedUploadFrame[] = [];
   const total = frames.reduce(
-    (count, frame) => count + 2 + frame.misc.length + (frame.heatmap ? 1 : 1),
+    (count, frame) =>
+      count + 2 + frame.misc.length + (frame.heatmap || generateMissingHeatmap ? 1 : 0),
     0,
   );
   let completed = 0;
@@ -178,8 +185,8 @@ export async function generateUploadFrames(
       const afterResult = await worker.generateAsset({
         assetKey: `${frame.order}:after`,
         original: frame.after.source.file,
-        heatmapBefore: frame.heatmap ? undefined : frame.before.source.file,
-        heatmapAfter: frame.heatmap ? undefined : frame.after.source.file,
+        heatmapBefore: !frame.heatmap && generateMissingHeatmap ? frame.before.source.file : undefined,
+        heatmapAfter: !frame.heatmap && generateMissingHeatmap ? frame.after.source.file : undefined,
       });
       tick(`${frame.title} after`);
 
@@ -195,7 +202,7 @@ export async function generateUploadFrames(
         });
         assets.push(generatedAsset(frame, frame.heatmap, "slot-003", heatmapResult));
         tick(`${frame.title} heatmap`);
-      } else {
+      } else if (generateMissingHeatmap) {
         assets.push(generatedHeatmapAsset(frame, afterResult));
         tick(`${frame.title} heatmap`);
       }
