@@ -14,13 +14,39 @@ const HEATMAP_VARIANTS = new Set(["heatmap"]);
 const BEFORE_DIR_HINTS = new Set([...SOURCE_VARIANTS, "before"]);
 const AFTER_DIR_HINTS = new Set([...AFTER_VARIANTS, "after"]);
 const MISC_DIR_HINTS = new Set(["misc", "extra", "extras", "alt", "alts"]);
+const MATCH_KEY_VARIANTS = [
+  "before",
+  "after",
+  "src",
+  "source",
+  "ori",
+  "origin",
+  "out",
+  "output",
+  "rip",
+  "misc",
+  "heatmap",
+  "nodeband",
+  "noband",
+  "nobanding",
+  "degrain",
+  "degrained",
+  "denoise",
+  "denoised",
+  "clean",
+  "cleaned",
+];
 const IGNORED_BASENAMES = new Set([".ds_store", "thumbs.db"]);
 const IGNORED_SUFFIXES = new Set([".json", ".yaml", ".yml", ".txt", ".md", ".csv", ".db", ".log"]);
 const FILENAME_RE = /(?<prefix>.+?)[_\-.](?<frame>\d+)(?:[_\-.](?<variant>[^_\-.]+))?$/;
 const FALLBACK_FILENAME_RE = /^(?<frame>\d+)(?<variant>[A-Za-z][A-Za-z0-9]*)$/;
 const GROUP_SUFFIX_NOISE_RE = /(?:[_\-. ]+\d{4,5}[_\-. ]+gen[_\-. ]+vpy)$/i;
-const MATCH_KEY_SUFFIX_RE = /(?:[_\-. ]+(?:before|after|src|source|ori|origin|out|output|rip|misc|heatmap))+$/i;
+const MATCH_KEY_SUFFIX_RE = new RegExp(
+  `(?:[_\\-. ]+(?:${MATCH_KEY_VARIANTS.join("|")}))+$`,
+  "i",
+);
 const NON_ALNUM_RE = /[^0-9a-z]+/g;
+const MAX_AFTER_ASSETS = 4;
 
 interface SourceCandidate {
   entry: BrowserUploadFile;
@@ -87,6 +113,24 @@ function titleCase(input: string) {
     .replace(/[_\-.]+/g, " ")
     .trim()
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function variantLabel(variant: string) {
+  const normalized = variant.toLowerCase();
+  if (normalized === "after" || normalized === "out" || normalized === "output" || normalized === "rip") {
+    return "After";
+  }
+  if (normalized === "before" || normalized === "src" || normalized === "source" || normalized === "ori" || normalized === "origin") {
+    return "Before";
+  }
+  if (normalized === "nodeband" || normalized === "noband" || normalized === "nobanding") {
+    return "NoDeband";
+  }
+  return normalized
+    .split(/[^a-z0-9]+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join("");
 }
 
 function ignoreReason(entry: BrowserUploadFile) {
@@ -242,12 +286,12 @@ function afterPriority(candidate: SourceCandidate) {
 function assetPlan(kind: WebUploadAssetPlan["kind"], candidate: SourceCandidate): WebUploadAssetPlan {
   const label =
     kind === "before"
-      ? "基准图"
+      ? "Before"
       : kind === "after"
-        ? "对比方案"
+        ? "After"
         : kind === "heatmap"
           ? "Heatmap"
-          : candidate.variant || "Misc";
+          : variantLabel(candidate.variant) || "Misc";
   return {
     kind,
     label,
@@ -283,7 +327,7 @@ function buildFrameFromCandidates(order: number, candidates: SourceCandidate[], 
       code: "after-missing",
       severity: "error",
       path: candidates[0].entry.relativePath,
-      message: `${candidates[0].title} 没有可用的对比方案 after/output 文件。`,
+      message: `${candidates[0].title} 没有可用的 After 文件。`,
     };
   }
 
@@ -302,7 +346,7 @@ function buildFrameFromCandidates(order: number, candidates: SourceCandidate[], 
     before: assetPlan("before", before),
     after: assetPlan("after", after),
     heatmap: heatmapCandidates[0] ? assetPlan("heatmap", heatmapCandidates[0]) : null,
-    misc: misc.map((candidate) => assetPlan("misc", candidate)),
+    misc: misc.slice(0, MAX_AFTER_ASSETS - 1).map((candidate) => assetPlan("misc", candidate)),
   };
 }
 
@@ -463,7 +507,7 @@ function buildNestedPlan(sourceRootName: string, entries: BrowserUploadFile[], i
         code: "duplicate-before",
         severity: "error",
         path: candidates[0].entry.relativePath,
-        message: `基准图文件无法唯一配对：${key}`,
+        message: `Before 文件无法唯一配对：${key}`,
       });
     }
   }
@@ -484,7 +528,7 @@ function buildNestedPlan(sourceRootName: string, entries: BrowserUploadFile[], i
         code: "unmatched-before",
         severity: "error",
         path: before.entry.relativePath,
-        message: `${before.originalName} 没有匹配到对比方案文件。`,
+        message: `${before.originalName} 没有匹配到 After 文件。`,
       });
       continue;
     }
@@ -499,7 +543,10 @@ function buildNestedPlan(sourceRootName: string, entries: BrowserUploadFile[], i
       before: assetPlan("before", before),
       after: assetPlan("after", primaryAfter),
       heatmap: heatmapAssignments.grouped.get(matchKey)?.[0] ? assetPlan("heatmap", heatmapAssignments.grouped.get(matchKey)![0]) : null,
-      misc: [...extraAfter, ...(miscAssignments.grouped.get(matchKey) ?? [])].map((candidate) => assetPlan("misc", candidate)),
+      misc: [
+        ...extraAfter.slice(0, MAX_AFTER_ASSETS - 1),
+        ...(miscAssignments.grouped.get(matchKey) ?? []),
+      ].map((candidate) => assetPlan("misc", candidate)),
     });
   }
 

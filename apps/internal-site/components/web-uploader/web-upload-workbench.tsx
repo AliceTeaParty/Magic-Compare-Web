@@ -198,12 +198,6 @@ function writeUploadResumeHint(groupSlug: string, inputHash: string) {
   }
 }
 
-function ModeLabel({ value }: { value: ViewerMode }) {
-  const label =
-    value === "before-after" ? "滑动对比" : value === "a-b" ? "A/B" : "热力图";
-  return <>{label}</>;
-}
-
 function StatChip({ label, value }: { label: string; value: string | number }) {
   return (
     <Chip
@@ -295,49 +289,78 @@ function UploadQueue({ snapshot }: { snapshot: UploadRunnerSnapshot }) {
   );
 }
 
-function UploadProgress({
+function UploadLog({
   generationProgress,
   overallProgress,
+  planView,
   snapshot,
 }: {
   generationProgress: GenerationProgress | null;
   overallProgress: number;
+  planView: PlanView | null;
   snapshot: UploadRunnerSnapshot;
 }) {
+  const lines = [
+    `状态：${stageLabel(snapshot.stage)}`,
+    snapshot.message ? `消息：${snapshot.message}` : null,
+    planView
+      ? `扫描：${planView.healthyPairCount}/${planView.frames.length} 对可用，忽略 ${planView.ignoredCount}，问题 ${planView.errorCount}`
+      : "扫描：等待选择文件夹",
+    generationProgress
+      ? `生成：${generationProgress.label} ${generationProgress.completed}/${generationProgress.total}`
+      : null,
+    snapshot.totalFiles > 0
+      ? `上传：${snapshot.completedFrames}/${snapshot.totalFrames} frames，${Math.round(overallProgress)}%`
+      : null,
+  ].filter(Boolean);
+
   return (
     <Stack spacing={1.35}>
+      <Box
+        role="log"
+        aria-live="polite"
+        sx={{
+          border: "1px solid",
+          borderColor: "divider",
+          borderRadius: 1.5,
+          backgroundColor: "rgba(255,255,255,0.03)",
+          overflow: "hidden",
+        }}
+      >
+        {lines.map((line) => (
+          <Typography
+            key={line}
+            variant="body2"
+            sx={{
+              px: 1.15,
+              py: 0.75,
+              borderBottom: "1px solid",
+              borderColor: "rgba(255,255,255,0.07)",
+              fontVariantNumeric: "tabular-nums",
+              "&:last-of-type": {
+                borderBottom: 0,
+              },
+            }}
+          >
+            {line}
+          </Typography>
+        ))}
+      </Box>
+
       {generationProgress ? (
-        <Box>
-          <Stack direction="row" justifyContent="space-between" spacing={1}>
-            <Typography variant="body2">{generationProgress.label}</Typography>
-            <Typography variant="body2" color="text.secondary">
-              {generationProgress.completed}/{generationProgress.total}
-            </Typography>
-          </Stack>
-          <LinearProgress
-            variant="determinate"
-            value={(generationProgress.completed / generationProgress.total) * 100}
-            sx={{ mt: 0.8, height: 7, borderRadius: 999 }}
-          />
-        </Box>
+        <LinearProgress
+          variant="determinate"
+          value={(generationProgress.completed / generationProgress.total) * 100}
+          sx={{ height: 7, borderRadius: 999 }}
+        />
       ) : null}
 
       {snapshot.totalFiles > 0 ? (
-        <Box>
-          <Stack direction="row" justifyContent="space-between" spacing={1}>
-            <Typography variant="body2">
-              {snapshot.completedFrames}/{snapshot.totalFrames} frames committed
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              {Math.round(overallProgress)}%
-            </Typography>
-          </Stack>
-          <LinearProgress
-            variant="determinate"
-            value={overallProgress}
-            sx={{ mt: 0.8, height: 7, borderRadius: 999 }}
-          />
-        </Box>
+        <LinearProgress
+          variant="determinate"
+          value={overallProgress}
+          sx={{ height: 7, borderRadius: 999 }}
+        />
       ) : null}
 
       <UploadQueue snapshot={snapshot} />
@@ -597,57 +620,95 @@ export function WebUploadWorkbench({
 
   return (
     <>
-      <Stack spacing={{ xs: 1.8, md: 2 }}>
-        <Stack
-          direction={{ xs: "column", sm: "row" }}
-          justifyContent="space-between"
-          alignItems={{ xs: "stretch", sm: "center" }}
-          spacing={1.2}
-        >
-          <Typography
-            variant="h4"
-            component="h1"
-            sx={{ lineHeight: 1.05, fontSize: { xs: "2rem", md: "2.35rem" } }}
-          >
-            上传对比
+      <Stack spacing={{ xs: 3.1, md: 4.2 }}>
+        <Stack spacing={1.55} sx={{ width: "100%" }}>
+          <Typography variant="overline" color="primary.main">
+            Magic Compare Web / Internal
           </Typography>
-          <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-            <Button component={Link} href="/" variant="text" startIcon={<ArrowBack />}>
-              返回
-            </Button>
-            {snapshot.stage === "uploading" ? (
-              <Button variant="outlined" startIcon={<Pause />} onClick={pauseUpload}>
-                暂停
-              </Button>
-            ) : (
+          <Box
+            sx={{
+              display: "grid",
+              gridTemplateColumns: { xs: "1fr", md: "minmax(0, 1fr) auto" },
+              gap: { xs: 1.5, md: 2 },
+              alignItems: "end",
+              pb: { xs: 2.75, md: 3.4 },
+              borderBottom: "1px solid",
+              borderColor: "divider",
+            }}
+          >
+            <Typography
+              variant="h2"
+              component="h1"
+              sx={{ lineHeight: 1, textWrap: "balance" }}
+            >
+              上传对比
+            </Typography>
+            <Stack
+              direction="row"
+              spacing={1}
+              alignItems="center"
+              justifyContent={{ xs: "flex-start", md: "flex-end" }}
+              flexWrap="wrap"
+              useFlexGap
+              sx={{
+                // Mirrors Internal Catalog's header grid so the upload action keeps the same
+                // visual anchor when users move between the list and the uploader.
+                justifySelf: { xs: "start", md: "end" },
+                "& .MuiButton-root": {
+                  minHeight: 42,
+                  px: 2.1,
+                },
+              }}
+            >
               <Button
-                variant="contained"
-                startIcon={snapshot.stage === "failed" ? <Refresh /> : <CloudUpload />}
-                disabled={
-                  !canStart ||
-                  snapshot.stage === "generating" ||
-                  snapshot.stage === "completed"
-                }
-                onClick={startOrResumeUpload}
+                component={Link}
+                href="/"
+                variant="text"
+                startIcon={<ArrowBack />}
                 sx={{
-                  color: UPLOAD_PRIMARY_TEXT,
-                  fontWeight: 650,
-                  "&.Mui-disabled": {
-                    color: "rgba(24, 15, 31, 0.46)",
+                  color: "text.secondary",
+                  "&:hover": {
+                    color: "text.primary",
+                    backgroundColor: "rgba(255,255,255,0.04)",
                   },
                 }}
               >
-                {snapshot.stage === "paused" || snapshot.stage === "failed"
-                  ? "继续上传"
-                  : "开始上传"}
+                返回
               </Button>
-            )}
-            {snapshot.stage === "completed" ? (
-              <Button variant="outlined" endIcon={<OpenInNew />} onClick={openCompletedGroup}>
-                打开 Group
-              </Button>
-            ) : null}
-          </Stack>
+              {snapshot.stage === "uploading" ? (
+                <Button variant="outlined" startIcon={<Pause />} onClick={pauseUpload}>
+                  暂停
+                </Button>
+              ) : (
+                <Button
+                  variant="contained"
+                  startIcon={snapshot.stage === "failed" ? <Refresh /> : <CloudUpload />}
+                  disabled={
+                    !canStart ||
+                    snapshot.stage === "generating" ||
+                    snapshot.stage === "completed"
+                  }
+                  onClick={startOrResumeUpload}
+                  sx={{
+                    color: UPLOAD_PRIMARY_TEXT,
+                    fontWeight: 650,
+                    "&.Mui-disabled": {
+                      color: "rgba(24, 15, 31, 0.46)",
+                    },
+                  }}
+                >
+                  {snapshot.stage === "paused" || snapshot.stage === "failed"
+                    ? "继续上传"
+                    : "开始上传"}
+                </Button>
+              )}
+              {snapshot.stage === "completed" ? (
+                <Button variant="outlined" endIcon={<OpenInNew />} onClick={openCompletedGroup}>
+                  打开 Group
+                </Button>
+              ) : null}
+            </Stack>
+          </Box>
         </Stack>
 
         <Box
@@ -663,11 +724,29 @@ export function WebUploadWorkbench({
               <Stack spacing={1.45} sx={uploadFieldSx}>
                 <Typography variant="h6">对比信息</Typography>
 
+                <Button
+                  variant="outlined"
+                  startIcon={<FolderOpen />}
+                  disabled={isLocked}
+                  onClick={chooseDirectory}
+                  sx={{ borderRadius: 999 }}
+                >
+                  选择文件夹
+                </Button>
+                <input
+                  ref={inputRef}
+                  type="file"
+                  multiple
+                  hidden
+                  onChange={handleFallbackInput}
+                  {...({ webkitdirectory: "", directory: "" } as Record<string, string>)}
+                />
+
                 <FormControl fullWidth size="small">
-                  <InputLabel id="web-upload-case-label">目标 Case</InputLabel>
+                  <InputLabel id="web-upload-case-label">目标目录</InputLabel>
                   <Select
                     labelId="web-upload-case-label"
-                    label="目标 Case"
+                    label="目标目录"
                     value={selectedCaseSlug}
                     disabled={isLocked}
                     onChange={(event) => setSelectedCaseSlug(event.target.value)}
@@ -683,7 +762,7 @@ export function WebUploadWorkbench({
                 {!selectedCaseExists ? (
                   <Stack spacing={1.1}>
                     <TextField
-                      label="Case slug"
+                      label="目录 Slug"
                       size="small"
                       value={newCase.slug}
                       disabled={isLocked}
@@ -695,7 +774,7 @@ export function WebUploadWorkbench({
                       }
                     />
                     <TextField
-                      label="Case 标题"
+                      label="目录标题"
                       size="small"
                       value={newCase.title}
                       disabled={isLocked}
@@ -704,7 +783,7 @@ export function WebUploadWorkbench({
                       }
                     />
                     <TextField
-                      label="Case 描述"
+                      label="目录描述"
                       size="small"
                       multiline
                       minRows={2}
@@ -718,7 +797,7 @@ export function WebUploadWorkbench({
                 ) : null}
 
                 <TextField
-                  label="Group slug"
+                  label="Slug"
                   size="small"
                   value={groupMeta.slug}
                   disabled={isLocked}
@@ -730,7 +809,7 @@ export function WebUploadWorkbench({
                   }
                 />
                 <TextField
-                  label="Group 标题"
+                  label="标题"
                   size="small"
                   value={groupMeta.title}
                   disabled={isLocked}
@@ -739,7 +818,7 @@ export function WebUploadWorkbench({
                   }
                 />
                 <TextField
-                  label="Group 描述"
+                  label="描述"
                   size="small"
                   multiline
                   minRows={2}
@@ -752,27 +831,6 @@ export function WebUploadWorkbench({
                     }))
                   }
                 />
-                <FormControl fullWidth size="small">
-                  <InputLabel id="web-upload-mode-label">默认对比模式</InputLabel>
-                  <Select
-                    labelId="web-upload-mode-label"
-                    label="默认对比模式"
-                    value={groupMeta.defaultMode}
-                    disabled={isLocked}
-                    onChange={(event) => {
-                      const value = event.target.value;
-                      if (value === "before-after" || value === "a-b" || value === "heatmap") {
-                        setGroupMeta((current) => ({ ...current, defaultMode: value }));
-                      }
-                    }}
-                  >
-                    {(["before-after", "a-b", "heatmap"] as ViewerMode[]).map((mode) => (
-                      <MenuItem key={mode} value={mode}>
-                        <ModeLabel value={mode} />
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
               </Stack>
             </Paper>
 
@@ -793,33 +851,16 @@ export function WebUploadWorkbench({
                   />
                 </Stack>
 
-                <Button
-                  variant="outlined"
-                  startIcon={<FolderOpen />}
-                  disabled={isLocked}
-                  onClick={chooseDirectory}
-                  sx={{ borderRadius: 999 }}
-                >
-                  选择文件夹
-                </Button>
-                <input
-                  ref={inputRef}
-                  type="file"
-                  multiple
-                  hidden
-                  onChange={handleFallbackInput}
-                  {...({ webkitdirectory: "", directory: "" } as Record<string, string>)}
-                />
-
                 <Stack direction="row" spacing={0.8} useFlexGap flexWrap="wrap">
                   <StatChip label="Frames" value={planView?.frames.length ?? 0} />
                   <StatChip label="忽略" value={planView?.ignoredCount ?? 0} />
                   <StatChip label="问题" value={planView?.errorCount ?? 0} />
                 </Stack>
 
-                <UploadProgress
+                <UploadLog
                   generationProgress={generationProgress}
                   overallProgress={overallProgress}
+                  planView={planView}
                   snapshot={snapshot}
                 />
               </Stack>

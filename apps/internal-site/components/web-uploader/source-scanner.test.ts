@@ -70,6 +70,8 @@ describe("scanBrowserUploadFiles", () => {
         image("sample/frame-001_out.png"),
         image("sample/frame-001_after.png"),
         image("sample/frame-001_rip.png"),
+        image("sample/frame-001_nodeband.png"),
+        image("sample/frame-001_degrain.png"),
       ],
       "sample",
     );
@@ -78,10 +80,36 @@ describe("scanBrowserUploadFiles", () => {
     expect(plan.frames[0].after.source.relativePath).toBe("frame-001_out.png");
     expect(plan.frames[0].misc.map((asset) => asset.source.relativePath)).toEqual([
       "frame-001_after.png",
-      "frame-001_rip.png",
+      "frame-001_degrain.png",
+      "frame-001_nodeband.png",
+    ]);
+    expect(plan.frames[0].misc.map((asset) => asset.label)).toEqual([
+      "After",
+      "Degrain",
+      "NoDeband",
     ]);
   });
 
+  it("caps alternate after assets at three", () => {
+    const plan = scanBrowserUploadFiles(
+      [
+        image("sample/frame-001_before.png"),
+        image("sample/frame-001_out.png"),
+        image("sample/frame-001_after.png"),
+        image("sample/frame-001_rip.png"),
+        image("sample/frame-001_degrain.png"),
+        image("sample/frame-001_denoise.png"),
+      ],
+      "sample",
+    );
+
+    expect(plan.frames).toHaveLength(1);
+    expect(plan.frames[0].misc.map((asset) => asset.source.relativePath)).toEqual([
+      "frame-001_after.png",
+      "frame-001_degrain.png",
+      "frame-001_denoise.png",
+    ]);
+  });
 
   it("ignores common sidecar and system files", () => {
     const plan = scanBrowserUploadFiles(

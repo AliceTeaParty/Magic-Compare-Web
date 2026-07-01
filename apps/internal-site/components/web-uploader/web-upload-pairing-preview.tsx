@@ -68,19 +68,19 @@ function frameForId(plan: WebUploadPlan | null, frameId: string | null) {
 
 function HeatmapStatus({ row }: { row: FramePreviewRow }) {
   if (row.heatmapPath) {
-    return <Chip label="显式" size="small" variant="outlined" sx={{ height: 26 }} />;
+    return <Typography aria-label="显式 heatmap">🟣</Typography>;
   }
-  return <Chip label="生成" size="small" variant="outlined" sx={{ height: 26 }} />;
+  return <Typography aria-label="自动生成 heatmap">✨</Typography>;
 }
 
 function IssueStatus({ row }: { row: FramePreviewRow }) {
   if (row.hasError) {
-    return <Chip label="错误" color="warning" size="small" sx={{ height: 26 }} />;
+    return <Typography aria-label="错误">⛔</Typography>;
   }
   if (row.hasWarning) {
-    return <Chip label="警告" color="warning" size="small" variant="outlined" sx={{ height: 26 }} />;
+    return <Typography aria-label="警告">⚠️</Typography>;
   }
-  return <Chip label="可用" color="primary" size="small" variant="outlined" sx={{ height: 26 }} />;
+  return <Typography aria-label="可用">✅</Typography>;
 }
 
 function ExpandedPreview({
@@ -103,8 +103,8 @@ function ExpandedPreview({
       >
         {urls ? (
           [
-            { label: "基准图", src: urls.beforeUrl, path: frame.before.source.relativePath },
-            { label: "对比方案", src: urls.afterUrl, path: frame.after.source.relativePath },
+            { label: "Before", src: urls.beforeUrl, path: frame.before.source.relativePath },
+            { label: "After", src: urls.afterUrl, path: frame.after.source.relativePath },
           ].map((preview) => (
             <Box
               key={preview.label}
@@ -145,6 +145,7 @@ function ExpandedPreview({
 
 function SortablePairingRow({
   row,
+  alternateColumns,
   disabled,
   expanded,
   previewFrame,
@@ -152,6 +153,7 @@ function SortablePairingRow({
   onToggleExpanded,
 }: {
   row: FramePreviewRow;
+  alternateColumns: string[];
   disabled: boolean;
   expanded: boolean;
   previewFrame: WebUploadFramePlan | null;
@@ -166,6 +168,9 @@ function SortablePairingRow({
     transform: CSS.Transform.toString(transform),
     transition,
   };
+  const desktopGridColumns = `38px 54px minmax(110px, 0.72fr) minmax(0, 1fr) minmax(0, 1fr) ${alternateColumns
+    .map(() => "minmax(0, 0.82fr)")
+    .join(" ")} 54px 54px 34px`;
 
   return (
     <Box
@@ -203,7 +208,7 @@ function SortablePairingRow({
           display: "grid",
           gridTemplateColumns: {
             xs: "34px 44px minmax(0, 1fr) 32px",
-            md: "38px 54px minmax(110px, 0.8fr) minmax(0, 1.1fr) minmax(0, 1.1fr) 74px 62px 74px 34px",
+            md: desktopGridColumns,
           },
           gap: { xs: 0.75, md: 1 },
           alignItems: "center",
@@ -259,16 +264,23 @@ function SortablePairingRow({
         >
           {row.afterPath}
         </Typography>
+        {alternateColumns.map((label) => {
+          const alternate = row.alternateAfter.find((item) => item.label === label);
+          return (
+            <Typography
+              key={label}
+              variant="body2"
+              noWrap
+              title={alternate?.path ?? ""}
+              sx={{ display: { xs: "none", md: "block" }, color: alternate ? "text.primary" : "text.disabled" }}
+            >
+              {alternate?.path ?? "—"}
+            </Typography>
+          );
+        })}
         <Box sx={{ display: { xs: "none", md: "block" } }}>
           <HeatmapStatus row={row} />
         </Box>
-        <Typography
-          variant="caption"
-          color="text.secondary"
-          sx={{ display: { xs: "none", md: "block" } }}
-        >
-          misc {row.miscCount}
-        </Typography>
         <Box sx={{ display: { xs: "none", md: "block" } }}>
           <IssueStatus row={row} />
         </Box>
@@ -310,6 +322,20 @@ export function PairingPreviewPanel({
     () => planView?.frames.map((row) => row.frameId) ?? [],
     [planView?.frames],
   );
+  const alternateColumns = useMemo(() => {
+    const labels = new Set<string>();
+    for (const row of planView?.frames ?? []) {
+      for (const alternate of row.alternateAfter) {
+        if (labels.size < 3) {
+          labels.add(alternate.label);
+        }
+      }
+    }
+    return [...labels];
+  }, [planView?.frames]);
+  const desktopGridColumns = `38px 54px minmax(110px, 0.72fr) minmax(0, 1fr) minmax(0, 1fr) ${alternateColumns
+    .map(() => "minmax(0, 0.82fr)")
+    .join(" ")} 54px 54px 34px`;
 
   useEffect(() => {
     if (!expandedFrame) {
@@ -359,7 +385,7 @@ export function PairingPreviewPanel({
         {planView ? (
           <Chip
             icon={hasBlockingIssues ? <WarningAmber /> : <CheckCircle />}
-            label={hasBlockingIssues ? "需要修正" : `${planView.frames.length} 对`}
+            label={`${planView.healthyPairCount} / ${planView.frames.length}`}
             color={hasBlockingIssues ? "warning" : "primary"}
             sx={{ height: 32 }}
           />
@@ -381,7 +407,7 @@ export function PairingPreviewPanel({
                   display: "grid",
                   gridTemplateColumns: {
                     xs: "34px 44px minmax(0, 1fr) 32px",
-                    md: "38px 54px minmax(110px, 0.8fr) minmax(0, 1.1fr) minmax(0, 1.1fr) 74px 62px 74px 34px",
+                    md: desktopGridColumns,
                   },
                   gap: { xs: 0.75, md: 1 },
                   px: { xs: 0.75, md: 1.1 },
@@ -400,16 +426,18 @@ export function PairingPreviewPanel({
                 <span>序号</span>
                 <span>Frame</span>
                 <Box component="span" sx={{ display: { xs: "none", md: "block" } }}>
-                  基准图
+                  Before
                 </Box>
                 <Box component="span" sx={{ display: { xs: "none", md: "block" } }}>
-                  对比方案
+                  After
                 </Box>
+                {alternateColumns.map((label) => (
+                  <Box key={label} component="span" sx={{ display: { xs: "none", md: "block" } }}>
+                    {label}
+                  </Box>
+                ))}
                 <Box component="span" sx={{ display: { xs: "none", md: "block" } }}>
                   Heatmap
-                </Box>
-                <Box component="span" sx={{ display: { xs: "none", md: "block" } }}>
-                  其他
                 </Box>
                 <Box component="span" sx={{ display: { xs: "none", md: "block" } }}>
                   状态
@@ -420,6 +448,7 @@ export function PairingPreviewPanel({
                 <SortablePairingRow
                   key={row.frameId}
                   row={row}
+                  alternateColumns={alternateColumns}
                   disabled={!canReorder}
                   expanded={expandedFrameId === row.frameId}
                   previewFrame={frameForId(plan, row.frameId)}

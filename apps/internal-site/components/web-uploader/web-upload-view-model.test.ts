@@ -90,4 +90,23 @@ describe("web upload view model", () => {
     expect(reorderUploadPlan(originalPlan, frameIdForFrame(originalPlan.frames[0]), "missing")).toBeNull();
     expect(reorderUploadPlan(originalPlan, frameIdForFrame(originalPlan.frames[0]), null)).toBeNull();
   });
+
+  it("exposes up to three alternate after columns for preview", () => {
+    const originalPlan = plan();
+    originalPlan.frames[0] = {
+      ...originalPlan.frames[0],
+      misc: [
+        { ...asset("misc", "after/1-nodeband.png"), label: "NoDeband" },
+        { ...asset("misc", "after/1-degrain.png"), label: "Degrain" },
+        { ...asset("misc", "after/1-denoise.png"), label: "Denoise" },
+        { ...asset("misc", "after/1-clean.png"), label: "Clean" },
+      ],
+    };
+
+    expect(buildPlanView(originalPlan).frames[0].alternateAfter).toEqual([
+      { label: "NoDeband", path: "after/1-nodeband.png" },
+      { label: "Degrain", path: "after/1-degrain.png" },
+      { label: "Denoise", path: "after/1-denoise.png" },
+    ]);
+  });
 });

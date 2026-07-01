@@ -10,6 +10,7 @@ export interface FramePreviewRow {
   title: string;
   beforePath: string;
   afterPath: string;
+  alternateAfter: Array<{ label: string; path: string }>;
   heatmapPath: string | null;
   miscCount: number;
   issueCount: number;
@@ -22,6 +23,7 @@ export interface PlanView {
   suggestedGroupSlug: string;
   suggestedGroupTitle: string;
   frames: FramePreviewRow[];
+  healthyPairCount: number;
   ignoredCount: number;
   warningCount: number;
   errorCount: number;
@@ -59,20 +61,35 @@ function frameIssueState(frame: WebUploadFramePlan, issues: WebUploadIssue[]) {
 }
 
 export function buildPlanView(plan: WebUploadPlan): PlanView {
-  return {
-    sourceRootName: plan.sourceRootName,
-    suggestedGroupSlug: plan.suggestedGroupSlug,
-    suggestedGroupTitle: plan.suggestedGroupTitle,
-    frames: plan.frames.map((frame) => ({
+  const frames = plan.frames.map((frame) => {
+    const issueState = frameIssueState(frame, plan.issues);
+    const alternateAfter = frame.misc
+      .filter((asset) => asset.label !== "Misc")
+      .slice(0, 3)
+      .map((asset) => ({
+        label: asset.label,
+        path: asset.source.relativePath,
+      }));
+
+    return {
       frameId: frameIdForFrame(frame),
       order: frame.order,
       title: frame.title,
       beforePath: frame.before.source.relativePath,
       afterPath: frame.after.source.relativePath,
+      alternateAfter,
       heatmapPath: frame.heatmap?.source.relativePath ?? null,
       miscCount: frame.misc.length,
-      ...frameIssueState(frame, plan.issues),
-    })),
+      ...issueState,
+    };
+  });
+
+  return {
+    sourceRootName: plan.sourceRootName,
+    suggestedGroupSlug: plan.suggestedGroupSlug,
+    suggestedGroupTitle: plan.suggestedGroupTitle,
+    frames,
+    healthyPairCount: frames.filter((frame) => !frame.hasError).length,
     ignoredCount: plan.ignoredFiles.length,
     warningCount: plan.issues.filter((issue) => issue.severity === "warning").length,
     errorCount: plan.issues.filter((issue) => issue.severity === "error").length,
