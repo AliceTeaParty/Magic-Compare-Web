@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  cancelGroupUpload,
   commitGroupUploadFrame,
   completeGroupUpload,
   prepareGroupUploadFrame,
@@ -9,7 +10,10 @@ import {
 const {
   groupUploadJobCreate,
   groupUploadJobUpdate,
+  groupUploadJobUpdateMany,
+  frameUploadJobFindMany,
   frameUploadJobUpdate,
+  frameUploadJobUpdateMany,
   frameFindMany,
   frameDeleteMany,
   frameCreate,
@@ -18,7 +22,10 @@ const {
 } = vi.hoisted(() => ({
   groupUploadJobCreate: vi.fn(),
   groupUploadJobUpdate: vi.fn(),
+  groupUploadJobUpdateMany: vi.fn(),
+  frameUploadJobFindMany: vi.fn(),
   frameUploadJobUpdate: vi.fn(),
+  frameUploadJobUpdateMany: vi.fn(),
   frameFindMany: vi.fn(),
   frameDeleteMany: vi.fn(),
   frameCreate: vi.fn(),
@@ -46,14 +53,21 @@ const helperMocks = vi.hoisted(() => ({
   markUploadJobCompleted: vi.fn(),
 }));
 
+const { deleteInternalAssetPrefix } = vi.hoisted(() => ({
+  deleteInternalAssetPrefix: vi.fn(),
+}));
+
 vi.mock("@/lib/server/db/client", () => ({
   prisma: {
     groupUploadJob: {
       create: groupUploadJobCreate,
       update: groupUploadJobUpdate,
+      updateMany: groupUploadJobUpdateMany,
     },
     frameUploadJob: {
+      findMany: frameUploadJobFindMany,
       update: frameUploadJobUpdate,
+      updateMany: frameUploadJobUpdateMany,
     },
     frame: {
       findMany: frameFindMany,
@@ -66,6 +80,17 @@ vi.mock("@/lib/server/db/client", () => ({
     $transaction: transaction,
   },
 }));
+
+vi.mock("@/lib/server/storage/internal-assets", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/server/storage/internal-assets")>(
+    "@/lib/server/storage/internal-assets",
+  );
+
+  return {
+    ...actual,
+    deleteInternalAssetPrefix,
+  };
+});
 
 vi.mock("./upload-service-helpers", async () => {
   const actual = await vi.importActual<typeof import("./upload-service-helpers")>(
@@ -82,7 +107,10 @@ describe("upload-service", () => {
   beforeEach(() => {
     groupUploadJobCreate.mockReset();
     groupUploadJobUpdate.mockReset();
+    groupUploadJobUpdateMany.mockReset();
+    frameUploadJobFindMany.mockReset();
     frameUploadJobUpdate.mockReset();
+    frameUploadJobUpdateMany.mockReset();
     frameFindMany.mockReset();
     frameDeleteMany.mockReset();
     frameCreate.mockReset();
@@ -90,6 +118,7 @@ describe("upload-service", () => {
     transaction.mockReset();
 
     Object.values(helperMocks).forEach((mockFn) => mockFn.mockReset());
+    deleteInternalAssetPrefix.mockReset();
   });
 
   it("cancels expired active jobs before looking for a resumable upload", async () => {
@@ -338,5 +367,65 @@ describe("upload-service", () => {
     ).rejects.toThrow("Not every frame in the upload job has been committed.");
 
     expect(helperMocks.markUploadJobCompleted).not.toHaveBeenCalled();
+  });
+
+  it("cancels an active upload job and removes pending prefixes", async () => {
+    helperMocks.requireActiveUploadJob.mockResolvedValue({
+      id: "job-1",
+      inputHash: "hash-1",
+      expectedFrameCount: 2,
+      committedFrameCount: 1,
+      status: "active",
+      expiresAt: null,
+      case: { id: "case-1", slug: "2026" },
+      group: { id: "group-1", slug: "test-group", storageRoot: "/groups/group-1" },
+    });
+    frameUploadJobFindMany.mockResolvedValue([
+      { pendingPrefix: "/groups/group-1/1/pending" },
+      { pendingPrefix: null },
+    ]);
+    frameUploadJobUpdateMany.mockReturnValue("cancelled-frames");
+    groupUploadJobUpdate.mockReturnValue("cancelled-job");
+    transaction.mockResolvedValue(undefined);
+
+    const result = await cancelGroupUpload({
+      groupUploadJobId: "job-1",
+    });
+
+    expect(helperMocks.requireActiveUploadJob).toHaveBeenCalledWith("job-1");
+    expect(frameUploadJobFindMany).toHaveBeenCalledWith({
+      where: {
+        groupUploadJobId: "job-1",
+        status: {
+          not: "committed",
+        },
+      },
+      select: {
+        pendingPrefix: true,
+      },
+    });
+    expect(frameUploadJobUpdateMany).toHaveBeenCalledWith({
+      where: {
+        groupUploadJobId: "job-1",
+        status: {
+          not: "committed",
+        },
+      },
+      data: {
+        status: "cancelled",
+      },
+    });
+    expect(groupUploadJobUpdate).toHaveBeenCalledWith({
+      where: { id: "job-1" },
+      data: {
+        status: "cancelled",
+      },
+    });
+    expect(deleteInternalAssetPrefix).toHaveBeenCalledWith("/groups/group-1/1/pending");
+    expect(result).toEqual({
+      groupUploadJobId: "job-1",
+      status: "cancelled",
+      deletedPendingPrefixCount: 1,
+    });
   });
 });

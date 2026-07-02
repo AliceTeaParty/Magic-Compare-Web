@@ -7,6 +7,7 @@ const apiMocks = vi.hoisted(() => ({
   prepareGroupUploadFrame: vi.fn(),
   commitGroupUploadFrame: vi.fn(),
   completeGroupUpload: vi.fn(),
+  cancelGroupUpload: vi.fn(),
 }));
 
 vi.mock("./upload-api", () => ({
@@ -14,6 +15,7 @@ vi.mock("./upload-api", () => ({
   prepareGroupUploadFrame: apiMocks.prepareGroupUploadFrame,
   commitGroupUploadFrame: apiMocks.commitGroupUploadFrame,
   completeGroupUpload: apiMocks.completeGroupUpload,
+  cancelGroupUpload: apiMocks.cancelGroupUpload,
 }));
 
 const sha = (char: string) => char.repeat(64);
@@ -92,6 +94,7 @@ describe("WebUploadRunner", () => {
     apiMocks.prepareGroupUploadFrame.mockReset();
     apiMocks.commitGroupUploadFrame.mockReset();
     apiMocks.completeGroupUpload.mockReset();
+    apiMocks.cancelGroupUpload.mockReset();
     vi.stubGlobal(
       "fetch",
       vi.fn().mockResolvedValue({ ok: true, status: 200 }),
@@ -181,5 +184,59 @@ describe("WebUploadRunner", () => {
         committedFrameCount: 2,
       },
     });
+  });
+
+  it("cancels the active server job when abandoning an upload", async () => {
+    apiMocks.startGroupUpload.mockResolvedValue({
+      groupUploadJobId: "job-1",
+      inputHash: "hash-1",
+      expectedFrameCount: 1,
+      committedFrameCount: 0,
+      canComplete: false,
+      frameStates: [{ frameOrder: 0, status: "pending" }],
+    });
+    apiMocks.prepareGroupUploadFrame.mockResolvedValue({
+      groupUploadJobId: "job-1",
+      frameOrder: 0,
+      files: [
+        {
+          slot: "slot-001",
+          variant: "original",
+          logicalPath: "/pending/o1.png",
+          uploadUrl: "https://r2.example/o1",
+          expiresInSeconds: 900,
+          contentType: "image/png",
+        },
+      ],
+    });
+    apiMocks.cancelGroupUpload.mockResolvedValue({
+      groupUploadJobId: "job-1",
+      status: "cancelled",
+      deletedPendingPrefixCount: 1,
+    });
+    vi.mocked(globalThis.fetch).mockImplementation((_, init) => {
+      const signal = init?.signal;
+      return new Promise<Response>((_resolve, reject) => {
+        if (signal instanceof AbortSignal) {
+          signal.addEventListener(
+            "abort",
+            () => reject(new DOMException("Aborted", "AbortError")),
+            { once: true },
+          );
+        }
+      });
+    });
+
+    const uploadRunner = runner([frame(0)]);
+    const run = uploadRunner.start();
+    await Promise.resolve();
+    await Promise.resolve();
+    await uploadRunner.cancel();
+
+    expect(apiMocks.cancelGroupUpload).toHaveBeenCalledWith({
+      groupUploadJobId: "job-1",
+    });
+
+    await run;
   });
 });

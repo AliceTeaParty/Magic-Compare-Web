@@ -44,6 +44,12 @@ export interface GroupUploadCompleteResult {
   committedFrameCount: number;
 }
 
+export interface GroupUploadCancelResult {
+  groupUploadJobId: string;
+  status: "cancelled";
+  deletedPendingPrefixCount: number;
+}
+
 /**
  * Keeps upload endpoints behind one JSON helper so the runner reports API validation failures with
  * the same message style regardless of which phase failed.
@@ -97,4 +103,8 @@ export function commitGroupUploadFrame(params: {
 
 export function completeGroupUpload(params: { groupUploadJobId: string }) {
   return postJson<GroupUploadCompleteResult>("/api/ops/group-upload-complete", params);
+}
+
+export function cancelGroupUpload(params: { groupUploadJobId: string }) {
+  return postJson<GroupUploadCancelResult>("/api/ops/group-upload-cancel", params);
 }

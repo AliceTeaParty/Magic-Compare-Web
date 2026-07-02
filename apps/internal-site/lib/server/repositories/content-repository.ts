@@ -22,6 +22,7 @@ export {
   searchCases,
 } from "../content/query-service";
 export {
+  cancelGroupUpload,
   completeGroupUpload,
   commitGroupUploadFrame,
   prepareGroupUploadFrame,

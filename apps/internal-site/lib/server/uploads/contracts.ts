@@ -64,6 +64,7 @@ export const GroupUploadFrameCommitInputSchema = GroupUploadFramePrepareInputSch
 export const GroupUploadCompleteInputSchema = z.object({
   groupUploadJobId: z.string().min(1),
 });
+export const GroupUploadCancelInputSchema = GroupUploadCompleteInputSchema;
 
 export type GroupUploadStartInput = z.infer<typeof GroupUploadStartInputSchema>;
 export type UploadFrameDescriptor = z.infer<typeof UploadFrameDescriptorSchema>;

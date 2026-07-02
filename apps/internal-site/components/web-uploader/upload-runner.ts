@@ -3,6 +3,7 @@ import type {
   UploadAssetDescriptor,
 } from "@/lib/server/uploads/contracts";
 import {
+  cancelGroupUpload,
   commitGroupUploadFrame,
   completeGroupUpload,
   prepareGroupUploadFrame,
@@ -145,6 +146,7 @@ export class WebUploadRunner {
   private stage: WebUploadStage = "ready";
   private message = "准备上传。";
   private paused = false;
+  private cancelled = false;
   private running = false;
   private commitQueue = Promise.resolve();
   private uploadedFiles = 0;
@@ -213,6 +215,13 @@ export class WebUploadRunner {
     };
   }
 
+  private abortBrowserRequests() {
+    for (const controller of this.abortControllers) {
+      controller.abort();
+    }
+    this.abortControllers.clear();
+  }
+
   /**
    * Pauses only browser-side work. The server job remains resumable, and a later start can safely
    * re-prepare non-committed frames using the same payload hash.
@@ -225,11 +234,25 @@ export class WebUploadRunner {
     this.paused = true;
     this.stage = "paused";
     this.message = "已暂停，可继续上传。";
-    for (const controller of this.abortControllers) {
-      controller.abort();
-    }
-    this.abortControllers.clear();
+    this.abortBrowserRequests();
     this.emitSoon();
+  }
+
+  /**
+   * Abandon is deliberately stronger than pause: browser PUTs stop immediately and any server-side
+   * prepared prefixes are cancelled so a later upload starts from an honest empty state.
+   */
+  async cancel() {
+    this.cancelled = true;
+    this.paused = true;
+    this.stage = "paused";
+    this.message = "正在放弃上传。";
+    this.abortBrowserRequests();
+    this.emitSoon();
+
+    if (this.jobId) {
+      await cancelGroupUpload({ groupUploadJobId: this.jobId });
+    }
   }
 
   dispose() {
@@ -273,6 +296,10 @@ export class WebUploadRunner {
 
       await this.runFramePool(pendingFrames);
 
+      if (this.cancelled) {
+        return;
+      }
+
       if (this.paused) {
         this.stage = "paused";
         this.message = "已暂停，可继续上传。";
@@ -286,10 +313,16 @@ export class WebUploadRunner {
       }
 
       await completeGroupUpload({ groupUploadJobId: this.requireJobId() });
+      if (this.cancelled) {
+        return;
+      }
       this.stage = "completed";
       this.message = "上传完成。";
       this.emitSoon();
     } catch (error) {
+      if (this.cancelled) {
+        return;
+      }
       if (this.paused) {
         this.stage = "paused";
         this.message = "已暂停，可继续上传。";
