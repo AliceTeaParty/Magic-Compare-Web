@@ -10,11 +10,12 @@
 | API 对接、上传链路开发 | [reference/api-endpoints.zh-CN.md](reference/api-endpoints.zh-CN.md) |
 | demo 与真实导入内容如何区别 | [reference/demo-vs-real.zh-CN.md](reference/demo-vs-real.zh-CN.md) |
 | SQLite / Prisma 数据库边界与上传作业约束 | [reference/database-architecture.zh-CN.md](reference/database-architecture.zh-CN.md) |
+| 当前 Web 上传工作台 | [web-uploader.zh-CN.md](web-uploader.zh-CN.md) |
 | 提交/分支规范 | [commit-guide.md](commit-guide.md) |
 | MCP 工具使用优先级 | [mcp-usage-guide.md](mcp-usage-guide.md) |
 | 跟踪当前 Web 站点 UI/UX 待办 | [uiux-todo.md](uiux-todo.md) |
 | 代码质量体检报告与重构追踪 | [optimize.md](optimize.md) |
-| Uploader 操作说明（面向组员） | [uploader/README.md](uploader/README.md) |
+| Legacy Python uploader 操作说明 | [uploader/README.md](uploader/README.md) |
 | 从 VSEditor 平铺目录开始上传 | [uploader/vseditor-workflow.zh-CN.md](uploader/vseditor-workflow.zh-CN.md) |
 | Uploader 与网站边界划分 | [uploader/boundaries-and-env-split.zh-CN.md](uploader/boundaries-and-env-split.zh-CN.md) |
 | Uploader 分发与构建 | [uploader/distribution.zh-CN.md](uploader/distribution.zh-CN.md) |
@@ -26,6 +27,7 @@
 直接读、优先信。
 
 - [workflow-guide.md](workflow-guide.md) — 工作流、架构分工、数据存储、已知坑，当前最权威的单文档
+- [web-uploader.zh-CN.md](web-uploader.zh-CN.md) — 当前推荐的 Web 上传入口、能力边界和实现定位
 - [commit-guide.md](commit-guide.md) — 提交粒度、分支规则、message 格式
 - [mcp-usage-guide.md](mcp-usage-guide.md) — MCP 工具分工与使用原则
 - [uiux-todo.md](uiux-todo.md) — 当前 Web 站点 UI/UX 审计后的可勾选待办清单
@@ -39,9 +41,9 @@
 - [reference/demo-vs-real.zh-CN.md](reference/demo-vs-real.zh-CN.md) — demo 与真实 case/group 流程对比
 - [reference/database-architecture.zh-CN.md](reference/database-architecture.zh-CN.md) — SQLite / Prisma 边界、上传作业约束与索引设计
 
-### Uploader 用户文档
+### Legacy Uploader 用户文档
 
-面向使用 uploader 上传素材的组员，受众独立。
+面向仍在使用 Python uploader 的组员。该工具已进入 FINAL / 弃用维护期，新的上传能力默认补到 Web 工作台。
 
 - [uploader/README.md](uploader/README.md)
 - [uploader/vseditor-workflow.zh-CN.md](uploader/vseditor-workflow.zh-CN.md)

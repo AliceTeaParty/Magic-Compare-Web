@@ -7,6 +7,7 @@ import {
   Close,
   CloudUpload,
   EditOutlined,
+  UploadFile,
 } from "@mui/icons-material";
 import {
   Box,
@@ -19,15 +20,10 @@ import {
   Tooltip,
   Typography,
 } from "@mui/material";
-import {
-  DndContext,
-  PointerSensor,
-  closestCenter,
-  useSensor,
-  useSensors,
-} from "@dnd-kit/core";
+import { DndContext, PointerSensor, closestCenter, useSensor, useSensors } from "@dnd-kit/core";
 import { SortableContext, rectSortingStrategy } from "@dnd-kit/sortable";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { motion } from "motion/react";
 import type { CaseWorkspaceData } from "@/lib/server/repositories/content-repository";
 import { inlineEditTextSx } from "./case-workspace/inline-edit-text-sx";
@@ -62,28 +58,18 @@ export function CaseWorkspaceBoard({
   canDeployPublicSite: boolean;
 }) {
   const router = useRouter();
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
-  );
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
   const [groups, setGroups] = useState(data.groups);
   const [caseSummary, setCaseSummary] = useState(limitCaseSummary(data.summary));
-  const [caseSummaryDraft, setCaseSummaryDraft] = useState(
-    limitCaseSummary(data.summary),
-  );
-  const [lastServerSummary, setLastServerSummary] = useState(
-    limitCaseSummary(data.summary),
-  );
+  const [caseSummaryDraft, setCaseSummaryDraft] = useState(limitCaseSummary(data.summary));
+  const [lastServerSummary, setLastServerSummary] = useState(limitCaseSummary(data.summary));
   const [isEditingCaseSummary, setIsEditingCaseSummary] = useState(false);
-  const isCaseSummaryOverLimit = isOverLimit(
-    caseSummaryDraft,
-    CASE_SUMMARY_MAX_LENGTH,
-  );
+  const isCaseSummaryOverLimit = isOverLimit(caseSummaryDraft, CASE_SUMMARY_MAX_LENGTH);
   const caseSummaryEditorRef = useRef<HTMLElement | null>(null);
   const caseSummaryEditSeedRef = useRef(limitCaseSummary(data.summary));
   const [isPending, startTransition] = useTransition();
   const workspaceNotifications = useWorkspaceNotifications();
-  const { dismissNotification, notifications, pushNotification } =
-    workspaceNotifications;
+  const { dismissNotification, notifications, pushNotification } = workspaceNotifications;
   const {
     publicGroupCount,
     isDeployingPublicSite,
@@ -92,6 +78,7 @@ export function CaseWorkspaceBoard({
     reorderCaseGroups,
     updateCaseSummary,
     updateGroupMetadata,
+    deleteGroup,
   } = useCaseWorkspaceActions({
     caseSummary,
     data,
@@ -236,11 +223,7 @@ export function CaseWorkspaceBoard({
             }}
           >
             <Stack spacing={1.15} sx={{ minWidth: 0, pr: { xl: 2.6 } }}>
-              <Typography
-                variant="h2"
-                component="h1"
-                sx={{ lineHeight: 1, textWrap: "balance" }}
-              >
+              <Typography variant="h2" component="h1" sx={{ lineHeight: 1, textWrap: "balance" }}>
                 {data.title}
               </Typography>
               <Box
@@ -263,9 +246,7 @@ export function CaseWorkspaceBoard({
                   contentEditable={isEditingCaseSummary && !isPending}
                   data-placeholder="暂无 Case 描述。"
                   suppressContentEditableWarning
-                  onInput={
-                    isEditingCaseSummary ? handleCaseSummaryInput : undefined
-                  }
+                  onInput={isEditingCaseSummary ? handleCaseSummaryInput : undefined}
                   sx={inlineEditTextSx({
                     active: isEditingCaseSummary,
                     kind: "summary",
@@ -357,13 +338,7 @@ export function CaseWorkspaceBoard({
                   )}
                 </Box>
               </Box>
-              <Stack
-                direction="row"
-                spacing={0.9}
-                flexWrap="wrap"
-                useFlexGap
-                sx={{ pt: 0.35 }}
-              >
+              <Stack direction="row" spacing={0.9} flexWrap="wrap" useFlexGap sx={{ pt: 0.35 }}>
                 <Chip
                   label={data.status}
                   color={data.status === "published" ? "primary" : "default"}
@@ -431,6 +406,22 @@ export function CaseWorkspaceBoard({
                   }}
                 >
                   Back to catalog
+                </Button>
+                <Button
+                  component={Link}
+                  href={`/upload?case=${encodeURIComponent(data.slug)}`}
+                  variant="outlined"
+                  startIcon={<UploadFile />}
+                  disabled={isPending || isDeployingPublicSite}
+                  sx={{
+                    borderColor: "transparent",
+                    backgroundColor: "rgba(255,255,255,0.04)",
+                    "&:hover": {
+                      borderColor: "rgba(232, 198, 246, 0.26)",
+                    },
+                  }}
+                >
+                  上传对比
                 </Button>
                 <Tooltip
                   title={
@@ -524,6 +515,7 @@ export function CaseWorkspaceBoard({
                       isPending={isPending}
                       onUpdateMetadata={updateGroupMetadata}
                       onToggleVisibility={toggleGroupVisibility}
+                      onDelete={deleteGroup}
                     />
                   ))}
                 </List>
@@ -533,10 +525,7 @@ export function CaseWorkspaceBoard({
         </Paper>
       </Box>
 
-      <WorkspaceNotifications
-        notifications={notifications}
-        onDismiss={dismissNotification}
-      />
+      <WorkspaceNotifications notifications={notifications} onDismiss={dismissNotification} />
     </Stack>
   );
 }

@@ -2,6 +2,7 @@ import { prisma } from "@/lib/server/db/client";
 import { deleteInternalAssetPrefix } from "@/lib/server/storage/internal-assets";
 import {
   type GroupUploadStartInput,
+  GroupUploadCancelInputSchema,
   GroupUploadCompleteInputSchema,
   GroupUploadFrameCommitInputSchema,
   GroupUploadFramePrepareInputSchema,
@@ -11,6 +12,7 @@ import {
 } from "./contracts";
 import {
   ACTIVE_JOB_STATUS,
+  CANCELLED_JOB_STATUS,
   COMMITTED_FRAME_STATUS,
   JOB_TTL_MS,
   PENDING_FRAME_STATUS,
@@ -187,6 +189,59 @@ export async function completeGroupUpload(rawInput: unknown) {
     caseSlug: job.case.slug,
     groupSlug: job.group.slug,
     committedFrameCount: job.committedFrameCount,
+  };
+}
+
+/**
+ * Abandon keeps committed group content intact but cancels the active import session and removes
+ * prepared object prefixes so a later Web upload cannot resume from stale browser state.
+ */
+export async function cancelGroupUpload(rawInput: unknown) {
+  const input = GroupUploadCancelInputSchema.parse(rawInput);
+  const job = await requireActiveUploadJob(input.groupUploadJobId);
+  const preparedFrameJobs = await prisma.frameUploadJob.findMany({
+    where: {
+      groupUploadJobId: job.id,
+      status: {
+        not: COMMITTED_FRAME_STATUS,
+      },
+    },
+    select: {
+      pendingPrefix: true,
+    },
+  });
+  const pendingPrefixes = preparedFrameJobs
+    .map((frameJob) => frameJob.pendingPrefix)
+    .filter((prefix): prefix is string => Boolean(prefix));
+
+  await prisma.$transaction([
+    prisma.frameUploadJob.updateMany({
+      where: {
+        groupUploadJobId: job.id,
+        status: {
+          not: COMMITTED_FRAME_STATUS,
+        },
+      },
+      data: {
+        status: CANCELLED_JOB_STATUS,
+      },
+    }),
+    prisma.groupUploadJob.update({
+      where: { id: job.id },
+      data: {
+        status: CANCELLED_JOB_STATUS,
+      },
+    }),
+  ]);
+
+  for (const prefix of pendingPrefixes) {
+    await deleteInternalAssetPrefix(prefix);
+  }
+
+  return {
+    groupUploadJobId: job.id,
+    status: CANCELLED_JOB_STATUS,
+    deletedPendingPrefixCount: pendingPrefixes.length,
   };
 }
 

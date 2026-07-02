@@ -11,7 +11,8 @@
 - `public-site` 是静态导出目标，构建产物可直接推到 Cloudflare Pages。
 - 内部原图、缩略图和 heatmap 已经统一走 S3-compatible 存储，不再使用 `.runtime` 或 `public/internal-assets`。
 - demo 是受控样本，不代表真实业务导入流程。
-- 真实内容的链路是：`uploader -> group-upload-start -> frame prepare/upload/commit -> group-upload-complete -> internal-site -> case-publish -> public-export/public-deploy`。
+- 真实内容的推荐链路是：`Web uploader -> group-upload-start -> frame prepare/upload/commit -> group-upload-complete -> internal-site -> case-publish -> public-export/public-deploy`。
+- 旧 Python uploader 已进入 FINAL / 弃用维护期，但仍复用同一组 frame-level 上传 API。
 - `public-export` 和 `public-deploy` 必须显式触发，它们不是 `case-publish` 的隐式副作用。
 
 ## 当前架构中的真实分工
@@ -140,11 +141,13 @@ pnpm db:seed
 
 真实内容来自：
 
+- `/upload` Web 上传工作台
 - `magic-compare-uploader`
 - `POST /api/ops/group-upload-start`
 - `POST /api/ops/group-upload-frame-prepare`
 - `POST /api/ops/group-upload-frame-commit`
 - `POST /api/ops/group-upload-complete`
+- `POST /api/ops/group-upload-cancel`
 
 它们不是仓库样本，而是实际工作数据。
 
@@ -256,23 +259,27 @@ Docker 用：
 
 ## 上传链路的真实顺序
 
-当前 uploader 是一站式中文 CLI。
+当前推荐入口是 `internal-site` 的 `/upload` Web 工作台。旧 Python uploader 仍可用于 legacy 导入和补救，但不再作为新增上传能力的默认承载面。
 
-真实导入链路是：
+Web 上传链路是：
 
-1. 预演 `plan`：扫描源素材目录、识别 `before / after / misc / heatmap`、校验关键图片并生成计划
-2. 生成工作目录与 metadata
-3. 打开编辑器确认 `case.yaml / group.yaml`
-4. 生成缩略图和 heatmap
+1. 浏览器扫描本地目录，识别 `Before / After / Rip / NoDeband / Degrain` 等列并生成配对计划
+2. 在右侧 `配对预览` 中确认问题、列名、顺序和全局 heatmap 参考
+3. worker 生成缩略图和缺失 heatmap
+4. 必要时用 `AbortController` 放弃本地生成或上传
 5. 调用 `POST /api/ops/group-upload-start`
 6. 按 frame 调用 `POST /api/ops/group-upload-frame-prepare`
-7. uploader 用返回的 presigned PUT URL 直接上传该 frame 的原图与缩略图
+7. 浏览器用返回的 presigned PUT URL 直接上传该 frame 的原图与缩略图
 8. 调用 `POST /api/ops/group-upload-frame-commit`
 9. 全部 frame 完成后调用 `POST /api/ops/group-upload-complete`
+10. 如果用户放弃任务，调用 `POST /api/ops/group-upload-cancel`，取消 active job 并清理未提交 pending 前缀
 
 关键约束：
 
-- uploader 现在不再把图先落到 internal-site 本地目录，也不再调用服务器二进制上传代理
+- Web 上传和 legacy uploader 都不把图先落到 internal-site 本地目录，也不调用服务器二进制上传代理
+- Web 上传的 `File` / `Blob` 不进入 React state；React 只保存轻量渲染模型
+- Web 上传的 heatmap 参考是全局设置，只能选择所有 frame 都存在的列
+- Web 上传的 VSEditor 行标题使用 `EP<episode>-<frame>`，长片名保留在 caption / tooltip 中
 - 远端内部站只支持 Cloudflare Service Token，不再走 `cloudflared` 人工登录链路
 - 新上传对象统一放在 `/groups/<group-storage-uuid>/<frame-order>/<frame-revision-uuid>/...`
 - 已存在的 case metadata 仍以数据库为准；uploader 不会覆盖已有 case 的 title / summary / tags
@@ -281,23 +288,24 @@ Docker 用：
 - 生产环境里的 `MAGIC_COMPARE_S3_PUBLIC_BASE_URL` 应指向 Cloudflare 代理的图片域名，不应直接使用裸 `r2.dev` 或 `cloudflarestorage.com` 桶域名
 - public-export/public-deploy 不再打包图片，Pages 只发布静态页面和 manifest
 - `public-site` 公开页默认不应被搜索引擎索引；页面层防爬通过 metadata / `robots.txt` 声明，真正的图片拦截和限流交给 Cloudflare
-- uploader 的 upload session 固定放在工作目录 `.magic-compare/upload-session.json`
-- wizard 当前显示的是**文件级**上传进度：总体文件条 + 当前并发/最近 frame 状态 + skipped/retried/failed 计数
-- wizard 的百分比行只显示 `进度：N%`，不再附加额外提示语
-- 直接 `sync` 命令仍保持轻量输出，不显示同等复杂的实时进度 UI
-- uploader 现在会复用一个共享 HTTP client，并用流式 PUT 上传文件，避免大图整文件读入内存
-- uploader 现在会并发处理多个 frame 的 prepare/upload，但 commit 仍串行执行，避免 internal-site 的 SQLite 写冲突
+- legacy uploader 的 upload session 固定放在工作目录 `.magic-compare/upload-session.json`
+- legacy wizard 当前显示的是**文件级**上传进度：总体文件条 + 当前并发/最近 frame 状态 + skipped/retried/failed 计数
+- legacy wizard 的百分比行只显示 `进度：N%`，不再附加额外提示语
+- legacy `sync` 命令仍保持轻量输出，不显示同等复杂的实时进度 UI
+- legacy uploader 会复用一个共享 HTTP client，并用流式 PUT 上传文件，避免大图整文件读入内存
+- Web 上传和 legacy uploader 都可以并发处理多个 frame 的 prepare/upload，但 commit 仍串行执行，避免 internal-site 的 SQLite 写冲突
 
 ### 上传链路当前的内部分层
 
 避免把 frame 级事务重新堆回一个文件，当前职责划分应保持如下：
 
 - `app/api/ops/group-upload-*`：只做 route 入口和错误转义，不写事务编排
-- `lib/server/uploads/upload-service.ts`：只保留 start / prepare / commit / complete 主流程
+- `lib/server/uploads/upload-service.ts`：只保留 start / prepare / commit / complete / cancel 主流程
 - `lib/server/uploads/upload-service-helpers.ts`：承接作业装载、group 重置、presign 组装、frame 状态 guard、complete 收尾
 - `lib/server/storage/internal-assets.ts`：只负责 S3-compatible 读写、presign、按前缀删除，不负责业务状态切换
-- `tools/uploader/src/wizard.py`：只负责交互向导和工作目录确认
-- `tools/uploader/src/upload_executor.py`：只负责 start -> per-frame prepare/upload/commit -> complete 的执行状态机，其中 prepare/upload 可并发，commit 串行收口
+- `components/web-uploader/`：只负责浏览器目录扫描、预览、生成、上传 runner 和轻量状态展示
+- `tools/uploader/src/wizard.py`：legacy CLI 交互向导和工作目录确认
+- `tools/uploader/src/upload_executor.py`：legacy CLI 的 start -> per-frame prepare/upload/commit -> complete 执行状态机，其中 prepare/upload 可并发，commit 串行收口
 
 新增上传逻辑时，优先把“副作用顺序”塞进 helper，而不是继续往 route 或单个主流程函数里追加分支。
 
@@ -307,6 +315,7 @@ Docker 用：
 
 - 不要恢复 internal-site 二进制上传代理；上传工具只能拿 presigned URL 后直传对象存储
 - 不要在 `upload-service.ts` 里混入大段 Prisma 明细和对象存储清理细节；新增分支优先落到 helper
+- 不要把新的上传体验继续扩展到 Python CLI；优先补齐 `/upload` Web 工作台
 - 不要把 viewer 的键盘、cookie、viewport、A/B outside-click 副作用重新塞回 `group-viewer-workbench.tsx`
 - 不要让 workspace action 自己管理 toast timer、optimistic rollback、transition 样板；复用 action helper 和 notification hook
 - 不要把 uploader 的 session 读写、frame 状态推进和 Rich 输出重新揉进一个超长函数
@@ -545,10 +554,11 @@ docker build -f docker/internal-site.Dockerfile -t magic-compare/internal-site .
 
 先看：
 
-- `docs/uploader/README.md`
-- `docs/uploader/vseditor-workflow.zh-CN.md`
+- `docs/web-uploader.zh-CN.md`
 - `docs/reference/database-architecture.zh-CN.md`
 - `docs/reference/demo-vs-real.zh-CN.md`
+- `docs/uploader/README.md`（legacy Python uploader）
+- `docs/uploader/vseditor-workflow.zh-CN.md`（legacy VSEditor CLI 流程）
 - `docs/uploader/boundaries-and-env-split.zh-CN.md`
 - `docs/uploader/distribution.zh-CN.md`
 

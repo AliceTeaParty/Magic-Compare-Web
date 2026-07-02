@@ -41,7 +41,7 @@ pnpm typecheck
 
 仓库分三条独立责任线，不能混用：
 
-- `tools/uploader/`：历史 Python CLI。扫描本地目录，通过 internal-site 签发的 presigned PUT 上传对象，再调用内部导入 API。它不是网站运行时的一部分。
+- `tools/uploader/`：历史 Python CLI。扫描本地目录，通过 internal-site 的 frame-level upload API 签发 presigned PUT、上传对象并提交 frame。它不是网站运行时的一部分。
 - `apps/internal-site/`：带服务端能力的 Next.js 内部工作站。负责 case catalog、case workspace、group viewer、`/api/ops/*`、SQLite/Prisma metadata、S3/R2 内部素材访问、publish bundle 生成，以及显式 public export/deploy 触发。
 - `apps/public-site/`：静态导出站点。只读取 `content/published/groups/*/manifest.json` 并服务 `/g/[publicSlug]`，没有 catalog、上传 UI 或写接口。
 
@@ -63,7 +63,7 @@ pnpm typecheck
 
 ## 前端和 UX 要求
 
-- 当前开发重点是补齐 Web 能力，尤其是 Case workspace、viewer、未来 Web 上传流。
+- 当前开发重点是补齐 Web 能力，尤其是 Case workspace、viewer 和 `/upload` Web 上传工作台。
 - UI 应保持精确、安静、工作台感。不要把内部工具做成营销 landing page，也不要用装饰性卡片、夸张圆角、无意义动效稀释信息层级。
 - 对比图页面以图像检查为核心；toolbar、filmstrip、details、guide 都应服务快速判断，不应遮挡主图或制造状态歧义。
 - loading / fallback 必须诚实：不要用模糊或错误图片冒充目标图片；原图仍是检查的最终依据。

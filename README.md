@@ -11,7 +11,7 @@
 <p align="center">
   <a href="#quick-start">Quick Start</a> ·
   <a href="#workflow-overview">View Workflow</a> ·
-  <a href="./docs/uploader/README.md">Uploader Docs</a>
+  <a href="./docs/web-uploader.zh-CN.md">Web Upload Docs</a>
 </p>
 
 <table>
@@ -56,9 +56,9 @@ This repository is deliberately not a video previewer, not an online VapourSynth
 - `Slider` for before/after inspection on the same frame.
 - `A/B` for direct version toggling during image review.
 - `Heatmap` for difference emphasis when visual deltas need extra contrast.
-- An internal import-to-publish workflow that turns local image sets into reviewable cases.
+- A Web upload-to-publish workflow that turns local image sets into reviewable cases.
 - A static public delivery target that reads published bundles from `content/published`.
-- S3-compatible internal asset storage with uploader direct upload.
+- S3-compatible internal asset storage with presigned direct uploads.
 - Explicit public export and Cloudflare Pages deploy actions from the internal workspace.
 
 <a id="quick-start"></a>
@@ -120,19 +120,20 @@ Demo content:
 
 ## 🔄 Workflow Overview
 
-### 📥 Import Workflow
+### 📥 Upload Workflow
 
-1. Prepare a local case directory that matches the uploader convention.
-2. Run the uploader to validate required files and scan the source set.
-3. Upload source images, generated thumbnails, and generated heatmaps into S3-compatible storage.
-5. Build an `ImportManifest` and post it to `POST /api/ops/import-sync`.
-6. Let the internal site upsert case and group metadata, then recreate replaced frame and asset rows from the manifest.
+1. Open the internal Web uploader at `/upload`, or `/upload?case=<caseSlug>` from a case workspace.
+2. Select a local directory and review the pairing preview before uploading.
+3. Generate thumbnails and missing heatmaps in the browser worker.
+4. Use `group-upload-start -> frame prepare -> presigned PUT -> frame commit -> group-upload-complete`.
+5. Let the internal site update case/group metadata and switch each committed frame to the new object-storage revision.
 
 Result:
 
 - imported review data is available in the internal site workspace
-- internal assets live in S3-compatible storage; the database keeps logical `/internal-assets/...` paths while browser-facing URLs resolve from `MAGIC_COMPARE_S3_PUBLIC_BASE_URL`
-- detailed uploader usage lives in `docs/uploader/README.md`
+- internal assets live in S3-compatible storage; the database keeps logical `/groups/...` paths while browser-facing URLs resolve from `MAGIC_COMPARE_S3_PUBLIC_BASE_URL`
+- current Web upload usage lives in `docs/web-uploader.zh-CN.md`
+- legacy Python uploader usage lives in `docs/uploader/README.md`
 - a Chinese note about the difference between built-in demo content and real case/group flows lives in `docs/reference/demo-vs-real.zh-CN.md`
 
 ### 📦 Publish Workflow
@@ -199,7 +200,7 @@ Internal site responsibilities:
 - show the case catalog
 - show a case workspace
 - show the internal group viewer
-- accept import manifests from the uploader
+- provide the Web upload workbench and frame-level upload APIs
 - reorder groups within a case
 - reorder frames within a group
 - publish public artifacts into `content/published`
@@ -237,7 +238,7 @@ Shared Zod schemas and TypeScript types for:
 - group
 - frame
 - asset
-- import manifest
+- frame-level upload payload
 - publish manifest
 - enums such as `CaseStatus`, `ViewerMode`, and `AssetKind`
 
@@ -269,15 +270,14 @@ Shared viewer workbench and theme:
 
 ### tools/uploader
 
-Python CLI that:
+Legacy Python CLI that:
 
 - validates a local case directory
-- uploads source images and thumbnails into S3-compatible internal asset storage
 - generates thumbnails
-- builds an import manifest
-- posts the manifest to `POST /api/ops/import-sync`
+- uses frame-level upload APIs and presigned PUT URLs
+- remains available for old import flows and emergency recovery
 
-There is a dedicated uploader document at `docs/uploader/README.md`.
+New upload work should target the Web uploader. Legacy CLI docs live at `docs/uploader/README.md`.
 
 </details>
 
@@ -366,9 +366,14 @@ Current semantic rules:
 ### Internal site
 
 - `/`
+- `/upload`
 - `/cases/[caseSlug]`
 - `/cases/[caseSlug]/groups/[groupSlug]`
-- `POST /api/ops/import-sync`
+- `POST /api/ops/group-upload-start`
+- `POST /api/ops/group-upload-frame-prepare`
+- `POST /api/ops/group-upload-frame-commit`
+- `POST /api/ops/group-upload-complete`
+- `POST /api/ops/group-upload-cancel`
 - `POST /api/ops/group-reorder`
 - `POST /api/ops/frame-reorder`
 - `POST /api/ops/case-publish`
@@ -415,16 +420,17 @@ Keyboard support currently includes:
 </details>
 
 <details>
-<summary><strong>📥 Detailed Import Flow</strong></summary>
+<summary><strong>📥 Detailed Upload Flow</strong></summary>
 
-The current import flow is local-processing + S3 upload.
+The current recommended upload flow is browser scanning + worker generation + presigned object upload.
 
-1. A local case directory is prepared according to the uploader convention.
-2. The uploader scans the directory and validates required files.
-3. The uploader uploads source images, thumbnails, and generated heatmaps into S3-compatible storage.
-5. The uploader builds an `ImportManifest`.
-6. The uploader posts the manifest to `POST /api/ops/import-sync`.
-7. The internal site upserts case/group metadata, deletes existing frame/asset rows for replaced groups, and recreates them from the manifest.
+1. `/upload` scans a local directory in the browser and builds a pairing plan.
+2. The pairing preview can rename alternate columns, reorder frames, and choose a global heatmap reference.
+3. A worker generates thumbnails and missing heatmaps without blocking the UI.
+4. `group-upload-start` creates or resumes a group upload job.
+5. Each frame runs `prepare -> presigned PUT upload -> commit`.
+6. `group-upload-complete` finalizes the group after every frame is committed.
+7. `group-upload-cancel` abandons an active job and deletes uncommitted pending prefixes.
 
 </details>
 
@@ -544,11 +550,12 @@ This is used for:
 - Prisma migrations are not yet wired; SQLite bootstrap is currently implemented through a manual init script.
 - The public site still consumes published artifacts from the same repository checkout before export.
 - Cloudflare Pages deploy assumes an existing Pages project and Wrangler-compatible credentials.
-- There is no browser-side upload UI in v1.
+- The Web uploader is the primary upload path, but it is still browser-first and currently optimized for Chrome / Edge directory selection.
 - There is no in-site discussion, scoring, annotation, or review workflow.
 
 ## 🔗 Related Docs
 
+- [Web uploader guide (Simplified Chinese)](./docs/web-uploader.zh-CN.md)
 - [Uploader README](./docs/uploader/README.md)
 - [VSEditor workflow guide (Simplified Chinese)](./docs/uploader/vseditor-workflow.zh-CN.md)
 - [Demo vs real case/group flow (Simplified Chinese)](./docs/reference/demo-vs-real.zh-CN.md)

@@ -1,9 +1,19 @@
 import { describe, expect, it } from "vitest";
-import { DEMO_CASE_SLUG, buildPublicGroupSlug, kebabCase, parseEnvFlag } from "./index";
+import { DEMO_CASE_SLUG, buildPublicGroupSlug, cjkKebabCase, kebabCase, parseEnvFlag } from "./index";
 
 describe("shared slug helpers", () => {
   it("normalizes general slugs with kebabCase", () => {
     expect(kebabCase(" Demo Grain Study ")).toBe("demo-grain-study");
+  });
+
+  it("collapses repeated separators so public slug delimiters stay reserved", () => {
+    expect(kebabCase("bad--case")).toBe("bad-case");
+  });
+
+  it("transliterates Chinese and kana before building upload slugs", () => {
+    expect(cjkKebabCase("测试 Case")).toBe("ceshi-case");
+    expect(cjkKebabCase("かな Upload")).toBe("kana-upload");
+    expect(cjkKebabCase("  --  ", "uploaded-group")).toBe("uploaded-group");
   });
 
   it("preserves the double-hyphen separator for public group slugs", () => {

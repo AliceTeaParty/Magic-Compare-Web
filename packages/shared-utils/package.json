@@ -10,5 +10,9 @@
   "scripts": {
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "pinyin-pro": "^3.28.1",
+    "wanakana": "^5.3.1"
   }
 }

@@ -18,23 +18,27 @@
 
 ## 端点总览
 
-| 路径 | 作用 |
-| --- | --- |
-| `POST /api/ops/case-list` | 列出当前全部 case |
-| `POST /api/ops/case-groups` | 列出某个 case 下当前全部 group |
-| `POST /api/ops/case-search` | 搜索 case，供 uploader / 内部站选择已有 case 使用 |
-| `POST /api/ops/case-delete` | 删除空 case |
-| `POST /api/ops/case-publish` | 重新发布一个 case 下当前可公开的 group |
-| `POST /api/ops/group-visibility` | 切换 group 的 `isPublic` 状态 |
-| `POST /api/ops/group-delete` | 删除一个 group 及其桶内图像前缀、已发布 bundle |
-| `POST /api/ops/group-reorder` | 调整一个 case 内 group 顺序 |
-| `POST /api/ops/frame-reorder` | 调整一个 group 内 frame 顺序 |
-| `POST /api/ops/group-upload-start` | 启动或恢复一个 group 上传作业 |
-| `POST /api/ops/group-upload-frame-prepare` | 为单个 frame 申请 presigned PUT URL |
-| `POST /api/ops/group-upload-frame-commit` | 提交单个 frame，切换数据库到新 revision |
-| `POST /api/ops/group-upload-complete` | 在全部 frame 提交后完成整个 group 上传 |
-| `POST /api/ops/public-export` | 导出当前 public-site 静态产物 |
-| `POST /api/ops/public-deploy` | 可选先发布一个 case，再导出并部署 public-site |
+| 路径                                       | 作用                                              |
+| ------------------------------------------ | ------------------------------------------------- |
+| `POST /api/ops/case-list`                  | 列出当前全部 case                                 |
+| `POST /api/ops/case-groups`                | 列出某个 case 下当前全部 group                    |
+| `POST /api/ops/case-search`                | 搜索 case，供 uploader / 内部站选择已有 case 使用 |
+| `POST /api/ops/case-create`                | 新建一个空的 internal case                        |
+| `POST /api/ops/case-update`                | 修改 case summary                                 |
+| `POST /api/ops/case-delete`                | 删除空 case                                       |
+| `POST /api/ops/case-publish`               | 重新发布一个 case 下当前可公开的 group            |
+| `POST /api/ops/group-update`               | 修改 group 标题和描述                             |
+| `POST /api/ops/group-visibility`           | 切换 group 的 `isPublic` 状态                     |
+| `POST /api/ops/group-delete`               | 删除一个 group 及其桶内图像前缀、已发布 bundle    |
+| `POST /api/ops/group-reorder`              | 调整一个 case 内 group 顺序                       |
+| `POST /api/ops/frame-reorder`              | 调整一个 group 内 frame 顺序                      |
+| `POST /api/ops/group-upload-start`         | 启动或恢复一个 group 上传作业                     |
+| `POST /api/ops/group-upload-frame-prepare` | 为单个 frame 申请 presigned PUT URL               |
+| `POST /api/ops/group-upload-frame-commit`  | 提交单个 frame，切换数据库到新 revision           |
+| `POST /api/ops/group-upload-complete`      | 在全部 frame 提交后完成整个 group 上传            |
+| `POST /api/ops/group-upload-cancel`        | 放弃 active 上传作业并清理未提交 pending 前缀     |
+| `POST /api/ops/public-export`              | 导出当前 public-site 静态产物                     |
+| `POST /api/ops/public-deploy`              | 可选先发布一个 case，再导出并部署 public-site     |
 
 ## Case 相关端点
 
@@ -164,6 +168,38 @@
 - 搜索按 case 的 `slug` 和 `title` 做包含匹配。
 - 如果 runtime 配置隐藏 demo case，这个接口也会同步隐藏 demo 结果。
 
+### `POST /api/ops/case-create`
+
+实现：`apps/internal-site/app/api/ops/case-create/route.ts`
+
+请求体：
+
+```json
+{
+  "slug": "new-case",
+  "title": "New Case",
+  "summary": "Draft summary"
+}
+```
+
+成功响应：
+
+```json
+{
+  "caseSlug": "new-case",
+  "title": "New Case",
+  "summary": "Draft summary",
+  "status": "draft"
+}
+```
+
+说明：
+
+- 只创建一个空的 `draft` case，不创建 group、frame 或对象存储内容。
+- `slug` 使用 `SlugSchema`，因此不允许 `bad--case` 这类 public slug 分隔符形式。
+- 如果 slug 已存在，返回 `400` 和 `{ "error": "Case already exists." }`。
+- 创建 case 不会触发 publish、public export 或 deploy。
+
 ### `POST /api/ops/case-delete`
 
 实现：`apps/internal-site/app/api/ops/case-delete/route.ts`
@@ -190,6 +226,34 @@
 - 只允许删除空 case。
 - 如果 case 下仍有任意 group，会返回 `400`，错误消息为 `Case must be empty before deletion.`。
 - 这个接口不会递归清理 group，也不会触发对象存储递归删除。
+
+### `POST /api/ops/case-update`
+
+实现：`apps/internal-site/app/api/ops/case-update/route.ts`
+
+请求体：
+
+```json
+{
+  "caseSlug": "2026",
+  "summary": "Updated summary"
+}
+```
+
+成功响应：
+
+```json
+{
+  "caseSlug": "2026",
+  "summary": "Updated summary"
+}
+```
+
+说明：
+
+- 当前只修改 `Case.summary`，不修改 slug、title、status 或发布状态。
+- `summary` 会 trim 后保存，允许为空字符串。
+- 如果 case 不存在，返回 `400` 和 `{ "error": "Case not found." }`。
 
 ### `POST /api/ops/case-publish`
 
@@ -225,6 +289,38 @@
 - 这个接口会把 case 的 `status` 设为 `published`，并写入 `publishedAt`。
 
 ## Group / Frame 工作区端点
+
+### `POST /api/ops/group-update`
+
+实现：`apps/internal-site/app/api/ops/group-update/route.ts`
+
+请求体：
+
+```json
+{
+  "caseSlug": "2026",
+  "groupSlug": "test-group",
+  "title": "Test Group",
+  "description": "Updated description"
+}
+```
+
+成功响应：
+
+```json
+{
+  "caseSlug": "2026",
+  "groupSlug": "test-group",
+  "title": "Test Group",
+  "description": "Updated description"
+}
+```
+
+说明：
+
+- 当前只修改 `Group.title` 和 `Group.description`，不修改 slug、排序、公开状态或素材。
+- `title` trim 后必须非空；`description` trim 后允许为空。
+- 如果 group 不存在，返回 `400` 和 `{ "error": "Group not found." }`。
 
 ### `POST /api/ops/group-visibility`
 
@@ -348,6 +444,8 @@
 4. 每个 frame 上传完成后调用 `POST /api/ops/group-upload-frame-commit`
 5. 全部 frame 提交完成后调用 `POST /api/ops/group-upload-complete`
 
+如果用户在 Web 上传中选择放弃，客户端会调用 `POST /api/ops/group-upload-cancel` 取消 active job 并清理未提交 pending 对象。
+
 ### `POST /api/ops/group-upload-start`
 
 实现：`apps/internal-site/app/api/ops/group-upload-start/route.ts`
@@ -379,7 +477,7 @@
       "assets": [
         {
           "slot": "before",
-          "kind": "image",
+          "kind": "before",
           "label": "Before",
           "note": "",
           "width": 1920,
@@ -400,7 +498,7 @@
         },
         {
           "slot": "after",
-          "kind": "image",
+          "kind": "after",
           "label": "After",
           "note": "",
           "width": 1920,
@@ -569,6 +667,35 @@
 - complete 成功后，group upload job 会标记为 `completed`，group 会记录本次 `inputHash`，然后重算 case cover 和 case 发布状态。
 - 如果还有任意 frame 未提交，会返回 `400`，错误消息为 `Not every frame in the upload job has been committed.`。
 
+### `POST /api/ops/group-upload-cancel`
+
+实现：`apps/internal-site/app/api/ops/group-upload-cancel/route.ts`
+
+请求体：
+
+```json
+{
+  "groupUploadJobId": "job-1"
+}
+```
+
+成功响应：
+
+```json
+{
+  "groupUploadJobId": "job-1",
+  "status": "cancelled",
+  "deletedPendingPrefixCount": 2
+}
+```
+
+说明：
+
+- 只接受仍为 active 且未过期的 upload job。
+- 服务端会把未 committed 的 frame jobs 标记为 `cancelled`，再把 group upload job 标记为 `cancelled`。
+- 服务端会删除这些未提交 frame job 的 `pendingPrefix` 对象前缀。
+- 已经 committed 的 frame 内容不会被删除；cancel 是放弃本次 active 上传会话，不是删除 group。
+
 ## Public 站点导出与部署端点
 
 ### `POST /api/ops/public-export`
@@ -631,7 +758,7 @@
 
 - 不再存在 `POST /api/ops/internal-asset-upload`
 - 不再存在旧的 `POST /api/ops/import-sync`
-- 不存在“修改已有 case metadata”的专门端点
+- case summary 和 group title / description 已有专门 metadata 端点；当前没有 slug / status / asset 级任意修改端点
 - 不存在“直接覆盖/删除单个对象”的上传工具专用端点
 
 ## 代码定位

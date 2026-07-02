@@ -1,3 +1,6 @@
+import { pinyin } from "pinyin-pro";
+import { toRomaji } from "wanakana";
+
 export const DEMO_CASE_SLUG = "demo-grain-study";
 export const HIDE_DEMO_ENV_NAME = "MAGIC_COMPARE_HIDE_DEMO";
 export const PUBLISHED_ROOT_ENV_NAME = "MAGIC_COMPARE_PUBLISHED_ROOT";
@@ -17,6 +20,27 @@ export function kebabCase(input: string): string {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
     .replace(/-{2,}/g, "-");
+}
+
+const HAN_RE = /\p{Script=Han}/u;
+const KANA_RE = /[\u3040-\u30ff]/;
+
+function transliterateCjk(input: string): string {
+  const kanaAsRomaji = KANA_RE.test(input) ? toRomaji(input) : input;
+
+  // Web uploads often start from Chinese/Japanese folder names. Transliterate before stripping
+  // non-ASCII characters so automatic slug suggestions do not collapse to the fallback.
+  return [...kanaAsRomaji]
+    .map((character) =>
+      HAN_RE.test(character)
+        ? pinyin(character, { toneType: "none", type: "array" }).join("")
+        : character,
+    )
+    .join("");
+}
+
+export function cjkKebabCase(input: string, fallback = "untitled"): string {
+  return kebabCase(transliterateCjk(input)) || fallback;
 }
 
 export function buildPublicGroupSlug(caseSlug: string, groupSlug: string): string {

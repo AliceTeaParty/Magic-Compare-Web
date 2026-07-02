@@ -5,7 +5,7 @@
 ## 先看结论
 
 - `demo` 是仓库内置的开发 / 演示样本，不代表正常业务导入流程。
-- 真实 `case / group` 来自 uploader 或内部 API，同步后才进入数据库与对象存储。
+- 真实 `case / group` 来自 Web 上传工作台、legacy uploader 或内部上传 API，同步后才进入数据库与对象存储。
 - `demo` 的目标是让仓库开箱即用，方便本地开发、UI 联调、公开站静态导出验证。
 - 真实内容的目标是支撑日常工作流，数据生命周期由导入、排序、发布、删除驱动。
 
@@ -62,12 +62,16 @@ pnpm db:seed
 
 ## 真实 case / group 的处理流程
 
-### 1. 真实内容来自 uploader 或内部接口
+### 1. 真实内容来自 Web 上传或内部接口
 
 真实内容通常从：
 
+- `/upload` Web 上传工作台
 - `magic-compare-uploader`
-- `POST /api/ops/import-sync`
+- `POST /api/ops/group-upload-start`
+- `POST /api/ops/group-upload-frame-prepare`
+- `POST /api/ops/group-upload-frame-commit`
+- `POST /api/ops/group-upload-complete`
 
 进入系统。
 
@@ -76,16 +80,18 @@ pnpm db:seed
 - VSEditor 导图目录
 - 手工整理好的 compare 素材目录
 
-### 2. uploader 负责解析、生成 metadata、上传素材
+### 2. Web 上传负责解析、生成 metadata、上传素材
 
-真实导入时，uploader 会：
+真实导入时，Web 上传工作台会：
 
 1. 扫描原始文件名
-2. 识别 `before / after / misc / heatmap`
-3. 生成工作目录与 metadata
-4. 上传原图、缩略图、heatmap 到 S3-compatible 存储
-5. 生成 import manifest
-6. 调用 internal-site 的 `import-sync`
+2. 识别 `Before / After / Rip / NoDeband / Degrain / Heatmap`
+3. 在配对预览里确认顺序、列名和全局 heatmap 参考
+4. 在浏览器 worker 中生成缩略图和缺失 heatmap
+5. 通过 frame-level upload API 申请 presigned PUT URL 并直传对象存储
+6. 按 frame commit，最后 complete 整个 group
+
+旧 Python uploader 仍可用于 legacy 导入或临时补救，但不再是新增上传能力的默认方向。
 
 这里的数据是“用户输入驱动”的，而不是像 demo 一样由仓库写死。
 
@@ -107,12 +113,12 @@ pnpm db:seed
 ### 数据来源不同
 
 - demo：仓库内置素材 + 固定 manifest
-- 真实内容：外部导入素材 + 动态生成 manifest
+- 真实内容：外部导入素材 + 动态生成上传计划
 
 ### 写入触发点不同
 
 - demo：`pnpm db:seed`
-- 真实内容：uploader / `import-sync`
+- 真实内容：Web 上传工作台 / frame-level upload API
 
 ### 目标不同
 
@@ -158,7 +164,7 @@ pnpm db:seed
 ### 业务内容层
 
 - 所有真实 case / group
-- 由 uploader 和内部站维护
+- 由 Web 上传工作台、legacy uploader 和内部站维护
 - 用于真实导入、查看、排序、发布与删除
 
 ## 开发时应该怎么用
@@ -188,13 +194,19 @@ pnpm dev:internal
 
 ### 你在调真实导入链路
 
-不要依赖 demo，直接跑 uploader：
+不要依赖 demo，直接打开 Web 上传工作台：
 
 ```bash
-magic-compare-uploader
+pnpm dev:internal
 ```
 
-这样验证的是实际导入和资产写入流程。
+然后访问：
+
+```text
+http://localhost:3000/upload
+```
+
+这样验证的是当前推荐的实际导入和资产写入流程。若需要验证旧 CLI，再单独运行 `magic-compare-uploader`。
 
 ### 你在调公开站导出
 
@@ -215,6 +227,7 @@ magic-compare-uploader
 
 - demo seed：`apps/internal-site/prisma/seed.ts`
 - demo 原始素材：`apps/internal-site/prisma/demo-assets/`
-- 真实导入入口：`tools/uploader/`
+- 真实导入入口：`apps/internal-site/app/upload/page.tsx`
+- legacy uploader：`tools/uploader/`
 - published bundle：`content/published/groups/`
 - 公开站读取逻辑：`apps/public-site/lib/content.ts`

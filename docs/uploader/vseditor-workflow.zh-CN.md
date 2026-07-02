@@ -1,5 +1,7 @@
 # 从 VSEditor 平铺目录到上传成功
 
+> **Legacy：** 这份文档描述 Python uploader 的旧流程。当前推荐入口是 internal-site 的 `/upload` Web 上传工作台；旧 CLI 只用于兼容、补救或无法使用浏览器目录选择的场景。
+
 本文档给出从 VSEditor 平铺导图目录到 internal-site 导入成功的最短路径。
 重点是先做预演、再上传，并在失败后可以直接续传，而不是每次从头开始。
 

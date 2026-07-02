@@ -125,7 +125,6 @@ python scripts/build-binary.py --platform linux --arch amd64
 触发方式：
 
 - `workflow_dispatch`
-- `push` tag `v*`
 
 CI 每个目标会：
 
@@ -135,7 +134,10 @@ CI 每个目标会：
 - 校验 onedir 目录里存在 `pykakasi/data/kanwadict4.db`
 - 在每个平台上额外跑一条包含假名目录名的 `plan` smoke，确保 romaji slug 路径在打包后二进制里也能跑通
 - 上传对应 zip artifact
-- 在 tag push 时自动创建 GitHub Release 并附加这些 zip
+
+说明：
+
+- uploader binaries 已暂停自动触发。需要补发 legacy 二进制时手动运行 workflow，再按需要人工附加到 release。
 
 ## 5. linux/arm64 手工构建
 
