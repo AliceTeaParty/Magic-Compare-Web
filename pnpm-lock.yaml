@@ -178,7 +178,14 @@ importers:
         specifier: ^3.25.76
         version: 3.25.76
 
-  packages/shared-utils: {}
+  packages/shared-utils:
+    dependencies:
+      pinyin-pro:
+        specifier: ^3.28.1
+        version: 3.28.1
+      wanakana:
+        specifier: ^5.3.1
+        version: 5.3.1
 
   packages/ui:
     dependencies:
@@ -2634,6 +2641,9 @@ packages:
     resolution: {integrity: sha512-5gTmgEY/sqK6gFXLIsQNH19lWb4ebPDLA4SdLP7dsWkIXHWlG66oPuVvXSGFPppYZz8ZDZq0dYYrbHfBCVUb1Q==}
     engines: {node: '>=12'}
 
+  pinyin-pro@3.28.1:
+    resolution: {integrity: sha512-oqz8ulwRgtUXRi0vbqEfGNly19zpyCxYrjhkk5TibGcgSW6eNwS5woajCXRwqURi8Ehc2yOFTiB4uNoZ+NJOnA==}
+
   pkg-types@2.3.0:
     resolution: {integrity: sha512-SIqCzDRg0s9npO5XQ3tNZioRY1uK06lA41ynBC1YmFTmnY6FjUjVt6s4LoADmwoig1qqD0oK8h1p/8mlMx8Oig==}
 
@@ -3019,6 +3029,10 @@ packages:
         optional: true
       jsdom:
         optional: true
+
+  wanakana@5.3.1:
+    resolution: {integrity: sha512-OSDqupzTlzl2LGyqTdhcXcl6ezMiFhcUwLBP8YKaBIbMYW1wAwDvupw2T9G9oVaKT9RmaSpyTXjxddFPUcFFIw==}
+    engines: {node: '>=12'}
 
   which@2.0.2:
     resolution: {integrity: sha512-BLI3Tl1TW3Pvl70l3yq3Y64i+awpwXqsGBYWkkqMtnbXgrMD+yj7rhW0kuEDxzJaYXGjEW5ogapKNMEKNMjibA==}
@@ -5703,6 +5717,8 @@ snapshots:
 
   picomatch@4.0.3: {}
 
+  pinyin-pro@3.28.1: {}
+
   pkg-types@2.3.0:
     dependencies:
       confbox: 0.2.4
@@ -6119,6 +6135,8 @@ snapshots:
       - terser
       - tsx
       - yaml
+
+  wanakana@5.3.1: {}
 
   which@2.0.2:
     dependencies:
