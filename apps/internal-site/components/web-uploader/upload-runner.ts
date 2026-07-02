@@ -23,6 +23,7 @@ import type {
 
 const SNAPSHOT_THROTTLE_MS = 140;
 const DEFAULT_UPLOAD_CONCURRENCY = 2;
+const DEFAULT_FILE_UPLOAD_CONCURRENCY = 4;
 
 type UploadFileVariant = "original" | "thumbnail";
 type RunnerListener = (snapshot: UploadRunnerSnapshot) => void;
@@ -32,6 +33,7 @@ interface UploadRunnerOptions {
   groupInput: WebUploadGroupMetadata;
   frames: GeneratedUploadFrame[];
   uploadConcurrency?: number;
+  fileUploadConcurrency?: number;
 }
 
 interface UploadFileSource {
@@ -137,6 +139,7 @@ export class WebUploadRunner {
   private readonly payload: GroupUploadStartInput;
   private readonly filesByKey: Map<string, UploadFileSource>;
   private readonly uploadConcurrency: number;
+  private readonly fileUploadConcurrency: number;
   private readonly listeners = new Set<RunnerListener>();
   private readonly abortControllers = new Set<AbortController>();
   private readonly frames = new Map<number, RunnerFrameState>();
@@ -161,6 +164,7 @@ export class WebUploadRunner {
     this.payload = plan.payload;
     this.filesByKey = plan.filesByKey;
     this.uploadConcurrency = options.uploadConcurrency ?? DEFAULT_UPLOAD_CONCURRENCY;
+    this.fileUploadConcurrency = options.fileUploadConcurrency ?? DEFAULT_FILE_UPLOAD_CONCURRENCY;
 
     for (const frame of options.frames) {
       const totalFiles = frame.assets.length * 2;
@@ -419,12 +423,7 @@ export class WebUploadRunner {
       this.message = `正在上传 ${frame.title}。`;
       this.emitSoon();
 
-      for (const file of prepared.files) {
-        if (this.paused) {
-          return;
-        }
-        await this.uploadPreparedFile(frame, file);
-      }
+      await this.uploadPreparedFiles(frame, prepared.files);
 
       frame.status = "committing";
       this.message = `正在提交 ${frame.title}。`;
@@ -445,6 +444,7 @@ export class WebUploadRunner {
   private async uploadPreparedFile(
     frame: RunnerFrameState,
     preparedFile: PreparedUploadFile,
+    batchControllers?: Set<AbortController>,
   ) {
     const source = this.filesByKey.get(
       uploadFileKey(frame.order, preparedFile.slot, preparedFile.variant),
@@ -455,6 +455,7 @@ export class WebUploadRunner {
 
     const controller = new AbortController();
     this.abortControllers.add(controller);
+    batchControllers?.add(controller);
     try {
       const response = await fetch(preparedFile.uploadUrl, {
         method: "PUT",
@@ -473,6 +474,47 @@ export class WebUploadRunner {
       this.emitSoon();
     } finally {
       this.abortControllers.delete(controller);
+      batchControllers?.delete(controller);
+    }
+  }
+
+  private async uploadPreparedFiles(
+    frame: RunnerFrameState,
+    files: PreparedUploadFile[],
+  ) {
+    let cursor = 0;
+    let firstError: unknown = null;
+    const batchControllers = new Set<AbortController>();
+    const workerCount = Math.max(
+      1,
+      Math.min(this.fileUploadConcurrency, files.length),
+    );
+    const workers = Array.from({ length: workerCount }, async () => {
+      while (!this.paused && !firstError) {
+        const file = files[cursor];
+        cursor += 1;
+        if (!file) {
+          return;
+        }
+
+        try {
+          await this.uploadPreparedFile(frame, file, batchControllers);
+        } catch (error) {
+          if (!firstError) {
+            firstError = error;
+            for (const controller of batchControllers) {
+              controller.abort();
+            }
+          }
+        }
+      }
+    });
+
+    // Presigned PUT latency dominates small generated assets. Upload the files in a frame together,
+    // then wait before committing so the database still observes one serial frame commit.
+    await Promise.all(workers);
+    if (firstError) {
+      throw firstError;
     }
   }
 

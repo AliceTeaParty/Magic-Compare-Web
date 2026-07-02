@@ -68,6 +68,7 @@ class WebUploadAssetWorkerClient {
       reject: (error: Error) => void;
     }
   >();
+  private requestCounter = 0;
 
   constructor() {
     this.worker.addEventListener("message", (event: MessageEvent<WorkerResponse>) => {
@@ -97,7 +98,8 @@ class WebUploadAssetWorkerClient {
     heatmapBefore?: File;
     heatmapAfter?: File;
   }) {
-    const requestId = `${params.assetKey}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    const requestId = `${params.assetKey}-${this.requestCounter}`;
+    this.requestCounter += 1;
     return new Promise<WorkerAssetResult>((resolve, reject) => {
       this.pending.set(requestId, { resolve, reject });
       this.worker.postMessage({

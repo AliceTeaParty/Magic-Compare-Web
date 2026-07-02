@@ -26,6 +26,11 @@
 - 长文件名信息应进 caption、tooltip 或文件列，不应进入 Frame 主标题。主标题服务扫描和排序，VSEditor 导入优先显示 `EP<episode>-<frame>`。
 - 放弃上传不能只是清空前端状态。已经 prepare 的对象前缀属于远端 pending 状态，必须同时取消服务端 job 并清理 pending 对象，避免下次续传读到 stale state。
 - CJK 目录名生成 slug 时先转写再 kebab；否则中文/日文目录会退化成 `uploaded-group`，用户要手动补信息。
+- 重新选择上传目录应被视为新的上传意图。由目录推断出的 slug / 标题必须刷新，不能让上一个目录的自动填充值静默留在表单里。
+- VSEditor 类文件名解析不能写死 `.gen.vpy` 或 `fps_` 前缀；实际素材可能来自 `.m2ts` / `.mkv` / `.mp4` 等源标记，也可能省略开头 fps。
+- 上传性能瓶颈经常不是单个 PUT 的带宽，而是 presign / PUT 往返延迟。同一 frame 的 original / thumbnail / alternate 文件可以并发 PUT，但 frame commit 仍应串行，避免 SQLite 写入冲突。
+- 可编辑列名必须保持列语义唯一。不要允许备选列重命名为 `Before` / `After` / `Heatmap` 或现有列名，否则全局 heatmap 参考和表格阅读都会变得含糊。
+- 上传页局部样式超过三处复用时先抽本地 tokens / primitives。面板 surface、控件圆角、列表行、缩略图这类语义稳定的值不要继续散落在 `sx` 里。
 
 ## P1
 

@@ -55,9 +55,9 @@ const IGNORED_BASENAMES = new Set([".ds_store", "thumbs.db"]);
 const IGNORED_SUFFIXES = new Set([".json", ".yaml", ".yml", ".txt", ".md", ".csv", ".db", ".log"]);
 const FILENAME_RE = /(?<prefix>.+?)[_\-.](?<frame>\d+)(?:[_\-.](?<variant>[^_\-.]+))?$/;
 const FALLBACK_FILENAME_RE = /^(?<frame>\d+)(?<variant>[A-Za-z][A-Za-z0-9]*)$/;
-const VSEDITOR_FILENAME_RE =
-  /^(?<fps>\d{2})_(?<title>.+)_(?<episode>\d+)\.gen\.vpy-(?<frame>\d+)-(?<variant>[^_\-.]+)$/i;
-const GROUP_SUFFIX_NOISE_RE = /(?:[_\-. ]+\d{4,5}[_\-. ]+gen[_\-. ]+vpy)$/i;
+const STRUCTURED_SOURCE_FILENAME_RE =
+  /^(?:(?<fps>\d{2})_)?(?<title>.+)_(?<episode>\d+)\.(?<sourceMarker>[^-]+)-(?<frame>\d+)-(?<variant>[^_\-.]+)$/i;
+const GROUP_SUFFIX_NOISE_RE = /(?:[_\-. ]+\d{4,5}[_\-. ]+(?:gen[_\-. ]+vpy|m2ts|mkv|mp4|ts))$/i;
 const MATCH_KEY_SUFFIX_RE = new RegExp(
   `(?:[_\\-. ]+(?:${MATCH_KEY_VARIANTS.join("|")}))+$`,
   "i",
@@ -75,6 +75,7 @@ interface SourceCandidate {
   title: string;
   caption: string;
   rootHint: string;
+  frameKey: string;
   isFallback: boolean;
   isStructured: boolean;
 }
@@ -146,20 +147,27 @@ function variantLabel(variant: string) {
 }
 
 function structuredFrameInfo(pathStem: string) {
-  const match = VSEDITOR_FILENAME_RE.exec(pathStem);
+  const match = STRUCTURED_SOURCE_FILENAME_RE.exec(pathStem);
   if (!match?.groups) {
     return null;
   }
 
   const title = titleCase(match.groups.title);
   const frameNumber = Number(match.groups.frame.replace(/^0+/, "") || "0");
+  const fps = match.groups.fps ?? "00";
+  const episodeNumber = Number(match.groups.episode) || 0;
   return {
-    fps: match.groups.fps,
+    fps,
     episode: match.groups.episode,
     frameNumber,
     variant: match.groups.variant.toLowerCase(),
     title,
-    caption: `${title} / ${match.groups.fps} fps / frame ${frameNumber}`,
+    // Group by work title + episode + frame, not fps/source marker. Real VSEditor exports can mix
+    // `24_TITLE...gen.vpy` with `TITLE...m2ts`, but they still describe the same frame.
+    frameKey: `structured:${matchKeyForName(match.groups.title)}:${episodeNumber}:${frameNumber}`,
+    caption: match.groups.fps
+      ? `${title} / ${match.groups.fps} fps / frame ${frameNumber}`
+      : `${title} / frame ${frameNumber}`,
   };
 }
 
@@ -198,6 +206,11 @@ function directoryTokens(name: string) {
 
 function pathMatchesHints(path: string, hints: Set<string>) {
   return [...directoryTokens(basename(path))].some((token) => hints.has(token));
+}
+
+function matchKeyForName(name: string) {
+  const normalized = name.toLowerCase().replace(MATCH_KEY_SUFFIX_RE, "");
+  return normalized.replace(NON_ALNUM_RE, "-").replace(/^-+|-+$/g, "") || name.toLowerCase().replace(NON_ALNUM_RE, "-").replace(/^-+|-+$/g, "");
 }
 
 function topLevelDirectory(relativePath: string) {
@@ -255,6 +268,7 @@ function parseCandidate(entry: BrowserUploadFile, variantOverride?: string): Sou
       title: structured.title,
       caption: structured.caption,
       rootHint: `${structured.fps}_${structured.title}_${structured.episode}`,
+      frameKey: structured.frameKey,
       isFallback: false,
       isStructured: true,
     };
@@ -279,6 +293,7 @@ function parseCandidate(entry: BrowserUploadFile, variantOverride?: string): Sou
       title,
       caption: `fps ${fps} / episode ${episode} / frame ${frameNumber}`,
       rootHint: prefix,
+      frameKey: `name:${matchKeyForName(pathStem)}`,
       isFallback: false,
       isStructured: false,
     };
@@ -297,6 +312,7 @@ function parseCandidate(entry: BrowserUploadFile, variantOverride?: string): Sou
       title: String(frameNumber),
       caption: `frame ${frameNumber}`,
       rootHint: pathStem,
+      frameKey: `fallback:${matchKeyForName(pathStem)}`,
       isFallback: true,
       isStructured: false,
     };
@@ -319,13 +335,14 @@ function parseCandidate(entry: BrowserUploadFile, variantOverride?: string): Sou
     title: fallbackTitle,
     caption: `file ${pathStem}`,
     rootHint: pathStem,
+    frameKey: `override:${variantOverride}:${matchKeyForName(pathStem)}`,
     isFallback: true,
     isStructured: false,
   };
 }
 
 function candidateFrameKey(candidate: SourceCandidate) {
-  return `${candidate.fps}:${candidate.episode}:${candidate.frameNumber}`;
+  return candidate.frameKey;
 }
 
 function afterPriority(candidate: SourceCandidate) {
@@ -455,11 +472,6 @@ function buildFrameFromCandidates(
   };
 }
 
-function matchKeyForName(name: string) {
-  const normalized = name.toLowerCase().replace(MATCH_KEY_SUFFIX_RE, "");
-  return normalized.replace(NON_ALNUM_RE, "-").replace(/^-+|-+$/g, "") || name.toLowerCase().replace(NON_ALNUM_RE, "-").replace(/^-+|-+$/g, "");
-}
-
 function matchTokensForName(name: string) {
   return new Set(matchKeyForName(name).split("-").filter(Boolean));
 }
@@ -559,11 +571,18 @@ function buildFlatPlan(sourceRootName: string, entries: BrowserUploadFile[], ign
   }
 
   const orderedGroups = [...grouped.entries()].sort((left, right) => {
-    const [leftFps, leftEpisode, leftFrame] = left[0].split(":");
-    const [rightFps, rightEpisode, rightFrame] = right[0].split(":");
-    return Number(leftEpisode) - Number(rightEpisode) || Number(leftFrame) - Number(rightFrame) || leftFps.localeCompare(rightFps);
+    const leftCandidate = left[1][0];
+    const rightCandidate = right[1][0];
+    return (
+      Number(leftCandidate.episode) - Number(rightCandidate.episode) ||
+      leftCandidate.frameNumber - rightCandidate.frameNumber ||
+      leftCandidate.rootHint.localeCompare(rightCandidate.rootHint)
+    );
   });
-  const fallbackWidth = Math.max(4, String(Math.max(0, ...orderedGroups.map(([key]) => Number(key.split(":")[2])))).length);
+  const fallbackWidth = Math.max(
+    4,
+    String(Math.max(0, ...orderedGroups.map(([, candidates]) => candidates[0]?.frameNumber ?? 0))).length,
+  );
   const episodeWidth = structuredEpisodeWidth(parsed.candidates);
   const frames: WebUploadFramePlan[] = [];
   const issues: WebUploadIssue[] = [];

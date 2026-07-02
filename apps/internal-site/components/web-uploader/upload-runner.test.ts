@@ -62,7 +62,10 @@ function frame(order: number): GeneratedUploadFrame {
   };
 }
 
-function runner(frames: GeneratedUploadFrame[]) {
+function runner(
+  frames: GeneratedUploadFrame[],
+  options: Partial<ConstructorParameters<typeof WebUploadRunner>[0]> = {},
+) {
   return new WebUploadRunner({
     caseInput: {
       slug: "mono",
@@ -80,11 +83,22 @@ function runner(frames: GeneratedUploadFrame[]) {
       tags: [],
     },
     frames,
+    ...options,
   });
 }
 
 async function drainTimers() {
   await vi.runOnlyPendingTimersAsync();
+}
+
+async function waitForMicrotasks(predicate: () => boolean) {
+  for (let index = 0; index < 20; index += 1) {
+    if (predicate()) {
+      return;
+    }
+    await Promise.resolve();
+  }
+  throw new Error("Timed out waiting for microtasks.");
 }
 
 describe("WebUploadRunner", () => {
@@ -238,5 +252,162 @@ describe("WebUploadRunner", () => {
     });
 
     await run;
+  });
+
+  it("uploads files inside one frame concurrently before serial commit", async () => {
+    apiMocks.startGroupUpload.mockResolvedValue({
+      groupUploadJobId: "job-1",
+      inputHash: "hash-1",
+      expectedFrameCount: 1,
+      committedFrameCount: 0,
+      canComplete: false,
+      frameStates: [{ frameOrder: 0, status: "pending" }],
+    });
+    apiMocks.prepareGroupUploadFrame.mockResolvedValue({
+      groupUploadJobId: "job-1",
+      frameOrder: 0,
+      files: [
+        {
+          slot: "slot-001",
+          variant: "original",
+          logicalPath: "/pending/o1.png",
+          uploadUrl: "https://r2.example/o1",
+          expiresInSeconds: 900,
+          contentType: "image/png",
+        },
+        {
+          slot: "slot-001",
+          variant: "thumbnail",
+          logicalPath: "/pending/t1.png",
+          uploadUrl: "https://r2.example/t1",
+          expiresInSeconds: 900,
+          contentType: "image/png",
+        },
+        {
+          slot: "slot-002",
+          variant: "original",
+          logicalPath: "/pending/o2.png",
+          uploadUrl: "https://r2.example/o2",
+          expiresInSeconds: 900,
+          contentType: "image/png",
+        },
+        {
+          slot: "slot-002",
+          variant: "thumbnail",
+          logicalPath: "/pending/t2.png",
+          uploadUrl: "https://r2.example/t2",
+          expiresInSeconds: 900,
+          contentType: "image/png",
+        },
+      ],
+    });
+    apiMocks.commitGroupUploadFrame.mockResolvedValue({
+      groupUploadJobId: "job-1",
+      inputHash: "hash-1",
+      expectedFrameCount: 1,
+      committedFrameCount: 1,
+      canComplete: true,
+      frameStates: [{ frameOrder: 0, status: "committed" }],
+    });
+    apiMocks.completeGroupUpload.mockResolvedValue({
+      groupUploadJobId: "job-1",
+      status: "completed",
+      committedFrameCount: 1,
+    });
+
+    const pendingResponses: Array<(value: Response) => void> = [];
+    vi.mocked(globalThis.fetch).mockImplementation(
+      () =>
+        new Promise<Response>((resolve) => {
+          pendingResponses.push(resolve);
+        }),
+    );
+
+    const uploadRunner = runner([frame(0)], { fileUploadConcurrency: 4 });
+    const run = uploadRunner.start();
+    await waitForMicrotasks(() => pendingResponses.length === 4);
+
+    expect(globalThis.fetch).toHaveBeenCalledTimes(4);
+    expect(apiMocks.commitGroupUploadFrame).not.toHaveBeenCalled();
+
+    for (const resolve of pendingResponses) {
+      resolve({ ok: true, status: 200 } as Response);
+    }
+
+    await run;
+    await drainTimers();
+
+    expect(apiMocks.commitGroupUploadFrame).toHaveBeenCalledWith({
+      groupUploadJobId: "job-1",
+      frameOrder: 0,
+    });
+  });
+
+  it("aborts sibling file PUTs in the same frame after one file fails", async () => {
+    apiMocks.startGroupUpload.mockResolvedValue({
+      groupUploadJobId: "job-1",
+      inputHash: "hash-1",
+      expectedFrameCount: 1,
+      committedFrameCount: 0,
+      canComplete: false,
+      frameStates: [{ frameOrder: 0, status: "pending" }],
+    });
+    apiMocks.prepareGroupUploadFrame.mockResolvedValue({
+      groupUploadJobId: "job-1",
+      frameOrder: 0,
+      files: [
+        {
+          slot: "slot-001",
+          variant: "original",
+          logicalPath: "/pending/o1.png",
+          uploadUrl: "https://r2.example/o1",
+          expiresInSeconds: 900,
+          contentType: "image/png",
+        },
+        {
+          slot: "slot-001",
+          variant: "thumbnail",
+          logicalPath: "/pending/t1.png",
+          uploadUrl: "https://r2.example/t1",
+          expiresInSeconds: 900,
+          contentType: "image/png",
+        },
+      ],
+    });
+
+    const pendingRejects: Array<(reason: Error) => void> = [];
+    const observedSignals: AbortSignal[] = [];
+    vi.mocked(globalThis.fetch).mockImplementation((_, init) => {
+      if (init?.signal instanceof AbortSignal) {
+        observedSignals.push(init.signal);
+      }
+      return new Promise<Response>((_resolve, reject) => {
+        if (init?.signal instanceof AbortSignal) {
+          init.signal.addEventListener(
+            "abort",
+            () => reject(new DOMException("Aborted", "AbortError")),
+            { once: true },
+          );
+        }
+        pendingRejects.push(reject);
+      });
+    });
+
+    const snapshots: UploadRunnerSnapshot[] = [];
+    const uploadRunner = runner([frame(0)], { fileUploadConcurrency: 2 });
+    uploadRunner.subscribe((snapshot) => snapshots.push(snapshot));
+    const run = uploadRunner.start();
+    await waitForMicrotasks(() => pendingRejects.length === 2);
+
+    pendingRejects[0](new Error("network failed"));
+    await run;
+    await drainTimers();
+
+    expect(observedSignals[1].aborted).toBe(true);
+    expect(apiMocks.commitGroupUploadFrame).not.toHaveBeenCalled();
+    expect(snapshots.at(-1)).toMatchObject({
+      stage: "failed",
+      failedCount: 1,
+    });
   });
 });

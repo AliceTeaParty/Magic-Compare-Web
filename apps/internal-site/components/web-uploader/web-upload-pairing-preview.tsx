@@ -46,13 +46,21 @@ import type {
   WebUploadPlan,
 } from "./web-upload-types";
 import {
+  webUploadColors,
+  webUploadMotion,
+  webUploadPanelSx,
+  webUploadRadii,
+  webUploadSizes,
+  webUploadSurfaces,
+} from "./web-upload-design";
+import {
   frameIdForFrame,
   compactUploadFilename,
   type FramePreviewRow,
   type PlanView,
 } from "./web-upload-view-model";
 
-const PANEL_TRANSITION = "background-color 160ms cubic-bezier(0.22, 1, 0.36, 1)";
+const PANEL_TRANSITION = `background-color ${webUploadMotion.standard}`;
 const REDUCED_MOTION = "@media (prefers-reduced-motion: reduce)";
 
 interface PreviewUrls {
@@ -137,14 +145,14 @@ function SmallLazyThumbnail({
       ref={rootRef}
       component="span"
       sx={{
-        width: 26,
-        height: 20,
+        width: webUploadSizes.tinyThumbnailWidth,
+        height: webUploadSizes.tinyThumbnailHeight,
         flex: "0 0 auto",
         overflow: "hidden",
-        borderRadius: 1,
+        borderRadius: webUploadRadii.thumbnail,
         border: "1px solid",
-        borderColor: "rgba(255,255,255,0.12)",
-        backgroundColor: "rgba(255,255,255,0.055)",
+        borderColor: webUploadSurfaces.thumbnailBorder,
+        backgroundColor: webUploadSurfaces.controlBackground,
       }}
     >
       {url ? (
@@ -245,8 +253,8 @@ function ExpandedPreview({
                   overflow: "hidden",
                   border: "1px solid",
                   borderColor: "divider",
-                  borderRadius: 1.5,
-                  backgroundColor: "rgba(255,255,255,0.035)",
+                  borderRadius: webUploadRadii.control,
+                  backgroundColor: webUploadSurfaces.row,
                 }}
               >
                 <Box
@@ -340,14 +348,19 @@ function EditableColumnHeader({
               font: "inherit",
             }}
           />
-          <IconButton aria-label="保存列名" size="small" onClick={save} sx={{ width: 22, height: 22 }}>
+          <IconButton
+            aria-label="保存列名"
+            size="small"
+            onClick={save}
+            sx={{ width: webUploadSizes.inlineIconButton, height: webUploadSizes.inlineIconButton }}
+          >
             <Check sx={{ fontSize: 15 }} />
           </IconButton>
           <IconButton
             aria-label="取消编辑列名"
             size="small"
             onClick={() => setEditing(false)}
-            sx={{ width: 22, height: 22 }}
+            sx={{ width: webUploadSizes.inlineIconButton, height: webUploadSizes.inlineIconButton }}
           >
             <Close sx={{ fontSize: 15 }} />
           </IconButton>
@@ -365,8 +378,8 @@ function EditableColumnHeader({
               setEditing(true);
             }}
             sx={{
-              width: 22,
-              height: 22,
+              width: webUploadSizes.inlineIconButton,
+              height: webUploadSizes.inlineIconButton,
               opacity: 0.72,
               "&:hover": { opacity: 1 },
             }}
@@ -414,13 +427,13 @@ function SortablePairingRow({
       style={style}
       sx={{
         borderBottom: "1px solid",
-        borderColor: "rgba(255,255,255,0.075)",
-        backgroundColor: expanded ? "rgba(232,198,246,0.075)" : "transparent",
+        borderColor: webUploadSurfaces.subtleBorder,
+        backgroundColor: expanded ? webUploadSurfaces.rowSelected : "transparent",
         transition: PANEL_TRANSITION,
         "&:hover": {
           backgroundColor: expanded
-            ? "rgba(232,198,246,0.09)"
-            : "rgba(255,255,255,0.035)",
+            ? webUploadSurfaces.rowSelectedHover
+            : webUploadSurfaces.rowHover,
         },
         [REDUCED_MOTION]: {
           transition: "none",
@@ -453,7 +466,7 @@ function SortablePairingRow({
           cursor: "pointer",
           outline: 0,
           "&:focus-visible": {
-            boxShadow: "inset 0 0 0 2px rgba(232,198,246,0.58)",
+            boxShadow: `inset 0 0 0 2px ${webUploadColors.focusRing}`,
           },
         }}
       >
@@ -467,9 +480,9 @@ function SortablePairingRow({
               size="small"
               onClick={(event) => event.stopPropagation()}
               sx={{
-                width: 32,
-                height: 32,
-                borderRadius: 1.5,
+                width: webUploadSizes.dragHandleButton,
+                height: webUploadSizes.dragHandleButton,
+                borderRadius: webUploadRadii.control,
                 border: 0,
                 backgroundColor: "transparent",
               }}
@@ -514,7 +527,7 @@ function SortablePairingRow({
           sx={{
             color: "text.secondary",
             transform: expanded ? "rotate(180deg)" : "rotate(0deg)",
-            transition: "transform 160ms cubic-bezier(0.22, 1, 0.36, 1)",
+            transition: `transform ${webUploadMotion.standard}`,
             [REDUCED_MOTION]: {
               transition: "none",
             },
@@ -610,11 +623,8 @@ export function PairingPreviewPanel({
         display: "flex",
         flexDirection: "column",
         overflow: "hidden",
-        borderRadius: 3,
-        border: "1px solid",
-        borderColor: "divider",
-        background:
-          "linear-gradient(180deg, rgba(255,255,255,0.055) 0%, rgba(255,255,255,0.02) 100%)",
+        ...webUploadPanelSx,
+        p: 0,
       }}
     >
       <Stack
@@ -635,9 +645,9 @@ export function PairingPreviewPanel({
                   disabled={!canReorder}
                   displayEmpty
                   sx={{
-                    height: 32,
+                    height: webUploadSizes.compactControlHeight,
                     minWidth: 132,
-                    borderRadius: 1.5,
+                    borderRadius: webUploadRadii.control,
                     "& .MuiSelect-select": {
                       py: 0.45,
                       fontSize: 13,
@@ -656,7 +666,7 @@ export function PairingPreviewPanel({
               icon={hasBlockingIssues ? <WarningAmber /> : <CheckCircle />}
               label={`${planView.healthyPairCount} / ${planView.frames.length}`}
               color={hasBlockingIssues ? "warning" : "primary"}
-              sx={{ height: 32 }}
+              sx={{ height: webUploadSizes.compactControlHeight }}
             />
           </Stack>
         ) : null}
@@ -686,7 +696,7 @@ export function PairingPreviewPanel({
                   top: 0,
                   zIndex: 1,
                   color: "text.secondary",
-                  backgroundColor: "rgba(10, 24, 51, 0.97)",
+                  backgroundColor: webUploadSurfaces.stickyHeader,
                   borderBottom: "1px solid",
                   borderColor: "divider",
                   fontSize: 13,

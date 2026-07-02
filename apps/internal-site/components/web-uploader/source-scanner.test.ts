@@ -30,6 +30,25 @@ describe("scanBrowserUploadFiles", () => {
     expect(plan.issues).toEqual([]);
   });
 
+  it("keeps same-number flat frames separate when their prefixes differ", () => {
+    const plan = scanBrowserUploadFiles(
+      [
+        image("sample/clip-a-001_src.png"),
+        image("sample/clip-a-001_output.png"),
+        image("sample/clip-b-001_src.png"),
+        image("sample/clip-b-001_output.png"),
+      ],
+      "sample",
+    );
+
+    expect(plan.frames).toHaveLength(2);
+    expect(plan.issues).toEqual([]);
+    expect(plan.frames.map((frame) => frame.before.source.relativePath)).toEqual([
+      "clip-a-001_src.png",
+      "clip-b-001_src.png",
+    ]);
+  });
+
   it("pairs nested before, after, heatmap, and misc directories", () => {
     const plan = scanBrowserUploadFiles(
       [
@@ -144,6 +163,42 @@ describe("scanBrowserUploadFiles", () => {
 
     expect(plan.suggestedGroupSlug).toBe("ceshimulu");
     expect(plan.frames.map((frame) => frame.title)).toEqual(["EP00-2183", "EP12-27240"]);
+  });
+
+  it("recognizes structured encode filenames with m2ts markers and no fps prefix", () => {
+    const plan = scanBrowserUploadFiles(
+      [
+        image("WATANARE_ANIME_VOL1_00000.m2ts-27240-src.png"),
+        image("WATANARE_ANIME_VOL1_00000.m2ts-27240-output.png"),
+        image("WATANARE_ANIME_VOL1_00000.m2ts-27240-rip.png"),
+      ],
+      "20260702",
+    );
+
+    expect(plan.frames).toHaveLength(1);
+    expect(plan.frames[0].title).toBe("EP0-27240");
+    expect(plan.frames[0].caption).toContain("WATANARE ANIME VOL1");
+    expect(plan.frames[0].after.label).toBe("After");
+    expect(plan.frames[0].misc.map((asset) => asset.label)).toEqual(["Rip"]);
+  });
+
+  it("pairs structured filenames even when only some variants keep the fps prefix", () => {
+    const plan = scanBrowserUploadFiles(
+      [
+        image("24_WATANARE_ANIME_VOL1_00000.gen.vpy-27240-src.png"),
+        image("WATANARE_ANIME_VOL1_00000.m2ts-27240-output.png"),
+      ],
+      "20260702",
+    );
+
+    expect(plan.frames).toHaveLength(1);
+    expect(plan.frames[0].title).toBe("EP0-27240");
+    expect(plan.frames[0].before.source.relativePath).toBe(
+      "24_WATANARE_ANIME_VOL1_00000.gen.vpy-27240-src.png",
+    );
+    expect(plan.frames[0].after.source.relativePath).toBe(
+      "WATANARE_ANIME_VOL1_00000.m2ts-27240-output.png",
+    );
   });
 
   it("ignores common sidecar and system files", () => {

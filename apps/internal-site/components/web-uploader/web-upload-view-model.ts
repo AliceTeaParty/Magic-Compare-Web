@@ -154,6 +154,16 @@ export function renameUploadPlanAssetLabel(
   if (!normalizedLabel || normalizedLabel === currentLabel) {
     return null;
   }
+  const reservedLabels = new Set(["Before", "After", "Heatmap"]);
+  const existingLabels = new Set(
+    plan.frames.flatMap((frame) => frame.misc.map((asset) => asset.label)),
+  );
+  existingLabels.delete(currentLabel);
+  // Column labels also feed the global heatmap selector, so aliases must stay unique and distinct
+  // from the built-in image roles.
+  if (reservedLabels.has(normalizedLabel) || existingLabels.has(normalizedLabel)) {
+    return null;
+  }
 
   return {
     ...plan,

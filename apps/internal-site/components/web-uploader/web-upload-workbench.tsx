@@ -37,9 +37,17 @@ import { useRouter } from "next/navigation";
 import type { CaseCatalogItem } from "@/lib/server/repositories/content-repository";
 import { AppNotifications } from "../notifications/app-notifications";
 import { useAppNotifications } from "../notifications/use-app-notifications";
-import { generateUploadFrames, type GenerationProgress } from "./asset-generator";
+import type { GenerationProgress } from "./asset-generator";
 import { scanBrowserUploadFiles } from "./source-scanner";
 import { WebUploadRunner } from "./upload-runner";
+import {
+  webUploadColors,
+  webUploadFieldSx,
+  webUploadPanelSx,
+  webUploadRadii,
+  webUploadSizes,
+  webUploadSurfaces,
+} from "./web-upload-design";
 import { PairingPreviewPanel } from "./web-upload-pairing-preview";
 import type {
   BrowserUploadFile,
@@ -60,7 +68,6 @@ const DEFAULT_NEW_CASE_TITLE = "New Case";
 const INPUT_HASH_STORAGE_PREFIX = "magic_compare_web_upload:";
 const UPLOAD_QUEUE_VISIBLE_LIMIT = 12;
 const BROWSER_RECOMMENDATION_MESSAGE = "推荐使用 Chrome / Edge 选择整个目录上传。";
-const UPLOAD_PRIMARY_TEXT = "rgba(24, 15, 31, 0.92)";
 
 interface WebUploadWorkbenchProps {
   cases: CaseCatalogItem[];
@@ -78,24 +85,6 @@ type BrowserFileSystemHandle =
 
 type DirectoryPickerWindow = Window & {
   showDirectoryPicker?: () => Promise<BrowserDirectoryHandle>;
-};
-
-const panelSx = {
-  p: { xs: 1.7, md: 2 },
-  borderRadius: 3,
-  border: "1px solid",
-  borderColor: "divider",
-  background:
-    "linear-gradient(180deg, rgba(255,255,255,0.055) 0%, rgba(255,255,255,0.02) 100%)",
-};
-
-const uploadFieldSx = {
-  "& .MuiOutlinedInput-root": {
-    borderRadius: 1.5,
-  },
-  "& .MuiOutlinedInput-root.MuiInputBase-multiline": {
-    borderRadius: 1.5,
-  },
 };
 
 function normalizeSlug(value: string, fallback = "uploaded-group") {
@@ -248,8 +237,8 @@ function UploadQueue({ snapshot }: { snapshot: UploadRunnerSnapshot }) {
               alignItems: "center",
               px: 1,
               py: 0.8,
-              borderRadius: 1.25,
-              backgroundColor: "rgba(255,255,255,0.035)",
+              borderRadius: webUploadRadii.item,
+              backgroundColor: webUploadSurfaces.row,
             }}
           >
             <Typography variant="body2" noWrap title={frame.title}>
@@ -266,7 +255,7 @@ function UploadQueue({ snapshot }: { snapshot: UploadRunnerSnapshot }) {
               variant="determinate"
               value={progress}
               color={frame.status === "failed" ? "error" : "primary"}
-              sx={{ height: 6, borderRadius: 999 }}
+              sx={{ height: webUploadSizes.progressHeight, borderRadius: 999 }}
             />
             {frame.error ? (
               <Typography variant="caption" color="error.main" sx={{ gridColumn: "1 / -1" }}>
@@ -429,13 +418,13 @@ function UploadDetails({
             aria-hidden="true"
             sx={{
               flex: "0 0 auto",
-              width: 26,
-              height: 26,
+              width: webUploadSizes.statusMarker,
+              height: webUploadSizes.statusMarker,
               borderRadius: 999,
               display: "grid",
               placeItems: "center",
               color: current.marker === "!" ? "warning.main" : "primary.main",
-              backgroundColor: "rgba(255,255,255,0.055)",
+              backgroundColor: webUploadSurfaces.controlBackground,
               fontSize: "0.9rem",
               fontWeight: 800,
               lineHeight: 1,
@@ -464,9 +453,9 @@ function UploadDetails({
           value={current.progress}
           sx={{
             mt: 1.15,
-            height: 6,
+            height: webUploadSizes.progressHeight,
             borderRadius: 999,
-            backgroundColor: "rgba(255,255,255,0.08)",
+            backgroundColor: webUploadSurfaces.progressTrack,
           }}
         />
         <Box
@@ -534,10 +523,13 @@ export function WebUploadWorkbench({
     buildInitialSnapshot(),
   );
 
+  // Failed uploads can be resumed against the existing server job. Keep metadata locked there too
+  // so visible inputs cannot drift away from the payload already owned by the runner.
   const isLocked =
     snapshot.stage === "generating" ||
     snapshot.stage === "uploading" ||
-    snapshot.stage === "paused";
+    snapshot.stage === "paused" ||
+    snapshot.stage === "failed";
   const selectedCaseExists = cases.some((item) => item.slug === selectedCaseSlug);
   const hasBlockingIssues = Boolean(planView && planView.errorCount > 0);
   const canStart = Boolean(planView && planRef.current && !hasBlockingIssues);
@@ -589,9 +581,10 @@ export function WebUploadWorkbench({
     setExpandedFrameId(null);
     setGroupMeta((current) => ({
       ...current,
-      slug: current.slug === "uploaded-group" ? plan.suggestedGroupSlug : current.slug,
-      title:
-        current.title === "Uploaded Group" ? plan.suggestedGroupTitle : current.title,
+      // Choosing a new directory starts a new upload intent. Refresh the inferred identity so a
+      // previous folder's auto-filled slug/title cannot silently leak into the next upload.
+      slug: plan.suggestedGroupSlug,
+      title: plan.suggestedGroupTitle,
     }));
     setPlanView(buildPlanView(plan));
     pushNotification(
@@ -656,6 +649,7 @@ export function WebUploadWorkbench({
     const abortController = new AbortController();
     generationAbortRef.current = abortController;
     setSnapshot({ ...buildInitialSnapshot(), stage: "generating", message: "正在生成资源。" });
+    const { generateUploadFrames } = await import("./asset-generator");
     const frames = await generateUploadFrames(
       plan.frames,
       (progress) => {
@@ -880,7 +874,7 @@ export function WebUploadWorkbench({
                   color: "text.secondary",
                   "&:hover": {
                     color: "text.primary",
-                    backgroundColor: "rgba(255,255,255,0.04)",
+                    backgroundColor: webUploadSurfaces.buttonHover,
                   },
                 }}
               >
@@ -901,10 +895,10 @@ export function WebUploadWorkbench({
                   }
                   onClick={startOrResumeUpload}
                   sx={{
-                    color: UPLOAD_PRIMARY_TEXT,
+                    color: webUploadColors.primaryButtonText,
                     fontWeight: 650,
                     "&.Mui-disabled": {
-                      color: "rgba(24, 15, 31, 0.46)",
+                      color: webUploadColors.primaryButtonDisabledText,
                     },
                   }}
                 >
@@ -941,8 +935,8 @@ export function WebUploadWorkbench({
           }}
         >
           <Stack spacing={1.4}>
-            <Paper elevation={0} sx={panelSx}>
-              <Stack spacing={1.45} sx={uploadFieldSx}>
+            <Paper elevation={0} sx={webUploadPanelSx}>
+              <Stack spacing={1.45} sx={webUploadFieldSx}>
                 <Typography variant="h6">对比信息</Typography>
 
                 <Button
@@ -1055,7 +1049,7 @@ export function WebUploadWorkbench({
               </Stack>
             </Paper>
 
-            <Paper elevation={0} sx={panelSx}>
+            <Paper elevation={0} sx={webUploadPanelSx}>
               <Stack spacing={1.35}>
                 <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1}>
                   <Typography variant="h6">上传详情</Typography>
@@ -1068,7 +1062,7 @@ export function WebUploadWorkbench({
                           ? "warning"
                           : "default"
                     }
-                    sx={{ height: 32 }}
+                    sx={{ height: webUploadSizes.compactControlHeight }}
                   />
                 </Stack>
 

@@ -136,6 +136,20 @@ describe("web upload view model", () => {
     expect(renamed?.heatmapReferenceLabel).toBe("Encode");
   });
 
+  it("rejects alternate column labels that collide with built-in or existing labels", () => {
+    const originalPlan = plan();
+    originalPlan.frames[0] = {
+      ...originalPlan.frames[0],
+      misc: [
+        { ...asset("misc", "after/1-rip.png"), label: "Rip" },
+        { ...asset("misc", "after/1-degrain.png"), label: "Degrain" },
+      ],
+    };
+
+    expect(renameUploadPlanAssetLabel(originalPlan, "Rip", "After")).toBeNull();
+    expect(renameUploadPlanAssetLabel(originalPlan, "Rip", "Degrain")).toBeNull();
+  });
+
   it("only exposes global heatmap references available on every frame", () => {
     const originalPlan = plan();
     originalPlan.frames[0] = {
