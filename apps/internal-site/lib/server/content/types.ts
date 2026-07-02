@@ -32,6 +32,7 @@ export interface CaseWorkspaceGroup {
   isPublic: boolean;
   publicSlug: string | null;
   frameCount: number;
+  extraAssetLabels: string[];
 }
 
 export interface CaseWorkspaceData {

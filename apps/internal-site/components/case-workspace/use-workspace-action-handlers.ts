@@ -2,6 +2,7 @@ import { useMemo, useRef } from "react";
 import type { TransitionStartFunction } from "react";
 import type { CaseWorkspaceData } from "@/lib/server/repositories/content-repository";
 import {
+  deleteWorkspaceGroup,
   deployWorkspacePublicSite,
   type NotificationApi,
   reorderWorkspaceGroups,
@@ -38,9 +39,7 @@ export function useWorkspaceActionHandlers({
   notifications: NotificationApi;
   refresh: () => void;
   setCaseSummary: (nextSummary: string) => void;
-  setGroups: (
-    updater: GroupItem[] | ((current: GroupItem[]) => GroupItem[]),
-  ) => void;
+  setGroups: (updater: GroupItem[] | ((current: GroupItem[]) => GroupItem[])) => void;
   setIsDeployingPublicSite: (nextState: boolean) => void;
   startTransition: TransitionStartFunction;
 }) {
@@ -52,10 +51,7 @@ export function useWorkspaceActionHandlers({
   groupsRef.current = groups;
   summaryRef.current = caseSummary;
 
-  const publicGroupCount = useMemo(
-    () => groups.filter((group) => group.isPublic).length,
-    [groups],
-  );
+  const publicGroupCount = useMemo(() => groups.filter((group) => group.isPublic).length, [groups]);
   const mutationContext: WorkspaceMutationContext = {
     data,
     notifications,
@@ -110,11 +106,11 @@ export function useWorkspaceActionHandlers({
     targetGroup: GroupItem,
     metadata: { title: string; description: string },
   ) {
-    return updateWorkspaceGroupMetadata(
-      targetGroup,
-      metadata,
-      groupMutationContext,
-    );
+    return updateWorkspaceGroupMetadata(targetGroup, metadata, groupMutationContext);
+  }
+
+  function deleteGroup(targetGroup: GroupItem) {
+    deleteWorkspaceGroup(targetGroup, groupMutationContext);
   }
 
   return {
@@ -124,5 +120,6 @@ export function useWorkspaceActionHandlers({
     reorderCaseGroups,
     updateCaseSummary,
     updateGroupMetadata,
+    deleteGroup,
   };
 }

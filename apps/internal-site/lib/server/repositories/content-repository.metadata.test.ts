@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { updateCaseSummary, updateGroupMetadata } from "./content-repository";
+import { createCase, updateCaseSummary, updateGroupMetadata } from "./content-repository";
 
-const { caseUpdate, caseFindUnique, groupUpdate } = vi.hoisted(() => ({
+const { caseCreate, caseUpdate, caseFindUnique, groupUpdate } = vi.hoisted(() => ({
+  caseCreate: vi.fn(),
   caseUpdate: vi.fn(),
   caseFindUnique: vi.fn(),
   groupUpdate: vi.fn(),
@@ -10,6 +11,7 @@ const { caseUpdate, caseFindUnique, groupUpdate } = vi.hoisted(() => ({
 vi.mock("@/lib/server/db/client", () => ({
   prisma: {
     case: {
+      create: caseCreate,
       findUnique: caseFindUnique,
       update: caseUpdate,
     },
@@ -18,6 +20,61 @@ vi.mock("@/lib/server/db/client", () => ({
     },
   },
 }));
+
+describe("createCase", () => {
+  beforeEach(() => {
+    caseCreate.mockReset();
+    caseFindUnique.mockReset();
+  });
+
+  it("creates an empty draft case without publishing side effects", async () => {
+    caseFindUnique.mockResolvedValue(null);
+    caseCreate.mockResolvedValue({
+      slug: "new-case",
+      title: "New Case",
+      summary: "Draft summary",
+      status: "draft",
+    });
+
+    const result = await createCase({
+      slug: "new-case",
+      title: " New Case ",
+      summary: " Draft summary ",
+    });
+
+    expect(caseCreate).toHaveBeenCalledWith({
+      data: {
+        slug: "new-case",
+        title: "New Case",
+        summary: "Draft summary",
+        subtitle: "",
+        tagsJson: "[]",
+        status: "draft",
+      },
+      select: {
+        slug: true,
+        title: true,
+        summary: true,
+        status: true,
+      },
+    });
+    expect(result).toEqual({
+      caseSlug: "new-case",
+      title: "New Case",
+      summary: "Draft summary",
+      status: "draft",
+    });
+  });
+
+  it("rejects duplicate case slugs before writing", async () => {
+    caseFindUnique.mockResolvedValue({ id: "case-1" });
+
+    await expect(createCase({ slug: "mono", title: "mono", summary: "" })).rejects.toThrow(
+      "Case already exists.",
+    );
+    expect(caseCreate).not.toHaveBeenCalled();
+  });
+});
 
 describe("updateCaseSummary", () => {
   beforeEach(() => {

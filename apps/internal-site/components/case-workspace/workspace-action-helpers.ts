@@ -23,16 +23,12 @@ export interface WorkspaceMutationContext {
   startTransition: TransitionStartFunction;
 }
 
-export interface WorkspaceGroupMutationContext
-  extends WorkspaceMutationContext {
+export interface WorkspaceGroupMutationContext extends WorkspaceMutationContext {
   groupsRef: MutableRefObject<GroupItem[]>;
-  setGroups: (
-    updater: GroupItem[] | ((current: GroupItem[]) => GroupItem[]),
-  ) => void;
+  setGroups: (updater: GroupItem[] | ((current: GroupItem[]) => GroupItem[])) => void;
 }
 
-export interface WorkspaceCaseMetadataMutationContext
-  extends WorkspaceMutationContext {
+export interface WorkspaceCaseMetadataMutationContext extends WorkspaceMutationContext {
   setCaseSummary: (nextSummary: string) => void;
   summaryRef: MutableRefObject<string>;
 }
@@ -64,9 +60,7 @@ export async function postJson(url: string, body: unknown) {
  */
 function replaceWorkspaceGroups(
   groupsRef: MutableRefObject<GroupItem[]>,
-  setGroups: (
-    updater: GroupItem[] | ((current: GroupItem[]) => GroupItem[]),
-  ) => void,
+  setGroups: (updater: GroupItem[] | ((current: GroupItem[]) => GroupItem[])) => void,
   nextGroups: GroupItem[],
 ) {
   groupsRef.current = nextGroups;
@@ -82,10 +76,7 @@ function pushWorkspaceError(
   error: unknown,
   fallbackMessage: string,
 ) {
-  notifications.pushNotification(
-    error instanceof Error ? error.message : fallbackMessage,
-    "error",
-  );
+  notifications.pushNotification(error instanceof Error ? error.message : fallbackMessage, "error");
 }
 
 /**
@@ -129,16 +120,8 @@ function runOptimisticGroupMutation<T>({
       onSuccess?.(result);
       context.refresh();
     } catch (error) {
-      replaceWorkspaceGroups(
-        context.groupsRef,
-        context.setGroups,
-        previousGroups,
-      );
-      pushWorkspaceError(
-        context.notifications,
-        error,
-        fallbackErrorMessage,
-      );
+      replaceWorkspaceGroups(context.groupsRef, context.setGroups, previousGroups);
+      pushWorkspaceError(context.notifications, error, fallbackErrorMessage);
     } finally {
       context.notifications.dismissWorkspaceSavingNotification();
     }
@@ -196,11 +179,7 @@ function buildVisibilityGroups(
  * Reorders the latest live group array instead of the render-time snapshot so overlapping drag
  * operations cannot persist an outdated order after another optimistic change lands first.
  */
-function buildReorderedGroups(
-  previousGroups: GroupItem[],
-  activeId: string,
-  overId: string,
-) {
+function buildReorderedGroups(previousGroups: GroupItem[], activeId: string, overId: string) {
   const oldIndex = previousGroups.findIndex((group) => group.id === activeId);
   const newIndex = previousGroups.findIndex((group) => group.id === overId);
 
@@ -223,9 +202,7 @@ export function toggleWorkspaceGroupVisibility(
   context: WorkspaceGroupMutationContext,
 ) {
   const previousGroups = context.groupsRef.current;
-  const liveTargetGroup = previousGroups.find(
-    (group) => group.id === targetGroup.id,
-  );
+  const liveTargetGroup = previousGroups.find((group) => group.id === targetGroup.id);
 
   if (!liveTargetGroup) {
     return;
@@ -234,11 +211,7 @@ export function toggleWorkspaceGroupVisibility(
   const nextVisibility = !liveTargetGroup.isPublic;
   runOptimisticGroupMutation({
     fallbackErrorMessage: "Failed to update group visibility.",
-    nextGroups: buildVisibilityGroups(
-      previousGroups,
-      targetGroup.id,
-      nextVisibility,
-    ),
+    nextGroups: buildVisibilityGroups(previousGroups, targetGroup.id, nextVisibility),
     onSuccess: () => {
       context.notifications.pushNotification(
         nextVisibility
@@ -280,9 +253,7 @@ export function updateWorkspaceCaseSummary(
         summary: normalizedSummary,
       });
       const savedSummary =
-        result && typeof result.summary === "string"
-          ? result.summary
-          : normalizedSummary;
+        result && typeof result.summary === "string" ? result.summary : normalizedSummary;
 
       context.summaryRef.current = savedSummary;
       context.setCaseSummary(savedSummary);
@@ -290,11 +261,7 @@ export function updateWorkspaceCaseSummary(
     } catch (error) {
       context.summaryRef.current = previousSummary;
       context.setCaseSummary(previousSummary);
-      pushWorkspaceError(
-        context.notifications,
-        error,
-        "保存 Case 描述失败。",
-      );
+      pushWorkspaceError(context.notifications, error, "保存 Case 描述失败。");
     } finally {
       context.notifications.dismissWorkspaceSavingNotification();
     }
@@ -340,12 +307,9 @@ export function updateWorkspaceGroupMetadata(
         title,
         description,
       });
-      const savedTitle =
-        result && typeof result.title === "string" ? result.title : title;
+      const savedTitle = result && typeof result.title === "string" ? result.title : title;
       const savedDescription =
-        result && typeof result.description === "string"
-          ? result.description
-          : description;
+        result && typeof result.description === "string" ? result.description : description;
       const savedGroups = context.groupsRef.current.map((group) =>
         group.id === targetGroup.id
           ? {
@@ -364,16 +328,43 @@ export function updateWorkspaceGroupMetadata(
         "success",
       );
     } catch (error) {
-      replaceWorkspaceGroups(
-        context.groupsRef,
-        context.setGroups,
-        previousGroups,
-      );
+      replaceWorkspaceGroups(context.groupsRef, context.setGroups, previousGroups);
       pushWorkspaceError(context.notifications, error, "保存 Group 元数据失败。");
     } finally {
       context.notifications.dismissWorkspaceSavingNotification();
     }
   })();
+}
+
+/**
+ * Deletes optimistically because removal is visually obvious, but still refreshes afterward: the
+ * server also cleans storage/publication metadata that the local row list cannot infer safely.
+ */
+export function deleteWorkspaceGroup(
+  targetGroup: GroupItem,
+  context: WorkspaceGroupMutationContext,
+) {
+  const previousGroups = context.groupsRef.current;
+  const nextGroups = previousGroups.filter((group) => group.id !== targetGroup.id);
+
+  if (nextGroups.length === previousGroups.length) {
+    return;
+  }
+
+  runOptimisticGroupMutation({
+    fallbackErrorMessage: "删除 Group 失败。",
+    nextGroups,
+    onSuccess: () => {
+      context.notifications.pushNotification("Group 已删除。", "success");
+    },
+    previousGroups,
+    request: async () =>
+      postJson("/api/ops/group-delete", {
+        caseSlug: context.data.slug,
+        groupSlug: targetGroup.slug,
+      }),
+    context,
+  });
 }
 
 /**
@@ -405,8 +396,7 @@ export function deployWorkspacePublicSite({
   );
 
   runWorkspaceMutation({
-    onError: (error) =>
-      pushWorkspaceError(notifications, error, "Failed to deploy public site."),
+    onError: (error) => pushWorkspaceError(notifications, error, "Failed to deploy public site."),
     onFinally: () => {
       notifications.dismissNotification("workspace-deploying-public-site");
       setIsDeployingPublicSite(false);

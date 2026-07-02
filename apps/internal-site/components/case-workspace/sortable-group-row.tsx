@@ -1,6 +1,7 @@
 import {
   Check,
   Close,
+  DeleteOutline,
   DragIndicator,
   EditOutlined,
   LockOutlined,
@@ -23,10 +24,7 @@ import {
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import Link from "next/link";
-import type {
-  MouseEvent as ReactMouseEvent,
-  PointerEvent as ReactPointerEvent,
-} from "react";
+import type { MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from "react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { CaseWorkspaceData } from "@/lib/server/repositories/content-repository";
 import { inlineEditTextSx } from "./inline-edit-text-sx";
@@ -58,6 +56,7 @@ export function SortableGroupRow({
   isPending,
   onUpdateMetadata,
   onToggleVisibility,
+  onDelete,
 }: {
   group: GroupItem;
   caseSlug: string;
@@ -67,6 +66,7 @@ export function SortableGroupRow({
     metadata: { title: string; description: string },
   ) => Promise<void>;
   onToggleVisibility: (group: GroupItem) => void;
+  onDelete: (group: GroupItem) => void;
 }) {
   // Workspace rows do a lot of work on mobile, so drag, visibility, and open controls share a
   // single 40px+ baseline instead of the older mixed 32/36px targets.
@@ -105,9 +105,7 @@ export function SortableGroupRow({
     },
   };
   const [isEditing, setIsEditing] = useState(false);
-  const [draftTitle, setDraftTitle] = useState(
-    limitText(group.title, GROUP_TITLE_MAX_LENGTH),
-  );
+  const [draftTitle, setDraftTitle] = useState(limitText(group.title, GROUP_TITLE_MAX_LENGTH));
   const [draftDescription, setDraftDescription] = useState(
     limitText(group.description, GROUP_DESCRIPTION_MAX_LENGTH),
   );
@@ -118,22 +116,19 @@ export function SortableGroupRow({
     description: limitText(group.description, GROUP_DESCRIPTION_MAX_LENGTH),
   });
   const isTitleOverLimit = isOverLimit(draftTitle, GROUP_TITLE_MAX_LENGTH);
-  const isDescriptionOverLimit = isOverLimit(
-    draftDescription,
-    GROUP_DESCRIPTION_MAX_LENGTH,
-  );
+  const isDescriptionOverLimit = isOverLimit(draftDescription, GROUP_DESCRIPTION_MAX_LENGTH);
   const titleError = draftTitle.trim() ? null : "标题不能为空。";
-  const hasMetadataError =
-    Boolean(titleError) || isTitleOverLimit || isDescriptionOverLimit;
-  const { attributes, listeners, setNodeRef, transform, transition } =
-    useSortable({ id: group.id });
+  const hasMetadataError = Boolean(titleError) || isTitleOverLimit || isDescriptionOverLimit;
+  const visibleExtraAssetLabels = group.extraAssetLabels.slice(0, 3);
+  const hiddenExtraAssetLabelCount = group.extraAssetLabels.length - visibleExtraAssetLabels.length;
+  const { attributes, listeners, setNodeRef, transform, transition } = useSortable({
+    id: group.id,
+  });
 
   useEffect(() => {
     if (!isEditing) {
       setDraftTitle(limitText(group.title, GROUP_TITLE_MAX_LENGTH));
-      setDraftDescription(
-        limitText(group.description, GROUP_DESCRIPTION_MAX_LENGTH),
-      );
+      setDraftDescription(limitText(group.description, GROUP_DESCRIPTION_MAX_LENGTH));
     }
   }, [group.description, group.title, isEditing]);
 
@@ -165,10 +160,7 @@ export function SortableGroupRow({
    * Ignores the ToggleButtonGroup "clear selection" null case because a group must always be either
    * internal or public; allowing deselection would only create a transient impossible state.
    */
-  function handleVisibilityChange(
-    _event: unknown,
-    nextValue: "public" | "internal" | null,
-  ) {
+  function handleVisibilityChange(_event: unknown, nextValue: "public" | "internal" | null) {
     if (!nextValue) {
       return;
     }
@@ -200,10 +192,7 @@ export function SortableGroupRow({
    */
   function startMetadataEdit() {
     const nextTitle = limitText(group.title, GROUP_TITLE_MAX_LENGTH);
-    const nextDescription = limitText(
-      group.description,
-      GROUP_DESCRIPTION_MAX_LENGTH,
-    );
+    const nextDescription = limitText(group.description, GROUP_DESCRIPTION_MAX_LENGTH);
     editSeedRef.current = {
       title: nextTitle,
       description: nextDescription,
@@ -219,9 +208,7 @@ export function SortableGroupRow({
    */
   function cancelMetadataEdit() {
     setDraftTitle(limitText(group.title, GROUP_TITLE_MAX_LENGTH));
-    setDraftDescription(
-      limitText(group.description, GROUP_DESCRIPTION_MAX_LENGTH),
-    );
+    setDraftDescription(limitText(group.description, GROUP_DESCRIPTION_MAX_LENGTH));
     setIsEditing(false);
   }
 
@@ -231,8 +218,7 @@ export function SortableGroupRow({
    */
   function saveMetadataEdit() {
     const titleText = titleEditorRef.current?.textContent ?? draftTitle;
-    const descriptionText =
-      descriptionEditorRef.current?.textContent ?? draftDescription;
+    const descriptionText = descriptionEditorRef.current?.textContent ?? draftDescription;
 
     if (
       !titleText.trim() ||
@@ -257,13 +243,26 @@ export function SortableGroupRow({
   }
 
   /**
+   * Uses a native confirmation for this rare destructive action so the row does not gain another
+   * persistent edit state alongside drag, visibility, and metadata editing.
+   */
+  function handleDeleteClick(event: ReactMouseEvent<HTMLButtonElement>) {
+    stopClickPropagation(event);
+
+    if (isPending || isEditing) {
+      return;
+    }
+
+    if (window.confirm(`删除 Group「${group.title}」？内部素材和已发布输出都会被清理。`)) {
+      onDelete(group);
+    }
+  }
+
+  /**
    * Keeps the visible editor text and React draft state in lockstep without trimming so the
    * character counter can guide users back under the limit instead of blocking input.
    */
-  function syncEditableText(
-    editor: HTMLElement | null,
-    updateDraft: (value: string) => void,
-  ) {
+  function syncEditableText(editor: HTMLElement | null, updateDraft: (value: string) => void) {
     if (!editor) {
       return;
     }
@@ -291,11 +290,7 @@ export function SortableGroupRow({
           backgroundColor: "rgba(255,255,255,0.025)",
         }}
       >
-        <Stack
-          direction="row"
-          spacing={{ xs: 1.15, md: 1.4 }}
-          alignItems="stretch"
-        >
+        <Stack direction="row" spacing={{ xs: 1.15, md: 1.4 }} alignItems="stretch">
           <Tooltip title="拖动调整此 Case 内的顺序。">
             <IconButton
               {...attributes}
@@ -394,11 +389,7 @@ export function SortableGroupRow({
                   suppressContentEditableWarning
                   onInput={
                     isEditing
-                      ? () =>
-                          syncEditableText(
-                            descriptionEditorRef.current,
-                            setDraftDescription,
-                          )
+                      ? () => syncEditableText(descriptionEditorRef.current, setDraftDescription)
                       : undefined
                   }
                   noWrap={!isEditing}
@@ -415,9 +406,7 @@ export function SortableGroupRow({
                     variant="caption"
                     aria-live="polite"
                     sx={{
-                      color: isDescriptionOverLimit
-                        ? "error.main"
-                        : "text.secondary",
+                      color: isDescriptionOverLimit ? "error.main" : "text.secondary",
                       fontVariantNumeric: "tabular-nums",
                       lineHeight: 1,
                     }}
@@ -437,19 +426,24 @@ export function SortableGroupRow({
             >
               {/* Let metadata and actions share one line as soon as there is enough physical room;
                   a fixed lg cutoff made medium-width workspaces wrap long before they needed to. */}
-              <Stack
-                direction="row"
-                spacing={0.85}
-                flexWrap="wrap"
-                useFlexGap
-                alignItems="center"
-              >
-                <Chip
-                  size="small"
-                  label={group.defaultMode}
-                  variant="outlined"
-                  sx={{ height: 34, "& .MuiChip-label": { px: 1.35 } }}
-                />
+              <Stack direction="row" spacing={0.85} flexWrap="wrap" useFlexGap alignItems="center">
+                {visibleExtraAssetLabels.map((label) => (
+                  <Chip
+                    key={label}
+                    size="small"
+                    label={label}
+                    variant="outlined"
+                    sx={{ height: 34, "& .MuiChip-label": { px: 1.35 } }}
+                  />
+                ))}
+                {hiddenExtraAssetLabelCount > 0 ? (
+                  <Chip
+                    size="small"
+                    label={`+${hiddenExtraAssetLabelCount}`}
+                    variant="outlined"
+                    sx={{ height: 34, "& .MuiChip-label": { px: 1.35 } }}
+                  />
+                ) : null}
                 <Chip
                   size="small"
                   label={`${group.frameCount} frames`}
@@ -457,13 +451,7 @@ export function SortableGroupRow({
                   sx={{ height: 36, "& .MuiChip-label": { px: 1.35 } }}
                 />
               </Stack>
-              <Stack
-                direction="row"
-                spacing={0.9}
-                flexWrap="wrap"
-                useFlexGap
-                alignItems="center"
-              >
+              <Stack direction="row" spacing={0.9} flexWrap="wrap" useFlexGap alignItems="center">
                 {/* These controls act on one group only, so they stay visually grouped here instead
                     of competing with workspace-level actions in the page header. */}
                 <ToggleButtonGroup
@@ -526,40 +514,40 @@ export function SortableGroupRow({
                 >
                   {isEditing ? (
                     <>
-                    <IconButton
-                      size="small"
-                      aria-label="保存 Group 元数据"
-                      disabled={isPending || hasMetadataError}
-                      onPointerDown={stopPointerPropagation}
-                      onClick={(event) => {
-                        stopClickPropagation(event);
-                        saveMetadataEdit();
-                      }}
-                      sx={{
-                        width: compactControlHeight,
-                        height: compactControlHeight,
-                        borderRadius: 999,
-                      }}
-                    >
-                      <Check fontSize="small" />
-                    </IconButton>
-                    <IconButton
-                      size="small"
-                      aria-label="取消编辑 Group 元数据"
-                      disabled={isPending}
-                      onPointerDown={stopPointerPropagation}
-                      onClick={(event) => {
-                        stopClickPropagation(event);
-                        cancelMetadataEdit();
-                      }}
-                      sx={{
-                        width: compactControlHeight,
-                        height: compactControlHeight,
-                        borderRadius: 999,
-                      }}
-                    >
-                      <Close fontSize="small" />
-                    </IconButton>
+                      <IconButton
+                        size="small"
+                        aria-label="保存 Group 元数据"
+                        disabled={isPending || hasMetadataError}
+                        onPointerDown={stopPointerPropagation}
+                        onClick={(event) => {
+                          stopClickPropagation(event);
+                          saveMetadataEdit();
+                        }}
+                        sx={{
+                          width: compactControlHeight,
+                          height: compactControlHeight,
+                          borderRadius: 999,
+                        }}
+                      >
+                        <Check fontSize="small" />
+                      </IconButton>
+                      <IconButton
+                        size="small"
+                        aria-label="取消编辑 Group 元数据"
+                        disabled={isPending}
+                        onPointerDown={stopPointerPropagation}
+                        onClick={(event) => {
+                          stopClickPropagation(event);
+                          cancelMetadataEdit();
+                        }}
+                        sx={{
+                          width: compactControlHeight,
+                          height: compactControlHeight,
+                          borderRadius: 999,
+                        }}
+                      >
+                        <Close fontSize="small" />
+                      </IconButton>
                     </>
                   ) : (
                     <Button
@@ -582,6 +570,18 @@ export function SortableGroupRow({
                     </Button>
                   )}
                 </Box>
+                <Button
+                  variant="text"
+                  size="small"
+                  color="warning"
+                  startIcon={<DeleteOutline />}
+                  disabled={isPending || isEditing}
+                  onPointerDown={stopPointerPropagation}
+                  onClick={handleDeleteClick}
+                  sx={{ minHeight: compactControlHeight, px: 1.15 }}
+                >
+                  Delete
+                </Button>
                 <Button
                   component={Link}
                   href={`/cases/${caseSlug}/groups/${group.slug}`}

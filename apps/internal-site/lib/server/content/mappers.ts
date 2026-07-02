@@ -3,11 +3,7 @@ import type { ViewerDataset } from "@magic-compare/compare-core/viewer-data";
 import type { CaseStatus, ViewerMode } from "@magic-compare/content-schema";
 import { resolvePublishedGroupUrl } from "@/lib/server/public-site/url";
 import { resolvePublicInternalAssetUrl } from "@/lib/server/storage/internal-assets";
-import type {
-  CaseCatalogItem,
-  CaseSearchResult,
-  CaseWorkspaceData,
-} from "./types";
+import type { CaseCatalogItem, CaseSearchResult, CaseWorkspaceData } from "./types";
 
 type OrderedItem = { order: number };
 
@@ -18,12 +14,7 @@ export type AssetKind = "before" | "after" | "heatmap" | "crop" | "misc";
  * experimental assets without widening every downstream union immediately.
  */
 export function asAssetKind(kind: string): AssetKind {
-  if (
-    kind === "before" ||
-    kind === "after" ||
-    kind === "heatmap" ||
-    kind === "crop"
-  ) {
+  if (kind === "before" || kind === "after" || kind === "heatmap" || kind === "crop") {
     return kind;
   }
 
@@ -52,6 +43,38 @@ export function stringifyTags(tags: string[]): string {
   return JSON.stringify(tags);
 }
 
+const WORKSPACE_CORE_ASSET_LABELS = new Set(["before", "after", "heatmap"]);
+const WORKSPACE_CORE_ASSET_KINDS = new Set(["before", "after", "heatmap"]);
+
+/**
+ * Workspace rows should show reviewer-meaningful extra columns such as Rip/Deband, not the old
+ * default viewer mode chip. Sampling the first frame keeps the list payload small while still
+ * reflecting the column set produced by the import/upload pipeline.
+ */
+function workspaceExtraAssetLabels(assets: Array<{ kind: string; label: string }>): string[] {
+  const seenLabels = new Set<string>();
+  const labels: string[] = [];
+
+  for (const asset of assets) {
+    const label = asset.label.trim();
+    const normalizedLabel = label.toLowerCase();
+
+    if (
+      !label ||
+      WORKSPACE_CORE_ASSET_KINDS.has(asset.kind) ||
+      WORKSPACE_CORE_ASSET_LABELS.has(normalizedLabel) ||
+      seenLabels.has(normalizedLabel)
+    ) {
+      continue;
+    }
+
+    seenLabels.add(normalizedLabel);
+    labels.push(label);
+  }
+
+  return labels;
+}
+
 /**
  * Falls back to swipe mode because it is the safest viewer default when stored data contains an
  * outdated mode string.
@@ -69,12 +92,7 @@ export function asViewerMode(input: string): ViewerMode {
  * appear published in the UI.
  */
 export function asCaseStatus(input: string): CaseStatus {
-  if (
-    input === "draft" ||
-    input === "internal" ||
-    input === "published" ||
-    input === "archived"
-  ) {
+  if (input === "draft" || input === "internal" || input === "published" || input === "archived") {
     return input;
   }
 
@@ -111,17 +129,15 @@ export function mapFrameAssets(assets: Asset[]) {
  * Keeps sibling navigation lightweight by exposing only first-frame primary image hints for
  * explicit cross-group intent instead of serializing every sibling frame and asset into the route.
  */
-function mapGroupPreloadAssets(
-  group: {
-    frames?: Array<{
-      assets: Array<{
-        kind: string;
-        imageUrl: string;
-        isPrimaryDisplay: boolean;
-      }>;
+function mapGroupPreloadAssets(group: {
+  frames?: Array<{
+    assets: Array<{
+      kind: string;
+      imageUrl: string;
+      isPrimaryDisplay: boolean;
     }>;
-  },
-) {
+  }>;
+}) {
   const firstFrame = group.frames?.[0];
   if (!firstFrame) {
     return [];
@@ -129,9 +145,7 @@ function mapGroupPreloadAssets(
 
   return firstFrame.assets
     .filter(
-      (asset) =>
-        asset.isPrimaryDisplay &&
-        (asset.kind === "before" || asset.kind === "after"),
+      (asset) => asset.isPrimaryDisplay && (asset.kind === "before" || asset.kind === "after"),
     )
     .map((asset) => ({
       imageUrl: resolvePublicInternalAssetUrl(asset.imageUrl),
@@ -220,6 +234,12 @@ export function mapCaseWorkspaceData(caseRow: {
     isPublic: boolean;
     publicSlug: string | null;
     _count: { frames: number };
+    frames: Array<{
+      assets: Array<{
+        kind: string;
+        label: string;
+      }>;
+    }>;
   }>;
 }): CaseWorkspaceData {
   return {
@@ -240,6 +260,7 @@ export function mapCaseWorkspaceData(caseRow: {
       isPublic: group.isPublic,
       publicSlug: group.publicSlug,
       frameCount: group._count.frames,
+      extraAssetLabels: workspaceExtraAssetLabels(group.frames[0]?.assets ?? []),
     })),
   };
 }
@@ -320,8 +341,7 @@ export function buildViewerDataset(
       title: group.title,
       href: `/cases/${caseRow.slug}/groups/${group.slug}`,
       isCurrent: group.id === currentGroup.id,
-      preloadAssets:
-        group.id === currentGroup.id ? [] : mapGroupPreloadAssets(group),
+      preloadAssets: group.id === currentGroup.id ? [] : mapGroupPreloadAssets(group),
     })),
     publishStatus: {
       status: asCaseStatus(caseRow.status),

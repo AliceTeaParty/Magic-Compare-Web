@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { CaseWorkspaceData } from "@/lib/server/repositories/content-repository";
 import {
+  deleteWorkspaceGroup,
   updateWorkspaceCaseSummary,
   updateWorkspaceGroupMetadata,
   type NotificationApi,
@@ -20,6 +21,7 @@ const baseGroup = {
   order: 0,
   publicSlug: "comparison-public",
   frameCount: 84,
+  extraAssetLabels: ["Rip"],
 } satisfies GroupItem;
 
 const baseCase = {
@@ -160,5 +162,56 @@ describe("workspace metadata actions", () => {
     ]);
     expect(refresh).not.toHaveBeenCalled();
     expect(startTransition).not.toHaveBeenCalled();
+  });
+
+  it("deletes a group optimistically and refreshes server-derived workspace state", async () => {
+    const notifications = createNotificationApi();
+    const refresh = vi.fn();
+    const startTransition = vi.fn((callback: () => void) => callback());
+    const previousGroups: GroupItem[] = [baseGroup];
+    const groupsRef = { current: previousGroups };
+    const setGroups = vi.fn(
+      (updater: GroupItem[] | ((current: GroupItem[]) => GroupItem[])) => {
+        groupsRef.current =
+          typeof updater === "function" ? updater(groupsRef.current) : updater;
+      },
+    );
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        caseSlug: "mono",
+        groupSlug: "comparison",
+        deleted: true,
+      }),
+    } as Response);
+    const context = {
+      data: baseCase,
+      groupsRef,
+      notifications,
+      refresh,
+      setGroups,
+      startTransition,
+    } satisfies WorkspaceGroupMutationContext;
+
+    deleteWorkspaceGroup(baseGroup, context);
+    await vi.waitFor(() => {
+      expect(notifications.pushNotification).toHaveBeenCalledWith(
+        "Group 已删除。",
+        "success",
+      );
+    });
+
+    expect(groupsRef.current).toEqual([]);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/ops/group-delete",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({
+          caseSlug: "mono",
+          groupSlug: "comparison",
+        }),
+      }),
+    );
+    expect(refresh).toHaveBeenCalledTimes(1);
   });
 });

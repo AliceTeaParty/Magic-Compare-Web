@@ -7,6 +7,7 @@ export type {
 } from "../content/types";
 export { applyImportManifest, upsertGroup } from "../content/import-service";
 export {
+  createCase,
   deleteCase,
   deleteGroup,
   reorderFrames,

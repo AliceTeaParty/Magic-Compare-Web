@@ -1,6 +1,7 @@
 import { CloudUpload } from "@mui/icons-material";
 import { Box, Button, Stack, Typography } from "@mui/material";
 import Link from "next/link";
+import { CaseCreateButton } from "./case-create-button";
 
 /**
  * Keeps the catalog opening compact so repeat operators reach the case list without rereading
@@ -37,15 +38,24 @@ export function InternalCatalogHeader() {
         <Typography variant="h2" component="h1">
           Internal catalog
         </Typography>
-        <Button
-          component={Link}
-          href="/upload"
-          variant="contained"
-          startIcon={<CloudUpload />}
-          sx={{ justifySelf: { xs: "start", md: "end" }, minHeight: 42 }}
+        <Stack
+          direction="row"
+          spacing={1}
+          flexWrap="wrap"
+          useFlexGap
+          sx={{ justifySelf: { xs: "start", md: "end" } }}
         >
-          上传对比
-        </Button>
+          <CaseCreateButton />
+          <Button
+            component={Link}
+            href="/upload"
+            variant="contained"
+            startIcon={<CloudUpload />}
+            sx={{ minHeight: 42 }}
+          >
+            上传对比
+          </Button>
+        </Stack>
       </Box>
     </Stack>
   );

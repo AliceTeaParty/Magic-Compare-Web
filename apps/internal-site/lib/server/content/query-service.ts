@@ -136,6 +136,18 @@ export async function getCaseWorkspace(
               frames: true,
             },
           },
+          frames: {
+            orderBy: { order: "asc" },
+            take: 1,
+            select: {
+              assets: {
+                select: {
+                  kind: true,
+                  label: true,
+                },
+              },
+            },
+          },
         },
         orderBy: { order: "asc" },
       },
