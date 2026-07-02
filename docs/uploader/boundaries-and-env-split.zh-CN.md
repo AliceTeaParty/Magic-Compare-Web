@@ -22,7 +22,8 @@
 ## 3. 后续约束
 
 - 新增 uploader 变量时，优先更新 `tools/uploader/.env.example`，不要再回写到根 `.env.example`
-- 新增 uploader 使用说明、排障经验或导入规范时，优先写到 `docs/uploader/`
+- legacy uploader 使用说明、排障经验或导入规范仍写到 `docs/uploader/`
+- 新增上传体验和普通成员入口默认写到 `docs/web-uploader.zh-CN.md`，并落到 `/upload` Web 工作台
 - 网站 README 可以保留 uploader 导航，但不要再承载 uploader 的完整配置细节
 - 如果网站端需要消费 uploader 产物，应通过 manifest / API / 对象存储边界交互，而不是共享一份“全仓通用 env 模板”
 - uploader 的恢复/重试/报告规则要继续围绕工作目录实现，不要再把运行状态散落回网站目录或仓库根目录

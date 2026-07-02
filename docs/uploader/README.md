@@ -2,6 +2,8 @@
 
 这份文档面向上传对比图素材的组员。
 
+> **FINAL / 已弃用：** Python uploader 已进入 legacy 维护期。现有工具仍可用于旧导入流程和临时补救；新的上传能力默认进入 `internal-site` 的 `/upload` Web 工作台。
+
 ---
 
 ## ✨ 工具功能

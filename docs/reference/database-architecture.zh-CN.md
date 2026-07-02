@@ -8,7 +8,7 @@
 
 - `schema.prisma` 是模型定义和 Prisma Client 生成来源，但它不是 SQLite 全部约束的完整表达。
 - `prisma/init-db.ts` 是当前仓库的增量建库/修库入口，`pnpm db:push` 运行的是它，不是 `prisma db push`。
-- 上传链路遵循 `start -> frame prepare -> frame commit -> complete`，数据库查询职责已经拆成摘要查询、单 frame 查询和收尾查询。
+- 上传链路遵循 `start -> frame prepare -> frame commit -> complete`，放弃上传走 `cancel`；数据库查询职责已经拆成摘要查询、单 frame 查询、收尾查询和取消清理。
 - SQLite 继续可用，但必须接受“一个数据库文件上并发 writer 不会因为数据量小就自动变快”的事实，所以约束设计和查询收口要尽量明确。
 
 ## SQLite 与 Prisma 的职责边界
@@ -69,6 +69,7 @@
 - 表示某个上传 job 下单个 frame 的状态。
 - 保存 frame 快照、prepare 产物、待提交前缀和 commit 时间。
 - `(groupUploadJobId, frameOrder)` 是稳定定位一帧上传状态的键。
+- `cancel` 只会取消未 committed 的 frame job，并删除这些行记录的 `pendingPrefix` 对象前缀。
 
 ## Upload Job 当前不变式
 
@@ -89,6 +90,7 @@
 - `start` 只需要活跃 job 摘要和 frame 状态列表。
 - `prepare/commit` 直接按 `(groupUploadJobId, frameOrder)` 查询目标 `FrameUploadJob`。
 - `complete` 只需要 job 自身最小元信息与未提交 frame 计数。
+- `cancel` 只需要 active job guard、未 committed frame job 的 `pendingPrefix`，以及状态更新事务。
 
 这样做的原因很直接：上传链路频繁、单次读路径固定，SQLite 没必要反复水合整棵 job + case + group + frameJobs 大对象。
 
@@ -159,6 +161,7 @@
 - 活跃 job 摘要
 - 单 frame job
 - complete 阶段最小 job 生命周期信息
+- cancel 阶段的 pending prefix 清理清单
 
 原因：
 
@@ -180,4 +183,5 @@
 - 改模型字段时，先改 `schema.prisma`，再判断是否需要在 `init-db.ts` 补增量迁移逻辑。
 - 任何依赖 SQLite 方言能力的约束，都要在文档里明确写出“为什么不在 Prisma 里声明”。
 - 改上传链路时，优先保持 `upload-service.ts` 主流程薄、helper 负责窄查询和副作用顺序。
+- 增加取消/清理类逻辑时，先更新数据库状态，再执行对象存储前缀删除，避免删除失败时仍把 job 暴露成可继续上传状态。
 - 改派生字段维护逻辑时，先确认查询是否真的需要拉整棵对象树。
