@@ -1,6 +1,6 @@
 "use client";
 
-import { CSSProperties, useEffect, useMemo, useState } from "react";
+import { CSSProperties, useEffect, useMemo, useRef, useState } from "react";
 import {
   closestCenter,
   DndContext,
@@ -34,7 +34,11 @@ import {
   Tooltip,
   Typography,
 } from "@mui/material";
-import type { WebUploadFramePlan, WebUploadPlan } from "./web-upload-types";
+import type {
+  BrowserUploadFile,
+  WebUploadFramePlan,
+  WebUploadPlan,
+} from "./web-upload-types";
 import {
   frameIdForFrame,
   type FramePreviewRow,
@@ -47,6 +51,12 @@ const REDUCED_MOTION = "@media (prefers-reduced-motion: reduce)";
 interface PreviewUrls {
   beforeUrl: string;
   afterUrl: string;
+}
+
+interface ImageCellProps {
+  path: string | null;
+  source: BrowserUploadFile | null;
+  muted?: boolean;
 }
 
 interface PairingPreviewPanelProps {
@@ -66,11 +76,114 @@ function frameForId(plan: WebUploadPlan | null, frameId: string | null) {
   return plan.frames.find((frame) => frameIdForFrame(frame) === frameId) ?? null;
 }
 
-function HeatmapStatus({ row }: { row: FramePreviewRow }) {
-  if (row.heatmapPath) {
-    return <Typography aria-label="显式 heatmap">🟣</Typography>;
+function alternateAssetForLabel(frame: WebUploadFramePlan | null, label: string) {
+  return frame?.misc.find((asset) => asset.label === label) ?? null;
+}
+
+function SmallLazyThumbnail({
+  alt,
+  source,
+}: {
+  alt: string;
+  source: BrowserUploadFile | null;
+}) {
+  const rootRef = useRef<HTMLSpanElement | null>(null);
+  const [isVisible, setIsVisible] = useState(false);
+  const [url, setUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    const element = rootRef.current;
+    if (!element || isVisible) {
+      return undefined;
+    }
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry?.isIntersecting) {
+          setIsVisible(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: "80px" },
+    );
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [isVisible]);
+
+  useEffect(() => {
+    if (!source || !isVisible) {
+      setUrl(null);
+      return undefined;
+    }
+
+    // The collapsed table may contain hundreds of source files. Create object URLs only after the
+    // cell scrolls near the viewport, and revoke them with the row so previews do not become a
+    // hidden cache of the entire directory.
+    const nextUrl = URL.createObjectURL(source.file);
+    setUrl(nextUrl);
+    return () => URL.revokeObjectURL(nextUrl);
+  }, [isVisible, source]);
+
+  return (
+    <Box
+      ref={rootRef}
+      component="span"
+      sx={{
+        width: 26,
+        height: 20,
+        flex: "0 0 auto",
+        overflow: "hidden",
+        borderRadius: 1,
+        border: "1px solid",
+        borderColor: "rgba(255,255,255,0.12)",
+        backgroundColor: "rgba(255,255,255,0.055)",
+      }}
+    >
+      {url ? (
+        <Box
+          component="img"
+          src={url}
+          alt={alt}
+          loading="lazy"
+          decoding="async"
+          sx={{
+            display: "block",
+            width: "100%",
+            height: "100%",
+            objectFit: "cover",
+          }}
+        />
+      ) : null}
+    </Box>
+  );
+}
+
+function ImageCell({ muted = false, path, source }: ImageCellProps) {
+  if (!path) {
+    return (
+      <Typography variant="body2" color="text.disabled" noWrap>
+        —
+      </Typography>
+    );
   }
-  return <Typography aria-label="自动生成 heatmap">✨</Typography>;
+
+  return (
+    <Box
+      title={path}
+      sx={{
+        minWidth: 0,
+        display: "flex",
+        alignItems: "center",
+        gap: 0.65,
+        color: muted ? "text.disabled" : "text.primary",
+      }}
+    >
+      <SmallLazyThumbnail alt={path} source={source} />
+      <Typography variant="body2" noWrap sx={{ minWidth: 0 }}>
+        {path}
+      </Typography>
+    </Box>
+  );
 }
 
 function IssueStatus({ row }: { row: FramePreviewRow }) {
@@ -168,9 +281,9 @@ function SortablePairingRow({
     transform: CSS.Transform.toString(transform),
     transition,
   };
-  const desktopGridColumns = `38px 54px minmax(110px, 0.72fr) minmax(0, 1fr) minmax(0, 1fr) ${alternateColumns
-    .map(() => "minmax(0, 0.82fr)")
-    .join(" ")} 54px 54px 34px`;
+  const imageColumnCount = 2 + alternateColumns.length;
+  const imageColumnMin = alternateColumns.length >= 2 ? 118 : 150;
+  const desktopGridColumns = `38px 54px minmax(88px, 0.58fr) repeat(${imageColumnCount}, minmax(${imageColumnMin}px, 1fr)) 54px 34px`;
 
   return (
     <Box
@@ -248,39 +361,28 @@ function SortablePairingRow({
         <Typography variant="body2" noWrap title={row.title}>
           {row.title}
         </Typography>
-        <Typography
-          variant="body2"
-          noWrap
-          title={row.beforePath}
-          sx={{ display: { xs: "none", md: "block" } }}
-        >
-          {row.beforePath}
-        </Typography>
-        <Typography
-          variant="body2"
-          noWrap
-          title={row.afterPath}
-          sx={{ display: { xs: "none", md: "block" } }}
-        >
-          {row.afterPath}
-        </Typography>
+        <Box sx={{ display: { xs: "none", md: "block" }, minWidth: 0 }}>
+          <ImageCell path={row.beforePath} source={previewFrame?.before.source ?? null} />
+        </Box>
+        <Box sx={{ display: { xs: "none", md: "block" }, minWidth: 0 }}>
+          <ImageCell path={row.afterPath} source={previewFrame?.after.source ?? null} />
+        </Box>
         {alternateColumns.map((label) => {
           const alternate = row.alternateAfter.find((item) => item.label === label);
+          const alternateAsset = alternateAssetForLabel(previewFrame, label);
           return (
-            <Typography
+            <Box
               key={label}
-              variant="body2"
-              noWrap
-              title={alternate?.path ?? ""}
-              sx={{ display: { xs: "none", md: "block" }, color: alternate ? "text.primary" : "text.disabled" }}
+              sx={{ display: { xs: "none", md: "block" }, minWidth: 0 }}
             >
-              {alternate?.path ?? "—"}
-            </Typography>
+              <ImageCell
+                muted={!alternate}
+                path={alternate?.path ?? null}
+                source={alternateAsset?.source ?? null}
+              />
+            </Box>
           );
         })}
-        <Box sx={{ display: { xs: "none", md: "block" } }}>
-          <HeatmapStatus row={row} />
-        </Box>
         <Box sx={{ display: { xs: "none", md: "block" } }}>
           <IssueStatus row={row} />
         </Box>
@@ -333,9 +435,9 @@ export function PairingPreviewPanel({
     }
     return [...labels];
   }, [planView?.frames]);
-  const desktopGridColumns = `38px 54px minmax(110px, 0.72fr) minmax(0, 1fr) minmax(0, 1fr) ${alternateColumns
-    .map(() => "minmax(0, 0.82fr)")
-    .join(" ")} 54px 54px 34px`;
+  const imageColumnCount = 2 + alternateColumns.length;
+  const imageColumnMin = alternateColumns.length >= 2 ? 118 : 150;
+  const desktopGridColumns = `38px 54px minmax(88px, 0.58fr) repeat(${imageColumnCount}, minmax(${imageColumnMin}px, 1fr)) 54px 34px`;
 
   useEffect(() => {
     if (!expandedFrame) {
@@ -436,9 +538,6 @@ export function PairingPreviewPanel({
                     {label}
                   </Box>
                 ))}
-                <Box component="span" sx={{ display: { xs: "none", md: "block" } }}>
-                  Heatmap
-                </Box>
                 <Box component="span" sx={{ display: { xs: "none", md: "block" } }}>
                   状态
                 </Box>

@@ -110,7 +110,7 @@ function buildInitialSnapshot(): UploadRunnerSnapshot {
     totalFiles: 0,
     failedCount: 0,
     retriedCount: 0,
-    message: "选择文件夹后开始预演。",
+    message: "选择文件夹后开始检查。",
     frames: [],
     result: null,
   };
@@ -198,16 +198,6 @@ function writeUploadResumeHint(groupSlug: string, inputHash: string) {
   }
 }
 
-function StatChip({ label, value }: { label: string; value: string | number }) {
-  return (
-    <Chip
-      label={`${label} ${value}`}
-      variant="outlined"
-      sx={{ height: 32, "& .MuiChip-label": { px: 1.2 } }}
-    />
-  );
-}
-
 function stageLabel(stage: UploadRunnerSnapshot["stage"]) {
   if (stage === "generating") {
     return "生成中";
@@ -226,11 +216,7 @@ function stageLabel(stage: UploadRunnerSnapshot["stage"]) {
 
 function UploadQueue({ snapshot }: { snapshot: UploadRunnerSnapshot }) {
   if (snapshot.frames.length === 0) {
-    return (
-      <Typography color="text.secondary" sx={{ py: 1.2 }}>
-        等待上传。
-      </Typography>
-    );
+    return null;
   }
 
   return (
@@ -289,7 +275,7 @@ function UploadQueue({ snapshot }: { snapshot: UploadRunnerSnapshot }) {
   );
 }
 
-function UploadLog({
+function uploadStageCopy({
   generationProgress,
   overallProgress,
   planView,
@@ -300,68 +286,193 @@ function UploadLog({
   planView: PlanView | null;
   snapshot: UploadRunnerSnapshot;
 }) {
-  const lines = [
-    `状态：${stageLabel(snapshot.stage)}`,
-    snapshot.message ? `消息：${snapshot.message}` : null,
-    planView
-      ? `扫描：${planView.healthyPairCount}/${planView.frames.length} 对可用，忽略 ${planView.ignoredCount}，问题 ${planView.errorCount}`
-      : "扫描：等待选择文件夹",
-    generationProgress
-      ? `生成：${generationProgress.label} ${generationProgress.completed}/${generationProgress.total}`
-      : null,
-    snapshot.totalFiles > 0
-      ? `上传：${snapshot.completedFrames}/${snapshot.totalFrames} frames，${Math.round(overallProgress)}%`
-      : null,
-  ].filter(Boolean);
+  if (snapshot.stage === "generating") {
+    return {
+      marker: "◐",
+      title: "正在准备资源",
+      detail: generationProgress
+        ? `${generationProgress.completed}/${generationProgress.total} · ${generationProgress.label}`
+        : "生成缩略图与 heatmap",
+      progress:
+        generationProgress && generationProgress.total > 0
+          ? (generationProgress.completed / generationProgress.total) * 100
+          : 0,
+    };
+  }
 
+  if (snapshot.stage === "uploading") {
+    return {
+      marker: "↑",
+      title: "正在上传",
+      detail:
+        snapshot.totalFrames > 0
+          ? `${snapshot.completedFrames}/${snapshot.totalFrames} frames · ${Math.round(overallProgress)}%`
+          : "等待文件队列",
+      progress: overallProgress,
+    };
+  }
+
+  if (snapshot.stage === "completed") {
+    return {
+      marker: "✓",
+      title: "上传完成",
+      detail: `${snapshot.completedFrames}/${snapshot.totalFrames} frames 已提交`,
+      progress: 100,
+    };
+  }
+
+  if (snapshot.stage === "failed") {
+    return {
+      marker: "!",
+      title: "需要处理",
+      detail: snapshot.message || "部分项目未完成",
+      progress: overallProgress,
+    };
+  }
+
+  if (planView) {
+    return {
+      marker: planView.errorCount > 0 ? "!" : "✓",
+      title: planView.errorCount > 0 ? "需要修正" : "检查完成",
+      detail:
+        planView.errorCount > 0
+          ? `${planView.errorCount} 个问题阻止上传`
+          : `${planView.healthyPairCount}/${planView.frames.length} 对可上传`,
+      progress: planView.frames.length > 0 ? 100 : 0,
+    };
+  }
+
+  return {
+    marker: "○",
+    title: "待选目录",
+    detail: "",
+    progress: 0,
+  };
+}
+
+function UploadMetric({ label, value, tone = "default" }: {
+  label: string;
+  value: number | string;
+  tone?: "default" | "warning";
+}) {
   return (
-    <Stack spacing={1.35}>
-      <Box
-        role="log"
-        aria-live="polite"
+    <Box
+      sx={{
+        minWidth: 0,
+        color: tone === "warning" ? "warning.main" : "text.primary",
+      }}
+    >
+      <Typography
+        variant="h6"
         sx={{
-          border: "1px solid",
-          borderColor: "divider",
-          borderRadius: 1.5,
-          backgroundColor: "rgba(255,255,255,0.03)",
-          overflow: "hidden",
+          lineHeight: 1,
+          fontWeight: 750,
+          fontSize: { xs: "1.12rem", md: "1.22rem" },
+          fontVariantNumeric: "tabular-nums",
         }}
       >
-        {lines.map((line) => (
-          <Typography
-            key={line}
-            variant="body2"
+        {value}
+      </Typography>
+      <Typography
+        variant="body2"
+        color="text.secondary"
+        sx={{ mt: 0.35, fontSize: { xs: "0.82rem", md: "0.88rem" }, lineHeight: 1.15 }}
+      >
+        {label}
+      </Typography>
+    </Box>
+  );
+}
+
+function UploadDetails({
+  generationProgress,
+  overallProgress,
+  planView,
+  snapshot,
+}: {
+  generationProgress: GenerationProgress | null;
+  overallProgress: number;
+  planView: PlanView | null;
+  snapshot: UploadRunnerSnapshot;
+}) {
+  const current = uploadStageCopy({
+    generationProgress,
+    overallProgress,
+    planView,
+    snapshot,
+  });
+
+  return (
+    <Stack spacing={1.45}>
+      <Box
+        aria-live="polite"
+        sx={{
+          minWidth: 0,
+        }}
+      >
+        {/* The panel heading already says "上传详情"; the live state stays to one compact row
+            so the empty state does not read like a second title block. */}
+        <Box sx={{ display: "flex", alignItems: "center", gap: 0.9, minWidth: 0 }}>
+          <Box
+            aria-hidden="true"
             sx={{
-              px: 1.15,
-              py: 0.75,
-              borderBottom: "1px solid",
-              borderColor: "rgba(255,255,255,0.07)",
-              fontVariantNumeric: "tabular-nums",
-              "&:last-of-type": {
-                borderBottom: 0,
-              },
+              flex: "0 0 auto",
+              width: 26,
+              height: 26,
+              borderRadius: 999,
+              display: "grid",
+              placeItems: "center",
+              color: current.marker === "!" ? "warning.main" : "primary.main",
+              backgroundColor: "rgba(255,255,255,0.055)",
+              fontSize: "0.9rem",
+              fontWeight: 800,
+              lineHeight: 1,
             }}
           >
-            {line}
+            {current.marker}
+          </Box>
+          <Typography
+            variant="body2"
+            noWrap
+            title={current.detail ? `${current.title} · ${current.detail}` : current.title}
+            sx={{ minWidth: 0, color: "text.primary", fontWeight: 700 }}
+          >
+            {current.title}
+            {current.detail ? (
+              <Box component="span" sx={{ color: "text.secondary", fontWeight: 500 }}>
+                {" "}
+                · {current.detail}
+              </Box>
+            ) : null}
           </Typography>
-        ))}
+        </Box>
+        <LinearProgress
+          variant="determinate"
+          value={current.progress}
+          sx={{
+            mt: 1.15,
+            height: 6,
+            borderRadius: 999,
+            backgroundColor: "rgba(255,255,255,0.08)",
+          }}
+        />
+        <Box
+          sx={{
+            display: "grid",
+            gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+            gap: { xs: 1.2, md: 1.45 },
+            mt: 1.35,
+          }}
+        >
+          <UploadMetric label="可用" value={planView?.healthyPairCount ?? 0} />
+          <UploadMetric
+            label="问题"
+            value={planView?.errorCount ?? 0}
+            tone={planView?.errorCount ? "warning" : "default"}
+          />
+          <UploadMetric label="忽略" value={planView?.ignoredCount ?? 0} />
+        </Box>
       </Box>
-
-      {generationProgress ? (
-        <LinearProgress
-          variant="determinate"
-          value={(generationProgress.completed / generationProgress.total) * 100}
-          sx={{ height: 7, borderRadius: 999 }}
-        />
-      ) : null}
-
-      {snapshot.totalFiles > 0 ? (
-        <LinearProgress
-          variant="determinate"
-          value={overallProgress}
-          sx={{ height: 7, borderRadius: 999 }}
-        />
-      ) : null}
 
       <UploadQueue snapshot={snapshot} />
     </Stack>
@@ -464,8 +575,8 @@ export function WebUploadWorkbench({
     setPlanView(buildPlanView(plan));
     pushNotification(
       plan.issues.some((issue) => issue.severity === "error")
-        ? "预演发现阻塞问题，请先修正文件夹。"
-        : "预演完成，可以开始上传。",
+        ? "检查发现阻塞问题，请先修正文件夹。"
+        : "检查完成，可以开始上传。",
       plan.issues.some((issue) => issue.severity === "error") ? "warning" : "success",
       { key: "web-upload-scan-result" },
     );
@@ -851,13 +962,7 @@ export function WebUploadWorkbench({
                   />
                 </Stack>
 
-                <Stack direction="row" spacing={0.8} useFlexGap flexWrap="wrap">
-                  <StatChip label="Frames" value={planView?.frames.length ?? 0} />
-                  <StatChip label="忽略" value={planView?.ignoredCount ?? 0} />
-                  <StatChip label="问题" value={planView?.errorCount ?? 0} />
-                </Stack>
-
-                <UploadLog
+                <UploadDetails
                   generationProgress={generationProgress}
                   overallProgress={overallProgress}
                   planView={planView}
