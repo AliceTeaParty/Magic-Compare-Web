@@ -6,6 +6,36 @@ Entries before that date are summarized at release level instead of being recons
 
 ## Unreleased
 
+## v1.9.0 - 2026-07-02
+
+Web upload and internal operations release. This version moves the main upload path into the browser, expands Case workspace management, and keeps the legacy Python uploader in FINAL maintenance mode.
+
+### Added
+
+- Added the `/upload` Web upload workbench with directory selection, pairing preview, frame reorder, per-row image preview, bounded worker-based asset generation, and direct presigned R2/S3 PUT uploads.
+- Added Web upload support for alternate comparison columns such as `Rip`, `NoDeband`, and `Degrain`, including editable column labels and global heatmap reference selection.
+- Added generated thumbnail and heatmap handling in the browser worker, with upload runner state, pause/continue, abandon upload, active job cancellation, and pending object cleanup.
+- Added CJK-aware slug generation for Web uploads and Case creation using shared transliteration utilities.
+- Added shared internal-site toast notifications for workspace and upload actions.
+- Added Case creation from the internal catalog and a `POST /api/ops/case-create` route.
+- Added Group deletion from Case workspace, backed by the existing delete route that removes database rows, internal object-storage prefixes, and published bundles when present.
+- Added Case workspace group-row extra asset labels so operators can see additional image columns instead of the old default-mode tag.
+
+### Changed
+
+- Reworked upload page layout into a focused two-column workbench: left-side comparison metadata and upload details, right-side pairing preview and inspection.
+- Changed upload copy and UI hierarchy toward the Web-first workflow, with `上传对比` as the primary upload entry from catalog and Case workspace.
+- Changed Web upload frame titles for VSEditor-style filenames to compact `EP<episode>-<frame>` labels while keeping long file names in captions/tooltips.
+- Updated README, workflow, API, database, demo-vs-real, and Web uploader documentation to describe the browser upload path and current internal ops endpoints.
+- Kept uploader binary workflows manual-only and clarified that Python uploader version sync after v1.8.0 does not reopen it as an active feature surface.
+
+### Fixed
+
+- Fixed public slug separator handling by reserving `--` for generated public group slugs.
+- Fixed stale placeholder not-found copy in the public site.
+- Fixed TypeScript deprecation noise by recording the current compiler deprecation suppression setting in app tsconfigs.
+- Fixed upload CORS/debuggability gaps in documentation and upload flow reporting by making failure and cancel states explicit in the Web workbench.
+
 ## v1.8.0 - 2026-06-28
 
 Web feature expansion release focused on the compare viewer, Case workspace editing, and a final legacy uploader maintenance patch before upload work moves to the cross-platform Web flow.
