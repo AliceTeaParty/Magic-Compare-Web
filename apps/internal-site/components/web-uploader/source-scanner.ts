@@ -6,6 +6,7 @@ import type {
   WebUploadIssue,
   WebUploadPlan,
 } from "./web-upload-types";
+import { cjkKebabCase } from "@magic-compare/shared-utils";
 
 const SUPPORTED_EXTENSIONS = new Set([".png", ".jpg", ".jpeg", ".webp", ".avif", ".svg"]);
 const SOURCE_VARIANTS = new Set(["src", "source", "ori", "origin", "before"]);
@@ -75,6 +76,7 @@ interface SourceCandidate {
   caption: string;
   rootHint: string;
   isFallback: boolean;
+  isStructured: boolean;
 }
 
 interface NonFlatLayout {
@@ -115,15 +117,6 @@ function extractEpisode(prefix: string) {
   return candidate ? String(Number(candidate)).padStart(2, "0") : "00";
 }
 
-function kebabCase(input: string) {
-  return input
-    .normalize("NFKD")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .replace(/-{2,}/g, "-");
-}
-
 function titleCase(input: string) {
   return input
     .replace(/[_\-.]+/g, " ")
@@ -159,13 +152,14 @@ function structuredFrameInfo(pathStem: string) {
   }
 
   const title = titleCase(match.groups.title);
+  const frameNumber = Number(match.groups.frame.replace(/^0+/, "") || "0");
   return {
     fps: match.groups.fps,
     episode: match.groups.episode,
-    frameNumber: Number(match.groups.frame.replace(/^0+/, "") || "0"),
+    frameNumber,
     variant: match.groups.variant.toLowerCase(),
-    title: `${title} · ${match.groups.episode} · #${match.groups.frame}`,
-    caption: `${match.groups.fps} fps / frame ${match.groups.frame}`,
+    title,
+    caption: `${title} / ${match.groups.fps} fps / frame ${frameNumber}`,
   };
 }
 
@@ -262,6 +256,7 @@ function parseCandidate(entry: BrowserUploadFile, variantOverride?: string): Sou
       caption: structured.caption,
       rootHint: `${structured.fps}_${structured.title}_${structured.episode}`,
       isFallback: false,
+      isStructured: true,
     };
   }
 
@@ -285,6 +280,7 @@ function parseCandidate(entry: BrowserUploadFile, variantOverride?: string): Sou
       caption: `fps ${fps} / episode ${episode} / frame ${frameNumber}`,
       rootHint: prefix,
       isFallback: false,
+      isStructured: false,
     };
   }
 
@@ -302,6 +298,7 @@ function parseCandidate(entry: BrowserUploadFile, variantOverride?: string): Sou
       caption: `frame ${frameNumber}`,
       rootHint: pathStem,
       isFallback: true,
+      isStructured: false,
     };
   }
 
@@ -323,6 +320,7 @@ function parseCandidate(entry: BrowserUploadFile, variantOverride?: string): Sou
     caption: `file ${pathStem}`,
     rootHint: pathStem,
     isFallback: true,
+    isStructured: false,
   };
 }
 
@@ -368,7 +366,46 @@ function assetPlan(kind: WebUploadAssetPlan["kind"], candidate: SourceCandidate)
   };
 }
 
-function buildFrameFromCandidates(order: number, candidates: SourceCandidate[], fallbackWidth: number): WebUploadFramePlan | WebUploadIssue {
+function formatCandidateFrameTitle(
+  candidate: SourceCandidate,
+  fallbackWidth: number,
+  structuredEpisodeWidth: number,
+) {
+  if (candidate.isFallback) {
+    return candidate.frameNumber
+      ? String(candidate.frameNumber).padStart(fallbackWidth, "0")
+      : stem(candidate.entry.relativePath);
+  }
+
+  if (candidate.isStructured) {
+    // VSEditor embeds the work title in every filename. Keep the row title to episode-frame so the
+    // preview table stays scannable; the long title remains in caption and file tooltips.
+    const episode = String(Number(candidate.episode) || 0).padStart(
+      structuredEpisodeWidth,
+      "0",
+    );
+    return `EP${episode}-${candidate.frameNumber}`;
+  }
+
+  return candidate.title;
+}
+
+function structuredEpisodeWidth(candidates: SourceCandidate[]) {
+  const maxEpisode = Math.max(
+    0,
+    ...candidates
+      .filter((candidate) => candidate.isStructured)
+      .map((candidate) => Number(candidate.episode) || 0),
+  );
+  return Math.max(1, String(maxEpisode).length);
+}
+
+function buildFrameFromCandidates(
+  order: number,
+  candidates: SourceCandidate[],
+  fallbackWidth: number,
+  episodeWidth: number,
+): WebUploadFramePlan | WebUploadIssue {
   const beforeCandidates = candidates.filter((candidate) => SOURCE_VARIANTS.has(candidate.variant));
   if (beforeCandidates.length !== 1) {
     return {
@@ -404,7 +441,7 @@ function buildFrameFromCandidates(order: number, candidates: SourceCandidate[], 
   const misc = outputCandidates
     .filter((candidate) => candidate !== after)
     .sort((left, right) => alternatePriority(left).localeCompare(alternatePriority(right)));
-  const title = before.isFallback ? String(before.frameNumber).padStart(fallbackWidth, "0") : before.title;
+  const title = formatCandidateFrameTitle(before, fallbackWidth, episodeWidth);
   const caption = before.isFallback ? `frame ${before.frameNumber}` : before.caption;
 
   return {
@@ -474,7 +511,7 @@ function assignCandidatesToBeforeKeys(candidates: SourceCandidate[], beforeByKey
 }
 
 function deriveGroupIdentity(sourceRootName: string, candidates: SourceCandidate[]) {
-  const sourceSlug = kebabCase(sourceRootName);
+  const sourceSlug = cjkKebabCase(sourceRootName, "");
   if (sourceSlug && sourceSlug !== "uploaded-group") {
     return {
       slug: sourceSlug,
@@ -492,9 +529,9 @@ function deriveGroupIdentity(sourceRootName: string, candidates: SourceCandidate
     commonPrefix = commonPrefix.slice(0, index);
   }
   commonPrefix = commonPrefix.replace(GROUP_SUFFIX_NOISE_RE, "").replace(/^[ _\-.]+|[ _\-.]+$/g, "") || sourceRootName;
-  const slug = kebabCase(commonPrefix);
+  const slug = cjkKebabCase(commonPrefix, "");
   if (slug.length < 3) {
-    return { slug: kebabCase(sourceRootName) || "uploaded-group", title: titleCase(sourceRootName) || "Uploaded Group" };
+    return { slug: cjkKebabCase(sourceRootName, "uploaded-group"), title: titleCase(sourceRootName) || "Uploaded Group" };
   }
   return { slug, title: titleCase(commonPrefix) || titleCase(sourceRootName) || "Uploaded Group" };
 }
@@ -527,10 +564,11 @@ function buildFlatPlan(sourceRootName: string, entries: BrowserUploadFile[], ign
     return Number(leftEpisode) - Number(rightEpisode) || Number(leftFrame) - Number(rightFrame) || leftFps.localeCompare(rightFps);
   });
   const fallbackWidth = Math.max(4, String(Math.max(0, ...orderedGroups.map(([key]) => Number(key.split(":")[2])))).length);
+  const episodeWidth = structuredEpisodeWidth(parsed.candidates);
   const frames: WebUploadFramePlan[] = [];
   const issues: WebUploadIssue[] = [];
   orderedGroups.forEach(([, candidates], index) => {
-    const frame = buildFrameFromCandidates(index, candidates, fallbackWidth);
+    const frame = buildFrameFromCandidates(index, candidates, fallbackWidth, episodeWidth);
     if ("severity" in frame) {
       issues.push(frame);
     } else {
@@ -544,6 +582,7 @@ function buildFlatPlan(sourceRootName: string, entries: BrowserUploadFile[], ign
     suggestedGroupSlug: identity.slug,
     suggestedGroupTitle: identity.title,
     frames,
+    heatmapReferenceLabel: "After",
     ignoredFiles: [...ignoredFiles, ...parsed.ignored],
     issues,
   };
@@ -587,6 +626,7 @@ function buildNestedPlan(sourceRootName: string, entries: BrowserUploadFile[], i
     .map(([matchKey, candidates]) => [matchKey, candidates[0]] as const)
     .sort((left, right) => Number(left[1].episode) - Number(right[1].episode) || left[1].frameNumber - right[1].frameNumber || left[0].localeCompare(right[0]));
   const fallbackWidth = Math.max(4, String(Math.max(0, ...allBefore.map(([, candidate]) => candidate.frameNumber))).length);
+  const episodeWidth = structuredEpisodeWidth(beforeParsed.candidates);
   const frames: WebUploadFramePlan[] = [];
 
   for (const [order, [matchKey, before]] of allBefore.entries()) {
@@ -605,7 +645,7 @@ function buildNestedPlan(sourceRootName: string, entries: BrowserUploadFile[], i
     const extraAfter = matchedAfter
       .filter((candidate) => candidate !== primaryAfter)
       .sort((left, right) => alternatePriority(left).localeCompare(alternatePriority(right)));
-    const title = before.isFallback ? (before.frameNumber ? String(before.frameNumber).padStart(fallbackWidth, "0") : stem(before.entry.relativePath)) : before.title;
+    const title = formatCandidateFrameTitle(before, fallbackWidth, episodeWidth);
     frames.push({
       order,
       title,
@@ -630,6 +670,7 @@ function buildNestedPlan(sourceRootName: string, entries: BrowserUploadFile[], i
     suggestedGroupSlug: identity.slug,
     suggestedGroupTitle: identity.title,
     frames,
+    heatmapReferenceLabel: "After",
     ignoredFiles: ignored,
     issues,
   };

@@ -35,6 +35,8 @@ export interface GenerationProgress {
 
 export interface GenerateUploadFrameOptions {
   generateMissingHeatmap?: boolean;
+  heatmapReferenceLabel?: string;
+  signal?: AbortSignal;
 }
 
 function workerUploadFileToGenerated(file: WorkerUploadFile): GeneratedUploadFile {
@@ -151,11 +153,13 @@ function generatedHeatmapAsset(
   };
 }
 
-function heatmapAfterAsset(frame: WebUploadFramePlan) {
+function heatmapAfterAsset(frame: WebUploadFramePlan, referenceLabel: string) {
   const candidates = [frame.after, ...frame.misc];
-  return (
-    candidates.find((asset) => asset.label === frame.heatmapAfterLabel) ?? frame.after
-  );
+  const selected = candidates.find((asset) => asset.label === referenceLabel);
+  if (!selected) {
+    throw new Error(`${frame.title} 不存在 heatmap 参考列 ${referenceLabel}。`);
+  }
+  return selected;
 }
 
 /**
@@ -168,6 +172,7 @@ export async function generateUploadFrames(
   options: GenerateUploadFrameOptions = {},
 ) {
   const generateMissingHeatmap = options.generateMissingHeatmap ?? true;
+  const heatmapReferenceLabel = options.heatmapReferenceLabel ?? "After";
   const worker = new WebUploadAssetWorkerClient();
   const generatedFrames: GeneratedUploadFrame[] = [];
   const total = frames.reduce(
@@ -182,21 +187,32 @@ export async function generateUploadFrames(
     onProgress({ completed, total, label });
   }
 
+  function throwIfAborted() {
+    if (options.signal?.aborted) {
+      throw new DOMException("Upload generation was abandoned.", "AbortError");
+    }
+  }
+
   try {
     for (const frame of frames) {
+      throwIfAborted();
       const beforeResult = await worker.generateAsset({
         assetKey: `${frame.order}:before`,
         original: frame.before.source.file,
       });
+      throwIfAborted();
       tick(`${frame.title} before`);
 
-      const selectedHeatmapAfter = heatmapAfterAsset(frame);
+      // The UI validates the global reference against every frame; this server-facing generation
+      // path still fails fast in case labels changed after the cached plan was built.
+      const selectedHeatmapAfter = heatmapAfterAsset(frame, heatmapReferenceLabel);
       const afterResult = await worker.generateAsset({
         assetKey: `${frame.order}:after`,
         original: frame.after.source.file,
         heatmapBefore: !frame.heatmap && generateMissingHeatmap ? frame.before.source.file : undefined,
         heatmapAfter: !frame.heatmap && generateMissingHeatmap ? selectedHeatmapAfter.source.file : undefined,
       });
+      throwIfAborted();
       tick(`${frame.title} after`);
 
       const assets: GeneratedUploadAsset[] = [
@@ -209,6 +225,7 @@ export async function generateUploadFrames(
           assetKey: `${frame.order}:heatmap`,
           original: frame.heatmap.source.file,
         });
+        throwIfAborted();
         assets.push(generatedAsset(frame, frame.heatmap, "slot-003", heatmapResult));
         tick(`${frame.title} heatmap`);
       } else if (generateMissingHeatmap) {
@@ -221,6 +238,7 @@ export async function generateUploadFrames(
           assetKey: `${frame.order}:misc:${index}`,
           original: misc.source.file,
         });
+        throwIfAborted();
         assets.push(generatedAsset(frame, misc, `slot-${String(index + 4).padStart(3, "0")}`, miscResult));
         tick(`${frame.title} ${misc.label}`);
       }

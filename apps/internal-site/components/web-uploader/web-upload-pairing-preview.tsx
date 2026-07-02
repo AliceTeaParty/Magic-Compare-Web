@@ -47,6 +47,7 @@ import type {
 } from "./web-upload-types";
 import {
   frameIdForFrame,
+  compactUploadFilename,
   type FramePreviewRow,
   type PlanView,
 } from "./web-upload-view-model";
@@ -71,7 +72,7 @@ interface PairingPreviewPanelProps {
   expandedFrameId: string | null;
   hasBlockingIssues: boolean;
   onExpandedFrameChange: (frameId: string | null) => void;
-  onHeatmapTargetChange: (frameId: string, label: string) => void;
+  onHeatmapReferenceChange: (label: string) => void;
   onRenameColumn: (currentLabel: string, nextLabel: string) => void;
   onReorder: (activeFrameId: string, overFrameId: string | null) => void;
 }
@@ -85,15 +86,6 @@ function frameForId(plan: WebUploadPlan | null, frameId: string | null) {
 
 function alternateAssetForLabel(frame: WebUploadFramePlan | null, label: string) {
   return frame?.misc.find((asset) => asset.label === label) ?? null;
-}
-
-function compactPath(path: string) {
-  const fileName = path.split("/").filter(Boolean).at(-1) ?? path;
-  if (fileName.length <= 38) {
-    return fileName;
-  }
-
-  return `${fileName.slice(0, 18)}…${fileName.slice(-17)}`;
 }
 
 function SmallLazyThumbnail({
@@ -204,7 +196,7 @@ function ImageCell({ muted = false, path, source }: ImageCellProps) {
           fontVariantNumeric: "tabular-nums",
         }}
       >
-        {compactPath(path)}
+        {compactUploadFilename(path)}
       </Typography>
     </Box>
   );
@@ -221,22 +213,12 @@ function IssueStatus({ row }: { row: FramePreviewRow }) {
 }
 
 function ExpandedPreview({
-  frameId,
   frame,
-  onHeatmapTargetChange,
   urls,
 }: {
-  frameId: string;
   frame: WebUploadFramePlan;
-  onHeatmapTargetChange: (frameId: string, label: string) => void;
   urls: PreviewUrls | null;
 }) {
-  const heatmapTargets = [frame.after, ...frame.misc].map((asset) => ({
-    label: asset.label,
-    path: asset.source.relativePath,
-  }));
-  const selectedHeatmapTarget = frame.heatmapAfterLabel ?? frame.after.label;
-
   return (
     <Collapse in={Boolean(urls)} timeout={180} unmountOnExit>
       <Box
@@ -245,37 +227,6 @@ function ExpandedPreview({
           pb: 1.15,
         }}
       >
-        {!frame.heatmap && heatmapTargets.length > 1 ? (
-          <Stack
-            direction="row"
-            alignItems="center"
-            spacing={0.8}
-            sx={{ mb: 1, color: "text.secondary" }}
-          >
-            <Typography variant="caption">Heatmap</Typography>
-            <FormControl size="small" variant="outlined">
-              <Select
-                value={selectedHeatmapTarget}
-                onChange={(event) => onHeatmapTargetChange(frameId, event.target.value)}
-                sx={{
-                  height: 30,
-                  minWidth: 112,
-                  borderRadius: 1.25,
-                  "& .MuiSelect-select": {
-                    py: 0.35,
-                    fontSize: 13,
-                  },
-                }}
-              >
-                {heatmapTargets.map((target) => (
-                  <MenuItem key={`${target.label}-${target.path}`} value={target.label}>
-                    {target.label}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </Stack>
-        ) : null}
         {urls ? (
           <Box
             sx={{
@@ -316,7 +267,7 @@ function ExpandedPreview({
                   title={preview.path}
                   sx={{ display: "block", px: 1, py: 0.65, color: "text.secondary" }}
                 >
-                  {preview.label} · {compactPath(preview.path)}
+                  {preview.label} · {compactUploadFilename(preview.path)}
                 </Typography>
               </Box>
             ))}
@@ -435,7 +386,6 @@ function SortablePairingRow({
   expanded,
   previewFrame,
   previewUrls,
-  onHeatmapTargetChange,
   onToggleExpanded,
 }: {
   row: FramePreviewRow;
@@ -444,7 +394,6 @@ function SortablePairingRow({
   expanded: boolean;
   previewFrame: WebUploadFramePlan | null;
   previewUrls: PreviewUrls | null;
-  onHeatmapTargetChange: (frameId: string, label: string) => void;
   onToggleExpanded: () => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({
@@ -574,10 +523,8 @@ function SortablePairingRow({
       </Box>
       {previewFrame ? (
         <ExpandedPreview
-          frameId={row.frameId}
           frame={previewFrame}
           urls={expanded ? previewUrls : null}
-          onHeatmapTargetChange={onHeatmapTargetChange}
         />
       ) : null}
     </Box>
@@ -591,7 +538,7 @@ export function PairingPreviewPanel({
   expandedFrameId,
   hasBlockingIssues,
   onExpandedFrameChange,
-  onHeatmapTargetChange,
+  onHeatmapReferenceChange,
   onRenameColumn,
   onReorder,
 }: PairingPreviewPanelProps) {
@@ -679,12 +626,39 @@ export function PairingPreviewPanel({
       >
         <Typography variant="h6">配对预览</Typography>
         {planView ? (
-          <Chip
-            icon={hasBlockingIssues ? <WarningAmber /> : <CheckCircle />}
-            label={`${planView.healthyPairCount} / ${planView.frames.length}`}
-            color={hasBlockingIssues ? "warning" : "primary"}
-            sx={{ height: 32 }}
-          />
+          <Stack direction="row" alignItems="center" spacing={1} flexWrap="wrap" useFlexGap>
+            {planView.heatmapReferenceOptions.length > 1 ? (
+              <FormControl size="small" variant="outlined">
+                <Select
+                  value={planView.heatmapReferenceLabel}
+                  onChange={(event) => onHeatmapReferenceChange(event.target.value)}
+                  disabled={!canReorder}
+                  displayEmpty
+                  sx={{
+                    height: 32,
+                    minWidth: 132,
+                    borderRadius: 1.5,
+                    "& .MuiSelect-select": {
+                      py: 0.45,
+                      fontSize: 13,
+                    },
+                  }}
+                >
+                  {planView.heatmapReferenceOptions.map((label) => (
+                    <MenuItem key={label} value={label}>
+                      Heatmap: {label}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            ) : null}
+            <Chip
+              icon={hasBlockingIssues ? <WarningAmber /> : <CheckCircle />}
+              label={`${planView.healthyPairCount} / ${planView.frames.length}`}
+              color={hasBlockingIssues ? "warning" : "primary"}
+              sx={{ height: 32 }}
+            />
+          </Stack>
         ) : null}
       </Stack>
 
@@ -750,7 +724,6 @@ export function PairingPreviewPanel({
                   expanded={expandedFrameId === row.frameId}
                   previewFrame={frameForId(plan, row.frameId)}
                   previewUrls={expandedFrameId === row.frameId ? previewUrls : null}
-                  onHeatmapTargetChange={onHeatmapTargetChange}
                   onToggleExpanded={() =>
                     onExpandedFrameChange(expandedFrameId === row.frameId ? null : row.frameId)
                   }

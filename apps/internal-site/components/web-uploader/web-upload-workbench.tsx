@@ -10,6 +10,7 @@ import {
 import {
   ArrowBack,
   CloudUpload,
+  DeleteOutline,
   FolderOpen,
   OpenInNew,
   Pause,
@@ -30,7 +31,7 @@ import {
   Typography,
 } from "@mui/material";
 import type { ViewerMode } from "@magic-compare/content-schema";
-import { kebabCase } from "@magic-compare/shared-utils";
+import { cjkKebabCase } from "@magic-compare/shared-utils";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { CaseCatalogItem } from "@/lib/server/repositories/content-repository";
@@ -50,7 +51,7 @@ import {
   buildPlanView,
   renameUploadPlanAssetLabel,
   reorderUploadPlan,
-  setUploadPlanHeatmapTarget,
+  setUploadPlanHeatmapReference,
   type PlanView,
 } from "./web-upload-view-model";
 
@@ -98,7 +99,7 @@ const uploadFieldSx = {
 };
 
 function normalizeSlug(value: string, fallback = "uploaded-group") {
-  return kebabCase(value) || fallback;
+  return cjkKebabCase(value, fallback);
 }
 
 function buildInitialSnapshot(): UploadRunnerSnapshot {
@@ -197,6 +198,14 @@ function writeUploadResumeHint(groupSlug: string, inputHash: string) {
     window.localStorage.setItem(`${INPUT_HASH_STORAGE_PREFIX}${groupSlug}`, inputHash);
   } catch {
     // Browser privacy settings can disable storage. The active runner still owns this session.
+  }
+}
+
+function removeUploadResumeHint(groupSlug: string) {
+  try {
+    window.localStorage.removeItem(`${INPUT_HASH_STORAGE_PREFIX}${groupSlug}`);
+  } catch {
+    // Storage is optional for uploads; inability to clear a hint must not block abandonment.
   }
 }
 
@@ -366,6 +375,7 @@ function UploadMetric({ label, value, tone = "default" }: {
     >
       <Typography
         variant="h6"
+        component="div"
         sx={{
           lineHeight: 1,
           fontWeight: 750,
@@ -496,6 +506,7 @@ export function WebUploadWorkbench({
   const generatedFramesRef = useRef<GeneratedUploadFrame[] | null>(null);
   const runnerRef = useRef<WebUploadRunner | null>(null);
   const unsubscribeRunnerRef = useRef<(() => void) | null>(null);
+  const generationAbortRef = useRef<AbortController | null>(null);
   const { dismissNotification, notifications, pushNotification } =
     useAppNotifications();
   const [selectedCaseSlug, setSelectedCaseSlug] = useState(() => {
@@ -530,6 +541,10 @@ export function WebUploadWorkbench({
   const selectedCaseExists = cases.some((item) => item.slug === selectedCaseSlug);
   const hasBlockingIssues = Boolean(planView && planView.errorCount > 0);
   const canStart = Boolean(planView && planRef.current && !hasBlockingIssues);
+  const canAbandon =
+    Boolean(planRef.current) &&
+    snapshot.stage !== "idle" &&
+    snapshot.stage !== "completed";
   const overallProgress =
     snapshot.totalFiles > 0 ? (snapshot.completedFiles / snapshot.totalFiles) * 100 : 0;
 
@@ -549,6 +564,7 @@ export function WebUploadWorkbench({
 
   useEffect(() => {
     return () => {
+      generationAbortRef.current?.abort();
       unsubscribeRunnerRef.current?.();
       runnerRef.current?.dispose();
     };
@@ -562,6 +578,8 @@ export function WebUploadWorkbench({
     const plan = scanBrowserUploadFiles(entries, sourceRootName);
     planRef.current = plan;
     generatedFramesRef.current = null;
+    generationAbortRef.current?.abort();
+    generationAbortRef.current = null;
     runnerRef.current?.dispose();
     runnerRef.current = null;
     unsubscribeRunnerRef.current?.();
@@ -635,14 +653,24 @@ export function WebUploadWorkbench({
       return generatedFramesRef.current;
     }
 
+    const abortController = new AbortController();
+    generationAbortRef.current = abortController;
     setSnapshot({ ...buildInitialSnapshot(), stage: "generating", message: "正在生成资源。" });
     const frames = await generateUploadFrames(
       plan.frames,
       (progress) => {
         setGenerationProgress(progress);
       },
-      { generateMissingHeatmap: true },
+      {
+        generateMissingHeatmap: true,
+        heatmapReferenceLabel: plan.heatmapReferenceLabel,
+        signal: abortController.signal,
+      },
     );
+    if (abortController.signal.aborted) {
+      throw new DOMException("Upload generation was abandoned.", "AbortError");
+    }
+    generationAbortRef.current = null;
     generatedFramesRef.current = frames;
     setSnapshot({ ...buildInitialSnapshot(), stage: "ready", message: "资源生成完成。" });
     return frames;
@@ -686,6 +714,9 @@ export function WebUploadWorkbench({
 
       await runner.start();
     } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") {
+        return;
+      }
       pushNotification(error instanceof Error ? error.message : "上传失败。", "error", {
         key: "web-upload-runner-error",
       });
@@ -699,6 +730,42 @@ export function WebUploadWorkbench({
 
   function pauseUpload() {
     runnerRef.current?.pause();
+  }
+
+  function resetLocalUploadState() {
+    generationAbortRef.current?.abort();
+    generationAbortRef.current = null;
+    unsubscribeRunnerRef.current?.();
+    unsubscribeRunnerRef.current = null;
+    runnerRef.current?.dispose();
+    runnerRef.current = null;
+    planRef.current = null;
+    generatedFramesRef.current = null;
+    setPlanView(null);
+    setGenerationProgress(null);
+    setExpandedFrameId(null);
+    setSnapshot(buildInitialSnapshot());
+  }
+
+  async function abandonUpload() {
+    if (!canAbandon) {
+      return;
+    }
+
+    const runner = runnerRef.current;
+    try {
+      generationAbortRef.current?.abort();
+      if (runner) {
+        await runner.cancel();
+      }
+      removeUploadResumeHint(groupMeta.slug);
+      resetLocalUploadState();
+      pushNotification("已放弃上传。", "info", { key: "web-upload-abandoned" });
+    } catch (error) {
+      pushNotification(error instanceof Error ? error.message : "放弃上传失败。", "error", {
+        key: "web-upload-abandon-error",
+      });
+    }
   }
 
   function openCompletedGroup() {
@@ -753,13 +820,13 @@ export function WebUploadWorkbench({
     applyPlanUpdate(renameUploadPlanAssetLabel(plan, currentLabel, nextLabel));
   }
 
-  function changeHeatmapTarget(frameId: string, nextLabel: string) {
+  function changeHeatmapReference(nextLabel: string) {
     const plan = planRef.current;
     if (!plan || snapshot.stage !== "scanned") {
       return;
     }
 
-    applyPlanUpdate(setUploadPlanHeatmapTarget(plan, frameId, nextLabel));
+    applyPlanUpdate(setUploadPlanHeatmapReference(plan, nextLabel));
   }
 
   return (
@@ -846,6 +913,16 @@ export function WebUploadWorkbench({
                     : "开始上传"}
                 </Button>
               )}
+              {canAbandon ? (
+                <Button
+                  variant="outlined"
+                  color="warning"
+                  startIcon={<DeleteOutline />}
+                  onClick={abandonUpload}
+                >
+                  放弃
+                </Button>
+              ) : null}
               {snapshot.stage === "completed" ? (
                 <Button variant="outlined" endIcon={<OpenInNew />} onClick={openCompletedGroup}>
                   打开 Group
@@ -1012,7 +1089,7 @@ export function WebUploadWorkbench({
             expandedFrameId={expandedFrameId}
             hasBlockingIssues={hasBlockingIssues}
             onExpandedFrameChange={setExpandedFrameId}
-            onHeatmapTargetChange={changeHeatmapTarget}
+            onHeatmapReferenceChange={changeHeatmapReference}
             onRenameColumn={renamePairingColumn}
             onReorder={reorderPairingRows}
           />

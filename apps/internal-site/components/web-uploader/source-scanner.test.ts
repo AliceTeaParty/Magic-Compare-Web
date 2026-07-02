@@ -122,12 +122,28 @@ describe("scanBrowserUploadFiles", () => {
     );
 
     expect(plan.frames).toHaveLength(1);
-    expect(plan.frames[0].title).toBe("WATANARE ANIME VOL1 · 00000 · #27240");
+    expect(plan.frames[0].title).toBe("EP0-27240");
+    expect(plan.frames[0].caption).toContain("WATANARE ANIME VOL1");
     expect(plan.frames[0].after.label).toBe("After");
     expect(plan.frames[0].after.source.relativePath).toBe(
       "24_WATANARE_ANIME_VOL1_00000.gen.vpy-27240-output.png",
     );
     expect(plan.frames[0].misc.map((asset) => asset.label)).toEqual(["Rip"]);
+  });
+
+  it("formats VSEditor frame titles with episode width from the scanned set", () => {
+    const plan = scanBrowserUploadFiles(
+      [
+        image("24_TITLE_00000.gen.vpy-2183-src.png"),
+        image("24_TITLE_00000.gen.vpy-2183-output.png"),
+        image("24_TITLE_00012.gen.vpy-27240-src.png"),
+        image("24_TITLE_00012.gen.vpy-27240-output.png"),
+      ],
+      "测试目录",
+    );
+
+    expect(plan.suggestedGroupSlug).toBe("ceshimulu");
+    expect(plan.frames.map((frame) => frame.title)).toEqual(["EP00-2183", "EP12-27240"]);
   });
 
   it("ignores common sidecar and system files", () => {

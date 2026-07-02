@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
   buildPlanView,
+  compactUploadFilename,
   frameIdForFrame,
+  getUploadPlanHeatmapReferenceOptions,
   renameUploadPlanAssetLabel,
   reorderUploadPlan,
-  setUploadPlanHeatmapTarget,
+  setUploadPlanHeatmapReference,
 } from "./web-upload-view-model";
 import type {
   BrowserUploadFile,
@@ -25,7 +27,14 @@ function image(path: string): BrowserUploadFile {
 function asset(kind: WebUploadAssetPlan["kind"], path: string): WebUploadAssetPlan {
   return {
     kind,
-    label: kind,
+    label:
+      kind === "before"
+        ? "Before"
+        : kind === "after"
+          ? "After"
+          : kind === "heatmap"
+            ? "Heatmap"
+            : "Misc",
     note: path,
     source: image(path),
   };
@@ -48,6 +57,7 @@ function plan(): WebUploadPlan {
     sourceRootName: "sample",
     suggestedGroupSlug: "sample",
     suggestedGroupTitle: "Sample",
+    heatmapReferenceLabel: "After",
     frames: [frame(0), frame(1), frame(2)],
     ignoredFiles: [],
     issues: [],
@@ -116,27 +126,46 @@ describe("web upload view model", () => {
     const originalPlan = plan();
     originalPlan.frames[0] = {
       ...originalPlan.frames[0],
-      heatmapAfterLabel: "Rip",
       misc: [{ ...asset("misc", "after/1-rip.png"), label: "Rip" }],
     };
+    originalPlan.heatmapReferenceLabel = "Rip";
 
     const renamed = renameUploadPlanAssetLabel(originalPlan, "Rip", "Encode");
 
     expect(renamed?.frames[0].misc[0].label).toBe("Encode");
-    expect(renamed?.frames[0].heatmapAfterLabel).toBe("Encode");
+    expect(renamed?.heatmapReferenceLabel).toBe("Encode");
   });
 
-  it("sets the generated heatmap target to an alternate asset", () => {
+  it("only exposes global heatmap references available on every frame", () => {
     const originalPlan = plan();
     originalPlan.frames[0] = {
       ...originalPlan.frames[0],
       misc: [{ ...asset("misc", "after/1-rip.png"), label: "Rip" }],
     };
-    const frameId = frameIdForFrame(originalPlan.frames[0]);
+    originalPlan.frames[1] = {
+      ...originalPlan.frames[1],
+      misc: [
+        { ...asset("misc", "after/2-rip.png"), label: "Rip" },
+        { ...asset("misc", "after/2-deband.png"), label: "Deband" },
+      ],
+    };
+    originalPlan.frames[2] = {
+      ...originalPlan.frames[2],
+      misc: [{ ...asset("misc", "after/3-rip.png"), label: "Rip" }],
+    };
 
-    const nextPlan = setUploadPlanHeatmapTarget(originalPlan, frameId, "Rip");
+    expect(getUploadPlanHeatmapReferenceOptions(originalPlan)).toEqual(["After", "Rip"]);
 
-    expect(nextPlan?.frames[0].heatmapAfterLabel).toBe("Rip");
-    expect(setUploadPlanHeatmapTarget(nextPlan!, frameId, "after")?.frames[0].heatmapAfterLabel).toBeNull();
+    const nextPlan = setUploadPlanHeatmapReference(originalPlan, "Rip");
+
+    expect(nextPlan?.heatmapReferenceLabel).toBe("Rip");
+    expect(setUploadPlanHeatmapReference(nextPlan!, "Deband")).toBeNull();
+  });
+
+  it("compacts long upload filenames by preserving the head and tail", () => {
+    expect(compactUploadFilename("short.png")).toBe("short.png");
+    expect(compactUploadFilename("24_WATANARE_ANIME_VOL1_00000.gen.vpy-27240-output.png")).toBe(
+      "24_WATANARE_ANIME_V…y-27240-output.png",
+    );
   });
 });

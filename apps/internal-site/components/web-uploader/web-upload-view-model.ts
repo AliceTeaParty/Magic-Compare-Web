@@ -11,7 +11,6 @@ export interface FramePreviewRow {
   beforePath: string;
   afterPath: string;
   alternateAfter: Array<{ label: string; path: string }>;
-  heatmapAfterLabel: string;
   heatmapPath: string | null;
   miscCount: number;
   issueCount: number;
@@ -23,6 +22,8 @@ export interface PlanView {
   sourceRootName: string;
   suggestedGroupSlug: string;
   suggestedGroupTitle: string;
+  heatmapReferenceLabel: string;
+  heatmapReferenceOptions: string[];
   frames: FramePreviewRow[];
   healthyPairCount: number;
   ignoredCount: number;
@@ -45,6 +46,19 @@ export function frameIdForFrame(frame: WebUploadFramePlan) {
   )}`;
 }
 
+export function compactUploadFilename(path: string, maxLength = 38) {
+  const fileName = path.split("/").filter(Boolean).at(-1) ?? path;
+  if (fileName.length <= maxLength) {
+    return fileName;
+  }
+
+  const ellipsis = "…";
+  const remaining = Math.max(2, maxLength - ellipsis.length);
+  const headLength = Math.ceil(remaining / 2);
+  const tailLength = Math.floor(remaining / 2);
+  return `${fileName.slice(0, headLength)}${ellipsis}${fileName.slice(-tailLength)}`;
+}
+
 function frameIssueState(frame: WebUploadFramePlan, issues: WebUploadIssue[]) {
   const framePaths = new Set([
     frame.before.source.relativePath,
@@ -61,7 +75,34 @@ function frameIssueState(frame: WebUploadFramePlan, issues: WebUploadIssue[]) {
   };
 }
 
+function orderedComparisonLabels(frame: WebUploadFramePlan) {
+  const labels = [frame.after.label, ...frame.misc.map((asset) => asset.label)];
+  return [...new Set(labels)];
+}
+
+export function getUploadPlanHeatmapReferenceOptions(plan: WebUploadPlan) {
+  if (plan.frames.length === 0) {
+    return [];
+  }
+
+  const [firstFrame, ...remainingFrames] = plan.frames;
+  const commonLabels = new Set(orderedComparisonLabels(firstFrame));
+  for (const frame of remainingFrames) {
+    const labels = new Set(orderedComparisonLabels(frame));
+    for (const label of [...commonLabels]) {
+      if (!labels.has(label)) {
+        commonLabels.delete(label);
+      }
+    }
+  }
+
+  // The global heatmap selector must only show columns that every frame can actually use. That
+  // prevents a table-level setting from silently falling back on rows where the column is missing.
+  return orderedComparisonLabels(firstFrame).filter((label) => commonLabels.has(label));
+}
+
 export function buildPlanView(plan: WebUploadPlan): PlanView {
+  const heatmapReferenceOptions = getUploadPlanHeatmapReferenceOptions(plan);
   const frames = plan.frames.map((frame) => {
     const issueState = frameIssueState(frame, plan.issues);
     const alternateAfter = frame.misc
@@ -79,7 +120,6 @@ export function buildPlanView(plan: WebUploadPlan): PlanView {
       beforePath: frame.before.source.relativePath,
       afterPath: frame.after.source.relativePath,
       alternateAfter,
-      heatmapAfterLabel: frame.heatmapAfterLabel ?? frame.after.label,
       heatmapPath: frame.heatmap?.source.relativePath ?? null,
       miscCount: frame.misc.length,
       ...issueState,
@@ -90,6 +130,8 @@ export function buildPlanView(plan: WebUploadPlan): PlanView {
     sourceRootName: plan.sourceRootName,
     suggestedGroupSlug: plan.suggestedGroupSlug,
     suggestedGroupTitle: plan.suggestedGroupTitle,
+    heatmapReferenceLabel: plan.heatmapReferenceLabel,
+    heatmapReferenceOptions,
     frames,
     healthyPairCount: frames.filter((frame) => !frame.hasError).length,
     ignoredCount: plan.ignoredFiles.length,
@@ -115,10 +157,12 @@ export function renameUploadPlanAssetLabel(
 
   return {
     ...plan,
+    heatmapReferenceLabel:
+      plan.heatmapReferenceLabel === currentLabel
+        ? normalizedLabel
+        : plan.heatmapReferenceLabel,
     frames: plan.frames.map((frame) => ({
       ...frame,
-      heatmapAfterLabel:
-        frame.heatmapAfterLabel === currentLabel ? normalizedLabel : frame.heatmapAfterLabel,
       misc: frame.misc.map((asset) =>
         asset.label === currentLabel ? { ...asset, label: normalizedLabel } : asset,
       ),
@@ -126,34 +170,20 @@ export function renameUploadPlanAssetLabel(
   };
 }
 
-export function setUploadPlanHeatmapTarget(
+export function setUploadPlanHeatmapReference(
   plan: WebUploadPlan,
-  frameId: string,
   nextLabel: string,
 ) {
-  const nextFrames = plan.frames.map((frame) => {
-    if (frameIdForFrame(frame) !== frameId) {
-      return frame;
-    }
-
-    const allowedLabels = new Set([frame.after.label, ...frame.misc.map((asset) => asset.label)]);
-    if (!allowedLabels.has(nextLabel)) {
-      return frame;
-    }
-
-    return {
-      ...frame,
-      heatmapAfterLabel: nextLabel === frame.after.label ? null : nextLabel,
-    };
-  });
-
-  if (nextFrames.every((frame, index) => frame === plan.frames[index])) {
+  if (
+    plan.heatmapReferenceLabel === nextLabel ||
+    !getUploadPlanHeatmapReferenceOptions(plan).includes(nextLabel)
+  ) {
     return null;
   }
 
   return {
     ...plan,
-    frames: nextFrames,
+    heatmapReferenceLabel: nextLabel,
   };
 }
 
