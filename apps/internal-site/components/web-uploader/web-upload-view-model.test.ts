@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
   buildPlanView,
   frameIdForFrame,
+  renameUploadPlanAssetLabel,
   reorderUploadPlan,
+  setUploadPlanHeatmapTarget,
 } from "./web-upload-view-model";
 import type {
   BrowserUploadFile,
@@ -108,5 +110,33 @@ describe("web upload view model", () => {
       { label: "Degrain", path: "after/1-degrain.png" },
       { label: "Denoise", path: "after/1-denoise.png" },
     ]);
+  });
+
+  it("renames alternate column labels in the upload plan", () => {
+    const originalPlan = plan();
+    originalPlan.frames[0] = {
+      ...originalPlan.frames[0],
+      heatmapAfterLabel: "Rip",
+      misc: [{ ...asset("misc", "after/1-rip.png"), label: "Rip" }],
+    };
+
+    const renamed = renameUploadPlanAssetLabel(originalPlan, "Rip", "Encode");
+
+    expect(renamed?.frames[0].misc[0].label).toBe("Encode");
+    expect(renamed?.frames[0].heatmapAfterLabel).toBe("Encode");
+  });
+
+  it("sets the generated heatmap target to an alternate asset", () => {
+    const originalPlan = plan();
+    originalPlan.frames[0] = {
+      ...originalPlan.frames[0],
+      misc: [{ ...asset("misc", "after/1-rip.png"), label: "Rip" }],
+    };
+    const frameId = frameIdForFrame(originalPlan.frames[0]);
+
+    const nextPlan = setUploadPlanHeatmapTarget(originalPlan, frameId, "Rip");
+
+    expect(nextPlan?.frames[0].heatmapAfterLabel).toBe("Rip");
+    expect(setUploadPlanHeatmapTarget(nextPlan!, frameId, "after")?.frames[0].heatmapAfterLabel).toBeNull();
   });
 });

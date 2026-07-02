@@ -9,10 +9,24 @@ import type {
 
 const SUPPORTED_EXTENSIONS = new Set([".png", ".jpg", ".jpeg", ".webp", ".avif", ".svg"]);
 const SOURCE_VARIANTS = new Set(["src", "source", "ori", "origin", "before"]);
-const AFTER_VARIANTS = new Set(["after", "out", "output", "rip"]);
+const PRIMARY_AFTER_VARIANTS = new Set(["after", "out", "output"]);
+const COMPARISON_VARIANTS = new Set([
+  ...PRIMARY_AFTER_VARIANTS,
+  "rip",
+  "deband",
+  "nodeband",
+  "noband",
+  "nobanding",
+  "degrain",
+  "degrained",
+  "denoise",
+  "denoised",
+  "clean",
+  "cleaned",
+]);
 const HEATMAP_VARIANTS = new Set(["heatmap"]);
 const BEFORE_DIR_HINTS = new Set([...SOURCE_VARIANTS, "before"]);
-const AFTER_DIR_HINTS = new Set([...AFTER_VARIANTS, "after"]);
+const AFTER_DIR_HINTS = new Set([...COMPARISON_VARIANTS, "after"]);
 const MISC_DIR_HINTS = new Set(["misc", "extra", "extras", "alt", "alts"]);
 const MATCH_KEY_VARIANTS = [
   "before",
@@ -40,6 +54,8 @@ const IGNORED_BASENAMES = new Set([".ds_store", "thumbs.db"]);
 const IGNORED_SUFFIXES = new Set([".json", ".yaml", ".yml", ".txt", ".md", ".csv", ".db", ".log"]);
 const FILENAME_RE = /(?<prefix>.+?)[_\-.](?<frame>\d+)(?:[_\-.](?<variant>[^_\-.]+))?$/;
 const FALLBACK_FILENAME_RE = /^(?<frame>\d+)(?<variant>[A-Za-z][A-Za-z0-9]*)$/;
+const VSEDITOR_FILENAME_RE =
+  /^(?<fps>\d{2})_(?<title>.+)_(?<episode>\d+)\.gen\.vpy-(?<frame>\d+)-(?<variant>[^_\-.]+)$/i;
 const GROUP_SUFFIX_NOISE_RE = /(?:[_\-. ]+\d{4,5}[_\-. ]+gen[_\-. ]+vpy)$/i;
 const MATCH_KEY_SUFFIX_RE = new RegExp(
   `(?:[_\\-. ]+(?:${MATCH_KEY_VARIANTS.join("|")}))+$`,
@@ -117,11 +133,14 @@ function titleCase(input: string) {
 
 function variantLabel(variant: string) {
   const normalized = variant.toLowerCase();
-  if (normalized === "after" || normalized === "out" || normalized === "output" || normalized === "rip") {
+  if (PRIMARY_AFTER_VARIANTS.has(normalized)) {
     return "After";
   }
   if (normalized === "before" || normalized === "src" || normalized === "source" || normalized === "ori" || normalized === "origin") {
     return "Before";
+  }
+  if (normalized === "rip") {
+    return "Rip";
   }
   if (normalized === "nodeband" || normalized === "noband" || normalized === "nobanding") {
     return "NoDeband";
@@ -131,6 +150,23 @@ function variantLabel(variant: string) {
     .filter(Boolean)
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join("");
+}
+
+function structuredFrameInfo(pathStem: string) {
+  const match = VSEDITOR_FILENAME_RE.exec(pathStem);
+  if (!match?.groups) {
+    return null;
+  }
+
+  const title = titleCase(match.groups.title);
+  return {
+    fps: match.groups.fps,
+    episode: match.groups.episode,
+    frameNumber: Number(match.groups.frame.replace(/^0+/, "") || "0"),
+    variant: match.groups.variant.toLowerCase(),
+    title: `${title} · ${match.groups.episode} · #${match.groups.frame}`,
+    caption: `${match.groups.fps} fps / frame ${match.groups.frame}`,
+  };
 }
 
 function ignoreReason(entry: BrowserUploadFile) {
@@ -213,6 +249,22 @@ function suggestNonFlatLayout(entries: BrowserUploadFile[]): NonFlatLayout {
 
 function parseCandidate(entry: BrowserUploadFile, variantOverride?: string): SourceCandidate | null {
   const pathStem = stem(entry.relativePath);
+  const structured = structuredFrameInfo(pathStem);
+  if (structured) {
+    return {
+      entry,
+      originalName: basename(entry.relativePath),
+      variant: (variantOverride ?? structured.variant).trim().toLowerCase(),
+      fps: structured.fps,
+      episode: structured.episode,
+      frameNumber: structured.frameNumber,
+      title: structured.title,
+      caption: structured.caption,
+      rootHint: `${structured.fps}_${structured.title}_${structured.episode}`,
+      isFallback: false,
+    };
+  }
+
   const match = FILENAME_RE.exec(pathStem);
   if (match?.groups) {
     const prefix = match.groups.prefix;
@@ -279,7 +331,23 @@ function candidateFrameKey(candidate: SourceCandidate) {
 }
 
 function afterPriority(candidate: SourceCandidate) {
-  const priority = candidate.variant === "out" ? 0 : candidate.variant === "output" ? 1 : candidate.variant === "rip" ? 2 : candidate.variant === "after" ? 3 : 4;
+  const priority = candidate.variant === "out" ? 0 : candidate.variant === "output" ? 1 : candidate.variant === "after" ? 2 : 3;
+  return `${priority}:${candidate.variant}:${candidate.originalName.toLowerCase()}`;
+}
+
+function alternatePriority(candidate: SourceCandidate) {
+  const priority =
+    candidate.variant === "after"
+      ? 0
+      : candidate.variant === "rip"
+        ? 1
+        : candidate.variant === "deband" || candidate.variant === "nodeband" || candidate.variant === "noband" || candidate.variant === "nobanding"
+          ? 2
+          : candidate.variant === "degrain" || candidate.variant === "degrained"
+            ? 3
+            : candidate.variant === "denoise" || candidate.variant === "denoised"
+              ? 4
+              : 5;
   return `${priority}:${candidate.variant}:${candidate.originalName.toLowerCase()}`;
 }
 
@@ -335,7 +403,7 @@ function buildFrameFromCandidates(order: number, candidates: SourceCandidate[], 
   const after = [...outputCandidates].sort((left, right) => afterPriority(left).localeCompare(afterPriority(right)))[0];
   const misc = outputCandidates
     .filter((candidate) => candidate !== after)
-    .sort((left, right) => `${left.variant}:${left.originalName}`.localeCompare(`${right.variant}:${right.originalName}`));
+    .sort((left, right) => alternatePriority(left).localeCompare(alternatePriority(right)));
   const title = before.isFallback ? String(before.frameNumber).padStart(fallbackWidth, "0") : before.title;
   const caption = before.isFallback ? `frame ${before.frameNumber}` : before.caption;
 
@@ -534,7 +602,9 @@ function buildNestedPlan(sourceRootName: string, entries: BrowserUploadFile[], i
     }
 
     const primaryAfter = [...matchedAfter].sort((left, right) => afterPriority(left).localeCompare(afterPriority(right)))[0];
-    const extraAfter = matchedAfter.filter((candidate) => candidate !== primaryAfter);
+    const extraAfter = matchedAfter
+      .filter((candidate) => candidate !== primaryAfter)
+      .sort((left, right) => alternatePriority(left).localeCompare(alternatePriority(right)));
     const title = before.isFallback ? (before.frameNumber ? String(before.frameNumber).padStart(fallbackWidth, "0") : stem(before.entry.relativePath)) : before.title;
     frames.push({
       order,

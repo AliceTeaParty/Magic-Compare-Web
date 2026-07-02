@@ -48,7 +48,9 @@ import type {
 } from "./web-upload-types";
 import {
   buildPlanView,
+  renameUploadPlanAssetLabel,
   reorderUploadPlan,
+  setUploadPlanHeatmapTarget,
   type PlanView,
 } from "./web-upload-view-model";
 
@@ -337,7 +339,7 @@ function uploadStageCopy({
       detail:
         planView.errorCount > 0
           ? `${planView.errorCount} 个问题阻止上传`
-          : `${planView.healthyPairCount}/${planView.frames.length} 对可上传`,
+          : `${planView.healthyPairCount}/${planView.frames.length} 项可上传`,
       progress: planView.frames.length > 0 ? 100 : 0,
     };
   }
@@ -427,6 +429,7 @@ function UploadDetails({
               fontSize: "0.9rem",
               fontWeight: 800,
               lineHeight: 1,
+              userSelect: "none",
             }}
           >
             {current.marker}
@@ -729,6 +732,36 @@ export function WebUploadWorkbench({
     setPlanView(buildPlanView(reorderedPlan));
   }
 
+  function applyPlanUpdate(nextPlan: WebUploadPlan | null) {
+    if (!nextPlan) {
+      return;
+    }
+
+    planRef.current = nextPlan;
+    // Generated blobs carry asset labels and heatmap descriptors, so any metadata-level plan edit
+    // before upload must invalidate the cached generation output.
+    generatedFramesRef.current = null;
+    setPlanView(buildPlanView(nextPlan));
+  }
+
+  function renamePairingColumn(currentLabel: string, nextLabel: string) {
+    const plan = planRef.current;
+    if (!plan || snapshot.stage !== "scanned") {
+      return;
+    }
+
+    applyPlanUpdate(renameUploadPlanAssetLabel(plan, currentLabel, nextLabel));
+  }
+
+  function changeHeatmapTarget(frameId: string, nextLabel: string) {
+    const plan = planRef.current;
+    if (!plan || snapshot.stage !== "scanned") {
+      return;
+    }
+
+    applyPlanUpdate(setUploadPlanHeatmapTarget(plan, frameId, nextLabel));
+  }
+
   return (
     <>
       <Stack spacing={{ xs: 3.1, md: 4.2 }}>
@@ -979,6 +1012,8 @@ export function WebUploadWorkbench({
             expandedFrameId={expandedFrameId}
             hasBlockingIssues={hasBlockingIssues}
             onExpandedFrameChange={setExpandedFrameId}
+            onHeatmapTargetChange={changeHeatmapTarget}
+            onRenameColumn={renamePairingColumn}
             onReorder={reorderPairingRows}
           />
         </Box>

@@ -80,12 +80,12 @@ describe("scanBrowserUploadFiles", () => {
     expect(plan.frames[0].after.source.relativePath).toBe("frame-001_out.png");
     expect(plan.frames[0].misc.map((asset) => asset.source.relativePath)).toEqual([
       "frame-001_after.png",
-      "frame-001_degrain.png",
+      "frame-001_rip.png",
       "frame-001_nodeband.png",
     ]);
     expect(plan.frames[0].misc.map((asset) => asset.label)).toEqual([
       "After",
-      "Degrain",
+      "Rip",
       "NoDeband",
     ]);
   });
@@ -106,9 +106,28 @@ describe("scanBrowserUploadFiles", () => {
     expect(plan.frames).toHaveLength(1);
     expect(plan.frames[0].misc.map((asset) => asset.source.relativePath)).toEqual([
       "frame-001_after.png",
+      "frame-001_rip.png",
       "frame-001_degrain.png",
-      "frame-001_denoise.png",
     ]);
+  });
+
+  it("keeps output as After and rip as a separate comparison column", () => {
+    const plan = scanBrowserUploadFiles(
+      [
+        image("24_WATANARE_ANIME_VOL1_00000.gen.vpy-27240-src.png"),
+        image("24_WATANARE_ANIME_VOL1_00000.gen.vpy-27240-output.png"),
+        image("24_WATANARE_ANIME_VOL1_00000.gen.vpy-27240-rip.png"),
+      ],
+      "20260702",
+    );
+
+    expect(plan.frames).toHaveLength(1);
+    expect(plan.frames[0].title).toBe("WATANARE ANIME VOL1 · 00000 · #27240");
+    expect(plan.frames[0].after.label).toBe("After");
+    expect(plan.frames[0].after.source.relativePath).toBe(
+      "24_WATANARE_ANIME_VOL1_00000.gen.vpy-27240-output.png",
+    );
+    expect(plan.frames[0].misc.map((asset) => asset.label)).toEqual(["Rip"]);
   });
 
   it("ignores common sidecar and system files", () => {

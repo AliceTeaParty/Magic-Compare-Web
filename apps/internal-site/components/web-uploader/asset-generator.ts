@@ -131,6 +131,7 @@ function generatedAsset(
 
 function generatedHeatmapAsset(
   frame: WebUploadFramePlan,
+  heatmapAfter: WebUploadAssetPlan,
   result: WorkerAssetResult,
 ): GeneratedUploadAsset {
   if (!result.heatmap) {
@@ -141,13 +142,20 @@ function generatedHeatmapAsset(
     slot: "slot-003",
     kind: "heatmap",
     label: "Heatmap",
-    note: `Auto-generated from ${frame.before.source.relativePath} vs ${frame.after.source.relativePath}`,
+    note: `Auto-generated from ${frame.before.source.relativePath} vs ${heatmapAfter.source.relativePath}`,
     width: result.width,
     height: result.height,
     isPrimaryDisplay: false,
     original: workerUploadFileToGenerated(result.heatmap),
     thumbnail: workerUploadFileToGenerated(result.heatmap),
   };
+}
+
+function heatmapAfterAsset(frame: WebUploadFramePlan) {
+  const candidates = [frame.after, ...frame.misc];
+  return (
+    candidates.find((asset) => asset.label === frame.heatmapAfterLabel) ?? frame.after
+  );
 }
 
 /**
@@ -182,11 +190,12 @@ export async function generateUploadFrames(
       });
       tick(`${frame.title} before`);
 
+      const selectedHeatmapAfter = heatmapAfterAsset(frame);
       const afterResult = await worker.generateAsset({
         assetKey: `${frame.order}:after`,
         original: frame.after.source.file,
         heatmapBefore: !frame.heatmap && generateMissingHeatmap ? frame.before.source.file : undefined,
-        heatmapAfter: !frame.heatmap && generateMissingHeatmap ? frame.after.source.file : undefined,
+        heatmapAfter: !frame.heatmap && generateMissingHeatmap ? selectedHeatmapAfter.source.file : undefined,
       });
       tick(`${frame.title} after`);
 
@@ -203,7 +212,7 @@ export async function generateUploadFrames(
         assets.push(generatedAsset(frame, frame.heatmap, "slot-003", heatmapResult));
         tick(`${frame.title} heatmap`);
       } else if (generateMissingHeatmap) {
-        assets.push(generatedHeatmapAsset(frame, afterResult));
+        assets.push(generatedHeatmapAsset(frame, selectedHeatmapAfter, afterResult));
         tick(`${frame.title} heatmap`);
       }
 

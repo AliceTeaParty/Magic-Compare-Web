@@ -11,6 +11,7 @@ export interface FramePreviewRow {
   beforePath: string;
   afterPath: string;
   alternateAfter: Array<{ label: string; path: string }>;
+  heatmapAfterLabel: string;
   heatmapPath: string | null;
   miscCount: number;
   issueCount: number;
@@ -78,6 +79,7 @@ export function buildPlanView(plan: WebUploadPlan): PlanView {
       beforePath: frame.before.source.relativePath,
       afterPath: frame.after.source.relativePath,
       alternateAfter,
+      heatmapAfterLabel: frame.heatmapAfterLabel ?? frame.after.label,
       heatmapPath: frame.heatmap?.source.relativePath ?? null,
       miscCount: frame.misc.length,
       ...issueState,
@@ -98,6 +100,60 @@ export function buildPlanView(plan: WebUploadPlan): PlanView {
       message: issue.message,
       path: issue.path,
     })),
+  };
+}
+
+export function renameUploadPlanAssetLabel(
+  plan: WebUploadPlan,
+  currentLabel: string,
+  nextLabel: string,
+) {
+  const normalizedLabel = nextLabel.trim();
+  if (!normalizedLabel || normalizedLabel === currentLabel) {
+    return null;
+  }
+
+  return {
+    ...plan,
+    frames: plan.frames.map((frame) => ({
+      ...frame,
+      heatmapAfterLabel:
+        frame.heatmapAfterLabel === currentLabel ? normalizedLabel : frame.heatmapAfterLabel,
+      misc: frame.misc.map((asset) =>
+        asset.label === currentLabel ? { ...asset, label: normalizedLabel } : asset,
+      ),
+    })),
+  };
+}
+
+export function setUploadPlanHeatmapTarget(
+  plan: WebUploadPlan,
+  frameId: string,
+  nextLabel: string,
+) {
+  const nextFrames = plan.frames.map((frame) => {
+    if (frameIdForFrame(frame) !== frameId) {
+      return frame;
+    }
+
+    const allowedLabels = new Set([frame.after.label, ...frame.misc.map((asset) => asset.label)]);
+    if (!allowedLabels.has(nextLabel)) {
+      return frame;
+    }
+
+    return {
+      ...frame,
+      heatmapAfterLabel: nextLabel === frame.after.label ? null : nextLabel,
+    };
+  });
+
+  if (nextFrames.every((frame, index) => frame === plan.frames[index])) {
+    return null;
+  }
+
+  return {
+    ...plan,
+    frames: nextFrames,
   };
 }
 

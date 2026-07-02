@@ -42,6 +42,7 @@ export interface WebUploadFramePlan {
   caption: string;
   before: WebUploadAssetPlan;
   after: WebUploadAssetPlan;
+  heatmapAfterLabel?: string | null;
   heatmap: WebUploadAssetPlan | null;
   misc: WebUploadAssetPlan[];
 }

@@ -18,8 +18,11 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import {
+  Check,
   CheckCircle,
+  Close,
   DragIndicator,
+  EditOutlined,
   KeyboardArrowDown,
   WarningAmber,
 } from "@mui/icons-material";
@@ -28,8 +31,11 @@ import {
   Box,
   Chip,
   Collapse,
+  FormControl,
   IconButton,
+  MenuItem,
   Paper,
+  Select,
   Stack,
   Tooltip,
   Typography,
@@ -49,8 +55,7 @@ const PANEL_TRANSITION = "background-color 160ms cubic-bezier(0.22, 1, 0.36, 1)"
 const REDUCED_MOTION = "@media (prefers-reduced-motion: reduce)";
 
 interface PreviewUrls {
-  beforeUrl: string;
-  afterUrl: string;
+  items: Array<{ key: string; label: string; path: string; url: string }>;
 }
 
 interface ImageCellProps {
@@ -66,6 +71,8 @@ interface PairingPreviewPanelProps {
   expandedFrameId: string | null;
   hasBlockingIssues: boolean;
   onExpandedFrameChange: (frameId: string | null) => void;
+  onHeatmapTargetChange: (frameId: string, label: string) => void;
+  onRenameColumn: (currentLabel: string, nextLabel: string) => void;
   onReorder: (activeFrameId: string, overFrameId: string | null) => void;
 }
 
@@ -78,6 +85,15 @@ function frameForId(plan: WebUploadPlan | null, frameId: string | null) {
 
 function alternateAssetForLabel(frame: WebUploadFramePlan | null, label: string) {
   return frame?.misc.find((asset) => asset.label === label) ?? null;
+}
+
+function compactPath(path: string) {
+  const fileName = path.split("/").filter(Boolean).at(-1) ?? path;
+  if (fileName.length <= 38) {
+    return fileName;
+  }
+
+  return `${fileName.slice(0, 18)}…${fileName.slice(-17)}`;
 }
 
 function SmallLazyThumbnail({
@@ -104,7 +120,7 @@ function SmallLazyThumbnail({
           observer.disconnect();
         }
       },
-      { rootMargin: "80px" },
+      { rootMargin: "720px" },
     );
     observer.observe(element);
     return () => observer.disconnect();
@@ -146,6 +162,7 @@ function SmallLazyThumbnail({
           alt={alt}
           loading="lazy"
           decoding="async"
+          fetchPriority="low"
           sx={{
             display: "block",
             width: "100%",
@@ -179,8 +196,15 @@ function ImageCell({ muted = false, path, source }: ImageCellProps) {
       }}
     >
       <SmallLazyThumbnail alt={path} source={source} />
-      <Typography variant="body2" noWrap sx={{ minWidth: 0 }}>
-        {path}
+      <Typography
+        variant="body2"
+        noWrap
+        sx={{
+          minWidth: 0,
+          fontVariantNumeric: "tabular-nums",
+        }}
+      >
+        {compactPath(path)}
       </Typography>
     </Box>
   );
@@ -188,71 +212,219 @@ function ImageCell({ muted = false, path, source }: ImageCellProps) {
 
 function IssueStatus({ row }: { row: FramePreviewRow }) {
   if (row.hasError) {
-    return <Typography aria-label="错误">⛔</Typography>;
+    return <Typography aria-label="错误" sx={{ userSelect: "none" }}>⛔</Typography>;
   }
   if (row.hasWarning) {
-    return <Typography aria-label="警告">⚠️</Typography>;
+    return <Typography aria-label="警告" sx={{ userSelect: "none" }}>⚠️</Typography>;
   }
-  return <Typography aria-label="可用">✅</Typography>;
+  return <Typography aria-label="可用" sx={{ userSelect: "none" }}>✅</Typography>;
 }
 
 function ExpandedPreview({
+  frameId,
   frame,
+  onHeatmapTargetChange,
   urls,
 }: {
+  frameId: string;
   frame: WebUploadFramePlan;
+  onHeatmapTargetChange: (frameId: string, label: string) => void;
   urls: PreviewUrls | null;
 }) {
+  const heatmapTargets = [frame.after, ...frame.misc].map((asset) => ({
+    label: asset.label,
+    path: asset.source.relativePath,
+  }));
+  const selectedHeatmapTarget = frame.heatmapAfterLabel ?? frame.after.label;
+
   return (
     <Collapse in={Boolean(urls)} timeout={180} unmountOnExit>
       <Box
         sx={{
-          display: "grid",
-          gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" },
-          gap: 1,
           px: { xs: 1, md: 1.25 },
           pb: 1.15,
         }}
       >
-        {urls ? (
-          [
-            { label: "Before", src: urls.beforeUrl, path: frame.before.source.relativePath },
-            { label: "After", src: urls.afterUrl, path: frame.after.source.relativePath },
-          ].map((preview) => (
-            <Box
-              key={preview.label}
-              sx={{
-                overflow: "hidden",
-                border: "1px solid",
-                borderColor: "divider",
-                borderRadius: 1.5,
-                backgroundColor: "rgba(255,255,255,0.035)",
-              }}
-            >
-              <Box
-                component="img"
-                src={preview.src}
-                alt={`${frame.title} ${preview.label}`}
+        {!frame.heatmap && heatmapTargets.length > 1 ? (
+          <Stack
+            direction="row"
+            alignItems="center"
+            spacing={0.8}
+            sx={{ mb: 1, color: "text.secondary" }}
+          >
+            <Typography variant="caption">Heatmap</Typography>
+            <FormControl size="small" variant="outlined">
+              <Select
+                value={selectedHeatmapTarget}
+                onChange={(event) => onHeatmapTargetChange(frameId, event.target.value)}
                 sx={{
-                  display: "block",
-                  width: "100%",
-                  aspectRatio: "16 / 9",
-                  objectFit: "cover",
+                  height: 30,
+                  minWidth: 112,
+                  borderRadius: 1.25,
+                  "& .MuiSelect-select": {
+                    py: 0.35,
+                    fontSize: 13,
+                  },
                 }}
-              />
-              <Typography
-                variant="caption"
-                noWrap
-                title={preview.path}
-                sx={{ display: "block", px: 1, py: 0.65, color: "text.secondary" }}
               >
-                {preview.path}
-              </Typography>
-            </Box>
-          ))
+                {heatmapTargets.map((target) => (
+                  <MenuItem key={`${target.label}-${target.path}`} value={target.label}>
+                    {target.label}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </Stack>
+        ) : null}
+        {urls ? (
+          <Box
+            sx={{
+              display: "grid",
+              gridTemplateColumns: {
+                xs: "1fr",
+                sm: "repeat(auto-fit, minmax(160px, 1fr))",
+              },
+              gap: 1,
+            }}
+          >
+            {urls.items.map((preview) => (
+              <Box
+                key={preview.key}
+                sx={{
+                  overflow: "hidden",
+                  border: "1px solid",
+                  borderColor: "divider",
+                  borderRadius: 1.5,
+                  backgroundColor: "rgba(255,255,255,0.035)",
+                }}
+              >
+                <Box
+                  component="img"
+                  src={preview.url}
+                  alt={`${frame.title} ${preview.label}`}
+                  decoding="async"
+                  sx={{
+                    display: "block",
+                    width: "100%",
+                    aspectRatio: "16 / 9",
+                    objectFit: "cover",
+                  }}
+                />
+                <Typography
+                  variant="caption"
+                  noWrap
+                  title={preview.path}
+                  sx={{ display: "block", px: 1, py: 0.65, color: "text.secondary" }}
+                >
+                  {preview.label} · {compactPath(preview.path)}
+                </Typography>
+              </Box>
+            ))}
+          </Box>
         ) : null}
       </Box>
     </Collapse>
+  );
+}
+
+function EditableColumnHeader({
+  canEdit,
+  label,
+  onRename,
+}: {
+  canEdit: boolean;
+  label: string;
+  onRename: (currentLabel: string, nextLabel: string) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(label);
+
+  useEffect(() => {
+    if (!editing) {
+      setDraft(label);
+    }
+  }, [editing, label]);
+
+  function save() {
+    const nextLabel = draft.trim();
+    if (nextLabel && nextLabel !== label) {
+      onRename(label, nextLabel);
+    }
+    setEditing(false);
+  }
+
+  if (!canEdit) {
+    return <>{label}</>;
+  }
+
+  return (
+    <Box sx={{ display: "inline-flex", alignItems: "center", gap: 0.35, minWidth: 0 }}>
+      {editing ? (
+        <>
+          <Box
+            component="input"
+            value={draft}
+            aria-label={`编辑 ${label} 列名`}
+            onChange={(event) => setDraft(event.target.value)}
+            onClick={(event) => event.stopPropagation()}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                save();
+              }
+              if (event.key === "Escape") {
+                event.preventDefault();
+                setEditing(false);
+              }
+            }}
+            sx={{
+              width: "9ch",
+              minWidth: 0,
+              border: 0,
+              borderBottom: "1px solid currentColor",
+              outline: 0,
+              p: 0,
+              color: "inherit",
+              background: "transparent",
+              font: "inherit",
+            }}
+          />
+          <IconButton aria-label="保存列名" size="small" onClick={save} sx={{ width: 22, height: 22 }}>
+            <Check sx={{ fontSize: 15 }} />
+          </IconButton>
+          <IconButton
+            aria-label="取消编辑列名"
+            size="small"
+            onClick={() => setEditing(false)}
+            sx={{ width: 22, height: 22 }}
+          >
+            <Close sx={{ fontSize: 15 }} />
+          </IconButton>
+        </>
+      ) : (
+        <>
+          <Typography component="span" variant="inherit" noWrap sx={{ minWidth: 0 }}>
+            {label}
+          </Typography>
+          <IconButton
+            aria-label={`编辑 ${label} 列名`}
+            size="small"
+            onClick={(event) => {
+              event.stopPropagation();
+              setEditing(true);
+            }}
+            sx={{
+              width: 22,
+              height: 22,
+              opacity: 0.72,
+              "&:hover": { opacity: 1 },
+            }}
+          >
+            <EditOutlined sx={{ fontSize: 14 }} />
+          </IconButton>
+        </>
+      )}
+    </Box>
   );
 }
 
@@ -263,6 +435,7 @@ function SortablePairingRow({
   expanded,
   previewFrame,
   previewUrls,
+  onHeatmapTargetChange,
   onToggleExpanded,
 }: {
   row: FramePreviewRow;
@@ -271,6 +444,7 @@ function SortablePairingRow({
   expanded: boolean;
   previewFrame: WebUploadFramePlan | null;
   previewUrls: PreviewUrls | null;
+  onHeatmapTargetChange: (frameId: string, label: string) => void;
   onToggleExpanded: () => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({
@@ -399,7 +573,12 @@ function SortablePairingRow({
         />
       </Box>
       {previewFrame ? (
-        <ExpandedPreview frame={previewFrame} urls={expanded ? previewUrls : null} />
+        <ExpandedPreview
+          frameId={row.frameId}
+          frame={previewFrame}
+          urls={expanded ? previewUrls : null}
+          onHeatmapTargetChange={onHeatmapTargetChange}
+        />
       ) : null}
     </Box>
   );
@@ -412,6 +591,8 @@ export function PairingPreviewPanel({
   expandedFrameId,
   hasBlockingIssues,
   onExpandedFrameChange,
+  onHeatmapTargetChange,
+  onRenameColumn,
   onReorder,
 }: PairingPreviewPanelProps) {
   const sensors = useSensors(
@@ -447,12 +628,25 @@ export function PairingPreviewPanel({
 
     // Large upload directories can contain hundreds of frames. Keep object URLs scoped to the one
     // expanded row so preview inspection does not pin every source image in memory.
-    const beforeUrl = URL.createObjectURL(expandedFrame.before.source.file);
-    const afterUrl = URL.createObjectURL(expandedFrame.after.source.file);
-    setPreviewUrls({ beforeUrl, afterUrl });
+    const previewItems = [
+      { key: "before", label: "Before", asset: expandedFrame.before },
+      { key: "after", label: "After", asset: expandedFrame.after },
+      ...expandedFrame.misc.map((asset, index) => ({
+        key: `misc-${index}`,
+        label: asset.label,
+        asset,
+      })),
+    ].map((item) => ({
+      key: item.key,
+      label: item.label,
+      path: item.asset.source.relativePath,
+      url: URL.createObjectURL(item.asset.source.file),
+    }));
+    setPreviewUrls({ items: previewItems });
     return () => {
-      URL.revokeObjectURL(beforeUrl);
-      URL.revokeObjectURL(afterUrl);
+      for (const item of previewItems) {
+        URL.revokeObjectURL(item.url);
+      }
     };
   }, [expandedFrame]);
 
@@ -535,7 +729,11 @@ export function PairingPreviewPanel({
                 </Box>
                 {alternateColumns.map((label) => (
                   <Box key={label} component="span" sx={{ display: { xs: "none", md: "block" } }}>
-                    {label}
+                    <EditableColumnHeader
+                      canEdit={canReorder}
+                      label={label}
+                      onRename={onRenameColumn}
+                    />
                   </Box>
                 ))}
                 <Box component="span" sx={{ display: { xs: "none", md: "block" } }}>
@@ -552,6 +750,7 @@ export function PairingPreviewPanel({
                   expanded={expandedFrameId === row.frameId}
                   previewFrame={frameForId(plan, row.frameId)}
                   previewUrls={expandedFrameId === row.frameId ? previewUrls : null}
+                  onHeatmapTargetChange={onHeatmapTargetChange}
                   onToggleExpanded={() =>
                     onExpandedFrameChange(expandedFrameId === row.frameId ? null : row.frameId)
                   }
