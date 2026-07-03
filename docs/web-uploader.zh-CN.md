@@ -17,7 +17,7 @@
 - 扫描平铺或常见 before / after 目录结构。
 - 识别 `Before`、`After`、`Rip`、`NoDeband`、`Degrain` 等对比列。
 - `out` / `output` / `after` 作为主 `After`；`rip` 保持独立 `Rip` 列，不和 `After` 混淆。
-- `Before`、`After` 和备选列的表头都可以在上传前编辑；上传开始后锁定。
+- `Before`、`After` 和备选列的表头都可以在上传前编辑；上传开始后锁定。列名必须全局唯一，且不能命名为 `Heatmap`。
 - VSEditor 文件名允许带 `.gen.vpy` / `.m2ts` 等 source marker，也允许省略 marker。
 - VSEditor 文件名会显示为 `<episode>-<frame>`，长片名保留在 caption、文件名 tooltip 和目录信息里。
 - 右侧 `配对预览` 可展开单行预览，并在上传前拖拽调整 frame 顺序。
@@ -32,6 +32,7 @@
 - 右侧缩略图只在行接近视口或展开时创建 object URL，并在卸载时释放。
 - 重排序、列名修改、Heatmap 参考变化都会清空已生成缓存，保证 UI 顺序和最终上传顺序一致。
 - 上传 commit 仍串行收口，减少 SQLite 写入冲突。
+- 浏览器生成的缩略图和 heatmap 在上传前只存在于当前页面内存和 object URL 中；点击放弃会清掉本地缓存并取消远端 pending job，不会写入仓库或 `public/`。
 
 ## 命名与 slug
 

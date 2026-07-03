@@ -31,6 +31,9 @@
 - 上传性能瓶颈经常不是单个 PUT 的带宽，而是 presign / PUT 往返延迟。同一 frame 的 original / thumbnail / alternate 文件可以并发 PUT，但 frame commit 仍应串行，避免 SQLite 写入冲突。
 - 可编辑列名必须保持列语义唯一。不要允许备选列重命名为 `Before` / `After` / `Heatmap` 或现有列名，否则全局 heatmap 参考和表格阅读都会变得含糊。
 - 上传页局部样式超过三处复用时先抽本地 tokens / primitives。面板 surface、控件圆角、列表行、缩略图这类语义稳定的值不要继续散落在 `sx` 里。
+- 站点级 header action 要同源。Catalog、Case workspace、Upload 的返回、上传、部署、新建入口应共享相近高度、圆角和文案权重，避免某一页出现“嵌套胶囊按钮”或孤立按钮组。
+- Dialog 不是普通表单套壳。`新建 Case` 这类高频 internal 操作要继承工作台 surface、divider、字段密度和 action hierarchy，不能退回默认浅色 MUI 弹窗。
+- 版本号、commit hash 属于低权重运行信息。它应和 footer copyright 同级显示，不应因为字号、字重或间距看起来像另一个品牌或状态标签。
 
 ## P1
 

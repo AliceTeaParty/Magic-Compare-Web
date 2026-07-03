@@ -299,7 +299,8 @@ Web 上传链路是：
 
 - internal-site 和 public-site 的全局 footer 通过 `packages/ui` 共享。
 - Next config 在构建时读取根 `package.json` 的 `version` 和当前 git 短 hash，注入为 `MAGIC_COMPARE_APP_VERSION` / `MAGIC_COMPARE_COMMIT_SHA`。
-- footer 显示为 `v<version> <hash>`；如果构建环境没有 git 信息，只显示 `v<version>`。
+- footer 显示为 `v<version>-<hash>`；如果构建环境没有 git 信息，只显示 `v<version>`。
+- 版本文本必须和 copyright 使用同级字号、字重和颜色，不要做成独立 badge 或高对比标签。
 
 ### 上传链路当前的内部分层
 
@@ -467,6 +468,25 @@ Web 上传链路是：
 
 - `docs/archive/2026-03-20-viewer-stage-and-filmstrip-notes.zh-CN.md`
 - `docs/archive/2026-03-20-frontend-refresh.zh-CN.md`
+
+### 6. 发版前先分清“功能提交”和“发版提交”
+
+`v1.9.1` 的经验是：功能修正和版本号 / CHANGELOG 可以连续完成，但不要揉进同一个提交。
+
+推荐顺序：
+
+1. 先提交功能、UI、文档修正。
+2. 再提交 `CHANGELOG.md`、根 `package.json`、`tools/uploader/pyproject.toml` 的发版元数据。
+3. 在发版提交上打 `vX.Y.Z` annotated tag。
+4. 分步推送 `main` 和 tag。
+5. 用 `gh run list` 确认 `CI`、`GHCR Docker`、`Dependency Graph` 等远端任务状态。
+6. 如果 GitHub Release 没有自动生成，用 CHANGELOG 对应版本段创建 release notes。
+
+经验教训：
+
+- 本地 `pnpm lint`、`pnpm typecheck`、`pnpm test` 都通过，只代表源码状态；tag 推送后仍要看 GitHub Actions，因为 Docker/GHCR 是远端路径。
+- 页脚 commit hash 来自构建时 git 状态，dev server 已经启动时不会自动刷新这类构建时 metadata。
+- GitHub push 可能返回 Dependabot 漏洞摘要，这不是发版失败；但应作为后续安全维护项单独处理。
 
 ## 给 CI / Docker 发布线程的建议
 
