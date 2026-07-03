@@ -6,6 +6,27 @@ Entries before that date are summarized at release level instead of being recons
 
 ## Unreleased
 
+## v1.9.1 - 2026-07-03
+
+Web uploader and internal UI polish release. This patch tightens browser-side upload recognition, adds visible build metadata, and brings Case workspace/catalog controls back into one product vocabulary.
+
+### Added
+
+- Added footer build metadata for both internal-site and public-site, showing the root package version and short git hash such as `v1.9.1-abc123`.
+
+### Changed
+
+- Changed Web upload structured filename parsing so VSEditor-style frame names may omit `.gen.vpy` / `.m2ts` while preserving the existing pairing and `Rip` handling rules.
+- Changed Web upload structured frame labels from `EP<episode>-<frame>` to `<episode>-<frame>`.
+- Changed Web upload pairing-preview headers so `Before` and `After` columns can be renamed like alternate comparison columns.
+- Reworked the Case workspace header actions to match the catalog/upload header button vocabulary instead of using a nested action capsule.
+- Reworked the internal catalog `新建 Case` dialog to use the same dark workbench surface, field treatment, spacing, and action hierarchy as the rest of the internal UI.
+
+### Fixed
+
+- Fixed Case workspace top-action copy consistency by localizing `Back to catalog` and `Deploy Pages` to `返回` and `部署 Pages`.
+- Fixed footer version text styling so version/hash metadata uses the same font size, weight, and color as the copyright line.
+
 ## v1.9.0 - 2026-07-02
 
 Web upload and internal operations release. This version moves the main upload path into the browser, expands Case workspace management, and keeps the legacy Python uploader in FINAL maintenance mode.
