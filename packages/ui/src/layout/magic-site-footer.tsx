@@ -2,6 +2,8 @@ import { Box, Link as MuiLink, Stack, Typography } from "@mui/material";
 
 export interface MagicSiteFooterProps {
   author: string;
+  appVersion?: string | null;
+  commitHash?: string | null;
   joinUsLabel?: string | null;
   joinUsUrl?: string | null;
   yearEnd: number;
@@ -10,12 +12,17 @@ export interface MagicSiteFooterProps {
 
 export function MagicSiteFooter({
   author,
+  appVersion,
+  commitHash,
   joinUsLabel,
   joinUsUrl,
   yearEnd,
   yearStart,
 }: MagicSiteFooterProps) {
   const yearLabel = yearStart === yearEnd ? `${yearEnd}` : `${yearStart}-${yearEnd}`;
+  const versionLabel = appVersion
+    ? `v${appVersion}${commitHash ? `-${commitHash}` : ""}`
+    : null;
 
   return (
     <Box
@@ -49,10 +56,26 @@ export function MagicSiteFooter({
             color="text.secondary"
             sx={{
               fontSize: "0.8rem",
+              fontWeight: 400,
               letterSpacing: "0.01em",
             }}
           >
             © {yearLabel} {author}. All Rights Reserved.
+            {versionLabel ? (
+              <>
+                {" · "}
+                <Box
+                  component="span"
+                  sx={{
+                    display: "inline-block",
+                    font: "inherit",
+                    fontVariantNumeric: "tabular-nums",
+                  }}
+                >
+                  {versionLabel}
+                </Box>
+              </>
+            ) : null}
           </Typography>
           {joinUsUrl && joinUsLabel ? (
             <MuiLink

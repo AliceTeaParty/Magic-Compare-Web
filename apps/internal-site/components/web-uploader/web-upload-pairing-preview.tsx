@@ -58,6 +58,7 @@ import {
   compactUploadFilename,
   type FramePreviewRow,
   type PlanView,
+  type UploadPlanImageColumn,
 } from "./web-upload-view-model";
 
 const PANEL_TRANSITION = `background-color ${webUploadMotion.standard}`;
@@ -81,7 +82,7 @@ interface PairingPreviewPanelProps {
   hasBlockingIssues: boolean;
   onExpandedFrameChange: (frameId: string | null) => void;
   onHeatmapReferenceChange: (label: string) => void;
-  onRenameColumn: (currentLabel: string, nextLabel: string) => void;
+  onRenameColumn: (column: UploadPlanImageColumn, nextLabel: string) => void;
   onReorder: (activeFrameId: string, overFrameId: string | null) => void;
 }
 
@@ -589,8 +590,8 @@ export function PairingPreviewPanel({
     // Large upload directories can contain hundreds of frames. Keep object URLs scoped to the one
     // expanded row so preview inspection does not pin every source image in memory.
     const previewItems = [
-      { key: "before", label: "Before", asset: expandedFrame.before },
-      { key: "after", label: "After", asset: expandedFrame.after },
+      { key: "before", label: expandedFrame.before.label, asset: expandedFrame.before },
+      { key: "after", label: expandedFrame.after.label, asset: expandedFrame.after },
       ...expandedFrame.misc.map((asset, index) => ({
         key: `misc-${index}`,
         label: asset.label,
@@ -706,17 +707,25 @@ export function PairingPreviewPanel({
                 <span>序号</span>
                 <span>Frame</span>
                 <Box component="span" sx={{ display: { xs: "none", md: "block" } }}>
-                  Before
+                  <EditableColumnHeader
+                    canEdit={canReorder}
+                    label={planView.beforeLabel}
+                    onRename={(_label, nextLabel) => onRenameColumn({ kind: "before" }, nextLabel)}
+                  />
                 </Box>
                 <Box component="span" sx={{ display: { xs: "none", md: "block" } }}>
-                  After
+                  <EditableColumnHeader
+                    canEdit={canReorder}
+                    label={planView.afterLabel}
+                    onRename={(_label, nextLabel) => onRenameColumn({ kind: "after" }, nextLabel)}
+                  />
                 </Box>
                 {alternateColumns.map((label) => (
                   <Box key={label} component="span" sx={{ display: { xs: "none", md: "block" } }}>
                     <EditableColumnHeader
                       canEdit={canReorder}
                       label={label}
-                      onRename={onRenameColumn}
+                      onRename={(_label, nextLabel) => onRenameColumn({ kind: "misc", label }, nextLabel)}
                     />
                   </Box>
                 ))}

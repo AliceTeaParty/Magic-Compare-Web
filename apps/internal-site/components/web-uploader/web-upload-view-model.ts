@@ -22,6 +22,8 @@ export interface PlanView {
   sourceRootName: string;
   suggestedGroupSlug: string;
   suggestedGroupTitle: string;
+  beforeLabel: string;
+  afterLabel: string;
   heatmapReferenceLabel: string;
   heatmapReferenceOptions: string[];
   frames: FramePreviewRow[];
@@ -31,6 +33,11 @@ export interface PlanView {
   errorCount: number;
   issues: Array<{ severity: "warning" | "error"; message: string; path: string }>;
 }
+
+export type UploadPlanImageColumn =
+  | { kind: "before" }
+  | { kind: "after" }
+  | { kind: "misc"; label: string };
 
 function stableHash(value: string) {
   let hash = 5381;
@@ -130,6 +137,8 @@ export function buildPlanView(plan: WebUploadPlan): PlanView {
     sourceRootName: plan.sourceRootName,
     suggestedGroupSlug: plan.suggestedGroupSlug,
     suggestedGroupTitle: plan.suggestedGroupTitle,
+    beforeLabel: plan.frames[0]?.before.label ?? "Before",
+    afterLabel: plan.frames[0]?.after.label ?? "After",
     heatmapReferenceLabel: plan.heatmapReferenceLabel,
     heatmapReferenceOptions,
     frames,
@@ -147,34 +156,66 @@ export function buildPlanView(plan: WebUploadPlan): PlanView {
 
 export function renameUploadPlanAssetLabel(
   plan: WebUploadPlan,
-  currentLabel: string,
+  column: UploadPlanImageColumn,
   nextLabel: string,
 ) {
   const normalizedLabel = nextLabel.trim();
-  if (!normalizedLabel || normalizedLabel === currentLabel) {
+  const currentLabel =
+    column.kind === "before"
+      ? plan.frames[0]?.before.label
+      : column.kind === "after"
+        ? plan.frames[0]?.after.label
+        : column.label;
+  if (!currentLabel || !normalizedLabel || normalizedLabel === currentLabel) {
     return null;
   }
-  const reservedLabels = new Set(["Before", "After", "Heatmap"]);
+  const currentColumnLabels =
+    column.kind === "before"
+      ? plan.frames.map((frame) => frame.before.label)
+      : column.kind === "after"
+        ? plan.frames.map((frame) => frame.after.label)
+        : [column.label];
+  const currentLabelSet = new Set(currentColumnLabels.map((label) => label.toLowerCase()));
   const existingLabels = new Set(
-    plan.frames.flatMap((frame) => frame.misc.map((asset) => asset.label)),
+    plan.frames
+      .flatMap((frame) => [frame.before.label, frame.after.label, ...frame.misc.map((asset) => asset.label)])
+      .filter((label) => !currentLabelSet.has(label.toLowerCase()))
+      .map((label) => label.toLowerCase()),
   );
-  existingLabels.delete(currentLabel);
-  // Column labels also feed the global heatmap selector, so aliases must stay unique and distinct
-  // from the built-in image roles.
-  if (reservedLabels.has(normalizedLabel) || existingLabels.has(normalizedLabel)) {
+  // Column labels drive table headers and the global heatmap selector, so keep them unique. The
+  // target role is explicit because older scans can contain a misc column also named "After".
+  if (normalizedLabel.toLowerCase() === "heatmap" || existingLabels.has(normalizedLabel.toLowerCase())) {
     return null;
   }
+  const hasBuiltInColumnWithCurrentLabel = plan.frames.some(
+    (frame) =>
+      frame.before.label === currentLabel ||
+      frame.after.label === currentLabel,
+  );
+  const shouldRenameHeatmapReference =
+    plan.heatmapReferenceLabel === currentLabel &&
+    (column.kind !== "misc" || !hasBuiltInColumnWithCurrentLabel);
 
   return {
     ...plan,
     heatmapReferenceLabel:
-      plan.heatmapReferenceLabel === currentLabel
+      shouldRenameHeatmapReference
         ? normalizedLabel
         : plan.heatmapReferenceLabel,
     frames: plan.frames.map((frame) => ({
       ...frame,
+      before:
+        column.kind === "before"
+          ? { ...frame.before, label: normalizedLabel }
+          : frame.before,
+      after:
+        column.kind === "after"
+          ? { ...frame.after, label: normalizedLabel }
+          : frame.after,
       misc: frame.misc.map((asset) =>
-        asset.label === currentLabel ? { ...asset, label: normalizedLabel } : asset,
+        column.kind === "misc" && asset.label === column.label
+          ? { ...asset, label: normalizedLabel }
+          : asset,
       ),
     })),
   };

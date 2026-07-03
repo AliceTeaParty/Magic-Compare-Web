@@ -3,13 +3,16 @@
 import { useState, useTransition } from "react";
 import { Add } from "@mui/icons-material";
 import {
+  Box,
   Button,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
+  Divider,
   Stack,
   TextField,
+  Typography,
 } from "@mui/material";
 import { cjkKebabCase } from "@magic-compare/shared-utils";
 import { useRouter } from "next/navigation";
@@ -19,6 +22,15 @@ import { useAppNotifications } from "./notifications/use-app-notifications";
 const DEFAULT_CASE_SLUG = "new-case";
 const DEFAULT_CASE_TITLE = "New Case";
 const CASE_SUMMARY_MAX_LENGTH = 160;
+const caseDialogFieldSx = {
+  "& .MuiOutlinedInput-root": {
+    borderRadius: 1.5,
+    backgroundColor: "rgba(255,255,255,0.035)",
+  },
+  "& .MuiFormHelperText-root": {
+    mx: 0,
+  },
+} as const;
 
 function normalizeSlug(value: string) {
   return cjkKebabCase(value, DEFAULT_CASE_SLUG);
@@ -111,15 +123,43 @@ export function CaseCreateButton() {
       >
         新建 Case
       </Button>
-      <Dialog open={open} onClose={closeDialog} fullWidth maxWidth="sm">
-        <DialogTitle>新建 Case</DialogTitle>
-        <DialogContent>
-          <Stack spacing={2.1} sx={{ pt: 0.75 }}>
+      <Dialog
+        open={open}
+        onClose={closeDialog}
+        fullWidth
+        maxWidth="sm"
+        PaperProps={{
+          elevation: 0,
+          sx: {
+            borderRadius: 3,
+            border: "1px solid",
+            borderColor: "divider",
+            background:
+              "linear-gradient(180deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.025) 100%), #081838",
+            overflow: "hidden",
+          },
+        }}
+      >
+        <DialogTitle sx={{ px: { xs: 2, sm: 2.4 }, pt: 2.1, pb: 1.2 }}>
+          <Stack spacing={0.45}>
+            <Typography variant="h6" component="span">
+              新建 Case
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              先创建内部工作区，上传和发布保持独立操作。
+            </Typography>
+          </Stack>
+        </DialogTitle>
+        <Divider />
+        <DialogContent sx={{ px: { xs: 2, sm: 2.4 }, py: 2.2 }}>
+          <Stack spacing={1.75}>
             <TextField
               label="标题"
               value={title}
               disabled={isPending}
               autoFocus
+              fullWidth
+              sx={caseDialogFieldSx}
               onChange={(event) => {
                 const nextTitle = event.target.value;
                 setTitle(nextTitle);
@@ -133,6 +173,8 @@ export function CaseCreateButton() {
               value={slug}
               disabled={isPending}
               helperText="用于内部路由，保存后不在此处修改。"
+              fullWidth
+              sx={caseDialogFieldSx}
               onChange={(event) => {
                 setSlugTouched(true);
                 setSlug(normalizeSlug(event.target.value));
@@ -144,17 +186,45 @@ export function CaseCreateButton() {
               disabled={isPending}
               multiline
               minRows={3}
-              helperText={`${summary.length}/${CASE_SUMMARY_MAX_LENGTH}`}
+              helperText={
+                <Box
+                  component="span"
+                  sx={{
+                    color: hasSummaryError ? "error.main" : "text.secondary",
+                    display: "block",
+                    fontVariantNumeric: "tabular-nums",
+                    textAlign: "right",
+                  }}
+                >
+                  {summary.length}/{CASE_SUMMARY_MAX_LENGTH}
+                </Box>
+              }
               error={hasSummaryError}
+              fullWidth
+              sx={caseDialogFieldSx}
               onChange={(event) => setSummary(event.target.value)}
             />
           </Stack>
         </DialogContent>
-        <DialogActions>
-          <Button onClick={closeDialog} disabled={isPending}>
+        <DialogActions
+          sx={{
+            borderTop: "1px solid",
+            borderColor: "divider",
+            gap: 1,
+            justifyContent: "flex-end",
+            px: { xs: 2, sm: 2.4 },
+            py: 1.55,
+          }}
+        >
+          <Button onClick={closeDialog} disabled={isPending} sx={{ minHeight: 40 }}>
             取消
           </Button>
-          <Button onClick={submitCase} disabled={isPending || !canSubmit}>
+          <Button
+            variant="contained"
+            onClick={submitCase}
+            disabled={isPending || !canSubmit}
+            sx={{ minHeight: 40 }}
+          >
             创建
           </Button>
         </DialogActions>

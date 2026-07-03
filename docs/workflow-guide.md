@@ -279,7 +279,7 @@ Web 上传链路是：
 - Web 上传和 legacy uploader 都不把图先落到 internal-site 本地目录，也不调用服务器二进制上传代理
 - Web 上传的 `File` / `Blob` 不进入 React state；React 只保存轻量渲染模型
 - Web 上传的 heatmap 参考是全局设置，只能选择所有 frame 都存在的列
-- Web 上传的 VSEditor 行标题使用 `EP<episode>-<frame>`，长片名保留在 caption / tooltip 中
+- Web 上传的 VSEditor 行标题使用 `<episode>-<frame>`，长片名保留在 caption / tooltip 中
 - 远端内部站只支持 Cloudflare Service Token，不再走 `cloudflared` 人工登录链路
 - 新上传对象统一放在 `/groups/<group-storage-uuid>/<frame-order>/<frame-revision-uuid>/...`
 - 已存在的 case metadata 仍以数据库为准；uploader 不会覆盖已有 case 的 title / summary / tags
@@ -294,6 +294,12 @@ Web 上传链路是：
 - legacy `sync` 命令仍保持轻量输出，不显示同等复杂的实时进度 UI
 - legacy uploader 会复用一个共享 HTTP client，并用流式 PUT 上传文件，避免大图整文件读入内存
 - Web 上传和 legacy uploader 都可以并发处理多个 frame 的 prepare/upload，但 commit 仍串行执行，避免 internal-site 的 SQLite 写冲突
+
+## 页脚版本信息
+
+- internal-site 和 public-site 的全局 footer 通过 `packages/ui` 共享。
+- Next config 在构建时读取根 `package.json` 的 `version` 和当前 git 短 hash，注入为 `MAGIC_COMPARE_APP_VERSION` / `MAGIC_COMPARE_COMMIT_SHA`。
+- footer 显示为 `v<version> <hash>`；如果构建环境没有 git 信息，只显示 `v<version>`。
 
 ### 上传链路当前的内部分层
 

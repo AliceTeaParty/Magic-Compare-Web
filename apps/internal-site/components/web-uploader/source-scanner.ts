@@ -56,7 +56,7 @@ const IGNORED_SUFFIXES = new Set([".json", ".yaml", ".yml", ".txt", ".md", ".csv
 const FILENAME_RE = /(?<prefix>.+?)[_\-.](?<frame>\d+)(?:[_\-.](?<variant>[^_\-.]+))?$/;
 const FALLBACK_FILENAME_RE = /^(?<frame>\d+)(?<variant>[A-Za-z][A-Za-z0-9]*)$/;
 const STRUCTURED_SOURCE_FILENAME_RE =
-  /^(?:(?<fps>\d{2})_)?(?<title>.+)_(?<episode>\d+)\.(?<sourceMarker>[^-]+)-(?<frame>\d+)-(?<variant>[^_\-.]+)$/i;
+  /^(?:(?<fps>\d{2})_)?(?<title>.+)_(?<episode>\d+)(?:\.(?<sourceMarker>[^-]+))?-(?<frame>\d+)-(?<variant>[^_\-.]+)$/i;
 const GROUP_SUFFIX_NOISE_RE = /(?:[_\-. ]+\d{4,5}[_\-. ]+(?:gen[_\-. ]+vpy|m2ts|mkv|mp4|ts))$/i;
 const MATCH_KEY_SUFFIX_RE = new RegExp(
   `(?:[_\\-. ]+(?:${MATCH_KEY_VARIANTS.join("|")}))+$`,
@@ -401,7 +401,7 @@ function formatCandidateFrameTitle(
       structuredEpisodeWidth,
       "0",
     );
-    return `EP${episode}-${candidate.frameNumber}`;
+    return `${episode}-${candidate.frameNumber}`;
   }
 
   return candidate.title;

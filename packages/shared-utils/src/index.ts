@@ -7,6 +7,8 @@ export const PUBLISHED_ROOT_ENV_NAME = "MAGIC_COMPARE_PUBLISHED_ROOT";
 
 export interface FooterConfig {
   author: string;
+  appVersion: string | null;
+  commitHash: string | null;
   joinUsLabel: string | null;
   joinUsUrl: string | null;
   yearEnd: number;
@@ -93,6 +95,8 @@ export function resolveFooterConfig(
 
   return {
     author: env.MAGIC_COMPARE_FOOTER_AUTHOR?.trim() || "Magic Compare",
+    appVersion: env.MAGIC_COMPARE_APP_VERSION?.trim() || null,
+    commitHash: env.MAGIC_COMPARE_COMMIT_SHA?.trim() || null,
     joinUsLabel: joinUsUrl ? env.MAGIC_COMPARE_FOOTER_JOIN_US_LABEL?.trim() || "Join us" : null,
     joinUsUrl,
     yearEnd: currentYear,

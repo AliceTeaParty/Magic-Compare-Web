@@ -17,7 +17,9 @@
 - 扫描平铺或常见 before / after 目录结构。
 - 识别 `Before`、`After`、`Rip`、`NoDeband`、`Degrain` 等对比列。
 - `out` / `output` / `after` 作为主 `After`；`rip` 保持独立 `Rip` 列，不和 `After` 混淆。
-- VSEditor 文件名会显示为 `EP<episode>-<frame>`，长片名保留在 caption、文件名 tooltip 和目录信息里。
+- `Before`、`After` 和备选列的表头都可以在上传前编辑；上传开始后锁定。
+- VSEditor 文件名允许带 `.gen.vpy` / `.m2ts` 等 source marker，也允许省略 marker。
+- VSEditor 文件名会显示为 `<episode>-<frame>`，长片名保留在 caption、文件名 tooltip 和目录信息里。
 - 右侧 `配对预览` 可展开单行预览，并在上传前拖拽调整 frame 顺序。
 - Heatmap 参考是全局设置，只显示每个 frame 都存在的列，避免部分行静默 fallback。
 - 生成缩略图和缺失 heatmap 后，走 `group-upload-start -> prepare -> presigned PUT -> commit -> complete`。

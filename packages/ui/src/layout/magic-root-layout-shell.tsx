@@ -26,7 +26,13 @@ const bodyFont = IBM_Plex_Sans({
 const rootClassName = `${displayFontSc.variable} ${displayFontJp.variable} ${bodyFont.variable}`;
 
 export function MagicRootLayoutShell({ children }: { children: ReactNode }) {
-  const footerConfig = resolveFooterConfig(process.env);
+  const footerConfig = resolveFooterConfig({
+    ...process.env,
+    // Next config env values are statically inlined for direct property reads, but not when a
+    // helper receives the dynamic process.env object wholesale.
+    MAGIC_COMPARE_APP_VERSION: process.env.MAGIC_COMPARE_APP_VERSION,
+    MAGIC_COMPARE_COMMIT_SHA: process.env.MAGIC_COMPARE_COMMIT_SHA,
+  });
 
   return (
     <html lang="en" className={rootClassName}>

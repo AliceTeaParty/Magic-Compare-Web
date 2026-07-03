@@ -141,7 +141,7 @@ describe("scanBrowserUploadFiles", () => {
     );
 
     expect(plan.frames).toHaveLength(1);
-    expect(plan.frames[0].title).toBe("EP0-27240");
+    expect(plan.frames[0].title).toBe("0-27240");
     expect(plan.frames[0].caption).toContain("WATANARE ANIME VOL1");
     expect(plan.frames[0].after.label).toBe("After");
     expect(plan.frames[0].after.source.relativePath).toBe(
@@ -162,7 +162,7 @@ describe("scanBrowserUploadFiles", () => {
     );
 
     expect(plan.suggestedGroupSlug).toBe("ceshimulu");
-    expect(plan.frames.map((frame) => frame.title)).toEqual(["EP00-2183", "EP12-27240"]);
+    expect(plan.frames.map((frame) => frame.title)).toEqual(["00-2183", "12-27240"]);
   });
 
   it("recognizes structured encode filenames with m2ts markers and no fps prefix", () => {
@@ -176,7 +176,24 @@ describe("scanBrowserUploadFiles", () => {
     );
 
     expect(plan.frames).toHaveLength(1);
-    expect(plan.frames[0].title).toBe("EP0-27240");
+    expect(plan.frames[0].title).toBe("0-27240");
+    expect(plan.frames[0].caption).toContain("WATANARE ANIME VOL1");
+    expect(plan.frames[0].after.label).toBe("After");
+    expect(plan.frames[0].misc.map((asset) => asset.label)).toEqual(["Rip"]);
+  });
+
+  it("recognizes structured encode filenames without an explicit source marker", () => {
+    const plan = scanBrowserUploadFiles(
+      [
+        image("24_WATANARE_ANIME_VOL1_00000-27240-src.png"),
+        image("24_WATANARE_ANIME_VOL1_00000-27240-output.png"),
+        image("24_WATANARE_ANIME_VOL1_00000-27240-rip.png"),
+      ],
+      "20260702",
+    );
+
+    expect(plan.frames).toHaveLength(1);
+    expect(plan.frames[0].title).toBe("0-27240");
     expect(plan.frames[0].caption).toContain("WATANARE ANIME VOL1");
     expect(plan.frames[0].after.label).toBe("After");
     expect(plan.frames[0].misc.map((asset) => asset.label)).toEqual(["Rip"]);
@@ -192,7 +209,7 @@ describe("scanBrowserUploadFiles", () => {
     );
 
     expect(plan.frames).toHaveLength(1);
-    expect(plan.frames[0].title).toBe("EP0-27240");
+    expect(plan.frames[0].title).toBe("0-27240");
     expect(plan.frames[0].before.source.relativePath).toBe(
       "24_WATANARE_ANIME_VOL1_00000.gen.vpy-27240-src.png",
     );

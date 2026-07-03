@@ -130,13 +130,44 @@ describe("web upload view model", () => {
     };
     originalPlan.heatmapReferenceLabel = "Rip";
 
-    const renamed = renameUploadPlanAssetLabel(originalPlan, "Rip", "Encode");
+    const renamed = renameUploadPlanAssetLabel(
+      originalPlan,
+      { kind: "misc", label: "Rip" },
+      "Encode",
+    );
 
     expect(renamed?.frames[0].misc[0].label).toBe("Encode");
     expect(renamed?.heatmapReferenceLabel).toBe("Encode");
   });
 
-  it("rejects alternate column labels that collide with built-in or existing labels", () => {
+  it("renames the before column label in the upload plan", () => {
+    const originalPlan = plan();
+
+    const renamed = renameUploadPlanAssetLabel(originalPlan, { kind: "before" }, "Source");
+
+    expect(renamed?.frames.map((item) => item.before.label)).toEqual([
+      "Source",
+      "Source",
+      "Source",
+    ]);
+    expect(buildPlanView(renamed!).beforeLabel).toBe("Source");
+  });
+
+  it("renames the after column label and keeps the heatmap reference aligned", () => {
+    const originalPlan = plan();
+
+    const renamed = renameUploadPlanAssetLabel(originalPlan, { kind: "after" }, "Output");
+
+    expect(renamed?.frames.map((item) => item.after.label)).toEqual([
+      "Output",
+      "Output",
+      "Output",
+    ]);
+    expect(renamed?.heatmapReferenceLabel).toBe("Output");
+    expect(getUploadPlanHeatmapReferenceOptions(renamed!)).toEqual(["Output"]);
+  });
+
+  it("rejects image column labels that collide with existing labels or Heatmap", () => {
     const originalPlan = plan();
     originalPlan.frames[0] = {
       ...originalPlan.frames[0],
@@ -146,8 +177,11 @@ describe("web upload view model", () => {
       ],
     };
 
-    expect(renameUploadPlanAssetLabel(originalPlan, "Rip", "After")).toBeNull();
-    expect(renameUploadPlanAssetLabel(originalPlan, "Rip", "Degrain")).toBeNull();
+    expect(renameUploadPlanAssetLabel(originalPlan, { kind: "before" }, "")).toBeNull();
+    expect(renameUploadPlanAssetLabel(originalPlan, { kind: "before" }, "After")).toBeNull();
+    expect(renameUploadPlanAssetLabel(originalPlan, { kind: "after" }, "Rip")).toBeNull();
+    expect(renameUploadPlanAssetLabel(originalPlan, { kind: "misc", label: "Rip" }, "Degrain")).toBeNull();
+    expect(renameUploadPlanAssetLabel(originalPlan, { kind: "misc", label: "Rip" }, "Heatmap")).toBeNull();
   });
 
   it("only exposes global heatmap references available on every frame", () => {

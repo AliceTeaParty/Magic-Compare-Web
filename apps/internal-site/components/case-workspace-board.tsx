@@ -209,13 +209,13 @@ export function CaseWorkspaceBoard({
           <Box
             sx={{
               display: "grid",
-              gap: { xs: 2.1, xl: 2.6 },
-              alignItems: "start",
-              // Giving header content and page actions their own columns prevents deploy/navigation
-              // controls from visually blending into the case summary and status chips.
+              gap: { xs: 1.5, md: 2 },
+              alignItems: "end",
+              // Match catalog/upload header structure so page-level actions keep one shared
+              // vocabulary instead of living in a separate nested control container.
               gridTemplateColumns: {
                 xs: "1fr",
-                xl: "minmax(0, 1.3fr) minmax(280px, 0.72fr)",
+                md: "minmax(0, 1fr) auto",
               },
               pb: { xs: 2.8, md: 3.2 },
               borderBottom: "1px solid",
@@ -357,55 +357,33 @@ export function CaseWorkspaceBoard({
               </Stack>
             </Stack>
             <Stack
-              spacing={1.15}
+              direction="row"
+              spacing={1}
+              alignItems="center"
+              justifyContent={{ xs: "flex-start", md: "flex-end" }}
+              flexWrap="wrap"
+              useFlexGap
               sx={{
-                justifySelf: "end",
+                justifySelf: { xs: "start", md: "end" },
                 "& .MuiButton-root": {
                   minHeight: 42,
                   px: 2.1,
                 },
               }}
             >
-              <Stack
-                direction="row"
-                spacing={1}
-                alignItems="center"
-                justifyContent="flex-end"
-                flexWrap="wrap"
-                useFlexGap
-                sx={{
-                  // Match the lighter nested treatment used by the group visibility control so
-                  // page-level actions feel embedded in the header instead of wrapped by a card.
-                  // The container stays width-fit so the two actions hug each other instead of
-                  // stretching across the whole header like a secondary content column.
-                  width: "fit-content",
-                  maxWidth: "100%",
-                  alignSelf: "flex-end",
-                  p: 0.45,
-                  borderRadius: 999,
-                  border: "1px solid",
-                  borderColor: "divider",
-                  backgroundColor: "rgba(255,255,255,0.028)",
-                }}
-              >
                 <Button
                   variant="text"
                   startIcon={<ArrowBack />}
                   onClick={navigateToCatalog}
                   sx={{
                     color: "text.secondary",
-                    px: 1.2,
-                    borderRadius: 999,
-                    backgroundColor: "transparent",
-                    border: "1px solid transparent",
                     "&:hover": {
                       color: "text.primary",
-                      borderColor: "rgba(232, 198, 246, 0.26)",
                       backgroundColor: "rgba(255,255,255,0.04)",
                     },
                   }}
                 >
-                  Back to catalog
+                  返回
                 </Button>
                 <Button
                   component={Link}
@@ -427,7 +405,7 @@ export function CaseWorkspaceBoard({
                   title={
                     canDeployPublicSite
                       ? ""
-                      : "Deploy Pages is disabled until Cloudflare Pages env is configured."
+                      : "配置 Cloudflare Pages 环境后才能部署。"
                   }
                 >
                   <span>
@@ -442,11 +420,10 @@ export function CaseWorkspaceBoard({
                       }
                       onClick={deployPublicSite}
                     >
-                      Deploy Pages
+                      部署 Pages
                     </Button>
                   </span>
                 </Tooltip>
-              </Stack>
             </Stack>
           </Box>
         </Stack>

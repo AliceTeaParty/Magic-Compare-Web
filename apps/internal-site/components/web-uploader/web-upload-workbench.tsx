@@ -61,6 +61,7 @@ import {
   reorderUploadPlan,
   setUploadPlanHeatmapReference,
   type PlanView,
+  type UploadPlanImageColumn,
 } from "./web-upload-view-model";
 
 const DEFAULT_NEW_CASE_SLUG = "new-case";
@@ -805,13 +806,13 @@ export function WebUploadWorkbench({
     setPlanView(buildPlanView(nextPlan));
   }
 
-  function renamePairingColumn(currentLabel: string, nextLabel: string) {
+  function renamePairingColumn(column: UploadPlanImageColumn, nextLabel: string) {
     const plan = planRef.current;
     if (!plan || snapshot.stage !== "scanned") {
       return;
     }
 
-    applyPlanUpdate(renameUploadPlanAssetLabel(plan, currentLabel, nextLabel));
+    applyPlanUpdate(renameUploadPlanAssetLabel(plan, column, nextLabel));
   }
 
   function changeHeatmapReference(nextLabel: string) {
