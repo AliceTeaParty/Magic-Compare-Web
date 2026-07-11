@@ -57,6 +57,7 @@ import type {
 } from "./web-upload-types";
 import {
   buildPlanView,
+  fallbackUploadPlanFrameTitles,
   renameUploadPlanAssetLabel,
   reorderUploadPlan,
   setUploadPlanHeatmapReference,
@@ -815,6 +816,15 @@ export function WebUploadWorkbench({
     applyPlanUpdate(renameUploadPlanAssetLabel(plan, column, nextLabel));
   }
 
+  function fallbackPairingFrameTitles() {
+    const plan = planRef.current;
+    if (!plan || snapshot.stage !== "scanned") {
+      return;
+    }
+
+    applyPlanUpdate(fallbackUploadPlanFrameTitles(plan));
+  }
+
   function changeHeatmapReference(nextLabel: string) {
     const plan = planRef.current;
     if (!plan || snapshot.stage !== "scanned") {
@@ -1085,6 +1095,7 @@ export function WebUploadWorkbench({
             hasBlockingIssues={hasBlockingIssues}
             onExpandedFrameChange={setExpandedFrameId}
             onHeatmapReferenceChange={changeHeatmapReference}
+            onFallbackFrameTitles={fallbackPairingFrameTitles}
             onRenameColumn={renamePairingColumn}
             onReorder={reorderPairingRows}
           />

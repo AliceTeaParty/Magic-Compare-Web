@@ -29,6 +29,7 @@ import {
 import {
   Alert,
   Box,
+  Button,
   Chip,
   Collapse,
   FormControl,
@@ -82,6 +83,7 @@ interface PairingPreviewPanelProps {
   hasBlockingIssues: boolean;
   onExpandedFrameChange: (frameId: string | null) => void;
   onHeatmapReferenceChange: (label: string) => void;
+  onFallbackFrameTitles: () => void;
   onRenameColumn: (column: UploadPlanImageColumn, nextLabel: string) => void;
   onReorder: (activeFrameId: string, overFrameId: string | null) => void;
 }
@@ -553,6 +555,7 @@ export function PairingPreviewPanel({
   hasBlockingIssues,
   onExpandedFrameChange,
   onHeatmapReferenceChange,
+  onFallbackFrameTitles,
   onRenameColumn,
   onReorder,
 }: PairingPreviewPanelProps) {
@@ -638,6 +641,15 @@ export function PairingPreviewPanel({
         <Typography variant="h6">配对预览</Typography>
         {planView ? (
           <Stack direction="row" alignItems="center" spacing={1} flexWrap="wrap" useFlexGap>
+            <Button
+              size="small"
+              variant="outlined"
+              onClick={onFallbackFrameTitles}
+              disabled={!canReorder}
+              sx={{ height: webUploadSizes.compactControlHeight, borderRadius: webUploadRadii.control }}
+            >
+              使用完整 m2ts-帧号
+            </Button>
             {planView.heatmapReferenceOptions.length > 1 ? (
               <FormControl size="small" variant="outlined">
                 <Select

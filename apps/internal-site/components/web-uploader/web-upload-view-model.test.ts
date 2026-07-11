@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildPlanView,
   compactUploadFilename,
+  fallbackUploadPlanFrameTitles,
   frameIdForFrame,
   getUploadPlanHeatmapReferenceOptions,
   renameUploadPlanAssetLabel,
@@ -208,6 +209,23 @@ describe("web upload view model", () => {
 
     expect(nextPlan?.heatmapReferenceLabel).toBe("Rip");
     expect(setUploadPlanHeatmapReference(nextPlan!, "Deband")).toBeNull();
+  });
+
+
+  it("can fall back frame titles to full m2ts filename and frame number", () => {
+    const originalPlan = plan();
+    originalPlan.frames[0] = {
+      ...originalPlan.frames[0],
+      title: "BOX1-00006-1917",
+      before: asset(
+        "before",
+        "30_ULTRAMAN_DYNA_BD_BOX_1_00006 - 01917 - src.png",
+      ),
+    };
+
+    expect(fallbackUploadPlanFrameTitles(originalPlan).frames[0].title).toBe(
+      "30_ULTRAMAN_DYNA_BD_BOX_1_00006 - 01917",
+    );
   });
 
   it("compacts long upload filenames by preserving the head and tail", () => {
