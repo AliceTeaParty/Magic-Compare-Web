@@ -65,6 +65,21 @@ describe("scanBrowserUploadFiles", () => {
     expect(plan.frames[0].misc).toHaveLength(1);
   });
 
+  it("uses the first after label as the default heatmap reference for src/rip/flt sets", () => {
+    const plan = scanBrowserUploadFiles(
+      [
+        image("case/src/001.png"),
+        image("case/rip/001.png"),
+        image("case/flt/001_crop.png"),
+      ],
+      "case",
+    );
+
+    expect(plan.frames).toHaveLength(1);
+    expect(plan.frames[0].after.label).toBe("Rip");
+    expect(plan.heatmapReferenceLabel).toBe("Rip");
+  });
+
   it("reports an error when a before file has no matching after file", () => {
     const plan = scanBrowserUploadFiles(
       [image("before/001.png"), image("before/002.png"), image("after/001.png")],

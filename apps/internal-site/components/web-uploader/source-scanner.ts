@@ -371,7 +371,7 @@ function assetPlan(kind: WebUploadAssetPlan["kind"], candidate: SourceCandidate)
     kind === "before"
       ? "Before"
       : kind === "after"
-        ? "After"
+        ? variantLabel(candidate.variant) || "After"
         : kind === "heatmap"
           ? "Heatmap"
           : variantLabel(candidate.variant) || "Misc";
@@ -548,6 +548,10 @@ function deriveGroupIdentity(sourceRootName: string, candidates: SourceCandidate
   return { slug, title: titleCase(commonPrefix) || titleCase(sourceRootName) || "Uploaded Group" };
 }
 
+export function defaultHeatmapReferenceLabel(frames: WebUploadFramePlan[]) {
+  return frames[0]?.after.label ?? "After";
+}
+
 function parseEntries(entries: BrowserUploadFile[], variantOverride?: string) {
   const candidates: SourceCandidate[] = [];
   const ignored: IgnoredUploadFile[] = [];
@@ -601,7 +605,7 @@ function buildFlatPlan(sourceRootName: string, entries: BrowserUploadFile[], ign
     suggestedGroupSlug: identity.slug,
     suggestedGroupTitle: identity.title,
     frames,
-    heatmapReferenceLabel: "After",
+    heatmapReferenceLabel: defaultHeatmapReferenceLabel(frames),
     ignoredFiles: [...ignoredFiles, ...parsed.ignored],
     issues,
   };
@@ -611,7 +615,13 @@ function buildNestedPlan(sourceRootName: string, entries: BrowserUploadFile[], i
   const scopedEntries = (directory: string | null) =>
     directory ? entries.filter((entry) => topLevelDirectory(entry.relativePath) === directory) : [];
   const beforeParsed = parseEntries(scopedEntries(layout.beforeDir), "source");
-  const afterParsedResults = layout.afterDirs.map((directory, index) => parseEntries(scopedEntries(directory), index === 0 ? "out" : basename(directory).toLowerCase()));
+  const afterParsedResults = layout.afterDirs.map((directory) => {
+    const directoryVariant = basename(directory).toLowerCase();
+    return parseEntries(
+      scopedEntries(directory),
+      PRIMARY_AFTER_VARIANTS.has(directoryVariant) ? "out" : directoryVariant,
+    );
+  });
   const heatmapParsedResults = layout.heatmapDirs.map((directory) => parseEntries(scopedEntries(directory), "heatmap"));
   const miscParsedResults = layout.miscDirs.map((directory) => parseEntries(scopedEntries(directory), basename(directory).toLowerCase() || "misc"));
   const afterParsed = afterParsedResults.flatMap((result) => result.candidates);
@@ -689,7 +699,7 @@ function buildNestedPlan(sourceRootName: string, entries: BrowserUploadFile[], i
     suggestedGroupSlug: identity.slug,
     suggestedGroupTitle: identity.title,
     frames,
-    heatmapReferenceLabel: "After",
+    heatmapReferenceLabel: defaultHeatmapReferenceLabel(frames),
     ignoredFiles: ignored,
     issues,
   };
