@@ -65,6 +65,12 @@ const MATCH_KEY_SUFFIX_RE = new RegExp(
 const NON_ALNUM_RE = /[^0-9a-z]+/g;
 const MAX_AFTER_ASSETS = 4;
 
+interface VolumeSortKey {
+  kind: "VOL" | "BOX";
+  number: number;
+  label: string;
+}
+
 interface SourceCandidate {
   entry: BrowserUploadFile;
   originalName: string;
@@ -123,6 +129,28 @@ function titleCase(input: string) {
     .replace(/[_\-.]+/g, " ")
     .trim()
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function volumeSortKey(input: string): VolumeSortKey | null {
+  const match = input.match(/(?:^|[^a-z0-9])(VOL|BOX)[ _-]*(\d+)(?=$|[^a-z0-9])/i);
+  if (!match) {
+    return null;
+  }
+
+  const kind = match[1].toUpperCase() as VolumeSortKey["kind"];
+  const number = Number(match[2]);
+  return { kind, number, label: `${kind}${number}` };
+}
+
+function compareVolumeHints(left: string, right: string) {
+  const leftKey = volumeSortKey(left);
+  const rightKey = volumeSortKey(right);
+  const kindRank = (key: VolumeSortKey | null) => key ? (key.kind === "VOL" ? 0 : 1) : 2;
+
+  return (
+    kindRank(leftKey) - kindRank(rightKey) ||
+    (leftKey?.number ?? Number.MAX_SAFE_INTEGER) - (rightKey?.number ?? Number.MAX_SAFE_INTEGER)
+  );
 }
 
 function variantLabel(variant: string) {
@@ -576,6 +604,7 @@ function buildFlatPlan(sourceRootName: string, entries: BrowserUploadFile[], ign
     return (
       Number(leftCandidate.episode) - Number(rightCandidate.episode) ||
       leftCandidate.frameNumber - rightCandidate.frameNumber ||
+      compareVolumeHints(leftCandidate.rootHint, rightCandidate.rootHint) ||
       leftCandidate.rootHint.localeCompare(rightCandidate.rootHint)
     );
   });
@@ -643,7 +672,13 @@ function buildNestedPlan(sourceRootName: string, entries: BrowserUploadFile[], i
   const miscAssignments = assignCandidatesToBeforeKeys(miscParsed, beforeByKey);
   const allBefore = [...beforeByKey.entries()]
     .map(([matchKey, candidates]) => [matchKey, candidates[0]] as const)
-    .sort((left, right) => Number(left[1].episode) - Number(right[1].episode) || left[1].frameNumber - right[1].frameNumber || left[0].localeCompare(right[0]));
+    .sort(
+      (left, right) =>
+        Number(left[1].episode) - Number(right[1].episode) ||
+        left[1].frameNumber - right[1].frameNumber ||
+        compareVolumeHints(left[1].rootHint, right[1].rootHint) ||
+        left[0].localeCompare(right[0]),
+    );
   const fallbackWidth = Math.max(4, String(Math.max(0, ...allBefore.map(([, candidate]) => candidate.frameNumber))).length);
   const episodeWidth = structuredEpisodeWidth(beforeParsed.candidates);
   const frames: WebUploadFramePlan[] = [];
