@@ -3,6 +3,7 @@ import {
   buildPlanView,
   compactUploadFilename,
   frameIdForFrame,
+  fullFrameTitleFromSourcePath,
   getUploadPlanHeatmapReferenceOptions,
   renameUploadPlanAssetLabel,
   reorderUploadPlan,
@@ -208,6 +209,13 @@ describe("web upload view model", () => {
 
     expect(nextPlan?.heatmapReferenceLabel).toBe("Rip");
     expect(setUploadPlanHeatmapReference(nextPlan!, "Deband")).toBeNull();
+  });
+
+  it("builds full frame titles from the shared filename parser", () => {
+    expect(fullFrameTitleFromSourcePath("before/clip - 0001 - source.png")).toBe("clip - 0001");
+    expect(fullFrameTitleFromSourcePath("before/clip-0002-source.png")).toBe("clip - 0002");
+    expect(fullFrameTitleFromSourcePath("before/clip_0003_source.png")).toBe("clip - 0003");
+    expect(fullFrameTitleFromSourcePath("before/clip.0004.source.png")).toBe("clip - 0004");
   });
 
   it("compacts long upload filenames by preserving the head and tail", () => {
