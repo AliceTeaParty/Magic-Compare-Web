@@ -165,6 +165,60 @@ describe("scanBrowserUploadFiles", () => {
     expect(plan.frames.map((frame) => frame.title)).toEqual(["00-2183", "12-27240"]);
   });
 
+  it("sorts structured flat volumes numerically when episode and frame match", () => {
+    const plan = scanBrowserUploadFiles(
+      [
+        image("TITLE_VOL10_00000.m2ts-27240-src.png"),
+        image("TITLE_VOL10_00000.m2ts-27240-output.png"),
+        image("TITLE_VOL2_00000.m2ts-27240-src.png"),
+        image("TITLE_VOL2_00000.m2ts-27240-output.png"),
+      ],
+      "20260702",
+    );
+
+    expect(plan.frames).toHaveLength(2);
+    expect(plan.frames.map((frame) => frame.before.source.relativePath)).toEqual([
+      "TITLE_VOL2_00000.m2ts-27240-src.png",
+      "TITLE_VOL10_00000.m2ts-27240-src.png",
+    ]);
+  });
+
+  it("keeps unrelated flat titles grouped before comparing volume numbers", () => {
+    const plan = scanBrowserUploadFiles(
+      [
+        image("BBB_VOL2_00000.m2ts-27240-src.png"),
+        image("BBB_VOL2_00000.m2ts-27240-output.png"),
+        image("AAA_VOL10_00000.m2ts-27240-src.png"),
+        image("AAA_VOL10_00000.m2ts-27240-output.png"),
+      ],
+      "20260702",
+    );
+
+    expect(plan.frames).toHaveLength(2);
+    expect(plan.frames.map((frame) => frame.before.source.relativePath)).toEqual([
+      "AAA_VOL10_00000.m2ts-27240-src.png",
+      "BBB_VOL2_00000.m2ts-27240-src.png",
+    ]);
+  });
+
+  it("sorts structured nested volumes numerically when episode and frame match", () => {
+    const plan = scanBrowserUploadFiles(
+      [
+        image("case/before/TITLE_VOL10_00000.m2ts-27240.png"),
+        image("case/after/TITLE_VOL10_00000.m2ts-27240.png"),
+        image("case/before/TITLE_VOL2_00000.m2ts-27240.png"),
+        image("case/after/TITLE_VOL2_00000.m2ts-27240.png"),
+      ],
+      "case",
+    );
+
+    expect(plan.frames).toHaveLength(2);
+    expect(plan.frames.map((frame) => frame.before.source.relativePath)).toEqual([
+      "before/TITLE_VOL2_00000.m2ts-27240.png",
+      "before/TITLE_VOL10_00000.m2ts-27240.png",
+    ]);
+  });
+
   it("recognizes structured encode filenames with m2ts markers and no fps prefix", () => {
     const plan = scanBrowserUploadFiles(
       [
