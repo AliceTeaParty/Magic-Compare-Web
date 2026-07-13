@@ -53,10 +53,10 @@ const MATCH_KEY_VARIANTS = [
 ];
 const IGNORED_BASENAMES = new Set([".ds_store", "thumbs.db"]);
 const IGNORED_SUFFIXES = new Set([".json", ".yaml", ".yml", ".txt", ".md", ".csv", ".db", ".log"]);
-const FILENAME_RE = /(?<prefix>.+?)[_\-.](?<frame>\d+)(?:[_\-.](?<variant>[^_\-.]+))?$/;
+const FILENAME_RE = /(?<prefix>.+?)[_\-. ]+(?<frame>\d+)(?:[_\-. ]+(?<variant>[^_\-. ]+))?$/;
 const FALLBACK_FILENAME_RE = /^(?<frame>\d+)(?<variant>[A-Za-z][A-Za-z0-9]*)$/;
 const STRUCTURED_SOURCE_FILENAME_RE =
-  /^(?:(?<fps>\d{2})_)?(?<title>.+)_(?<episode>\d+)(?:\.(?<sourceMarker>[^-]+))?-(?<frame>\d+)-(?<variant>[^_\-.]+)$/i;
+  /^(?:(?<fps>\d{2})_)?(?<title>.+)_(?<episode>\d+)(?:\.(?<sourceMarker>[^-]+))?[_\-. ]+(?<frame>\d+)[_\-. ]+(?<variant>[^_\-. ]+)$/i;
 const GROUP_SUFFIX_NOISE_RE = /(?:[_\-. ]+\d{4,5}[_\-. ]+(?:gen[_\-. ]+vpy|m2ts|mkv|mp4|ts))$/i;
 const MATCH_KEY_SUFFIX_RE = new RegExp(
   `(?:[_\\-. ]+(?:${MATCH_KEY_VARIANTS.join("|")}))+$`,
@@ -123,6 +123,15 @@ function titleCase(input: string) {
     .replace(/[_\-.]+/g, " ")
     .trim()
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function volumeLabel(input: string) {
+  const match = input.match(/(?:^|[^a-z0-9])(?<kind>vol(?:ume)?|box)[_\-. ]*(?<number>\d+)/i);
+  if (!match?.groups) {
+    return null;
+  }
+
+  return `${match.groups.kind.toUpperCase().startsWith("BOX") ? "BOX" : "VOL"}${Number(match.groups.number)}`;
 }
 
 function variantLabel(variant: string) {
@@ -261,7 +270,7 @@ function parseCandidate(entry: BrowserUploadFile, variantOverride?: string): Sou
     return {
       entry,
       originalName: basename(entry.relativePath),
-      variant: (variantOverride ?? structured.variant).trim().toLowerCase(),
+      variant: (structured.variant ?? variantOverride ?? "output").trim().toLowerCase(),
       fps: structured.fps,
       episode: structured.episode,
       frameNumber: structured.frameNumber,
@@ -279,7 +288,7 @@ function parseCandidate(entry: BrowserUploadFile, variantOverride?: string): Sou
     const prefix = match.groups.prefix;
     const rawFrame = match.groups.frame;
     const frameNumber = Number(rawFrame.replace(/^0+/, "") || "0");
-    const variant = (variantOverride ?? match.groups.variant ?? "output").trim().toLowerCase();
+    const variant = (match.groups.variant ?? variantOverride ?? "output").trim().toLowerCase();
     const fps = extractFps(pathStem);
     const episode = extractEpisode(prefix);
     const title = `${fps}_${episode}_${frameNumber}`;
@@ -305,7 +314,7 @@ function parseCandidate(entry: BrowserUploadFile, variantOverride?: string): Sou
     return {
       entry,
       originalName: basename(entry.relativePath),
-      variant: (variantOverride ?? fallbackMatch.groups.variant).trim().toLowerCase(),
+      variant: (fallbackMatch.groups.variant ?? variantOverride).trim().toLowerCase(),
       fps: "00",
       episode: "00",
       frameNumber,
@@ -346,7 +355,16 @@ function candidateFrameKey(candidate: SourceCandidate) {
 }
 
 function afterPriority(candidate: SourceCandidate) {
-  const priority = candidate.variant === "out" ? 0 : candidate.variant === "output" ? 1 : candidate.variant === "after" ? 2 : 3;
+  const priority =
+    candidate.variant === "out"
+      ? 0
+      : candidate.variant === "output"
+        ? 1
+        : candidate.variant === "after"
+          ? 2
+          : candidate.variant === "rip"
+            ? 3
+            : 4;
   return `${priority}:${candidate.variant}:${candidate.originalName.toLowerCase()}`;
 }
 
@@ -366,12 +384,30 @@ function alternatePriority(candidate: SourceCandidate) {
   return `${priority}:${candidate.variant}:${candidate.originalName.toLowerCase()}`;
 }
 
+/** Keeps scanned source column names faithful to filenames when exports use src/source/ori. */
+function sourceVariantLabel(variant: string) {
+  const normalized = variant.toLowerCase();
+  if (normalized === "src") {
+    return "Src";
+  }
+  if (normalized === "source") {
+    return "Source";
+  }
+  if (normalized === "ori") {
+    return "Ori";
+  }
+  if (normalized === "origin") {
+    return "Origin";
+  }
+  return "Before";
+}
+
 function assetPlan(kind: WebUploadAssetPlan["kind"], candidate: SourceCandidate): WebUploadAssetPlan {
   const label =
     kind === "before"
-      ? "Before"
+      ? sourceVariantLabel(candidate.variant)
       : kind === "after"
-        ? "After"
+        ? variantLabel(candidate.variant) || "After"
         : kind === "heatmap"
           ? "Heatmap"
           : variantLabel(candidate.variant) || "Misc";
@@ -401,10 +437,12 @@ function formatCandidateFrameTitle(
       structuredEpisodeWidth,
       "0",
     );
-    return `${episode}-${candidate.frameNumber}`;
+    const volume = volumeLabel(candidate.rootHint);
+    return volume ? `${volume}-${candidate.episode}-${candidate.frameNumber}` : `${episode}-${candidate.frameNumber}`;
   }
 
-  return candidate.title;
+  const volume = volumeLabel(candidate.rootHint);
+  return volume ? `${volume}-${candidate.title}` : candidate.title;
 }
 
 function structuredEpisodeWidth(candidates: SourceCandidate[]) {

@@ -66,6 +66,34 @@ export function compactUploadFilename(path: string, maxLength = 38) {
   return `${fileName.slice(0, headLength)}${ellipsis}${fileName.slice(-tailLength)}`;
 }
 
+function stemFromPath(path: string) {
+  const fileName = path.split("/").filter(Boolean).at(-1) ?? path;
+  const dotIndex = fileName.lastIndexOf(".");
+  return dotIndex === -1 ? fileName : fileName.slice(0, dotIndex);
+}
+
+function fullFrameTitleFromSourcePath(path: string) {
+  const pathStem = stemFromPath(path);
+  const match = /^(?<prefix>.+?)[_\-. ]+(?<frame>\d+)(?:[_\-. ]+[^_\-. ]+)?$/.exec(pathStem);
+  if (!match?.groups) {
+    return pathStem;
+  }
+
+  return `${match.groups.prefix} - ${match.groups.frame}`;
+}
+
+export function fallbackUploadPlanFrameTitles(plan: WebUploadPlan) {
+  return {
+    ...plan,
+    frames: plan.frames.map((frame) => ({
+      ...frame,
+      // Manual fallback is intentionally explicit because automatic VOL/m2ts shortening can still
+      // collide on mixed-disc work folders where operators need the full source identity visible.
+      title: fullFrameTitleFromSourcePath(frame.before.source.relativePath),
+    })),
+  };
+}
+
 function frameIssueState(frame: WebUploadFramePlan, issues: WebUploadIssue[]) {
   const framePaths = new Set([
     frame.before.source.relativePath,

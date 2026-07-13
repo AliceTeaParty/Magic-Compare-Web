@@ -367,6 +367,32 @@ export function deleteWorkspaceGroup(
   });
 }
 
+function canUseBrowserNotifications() {
+  return typeof window !== "undefined" && "Notification" in window;
+}
+
+function requestBrowserPublicDeployNotificationPermission() {
+  if (!canUseBrowserNotifications() || Notification.permission !== "default") {
+    return;
+  }
+
+  // Permission prompts must be tied to the operator's deploy click; asking after the async deploy
+  // succeeds can be blocked by browsers because it is no longer in the user-activation window.
+  void Notification.requestPermission();
+}
+
+function notifyBrowserPublicDeploySuccess(projectName: string) {
+  if (!canUseBrowserNotifications() || Notification.permission !== "granted") {
+    return;
+  }
+
+  // Browser notifications make long Cloudflare deploys visible even after the operator switches
+  // tabs; in-app snackbars alone are too easy to miss after a successful public publish.
+  new Notification("Magic Compare public site deployed", {
+    body: `Cloudflare Pages project ${projectName} is live with a fresh export.`,
+  });
+}
+
 /**
  * Deploy remains single-flight on the client as well as the server lock so repeated taps cannot
  * queue duplicate Cloudflare deploys before the first request leaves the browser.
@@ -385,6 +411,7 @@ export function deployWorkspacePublicSite({
     return;
   }
 
+  requestBrowserPublicDeployNotificationPermission();
   setIsDeployingPublicSite(true);
   notifications.pushNotification(
     "Republishing this case and deploying a fresh public export to Cloudflare Pages...",
@@ -406,6 +433,7 @@ export function deployWorkspacePublicSite({
         `Deployed fresh static export to Cloudflare Pages project ${result.projectName}.`,
         "success",
       );
+      notifyBrowserPublicDeploySuccess(result.projectName);
     },
     request: async () => postJson("/api/ops/public-deploy", { caseId: data.id }),
     startTransition,

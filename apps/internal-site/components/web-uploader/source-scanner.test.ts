@@ -65,6 +65,24 @@ describe("scanBrowserUploadFiles", () => {
     expect(plan.frames[0].misc).toHaveLength(1);
   });
 
+  it("preserves explicit rip and flt variants inside an after directory", () => {
+    const plan = scanBrowserUploadFiles(
+      [
+        image("case/before/30_ULTRAMAN_DYNA_BD_BOX_1_00006 - 01917 - src.png"),
+        image("case/after/30_ULTRAMAN_DYNA_BD_BOX_1_00006 - 01917 - rip.png"),
+        image("case/after/30_ULTRAMAN_DYNA_BD_BOX_1_00006 - 01917 - flt.png"),
+      ],
+      "case",
+    );
+
+    expect(plan.frames).toHaveLength(1);
+    expect(plan.frames[0].after.label).toBe("Rip");
+    expect(plan.frames[0].misc.map((asset) => asset.label)).toEqual(["Flt"]);
+    expect(plan.frames[0].after.source.relativePath).toBe(
+      "after/30_ULTRAMAN_DYNA_BD_BOX_1_00006 - 01917 - rip.png",
+    );
+  });
+
   it("reports an error when a before file has no matching after file", () => {
     const plan = scanBrowserUploadFiles(
       [image("before/001.png"), image("before/002.png"), image("after/001.png")],
@@ -141,7 +159,7 @@ describe("scanBrowserUploadFiles", () => {
     );
 
     expect(plan.frames).toHaveLength(1);
-    expect(plan.frames[0].title).toBe("0-27240");
+    expect(plan.frames[0].title).toBe("VOL1-00000-27240");
     expect(plan.frames[0].caption).toContain("WATANARE ANIME VOL1");
     expect(plan.frames[0].after.label).toBe("After");
     expect(plan.frames[0].after.source.relativePath).toBe(
@@ -176,7 +194,7 @@ describe("scanBrowserUploadFiles", () => {
     );
 
     expect(plan.frames).toHaveLength(1);
-    expect(plan.frames[0].title).toBe("0-27240");
+    expect(plan.frames[0].title).toBe("VOL1-00000-27240");
     expect(plan.frames[0].caption).toContain("WATANARE ANIME VOL1");
     expect(plan.frames[0].after.label).toBe("After");
     expect(plan.frames[0].misc.map((asset) => asset.label)).toEqual(["Rip"]);
@@ -193,7 +211,7 @@ describe("scanBrowserUploadFiles", () => {
     );
 
     expect(plan.frames).toHaveLength(1);
-    expect(plan.frames[0].title).toBe("0-27240");
+    expect(plan.frames[0].title).toBe("VOL1-00000-27240");
     expect(plan.frames[0].caption).toContain("WATANARE ANIME VOL1");
     expect(plan.frames[0].after.label).toBe("After");
     expect(plan.frames[0].misc.map((asset) => asset.label)).toEqual(["Rip"]);
@@ -209,13 +227,35 @@ describe("scanBrowserUploadFiles", () => {
     );
 
     expect(plan.frames).toHaveLength(1);
-    expect(plan.frames[0].title).toBe("0-27240");
+    expect(plan.frames[0].title).toBe("VOL1-00000-27240");
     expect(plan.frames[0].before.source.relativePath).toBe(
       "24_WATANARE_ANIME_VOL1_00000.gen.vpy-27240-src.png",
     );
     expect(plan.frames[0].after.source.relativePath).toBe(
       "WATANARE_ANIME_VOL1_00000.m2ts-27240-output.png",
     );
+  });
+
+
+  it("pairs spaced dash filenames and infers src/rip/flt columns", () => {
+    const plan = scanBrowserUploadFiles(
+      [
+        image("sample/30_ULTRAMAN_DYNA_BD_BOX_1_00006 - 01917 - flt.png"),
+        image("sample/30_ULTRAMAN_DYNA_BD_BOX_1_00006 - 01917 - rip.png"),
+        image("sample/30_ULTRAMAN_DYNA_BD_BOX_1_00006 - 01917 - src.png"),
+        image("sample/30_ULTRAMAN_DYNA_BD_BOX_1_00006 - 05455 - flt.png"),
+        image("sample/30_ULTRAMAN_DYNA_BD_BOX_1_00006 - 05455 - rip.png"),
+        image("sample/30_ULTRAMAN_DYNA_BD_BOX_1_00006 - 05455 - src.png"),
+      ],
+      "sample",
+    );
+
+    expect(plan.frames).toHaveLength(2);
+    expect(plan.frames[0].title).toBe("BOX1-00006-1917");
+    expect(plan.frames[0].before.label).toBe("Src");
+    expect(plan.frames[0].after.label).toBe("Rip");
+    expect(plan.frames[0].misc.map((asset) => asset.label)).toEqual(["Flt"]);
+    expect(plan.issues).toEqual([]);
   });
 
   it("ignores common sidecar and system files", () => {
