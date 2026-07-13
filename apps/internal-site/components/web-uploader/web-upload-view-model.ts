@@ -1,3 +1,4 @@
+import { parseUploadFilenameStem } from "./filename-parser";
 import type {
   WebUploadFramePlan,
   WebUploadIssue,
@@ -45,6 +46,18 @@ function stableHash(value: string) {
     hash = (hash * 33) ^ value.charCodeAt(index);
   }
   return (hash >>> 0).toString(36);
+}
+
+function stemFromSourcePath(path: string) {
+  const fileName = path.split("/").filter(Boolean).at(-1) ?? path;
+  const dotIndex = fileName.lastIndexOf(".");
+  return dotIndex === -1 ? fileName : fileName.slice(0, dotIndex);
+}
+
+export function fullFrameTitleFromSourcePath(path: string) {
+  const pathStem = stemFromSourcePath(path);
+  const parsedFilename = parseUploadFilenameStem(pathStem);
+  return parsedFilename ? `${parsedFilename.prefix} - ${parsedFilename.frame}` : pathStem;
 }
 
 export function frameIdForFrame(frame: WebUploadFramePlan) {

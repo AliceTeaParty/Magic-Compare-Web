@@ -30,6 +30,31 @@ describe("scanBrowserUploadFiles", () => {
     expect(plan.issues).toEqual([]);
   });
 
+  it("pairs flat files across supported filename separators", () => {
+    const plan = scanBrowserUploadFiles(
+      [
+        image("sample/clip - 001 - before.png"),
+        image("sample/clip - 001 - after.png"),
+        image("sample/clip-002-before.png"),
+        image("sample/clip-002-after.png"),
+        image("sample/clip_003_before.png"),
+        image("sample/clip_003_after.png"),
+        image("sample/clip.004.before.png"),
+        image("sample/clip.004.after.png"),
+      ],
+      "sample",
+    );
+
+    expect(plan.frames).toHaveLength(4);
+    expect(plan.frames.map((frame) => frame.title)).toEqual([
+      "00_00_1",
+      "00_00_2",
+      "00_00_3",
+      "00_00_4",
+    ]);
+    expect(plan.issues).toEqual([]);
+  });
+
   it("keeps same-number flat frames separate when their prefixes differ", () => {
     const plan = scanBrowserUploadFiles(
       [

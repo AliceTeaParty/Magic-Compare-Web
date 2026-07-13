@@ -7,6 +7,7 @@ import type {
   WebUploadPlan,
 } from "./web-upload-types";
 import { cjkKebabCase } from "@magic-compare/shared-utils";
+import { parseUploadFilenameStem } from "./filename-parser";
 
 const SUPPORTED_EXTENSIONS = new Set([".png", ".jpg", ".jpeg", ".webp", ".avif", ".svg"]);
 const SOURCE_VARIANTS = new Set(["src", "source", "ori", "origin", "before"]);
@@ -53,7 +54,6 @@ const MATCH_KEY_VARIANTS = [
 ];
 const IGNORED_BASENAMES = new Set([".ds_store", "thumbs.db"]);
 const IGNORED_SUFFIXES = new Set([".json", ".yaml", ".yml", ".txt", ".md", ".csv", ".db", ".log"]);
-const FILENAME_RE = /(?<prefix>.+?)[_\-.](?<frame>\d+)(?:[_\-.](?<variant>[^_\-.]+))?$/;
 const FALLBACK_FILENAME_RE = /^(?<frame>\d+)(?<variant>[A-Za-z][A-Za-z0-9]*)$/;
 const STRUCTURED_SOURCE_FILENAME_RE =
   /^(?:(?<fps>\d{2})_)?(?<title>.+)_(?<episode>\d+)(?:\.(?<sourceMarker>[^-]+))?-(?<frame>\d+)-(?<variant>[^_\-.]+)$/i;
@@ -274,12 +274,11 @@ function parseCandidate(entry: BrowserUploadFile, variantOverride?: string): Sou
     };
   }
 
-  const match = FILENAME_RE.exec(pathStem);
-  if (match?.groups) {
-    const prefix = match.groups.prefix;
-    const rawFrame = match.groups.frame;
-    const frameNumber = Number(rawFrame.replace(/^0+/, "") || "0");
-    const variant = (variantOverride ?? match.groups.variant ?? "output").trim().toLowerCase();
+  const parsedFilename = parseUploadFilenameStem(pathStem);
+  if (parsedFilename) {
+    const prefix = parsedFilename.prefix;
+    const frameNumber = Number(parsedFilename.frame.replace(/^0+/, "") || "0");
+    const variant = (variantOverride ?? parsedFilename.variant ?? "output").trim().toLowerCase();
     const fps = extractFps(pathStem);
     const episode = extractEpisode(prefix);
     const title = `${fps}_${episode}_${frameNumber}`;
