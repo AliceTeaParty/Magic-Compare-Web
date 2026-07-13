@@ -417,7 +417,7 @@ function assetPlan(kind: WebUploadAssetPlan["kind"], candidate: SourceCandidate)
     kind === "before"
       ? "Before"
       : kind === "after"
-        ? "After"
+        ? variantLabel(candidate.variant) || "After"
         : kind === "heatmap"
           ? "Heatmap"
           : variantLabel(candidate.variant) || "Misc";
@@ -594,6 +594,58 @@ function deriveGroupIdentity(sourceRootName: string, candidates: SourceCandidate
   return { slug, title: titleCase(commonPrefix) || titleCase(sourceRootName) || "Uploaded Group" };
 }
 
+function orderedComparisonLabels(frame: WebUploadFramePlan) {
+  return [frame.after.label, ...frame.misc.map((asset) => asset.label)].filter(
+    (label, index, labels) => labels.indexOf(label) === index,
+  );
+}
+
+/**
+ * Mirrors the preview selector rule so the generated default is safe for every frame instead of
+ * only matching the first row's primary comparison column.
+ */
+function commonHeatmapReferenceLabels(frames: WebUploadFramePlan[]) {
+  if (frames.length === 0) {
+    return [];
+  }
+
+  const [firstFrame, ...remainingFrames] = frames;
+  const commonLabels = new Set(orderedComparisonLabels(firstFrame));
+  for (const frame of remainingFrames) {
+    const labels = new Set(orderedComparisonLabels(frame));
+    for (const label of [...commonLabels]) {
+      if (!labels.has(label)) {
+        commonLabels.delete(label);
+      }
+    }
+  }
+
+  return orderedComparisonLabels(firstFrame).filter((label) => commonLabels.has(label));
+}
+
+export function defaultHeatmapReferenceLabel(frames: WebUploadFramePlan[]) {
+  return commonHeatmapReferenceLabels(frames)[0] ?? "After";
+}
+
+/**
+ * Blocks generation when no global heatmap reference can exist; otherwise asset generation would
+ * fail later on the first row missing the stored reference label.
+ */
+function heatmapReferenceIssues(frames: WebUploadFramePlan[]): WebUploadIssue[] {
+  if (frames.length === 0 || commonHeatmapReferenceLabels(frames).length > 0) {
+    return [];
+  }
+
+  return [
+    {
+      code: "heatmap-reference-missing",
+      severity: "error",
+      path: frames[0].after.source.relativePath,
+      message: "没有所有帧都可用的 heatmap 参考列，请统一比较列后再上传。",
+    },
+  ];
+}
+
 function parseEntries(entries: BrowserUploadFile[], variantOverride?: string) {
   const candidates: SourceCandidate[] = [];
   const ignored: IgnoredUploadFile[] = [];
@@ -647,9 +699,9 @@ function buildFlatPlan(sourceRootName: string, entries: BrowserUploadFile[], ign
     suggestedGroupSlug: identity.slug,
     suggestedGroupTitle: identity.title,
     frames,
-    heatmapReferenceLabel: "After",
+    heatmapReferenceLabel: defaultHeatmapReferenceLabel(frames),
     ignoredFiles: [...ignoredFiles, ...parsed.ignored],
-    issues,
+    issues: [...issues, ...heatmapReferenceIssues(frames)],
   };
 }
 
@@ -657,7 +709,13 @@ function buildNestedPlan(sourceRootName: string, entries: BrowserUploadFile[], i
   const scopedEntries = (directory: string | null) =>
     directory ? entries.filter((entry) => topLevelDirectory(entry.relativePath) === directory) : [];
   const beforeParsed = parseEntries(scopedEntries(layout.beforeDir), "source");
-  const afterParsedResults = layout.afterDirs.map((directory, index) => parseEntries(scopedEntries(directory), index === 0 ? "out" : basename(directory).toLowerCase()));
+  const afterParsedResults = layout.afterDirs.map((directory) => {
+    const directoryVariant = basename(directory).toLowerCase();
+    return parseEntries(
+      scopedEntries(directory),
+      directoryVariant,
+    );
+  });
   const heatmapParsedResults = layout.heatmapDirs.map((directory) => parseEntries(scopedEntries(directory), "heatmap"));
   const miscParsedResults = layout.miscDirs.map((directory) => parseEntries(scopedEntries(directory), basename(directory).toLowerCase() || "misc"));
   const afterParsed = afterParsedResults.flatMap((result) => result.candidates);
@@ -741,9 +799,9 @@ function buildNestedPlan(sourceRootName: string, entries: BrowserUploadFile[], i
     suggestedGroupSlug: identity.slug,
     suggestedGroupTitle: identity.title,
     frames,
-    heatmapReferenceLabel: "After",
+    heatmapReferenceLabel: defaultHeatmapReferenceLabel(frames),
     ignoredFiles: ignored,
-    issues,
+    issues: [...issues, ...heatmapReferenceIssues(frames)],
   };
 }
 
