@@ -80,6 +80,62 @@ describe("scanBrowserUploadFiles", () => {
     expect(plan.heatmapReferenceLabel).toBe("Rip");
   });
 
+  it("uses a common comparison label when the first frame after label is not shared", () => {
+    const plan = scanBrowserUploadFiles(
+      [
+        image("sample/frame-001_src.png"),
+        image("sample/frame-001_output.png"),
+        image("sample/frame-001_rip.png"),
+        image("sample/frame-002_src.png"),
+        image("sample/frame-002_rip.png"),
+      ],
+      "sample",
+    );
+
+    expect(plan.frames.map((frame) => frame.after.label)).toEqual(["After", "Rip"]);
+    expect(plan.frames[0].misc.map((asset) => asset.label)).toEqual(["Rip"]);
+    expect(plan.heatmapReferenceLabel).toBe("Rip");
+    expect(plan.issues).toEqual([]);
+  });
+
+  it("reports an error when no heatmap reference label is shared by every frame", () => {
+    const plan = scanBrowserUploadFiles(
+      [
+        image("sample/frame-001_src.png"),
+        image("sample/frame-001_output.png"),
+        image("sample/frame-002_src.png"),
+        image("sample/frame-002_rip.png"),
+      ],
+      "sample",
+    );
+
+    expect(plan.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          severity: "error",
+          code: "heatmap-reference-missing",
+        }),
+      ]),
+    );
+  });
+
+  it("preserves nested out and output directory variants for primary selection", () => {
+    const plan = scanBrowserUploadFiles(
+      [
+        image("case/src/001.png"),
+        image("case/output/001.png"),
+        image("case/out/001.png"),
+      ],
+      "case",
+    );
+
+    expect(plan.frames).toHaveLength(1);
+    expect(plan.frames[0].after.source.relativePath).toBe("out/001.png");
+    expect(plan.frames[0].misc.map((asset) => asset.source.relativePath)).toEqual([
+      "output/001.png",
+    ]);
+  });
+
   it("reports an error when a before file has no matching after file", () => {
     const plan = scanBrowserUploadFiles(
       [image("before/001.png"), image("before/002.png"), image("after/001.png")],
