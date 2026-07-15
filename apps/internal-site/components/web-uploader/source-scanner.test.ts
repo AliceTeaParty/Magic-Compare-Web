@@ -199,6 +199,28 @@ describe("scanBrowserUploadFiles", () => {
     expect(plan.frames[0].misc.map((asset) => asset.label)).toEqual(["Rip"]);
   });
 
+  it("preserves explicit rip and flt variants inside an after directory", () => {
+    const plan = scanBrowserUploadFiles(
+      [
+        image("case/before/24_WATANARE_ANIME_VOL1_00000.gen.vpy-27240-src.png"),
+        image("case/after/24_WATANARE_ANIME_VOL1_00000.gen.vpy-27240-output.png"),
+        image("case/after/24_WATANARE_ANIME_VOL1_00000.gen.vpy-27240-rip.png"),
+        image("case/after/24_WATANARE_ANIME_VOL1_00000.gen.vpy-27240-flt.png"),
+      ],
+      "case",
+    );
+
+    expect(plan.frames).toHaveLength(1);
+    expect(plan.frames[0].after.source.relativePath).toBe(
+      "after/24_WATANARE_ANIME_VOL1_00000.gen.vpy-27240-output.png",
+    );
+    expect(plan.frames[0].misc.map((asset) => asset.source.relativePath)).toEqual([
+      "after/24_WATANARE_ANIME_VOL1_00000.gen.vpy-27240-rip.png",
+      "after/24_WATANARE_ANIME_VOL1_00000.gen.vpy-27240-flt.png",
+    ]);
+    expect(plan.frames[0].misc.map((asset) => asset.label)).toEqual(["Rip", "Flt"]);
+  });
+
   it("pairs structured filenames even when only some variants keep the fps prefix", () => {
     const plan = scanBrowserUploadFiles(
       [

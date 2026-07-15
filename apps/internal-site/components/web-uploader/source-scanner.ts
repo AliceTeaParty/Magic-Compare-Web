@@ -261,7 +261,8 @@ function parseCandidate(entry: BrowserUploadFile, variantOverride?: string): Sou
     return {
       entry,
       originalName: basename(entry.relativePath),
-      variant: (variantOverride ?? structured.variant).trim().toLowerCase(),
+      // Structured filenames must carry an explicit variant, so directory hints must not replace it.
+      variant: structured.variant.trim().toLowerCase(),
       fps: structured.fps,
       episode: structured.episode,
       frameNumber: structured.frameNumber,
@@ -279,7 +280,7 @@ function parseCandidate(entry: BrowserUploadFile, variantOverride?: string): Sou
     const prefix = match.groups.prefix;
     const rawFrame = match.groups.frame;
     const frameNumber = Number(rawFrame.replace(/^0+/, "") || "0");
-    const variant = (variantOverride ?? match.groups.variant ?? "output").trim().toLowerCase();
+    const variant = (match.groups.variant ?? variantOverride ?? "output").trim().toLowerCase();
     const fps = extractFps(pathStem);
     const episode = extractEpisode(prefix);
     const title = `${fps}_${episode}_${frameNumber}`;
