@@ -1,12 +1,6 @@
 "use client";
 
-import {
-  type ChangeEvent,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { type ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowBack,
   CloudUpload,
@@ -59,8 +53,10 @@ import {
   buildPlanView,
   renameUploadPlanAssetLabel,
   reorderUploadPlan,
+  getNextUploadPlanTitleDisplayMode,
   setUploadPlanHeatmapReference,
   type PlanView,
+  type UploadPlanTitleDisplayMode,
   type UploadPlanImageColumn,
 } from "./web-upload-view-model";
 
@@ -146,9 +142,7 @@ function getCaseInput(
   };
 }
 
-async function readDirectoryHandle(
-  handle: BrowserDirectoryHandle,
-): Promise<BrowserUploadFile[]> {
+async function readDirectoryHandle(handle: BrowserDirectoryHandle): Promise<BrowserUploadFile[]> {
   const entries: BrowserUploadFile[] = [];
 
   async function walk(directory: BrowserDirectoryHandle, prefix: string) {
@@ -223,8 +217,7 @@ function UploadQueue({ snapshot }: { snapshot: UploadRunnerSnapshot }) {
   return (
     <Stack spacing={0.75}>
       {snapshot.frames.slice(0, UPLOAD_QUEUE_VISIBLE_LIMIT).map((frame) => {
-        const progress =
-          frame.totalFiles > 0 ? (frame.completedFiles / frame.totalFiles) * 100 : 0;
+        const progress = frame.totalFiles > 0 ? (frame.completedFiles / frame.totalFiles) * 100 : 0;
         return (
           <Box
             key={frame.frameOrder}
@@ -351,7 +344,11 @@ function uploadStageCopy({
   };
 }
 
-function UploadMetric({ label, value, tone = "default" }: {
+function UploadMetric({
+  label,
+  value,
+  tone = "default",
+}: {
   label: string;
   value: number | string;
   tone?: "default" | "warning";
@@ -486,10 +483,7 @@ function UploadDetails({
  * Presents upload as a focused workbench. Heavy File/Blob data stays in refs and the upload runner;
  * React only keeps compact render models so large directories do not become component state.
  */
-export function WebUploadWorkbench({
-  cases,
-  initialCaseSlug,
-}: WebUploadWorkbenchProps) {
+export function WebUploadWorkbench({ cases, initialCaseSlug }: WebUploadWorkbenchProps) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement | null>(null);
   const planRef = useRef<WebUploadPlan | null>(null);
@@ -497,8 +491,7 @@ export function WebUploadWorkbench({
   const runnerRef = useRef<WebUploadRunner | null>(null);
   const unsubscribeRunnerRef = useRef<(() => void) | null>(null);
   const generationAbortRef = useRef<AbortController | null>(null);
-  const { dismissNotification, notifications, pushNotification } =
-    useAppNotifications();
+  const { dismissNotification, notifications, pushNotification } = useAppNotifications();
   const [selectedCaseSlug, setSelectedCaseSlug] = useState(() => {
     if (initialCaseSlug && cases.some((item) => item.slug === initialCaseSlug)) {
       return initialCaseSlug;
@@ -516,13 +509,11 @@ export function WebUploadWorkbench({
     description: "",
     defaultMode: "before-after" as ViewerMode,
   });
+  const [titleDisplayMode, setTitleDisplayMode] = useState<UploadPlanTitleDisplayMode>("auto");
   const [planView, setPlanView] = useState<PlanView | null>(null);
-  const [generationProgress, setGenerationProgress] =
-    useState<GenerationProgress | null>(null);
+  const [generationProgress, setGenerationProgress] = useState<GenerationProgress | null>(null);
   const [expandedFrameId, setExpandedFrameId] = useState<string | null>(null);
-  const [snapshot, setSnapshot] = useState<UploadRunnerSnapshot>(() =>
-    buildInitialSnapshot(),
-  );
+  const [snapshot, setSnapshot] = useState<UploadRunnerSnapshot>(() => buildInitialSnapshot());
 
   // Failed uploads can be resumed against the existing server job. Keep metadata locked there too
   // so visible inputs cannot drift away from the payload already owned by the runner.
@@ -535,9 +526,7 @@ export function WebUploadWorkbench({
   const hasBlockingIssues = Boolean(planView && planView.errorCount > 0);
   const canStart = Boolean(planView && planRef.current && !hasBlockingIssues);
   const canAbandon =
-    Boolean(planRef.current) &&
-    snapshot.stage !== "idle" &&
-    snapshot.stage !== "completed";
+    Boolean(planRef.current) && snapshot.stage !== "idle" && snapshot.stage !== "completed";
   const overallProgress =
     snapshot.totalFiles > 0 ? (snapshot.completedFiles / snapshot.totalFiles) * 100 : 0;
 
@@ -587,7 +576,8 @@ export function WebUploadWorkbench({
       slug: plan.suggestedGroupSlug,
       title: plan.suggestedGroupTitle,
     }));
-    setPlanView(buildPlanView(plan));
+    setTitleDisplayMode("auto");
+    setPlanView(buildPlanView(plan, "auto"));
     pushNotification(
       plan.issues.some((issue) => issue.severity === "error")
         ? "检查发现阻塞问题，请先修正文件夹。"
@@ -616,11 +606,9 @@ export function WebUploadWorkbench({
       if (error instanceof DOMException && error.name === "AbortError") {
         return;
       }
-      pushNotification(
-        error instanceof Error ? error.message : "读取目录失败。",
-        "error",
-        { key: "web-upload-directory-error" },
-      );
+      pushNotification(error instanceof Error ? error.message : "读取目录失败。", "error", {
+        key: "web-upload-directory-error",
+      });
     }
   }
 
@@ -737,6 +725,7 @@ export function WebUploadWorkbench({
     planRef.current = null;
     generatedFramesRef.current = null;
     setPlanView(null);
+    setTitleDisplayMode("auto");
     setGenerationProgress(null);
     setExpandedFrameId(null);
     setSnapshot(buildInitialSnapshot());
@@ -791,7 +780,7 @@ export function WebUploadWorkbench({
     // Generated blobs embed frame order in upload descriptors, so any pre-upload reorder must
     // invalidate cached generation output before the user starts the final upload.
     generatedFramesRef.current = null;
-    setPlanView(buildPlanView(reorderedPlan));
+    setPlanView(buildPlanView(reorderedPlan, titleDisplayMode));
   }
 
   function applyPlanUpdate(nextPlan: WebUploadPlan | null) {
@@ -803,7 +792,7 @@ export function WebUploadWorkbench({
     // Generated blobs carry asset labels and heatmap descriptors, so any metadata-level plan edit
     // before upload must invalidate the cached generation output.
     generatedFramesRef.current = null;
-    setPlanView(buildPlanView(nextPlan));
+    setPlanView(buildPlanView(nextPlan, titleDisplayMode));
   }
 
   function renamePairingColumn(column: UploadPlanImageColumn, nextLabel: string) {
@@ -824,6 +813,19 @@ export function WebUploadWorkbench({
     applyPlanUpdate(setUploadPlanHeatmapReference(plan, nextLabel));
   }
 
+  function toggleTitleDisplayMode() {
+    const plan = planRef.current;
+    if (!plan || snapshot.stage !== "scanned") {
+      return;
+    }
+
+    const nextMode = getNextUploadPlanTitleDisplayMode(titleDisplayMode);
+    setTitleDisplayMode(nextMode);
+    // The title toggle is preview-only: keep the upload plan's auto titles intact so switching back
+    // cannot lose the scanner's compact frame labels.
+    setPlanView(buildPlanView(plan, nextMode));
+  }
+
   return (
     <>
       <Stack spacing={{ xs: 3.1, md: 4.2 }}>
@@ -842,11 +844,7 @@ export function WebUploadWorkbench({
               borderColor: "divider",
             }}
           >
-            <Typography
-              variant="h2"
-              component="h1"
-              sx={{ lineHeight: 1, textWrap: "balance" }}
-            >
+            <Typography variant="h2" component="h1" sx={{ lineHeight: 1, textWrap: "balance" }}>
               上传对比
             </Typography>
             <Stack
@@ -890,9 +888,7 @@ export function WebUploadWorkbench({
                   variant="contained"
                   startIcon={snapshot.stage === "failed" ? <Refresh /> : <CloudUpload />}
                   disabled={
-                    !canStart ||
-                    snapshot.stage === "generating" ||
-                    snapshot.stage === "completed"
+                    !canStart || snapshot.stage === "generating" || snapshot.stage === "completed"
                   }
                   onClick={startOrResumeUpload}
                   sx={{
@@ -1052,7 +1048,12 @@ export function WebUploadWorkbench({
 
             <Paper elevation={0} sx={webUploadPanelSx}>
               <Stack spacing={1.35}>
-                <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1}>
+                <Stack
+                  direction="row"
+                  alignItems="center"
+                  justifyContent="space-between"
+                  spacing={1}
+                >
                   <Typography variant="h6">上传详情</Typography>
                   <Chip
                     label={stageLabel(snapshot.stage)}
@@ -1086,6 +1087,7 @@ export function WebUploadWorkbench({
             onExpandedFrameChange={setExpandedFrameId}
             onHeatmapReferenceChange={changeHeatmapReference}
             onRenameColumn={renamePairingColumn}
+            onToggleTitleDisplayMode={toggleTitleDisplayMode}
             onReorder={reorderPairingRows}
           />
         </Box>

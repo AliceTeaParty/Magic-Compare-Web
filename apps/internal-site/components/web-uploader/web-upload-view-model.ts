@@ -1,13 +1,13 @@
-import type {
-  WebUploadFramePlan,
-  WebUploadIssue,
-  WebUploadPlan,
-} from "./web-upload-types";
+import type { WebUploadFramePlan, WebUploadIssue, WebUploadPlan } from "./web-upload-types";
+
+export type UploadPlanTitleDisplayMode = "auto" | "full";
 
 export interface FramePreviewRow {
   frameId: string;
   order: number;
   title: string;
+  autoTitle: string;
+  fullTitle: string;
   beforePath: string;
   afterPath: string;
   alternateAfter: Array<{ label: string; path: string }>;
@@ -20,6 +20,7 @@ export interface FramePreviewRow {
 
 export interface PlanView {
   sourceRootName: string;
+  titleDisplayMode: UploadPlanTitleDisplayMode;
   suggestedGroupSlug: string;
   suggestedGroupTitle: string;
   beforeLabel: string;
@@ -87,6 +88,40 @@ function orderedComparisonLabels(frame: WebUploadFramePlan) {
   return [...new Set(labels)];
 }
 
+function titleFromStructuredCaption(caption: string) {
+  const match = /^(?<title>.+?) \/ (?:(?<fps>[^/]+) fps \/ )?frame (?<frame>\d+)$/.exec(caption);
+  if (!match?.groups) {
+    return null;
+  }
+
+  const frameNumber = String(Number(match.groups.frame) || 0);
+  return `${match.groups.title}-${frameNumber}`;
+}
+
+function uploadPlanFrameFullTitle(frame: WebUploadFramePlan) {
+  return titleFromStructuredCaption(frame.caption) ?? frame.title;
+}
+
+export function getUploadPlanFrameDisplayTitles(
+  frame: WebUploadFramePlan,
+  mode: UploadPlanTitleDisplayMode,
+) {
+  const autoTitle = frame.title;
+  const fullTitle = uploadPlanFrameFullTitle(frame);
+
+  return {
+    title: mode === "full" ? fullTitle : autoTitle,
+    autoTitle,
+    fullTitle,
+  };
+}
+
+export function getNextUploadPlanTitleDisplayMode(
+  mode: UploadPlanTitleDisplayMode,
+): UploadPlanTitleDisplayMode {
+  return mode === "full" ? "auto" : "full";
+}
+
 export function getUploadPlanHeatmapReferenceOptions(plan: WebUploadPlan) {
   if (plan.frames.length === 0) {
     return [];
@@ -108,7 +143,10 @@ export function getUploadPlanHeatmapReferenceOptions(plan: WebUploadPlan) {
   return orderedComparisonLabels(firstFrame).filter((label) => commonLabels.has(label));
 }
 
-export function buildPlanView(plan: WebUploadPlan): PlanView {
+export function buildPlanView(
+  plan: WebUploadPlan,
+  titleDisplayMode: UploadPlanTitleDisplayMode = "auto",
+): PlanView {
   const heatmapReferenceOptions = getUploadPlanHeatmapReferenceOptions(plan);
   const frames = plan.frames.map((frame) => {
     const issueState = frameIssueState(frame, plan.issues);
@@ -120,10 +158,12 @@ export function buildPlanView(plan: WebUploadPlan): PlanView {
         path: asset.source.relativePath,
       }));
 
+    const titles = getUploadPlanFrameDisplayTitles(frame, titleDisplayMode);
+
     return {
       frameId: frameIdForFrame(frame),
       order: frame.order,
-      title: frame.title,
+      ...titles,
       beforePath: frame.before.source.relativePath,
       afterPath: frame.after.source.relativePath,
       alternateAfter,
@@ -135,6 +175,7 @@ export function buildPlanView(plan: WebUploadPlan): PlanView {
 
   return {
     sourceRootName: plan.sourceRootName,
+    titleDisplayMode,
     suggestedGroupSlug: plan.suggestedGroupSlug,
     suggestedGroupTitle: plan.suggestedGroupTitle,
     beforeLabel: plan.frames[0]?.before.label ?? "Before",
@@ -178,19 +219,24 @@ export function renameUploadPlanAssetLabel(
   const currentLabelSet = new Set(currentColumnLabels.map((label) => label.toLowerCase()));
   const existingLabels = new Set(
     plan.frames
-      .flatMap((frame) => [frame.before.label, frame.after.label, ...frame.misc.map((asset) => asset.label)])
+      .flatMap((frame) => [
+        frame.before.label,
+        frame.after.label,
+        ...frame.misc.map((asset) => asset.label),
+      ])
       .filter((label) => !currentLabelSet.has(label.toLowerCase()))
       .map((label) => label.toLowerCase()),
   );
   // Column labels drive table headers and the global heatmap selector, so keep them unique. The
   // target role is explicit because older scans can contain a misc column also named "After".
-  if (normalizedLabel.toLowerCase() === "heatmap" || existingLabels.has(normalizedLabel.toLowerCase())) {
+  if (
+    normalizedLabel.toLowerCase() === "heatmap" ||
+    existingLabels.has(normalizedLabel.toLowerCase())
+  ) {
     return null;
   }
   const hasBuiltInColumnWithCurrentLabel = plan.frames.some(
-    (frame) =>
-      frame.before.label === currentLabel ||
-      frame.after.label === currentLabel,
+    (frame) => frame.before.label === currentLabel || frame.after.label === currentLabel,
   );
   const shouldRenameHeatmapReference =
     plan.heatmapReferenceLabel === currentLabel &&
@@ -198,20 +244,13 @@ export function renameUploadPlanAssetLabel(
 
   return {
     ...plan,
-    heatmapReferenceLabel:
-      shouldRenameHeatmapReference
-        ? normalizedLabel
-        : plan.heatmapReferenceLabel,
+    heatmapReferenceLabel: shouldRenameHeatmapReference
+      ? normalizedLabel
+      : plan.heatmapReferenceLabel,
     frames: plan.frames.map((frame) => ({
       ...frame,
-      before:
-        column.kind === "before"
-          ? { ...frame.before, label: normalizedLabel }
-          : frame.before,
-      after:
-        column.kind === "after"
-          ? { ...frame.after, label: normalizedLabel }
-          : frame.after,
+      before: column.kind === "before" ? { ...frame.before, label: normalizedLabel } : frame.before,
+      after: column.kind === "after" ? { ...frame.after, label: normalizedLabel } : frame.after,
       misc: frame.misc.map((asset) =>
         column.kind === "misc" && asset.label === column.label
           ? { ...asset, label: normalizedLabel }
@@ -221,10 +260,7 @@ export function renameUploadPlanAssetLabel(
   };
 }
 
-export function setUploadPlanHeatmapReference(
-  plan: WebUploadPlan,
-  nextLabel: string,
-) {
+export function setUploadPlanHeatmapReference(plan: WebUploadPlan, nextLabel: string) {
   if (
     plan.heatmapReferenceLabel === nextLabel ||
     !getUploadPlanHeatmapReferenceOptions(plan).includes(nextLabel)

@@ -29,6 +29,7 @@ import {
 import {
   Alert,
   Box,
+  Button,
   Chip,
   Collapse,
   FormControl,
@@ -40,11 +41,7 @@ import {
   Tooltip,
   Typography,
 } from "@mui/material";
-import type {
-  BrowserUploadFile,
-  WebUploadFramePlan,
-  WebUploadPlan,
-} from "./web-upload-types";
+import type { BrowserUploadFile, WebUploadFramePlan, WebUploadPlan } from "./web-upload-types";
 import {
   webUploadColors,
   webUploadMotion,
@@ -82,6 +79,7 @@ interface PairingPreviewPanelProps {
   hasBlockingIssues: boolean;
   onExpandedFrameChange: (frameId: string | null) => void;
   onHeatmapReferenceChange: (label: string) => void;
+  onToggleTitleDisplayMode: () => void;
   onRenameColumn: (column: UploadPlanImageColumn, nextLabel: string) => void;
   onReorder: (activeFrameId: string, overFrameId: string | null) => void;
 }
@@ -97,13 +95,7 @@ function alternateAssetForLabel(frame: WebUploadFramePlan | null, label: string)
   return frame?.misc.find((asset) => asset.label === label) ?? null;
 }
 
-function SmallLazyThumbnail({
-  alt,
-  source,
-}: {
-  alt: string;
-  source: BrowserUploadFile | null;
-}) {
+function SmallLazyThumbnail({ alt, source }: { alt: string; source: BrowserUploadFile | null }) {
   const rootRef = useRef<HTMLSpanElement | null>(null);
   const [isVisible, setIsVisible] = useState(false);
   const [url, setUrl] = useState<string | null>(null);
@@ -213,21 +205,27 @@ function ImageCell({ muted = false, path, source }: ImageCellProps) {
 
 function IssueStatus({ row }: { row: FramePreviewRow }) {
   if (row.hasError) {
-    return <Typography aria-label="错误" sx={{ userSelect: "none" }}>⛔</Typography>;
+    return (
+      <Typography aria-label="错误" sx={{ userSelect: "none" }}>
+        ⛔
+      </Typography>
+    );
   }
   if (row.hasWarning) {
-    return <Typography aria-label="警告" sx={{ userSelect: "none" }}>⚠️</Typography>;
+    return (
+      <Typography aria-label="警告" sx={{ userSelect: "none" }}>
+        ⚠️
+      </Typography>
+    );
   }
-  return <Typography aria-label="可用" sx={{ userSelect: "none" }}>✅</Typography>;
+  return (
+    <Typography aria-label="可用" sx={{ userSelect: "none" }}>
+      ✅
+    </Typography>
+  );
 }
 
-function ExpandedPreview({
-  frame,
-  urls,
-}: {
-  frame: WebUploadFramePlan;
-  urls: PreviewUrls | null;
-}) {
+function ExpandedPreview({ frame, urls }: { frame: WebUploadFramePlan; urls: PreviewUrls | null }) {
   return (
     <Collapse in={Boolean(urls)} timeout={180} unmountOnExit>
       <Box
@@ -508,10 +506,7 @@ function SortablePairingRow({
           const alternate = row.alternateAfter.find((item) => item.label === label);
           const alternateAsset = alternateAssetForLabel(previewFrame, label);
           return (
-            <Box
-              key={label}
-              sx={{ display: { xs: "none", md: "block" }, minWidth: 0 }}
-            >
+            <Box key={label} sx={{ display: { xs: "none", md: "block" }, minWidth: 0 }}>
               <ImageCell
                 muted={!alternate}
                 path={alternate?.path ?? null}
@@ -536,10 +531,7 @@ function SortablePairingRow({
         />
       </Box>
       {previewFrame ? (
-        <ExpandedPreview
-          frame={previewFrame}
-          urls={expanded ? previewUrls : null}
-        />
+        <ExpandedPreview frame={previewFrame} urls={expanded ? previewUrls : null} />
       ) : null}
     </Box>
   );
@@ -553,6 +545,7 @@ export function PairingPreviewPanel({
   hasBlockingIssues,
   onExpandedFrameChange,
   onHeatmapReferenceChange,
+  onToggleTitleDisplayMode,
   onRenameColumn,
   onReorder,
 }: PairingPreviewPanelProps) {
@@ -663,6 +656,21 @@ export function PairingPreviewPanel({
                 </Select>
               </FormControl>
             ) : null}
+            <Button
+              size="small"
+              variant="outlined"
+              onClick={onToggleTitleDisplayMode}
+              disabled={!canReorder}
+              sx={{
+                height: webUploadSizes.compactControlHeight,
+                borderRadius: webUploadRadii.control,
+                px: 1.25,
+                fontSize: 12,
+                whiteSpace: "nowrap",
+              }}
+            >
+              {planView.titleDisplayMode === "full" ? "恢复自动帧号" : "使用完整 m2ts-帧号"}
+            </Button>
             <Chip
               icon={hasBlockingIssues ? <WarningAmber /> : <CheckCircle />}
               label={`${planView.healthyPairCount} / ${planView.frames.length}`}
@@ -725,7 +733,9 @@ export function PairingPreviewPanel({
                     <EditableColumnHeader
                       canEdit={canReorder}
                       label={label}
-                      onRename={(_label, nextLabel) => onRenameColumn({ kind: "misc", label }, nextLabel)}
+                      onRename={(_label, nextLabel) =>
+                        onRenameColumn({ kind: "misc", label }, nextLabel)
+                      }
                     />
                   </Box>
                 ))}
@@ -758,7 +768,10 @@ export function PairingPreviewPanel({
       </Box>
 
       {planView?.issues.length ? (
-        <Stack spacing={0.7} sx={{ px: 1.5, py: 1.25, borderTop: "1px solid", borderColor: "divider" }}>
+        <Stack
+          spacing={0.7}
+          sx={{ px: 1.5, py: 1.25, borderTop: "1px solid", borderColor: "divider" }}
+        >
           {planView.issues.slice(0, 3).map((issue, index) => (
             <Alert key={`${issue.path}-${index}`} severity={issue.severity} sx={{ py: 0.45 }}>
               {issue.message}

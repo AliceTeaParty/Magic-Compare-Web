@@ -3,6 +3,7 @@ import {
   buildPlanView,
   compactUploadFilename,
   frameIdForFrame,
+  getNextUploadPlanTitleDisplayMode,
   getUploadPlanHeatmapReferenceOptions,
   renameUploadPlanAssetLabel,
   reorderUploadPlan,
@@ -72,11 +73,7 @@ describe("web upload view model", () => {
 
     const reordered = reorderUploadPlan(originalPlan, activeId, overId);
     expect(reordered).not.toBeNull();
-    expect(reordered?.frames.map((item) => item.title)).toEqual([
-      "Frame 3",
-      "Frame 1",
-      "Frame 2",
-    ]);
+    expect(reordered?.frames.map((item) => item.title)).toEqual(["Frame 3", "Frame 1", "Frame 2"]);
     expect(buildPlanView(reordered!).frames.map((item) => item.title)).toEqual([
       "Frame 3",
       "Frame 1",
@@ -98,9 +95,39 @@ describe("web upload view model", () => {
   it("ignores unknown drag ids", () => {
     const originalPlan = plan();
 
-    expect(reorderUploadPlan(originalPlan, "missing", frameIdForFrame(originalPlan.frames[0]))).toBeNull();
-    expect(reorderUploadPlan(originalPlan, frameIdForFrame(originalPlan.frames[0]), "missing")).toBeNull();
-    expect(reorderUploadPlan(originalPlan, frameIdForFrame(originalPlan.frames[0]), null)).toBeNull();
+    expect(
+      reorderUploadPlan(originalPlan, "missing", frameIdForFrame(originalPlan.frames[0])),
+    ).toBeNull();
+    expect(
+      reorderUploadPlan(originalPlan, frameIdForFrame(originalPlan.frames[0]), "missing"),
+    ).toBeNull();
+    expect(
+      reorderUploadPlan(originalPlan, frameIdForFrame(originalPlan.frames[0]), null),
+    ).toBeNull();
+  });
+
+  it("switches to full frame titles and restores the original automatic titles", () => {
+    const originalPlan = plan();
+    originalPlan.frames[0] = {
+      ...originalPlan.frames[0],
+      title: "12-27240",
+      caption: "WatanaRe Anime Vol1 / 24 fps / frame 27240",
+    };
+
+    const autoView = buildPlanView(originalPlan, "auto");
+    const fullMode = getNextUploadPlanTitleDisplayMode(autoView.titleDisplayMode);
+    const fullView = buildPlanView(originalPlan, fullMode);
+    const restoredMode = getNextUploadPlanTitleDisplayMode(fullView.titleDisplayMode);
+    const restoredView = buildPlanView(originalPlan, restoredMode);
+
+    expect(autoView.frames[0]).toMatchObject({
+      title: "12-27240",
+      autoTitle: "12-27240",
+      fullTitle: "WatanaRe Anime Vol1-27240",
+    });
+    expect(fullView.frames[0].title).toBe("WatanaRe Anime Vol1-27240");
+    expect(originalPlan.frames[0].title).toBe("12-27240");
+    expect(restoredView.frames[0].title).toBe("12-27240");
   });
 
   it("exposes up to three alternate after columns for preview", () => {
@@ -158,11 +185,7 @@ describe("web upload view model", () => {
 
     const renamed = renameUploadPlanAssetLabel(originalPlan, { kind: "after" }, "Output");
 
-    expect(renamed?.frames.map((item) => item.after.label)).toEqual([
-      "Output",
-      "Output",
-      "Output",
-    ]);
+    expect(renamed?.frames.map((item) => item.after.label)).toEqual(["Output", "Output", "Output"]);
     expect(renamed?.heatmapReferenceLabel).toBe("Output");
     expect(getUploadPlanHeatmapReferenceOptions(renamed!)).toEqual(["Output"]);
   });
@@ -180,8 +203,12 @@ describe("web upload view model", () => {
     expect(renameUploadPlanAssetLabel(originalPlan, { kind: "before" }, "")).toBeNull();
     expect(renameUploadPlanAssetLabel(originalPlan, { kind: "before" }, "After")).toBeNull();
     expect(renameUploadPlanAssetLabel(originalPlan, { kind: "after" }, "Rip")).toBeNull();
-    expect(renameUploadPlanAssetLabel(originalPlan, { kind: "misc", label: "Rip" }, "Degrain")).toBeNull();
-    expect(renameUploadPlanAssetLabel(originalPlan, { kind: "misc", label: "Rip" }, "Heatmap")).toBeNull();
+    expect(
+      renameUploadPlanAssetLabel(originalPlan, { kind: "misc", label: "Rip" }, "Degrain"),
+    ).toBeNull();
+    expect(
+      renameUploadPlanAssetLabel(originalPlan, { kind: "misc", label: "Rip" }, "Heatmap"),
+    ).toBeNull();
   });
 
   it("only exposes global heatmap references available on every frame", () => {
