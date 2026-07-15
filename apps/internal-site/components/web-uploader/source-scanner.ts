@@ -14,6 +14,9 @@ const PRIMARY_AFTER_VARIANTS = new Set(["after", "out", "output"]);
 const COMPARISON_VARIANTS = new Set([
   ...PRIMARY_AFTER_VARIANTS,
   "rip",
+  "flt",
+  "filter",
+  "filtered",
   "deband",
   "nodeband",
   "noband",
@@ -39,6 +42,9 @@ const MATCH_KEY_VARIANTS = [
   "out",
   "output",
   "rip",
+  "flt",
+  "filter",
+  "filtered",
   "misc",
   "heatmap",
   "nodeband",
@@ -600,6 +606,12 @@ function parseEntries(entries: BrowserUploadFile[], variantOverride?: string) {
   return { candidates, ignored };
 }
 
+function defaultHeatmapReferenceLabel(frames: WebUploadFramePlan[]) {
+  // Default heatmap generation must follow the selected primary comparison column; otherwise
+  // src/rip-only imports keep a stale "After" reference and fail during asset generation.
+  return frames[0]?.after.label ?? "After";
+}
+
 function buildFlatPlan(sourceRootName: string, entries: BrowserUploadFile[], ignoredFiles: IgnoredUploadFile[]): WebUploadPlan {
   const parsed = parseEntries(entries);
   const grouped = new Map<string, SourceCandidate[]>();
@@ -639,7 +651,7 @@ function buildFlatPlan(sourceRootName: string, entries: BrowserUploadFile[], ign
     suggestedGroupSlug: identity.slug,
     suggestedGroupTitle: identity.title,
     frames,
-    heatmapReferenceLabel: "After",
+    heatmapReferenceLabel: defaultHeatmapReferenceLabel(frames),
     ignoredFiles: [...ignoredFiles, ...parsed.ignored],
     issues,
   };
@@ -727,7 +739,7 @@ function buildNestedPlan(sourceRootName: string, entries: BrowserUploadFile[], i
     suggestedGroupSlug: identity.slug,
     suggestedGroupTitle: identity.title,
     frames,
-    heatmapReferenceLabel: "After",
+    heatmapReferenceLabel: defaultHeatmapReferenceLabel(frames),
     ignoredFiles: ignored,
     issues,
   };

@@ -77,6 +77,7 @@ describe("scanBrowserUploadFiles", () => {
 
     expect(plan.frames).toHaveLength(1);
     expect(plan.frames[0].after.label).toBe("Rip");
+    expect(plan.heatmapReferenceLabel).toBe("Rip");
     expect(plan.frames[0].misc.map((asset) => asset.label)).toEqual(["Flt"]);
     expect(plan.frames[0].after.source.relativePath).toBe(
       "after/30_ULTRAMAN_DYNA_BD_BOX_1_00006 - 01917 - rip.png",
@@ -254,6 +255,24 @@ describe("scanBrowserUploadFiles", () => {
     expect(plan.frames[0].title).toBe("BOX1-00006-1917");
     expect(plan.frames[0].before.label).toBe("Src");
     expect(plan.frames[0].after.label).toBe("Rip");
+    expect(plan.heatmapReferenceLabel).toBe("Rip");
+    expect(plan.frames[0].misc.map((asset) => asset.label)).toEqual(["Flt"]);
+    expect(plan.issues).toEqual([]);
+  });
+
+  it("groups flat spaced flt variants with the same frame", () => {
+    const plan = scanBrowserUploadFiles(
+      [
+        image("sample/clip - 001 - src.png"),
+        image("sample/clip - 001 - rip.png"),
+        image("sample/clip - 001 - flt.png"),
+      ],
+      "sample",
+    );
+
+    expect(plan.frames).toHaveLength(1);
+    expect(plan.frames[0].after.label).toBe("Rip");
+    expect(plan.heatmapReferenceLabel).toBe("Rip");
     expect(plan.frames[0].misc.map((asset) => asset.label)).toEqual(["Flt"]);
     expect(plan.issues).toEqual([]);
   });
