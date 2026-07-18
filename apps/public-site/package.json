@@ -17,7 +17,7 @@
     "@magic-compare/content-schema": "workspace:*",
     "@magic-compare/shared-utils": "workspace:*",
     "@magic-compare/ui": "workspace:*",
-    "@mui/icons-material": "^7.0.2",
+    "@mui/icons-material": "^9.2.0",
     "@mui/material": "^7.0.2",
     "motion": "^12.23.24",
     "next": "^15.3.1",
