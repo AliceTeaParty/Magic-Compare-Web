@@ -6,6 +6,23 @@ Entries before that date are summarized at release level instead of being recons
 
 ## Unreleased
 
+## v1.9.3 - 2026-08-03
+
+AMD64 container release modernization. This release updates GHCR automation to current Node 24 actions and removes redundant image builds for the Intel N100 deployment target.
+
+### Changed
+
+- Updated the GHCR workflow to `setup-buildx-action@v4`, `login-action@v4`, `metadata-action@v6`, `build-push-action@v7`, and `upload-artifact@v7`.
+- Limited release images to `linux/amd64` and removed the need for multi-platform emulation.
+- Changed the smoke path to load a Buildx image, start Compose with `--no-build`, and share a `type=gha,mode=max` cache with the publish job.
+- Split lockfile dependency fetching from source copying in the runtime Dockerfile, then installed from the fetched store offline.
+- Excluded documentation and the deprecated Python uploader from the Docker build context.
+
+### Fixed
+
+- Removed the Node.js 20 action runtime warnings from the GHCR image workflow.
+- Ensured the smoke test runs the same Buildx image path used by the release build instead of rebuilding it through Compose.
+
 ## v1.9.2 - 2026-08-03
 
 Web uploader parsing and ordering patch. This release keeps filename recognition, frame ordering, and heatmap reference selection consistent across the upload plan.

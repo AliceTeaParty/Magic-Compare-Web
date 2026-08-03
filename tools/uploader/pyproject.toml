@@ -1,6 +1,6 @@
 [project]
 name = "magic-compare-uploader"
-version = "1.9.2"
+version = "1.9.3"
 description = "Local CLI importer for Magic Compare Web"
 requires-python = ">=3.11"
 dependencies = [
