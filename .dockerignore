@@ -1,5 +1,7 @@
 .git
 .github
+docs
+tools
 .env
 .next
 .turbo

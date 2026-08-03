@@ -539,16 +539,23 @@ docker build -f docker/internal-site.Dockerfile -t magic-compare/internal-site .
 
 1. `smoke`
 
-- 先用 `docker compose` 跑通 `internal-site-init -> internal-site`
+- 使用 Node 24 runtime 的 actions：`setup-buildx-action@v4`、`build-push-action@v7`、`upload-artifact@v7`
+- 只构建 `linux/amd64`，与 Intel N100 / Debian 12 目标机一致，不安装 QEMU
+- 构建上下文排除文档和弃用的 Python uploader，保留 Web workspace、共享包、发布内容与运行脚本
+- Buildx 先构建并 `load` 本地 smoke 镜像，通过 `type=gha,mode=max` 缓存完整构建层
+- `docker compose --no-build` 跑通 `internal-site-init -> internal-site`，确保 smoke 测试的是 Buildx 产物
 - 只验证运行路径和健康探活，不替代 `public:export`
 - 如果 smoke 需要验证 demo seed，必须同时显式提供对象存储配置和 `MAGIC_COMPARE_HIDE_DEMO=false`
 - 如果要补浏览器 smoke，至少额外验证 viewer 主图和 thumb 的 `naturalWidth > 0`
 - 不要把 `HTTP 200` 或 `img.complete === true` 当成图片真加载的充分证据
 - 失败时保留 compose 日志
+- 本地 `load` 不保留 attestation，因此 smoke 构建显式关闭 provenance；正式发布构建仍保留 BuildKit 默认 provenance
 
 2. `publish`
 
 - 只有 `smoke` 成功后才推 GHCR
+- 使用 `login-action@v4`、`metadata-action@v6`、`build-push-action@v7`，避免 Node 20 action runtime
+- 复用 `ghcr-docker-amd64` smoke 缓存，避免在独立 runner 上重新安装依赖和完整编译
 - `main` 标签只允许从 `main` 分支发布
 - 手动触发如果不在 `main`，也不应覆盖 `main` 镜像标签
 
