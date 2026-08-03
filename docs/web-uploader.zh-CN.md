@@ -15,8 +15,8 @@
 - 选择本地目录，推荐 Chrome / Edge 使用 `showDirectoryPicker()`。
 - 浏览器不支持目录选择 API 时，退回 `<input webkitdirectory>`。
 - 扫描平铺或常见 before / after 目录结构。
-- 从文件或目录后缀推断 `Before`、`Src`、`After`、`Rip`、`NoDeband`、`Degrain` 等对比列。
-- `out` / `output` / `after` 作为主 `After`；`rip` 保持独立 `Rip` 列，不和 `After` 混淆。
+- 从文件或目录后缀推断 `Before`、`Src`、`After`、`Rip`、`Flt`、`NoDeband`、`Degrain` 等对比列；文件名里的显式后缀优先于目录提示。
+- `out` / `output` / `after` 作为主 `After`；没有这些变量时优先用 `rip`，并把 `flt` / `filter` / `filtered` 保留为独立比较列。
 - 基准列、主比较列和备选列的表头都可以在上传前编辑；上传开始后锁定。列名必须全局唯一，且不能命名为 `Heatmap`。
 - VSEditor 文件名允许带 `.gen.vpy` / `.m2ts` 等 source marker，也允许省略 marker。
 - VSEditor 文件名默认显示为 `<episode>-<frame>`；配对预览可以切换到 `<文件名前缀> - <frame>`，并把选择写入最终上传标题。

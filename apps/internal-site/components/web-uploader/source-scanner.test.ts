@@ -103,7 +103,25 @@ describe("scanBrowserUploadFiles", () => {
     expect(plan.frames).toHaveLength(1);
     expect(plan.frames[0].before.label).toBe("Src");
     expect(plan.frames[0].after.label).toBe("Rip");
+    expect(plan.frames[0].misc.map((asset) => asset.label)).toEqual(["Flt"]);
     expect(plan.heatmapReferenceLabel).toBe("Rip");
+  });
+
+  it("recognizes flat src, rip, and flt variables with spaced separators", () => {
+    const plan = scanBrowserUploadFiles(
+      [
+        image("sample/30_ULTRAMAN_DYNA_BD_BOX_1_00006 - 01917 - flt.png"),
+        image("sample/30_ULTRAMAN_DYNA_BD_BOX_1_00006 - 01917 - rip.png"),
+        image("sample/30_ULTRAMAN_DYNA_BD_BOX_1_00006 - 01917 - src.png"),
+      ],
+      "sample",
+    );
+
+    expect(plan.frames).toHaveLength(1);
+    expect(plan.frames[0].before.label).toBe("Src");
+    expect(plan.frames[0].after.label).toBe("Rip");
+    expect(plan.frames[0].misc.map((asset) => asset.label)).toEqual(["Flt"]);
+    expect(plan.issues).toEqual([]);
   });
 
   it("uses a common comparison label when the first frame after label is not shared", () => {
@@ -245,6 +263,24 @@ describe("scanBrowserUploadFiles", () => {
       "24_WATANARE_ANIME_VOL1_00000.gen.vpy-27240-output.png",
     );
     expect(plan.frames[0].misc.map((asset) => asset.label)).toEqual(["Rip"]);
+  });
+
+  it("preserves explicit structured variables inside a generic after directory", () => {
+    const plan = scanBrowserUploadFiles(
+      [
+        image("case/before/24_WATANARE_ANIME_VOL1_00000.gen.vpy-27240-src.png"),
+        image("case/after/24_WATANARE_ANIME_VOL1_00000.gen.vpy-27240-output.png"),
+        image("case/after/24_WATANARE_ANIME_VOL1_00000.gen.vpy-27240-rip.png"),
+        image("case/after/24_WATANARE_ANIME_VOL1_00000.gen.vpy-27240-flt.png"),
+      ],
+      "case",
+    );
+
+    expect(plan.frames).toHaveLength(1);
+    expect(plan.frames[0].after.label).toBe("After");
+    expect(plan.frames[0].after.source.relativePath).toContain("-output.png");
+    expect(plan.frames[0].misc.map((asset) => asset.label)).toEqual(["Rip", "Flt"]);
+    expect(plan.issues).toEqual([]);
   });
 
   it("formats VSEditor frame titles with episode width from the scanned set", () => {

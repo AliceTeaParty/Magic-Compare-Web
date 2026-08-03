@@ -15,6 +15,9 @@ const PRIMARY_AFTER_VARIANTS = new Set(["after", "out", "output"]);
 const COMPARISON_VARIANTS = new Set([
   ...PRIMARY_AFTER_VARIANTS,
   "rip",
+  "flt",
+  "filter",
+  "filtered",
   "deband",
   "nodeband",
   "noband",
@@ -40,6 +43,9 @@ const MATCH_KEY_VARIANTS = [
   "out",
   "output",
   "rip",
+  "flt",
+  "filter",
+  "filtered",
   "misc",
   "heatmap",
   "nodeband",
@@ -300,6 +306,12 @@ function suggestNonFlatLayout(entries: BrowserUploadFile[]): NonFlatLayout {
   return { beforeDir, afterDirs, heatmapDirs, miscDirs };
 }
 
+// Filename suffixes describe the actual comparison variable; directory names only fill in names
+// that omit a suffix, such as `after/001.png`.
+function resolveCandidateVariant(explicitVariant: string | null | undefined, directoryHint?: string) {
+  return (explicitVariant ?? directoryHint ?? "output").trim().toLowerCase();
+}
+
 function parseCandidate(entry: BrowserUploadFile, variantOverride?: string): SourceCandidate | null {
   const pathStem = stem(entry.relativePath);
   const structured = structuredFrameInfo(pathStem);
@@ -307,7 +319,7 @@ function parseCandidate(entry: BrowserUploadFile, variantOverride?: string): Sou
     return {
       entry,
       originalName: basename(entry.relativePath),
-      variant: (variantOverride ?? structured.variant).trim().toLowerCase(),
+      variant: resolveCandidateVariant(structured.variant, variantOverride),
       fps: structured.fps,
       episode: structured.episode,
       frameNumber: structured.frameNumber,
@@ -324,7 +336,7 @@ function parseCandidate(entry: BrowserUploadFile, variantOverride?: string): Sou
   if (parsedFilename) {
     const prefix = parsedFilename.prefix;
     const frameNumber = Number(parsedFilename.frame.replace(/^0+/, "") || "0");
-    const variant = (variantOverride ?? parsedFilename.variant ?? "output").trim().toLowerCase();
+    const variant = resolveCandidateVariant(parsedFilename.variant, variantOverride);
     const fps = extractFps(pathStem);
     const episode = extractEpisode(prefix);
     const title = `${fps}_${episode}_${frameNumber}`;
@@ -350,7 +362,7 @@ function parseCandidate(entry: BrowserUploadFile, variantOverride?: string): Sou
     return {
       entry,
       originalName: basename(entry.relativePath),
-      variant: (variantOverride ?? fallbackMatch.groups.variant).trim().toLowerCase(),
+      variant: resolveCandidateVariant(fallbackMatch.groups.variant, variantOverride),
       fps: "00",
       episode: "00",
       frameNumber,
@@ -390,8 +402,17 @@ function candidateFrameKey(candidate: SourceCandidate) {
   return candidate.frameKey;
 }
 
+const AFTER_VARIANT_PRIORITY = new Map([
+  ["out", 0],
+  ["output", 1],
+  ["after", 2],
+  ["rip", 3],
+]);
+
 function afterPriority(candidate: SourceCandidate) {
-  const priority = candidate.variant === "out" ? 0 : candidate.variant === "output" ? 1 : candidate.variant === "after" ? 2 : 3;
+  // Prefer conventional output names, then Rip as the primary comparison when only derived
+  // variants such as Rip/Flt are present.
+  const priority = AFTER_VARIANT_PRIORITY.get(candidate.variant) ?? 4;
   return `${priority}:${candidate.variant}:${candidate.originalName.toLowerCase()}`;
 }
 
