@@ -135,16 +135,11 @@ export function MagicThemeProvider({ children }: PropsWithChildren) {
           MuiButton: {
             styleOverrides: {
               root: {
+                // Keep button coordinates stable while hover feedback changes only paint.
                 borderRadius: 999,
                 paddingInline: 17,
                 minHeight: 40,
-                transition: interactiveTransition("transform", "background-color", "border-color", "box-shadow"),
-                "&:hover": {
-                  transform: "translateY(-1px)",
-                },
-                "&:active": {
-                  transform: "translateY(0)",
-                },
+                transition: interactiveTransition("background-color", "border-color", "box-shadow"),
               },
               contained: {
                 background: `linear-gradient(180deg, ${tokens.primary.light} 0%, ${tokens.primary.main} 100%)`,
@@ -177,9 +172,8 @@ export function MagicThemeProvider({ children }: PropsWithChildren) {
                 borderRadius: 13,
                 border: `1px solid ${subtleDivider}`,
                 backgroundColor: alpha(tokens.background.elevated, 0.76),
-                transition: interactiveTransition("transform", "background-color", "border-color"),
+                transition: interactiveTransition("background-color", "border-color"),
                 "&:hover": {
-                  transform: "translateY(-1px)",
                   borderColor: alpha(tokens.primary.main, 0.3),
                   backgroundColor: alpha(tokens.background.elevated, 0.96),
                 },

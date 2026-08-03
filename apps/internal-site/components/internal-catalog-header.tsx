@@ -9,10 +9,7 @@ import { CaseCreateButton } from "./case-create-button";
  */
 export function InternalCatalogHeader() {
   return (
-    <Stack spacing={1.55} sx={{ width: "100%" }}>
-      <Typography variant="overline" color="primary.main">
-        Magic Compare Web / Internal
-      </Typography>
+    <Stack sx={{ width: "100%" }}>
       <Box
         sx={{
           display: "grid",
@@ -22,17 +19,7 @@ export function InternalCatalogHeader() {
           pb: { xs: 2.75, md: 3.4 },
           borderBottom: "1px solid",
           borderColor: "divider",
-          animation: "catalogHeaderRise 320ms cubic-bezier(0.22, 1, 0.36, 1)",
-          "@keyframes catalogHeaderRise": {
-            from: {
-              opacity: 0,
-              transform: "translateY(18px)",
-            },
-            to: {
-              opacity: 1,
-              transform: "translateY(0)",
-            },
-          },
+          // Keep navigation targets at their final position instead of animating the whole header.
         }}
       >
         <Typography variant="h2" component="h1">

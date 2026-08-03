@@ -25,11 +25,10 @@ export function CaseDirectoryGrid({ items }: { items: CaseCatalogItem[] }) {
         alignItems: "stretch",
       }}
     >
-      {items.map((item, index) => (
+      {items.map((item) => (
         <CaseDirectoryCard
           key={item.id}
           item={item}
-          index={index}
           // Keep every card on the same width after the lead-card experiment proved worse for
           // scanability than a plain equal grid.
           isLead={false}

@@ -9,11 +9,9 @@ import type { CaseCatalogItem } from "@/lib/server/repositories/content-reposito
  */
 export function CaseDirectoryCard({
   item,
-  index,
   isLead,
 }: {
   item: CaseCatalogItem;
-  index: number;
   isLead: boolean;
 }) {
   return (
@@ -27,28 +25,9 @@ export function CaseDirectoryCard({
         background:
           "linear-gradient(180deg, rgba(255,255,255,0.065) 0%, rgba(255,255,255,0.025) 100%)",
         minHeight: { xs: 246, md: 258 },
+        // Cards render at their final coordinates so navigation never exposes late or moving targets.
         position: "relative",
         overflow: "hidden",
-        animation: "catalogCardRise 420ms cubic-bezier(0.22, 1, 0.36, 1) both",
-        animationDelay: `${index * 50}ms`,
-        "@keyframes catalogCardRise": {
-          from: {
-            opacity: 0,
-            transform: "translateY(16px)",
-          },
-          to: {
-            opacity: 1,
-            transform: "translateY(0)",
-          },
-        },
-        "&::before": {
-          content: '""',
-          position: "absolute",
-          inset: 0,
-          background:
-            "radial-gradient(circle at top right, rgba(232, 198, 246, 0.12), transparent 32%)",
-          pointerEvents: "none",
-        },
       }}
     >
       <Stack

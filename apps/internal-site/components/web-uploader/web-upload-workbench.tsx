@@ -21,6 +21,7 @@ import {
   Button,
   Chip,
   FormControl,
+  IconButton,
   InputLabel,
   LinearProgress,
   MenuItem,
@@ -28,6 +29,7 @@ import {
   Select,
   Stack,
   TextField,
+  Tooltip,
   Typography,
 } from "@mui/material";
 import type { ViewerMode } from "@magic-compare/content-schema";
@@ -846,10 +848,7 @@ export function WebUploadWorkbench({
   return (
     <>
       <Stack spacing={{ xs: 3.1, md: 4.2 }}>
-        <Stack spacing={1.55} sx={{ width: "100%" }}>
-          <Typography variant="overline" color="primary.main">
-            Magic Compare Web / Internal
-          </Typography>
+        <Stack sx={{ width: "100%" }}>
           <Box
             sx={{
               display: "grid",
@@ -868,20 +867,19 @@ export function WebUploadWorkbench({
             >
               上传对比
             </Typography>
-            <Stack
-              direction="row"
-              spacing={1}
-              alignItems="center"
-              justifyContent={{ xs: "flex-start", md: "flex-end" }}
-              flexWrap="wrap"
-              useFlexGap
+            <Box
               sx={{
-                // Mirrors Internal Catalog's header grid so the upload action keeps the same
-                // visual anchor when users move between the list and the uploader.
+                // Fixed action columns keep every button at the same screen coordinate while the
+                // upload runner changes state or exposes the destructive abandon action.
+                display: "grid",
+                gridTemplateColumns: "92px 42px 132px",
+                gap: 1,
+                alignItems: "center",
                 justifySelf: { xs: "start", md: "end" },
                 "& .MuiButton-root": {
                   minHeight: 42,
-                  px: 2.1,
+                  width: "100%",
+                  px: 1.25,
                 },
               }}
             >
@@ -900,7 +898,35 @@ export function WebUploadWorkbench({
               >
                 返回
               </Button>
-              {snapshot.stage === "uploading" ? (
+              <Tooltip title={canAbandon ? "放弃本次上传" : ""}>
+                <Box
+                  component="span"
+                  sx={{
+                    width: 42,
+                    height: 42,
+                    visibility: canAbandon ? "visible" : "hidden",
+                  }}
+                >
+                  <IconButton
+                    aria-label="放弃本次上传"
+                    color="warning"
+                    disabled={!canAbandon}
+                    onClick={abandonUpload}
+                    sx={{ width: 42, height: 42 }}
+                  >
+                    <DeleteOutline />
+                  </IconButton>
+                </Box>
+              </Tooltip>
+              {snapshot.stage === "completed" ? (
+                <Button
+                  variant="contained"
+                  endIcon={<OpenInNew />}
+                  onClick={openCompletedGroup}
+                >
+                  打开 Group
+                </Button>
+              ) : snapshot.stage === "uploading" ? (
                 <Button variant="outlined" startIcon={<Pause />} onClick={pauseUpload}>
                   暂停
                 </Button>
@@ -908,11 +934,7 @@ export function WebUploadWorkbench({
                 <Button
                   variant="contained"
                   startIcon={snapshot.stage === "failed" ? <Refresh /> : <CloudUpload />}
-                  disabled={
-                    !canStart ||
-                    snapshot.stage === "generating" ||
-                    snapshot.stage === "completed"
-                  }
+                  disabled={!canStart || snapshot.stage === "generating"}
                   onClick={startOrResumeUpload}
                   sx={{
                     color: webUploadColors.primaryButtonText,
@@ -927,22 +949,7 @@ export function WebUploadWorkbench({
                     : "开始上传"}
                 </Button>
               )}
-              {canAbandon ? (
-                <Button
-                  variant="outlined"
-                  color="warning"
-                  startIcon={<DeleteOutline />}
-                  onClick={abandonUpload}
-                >
-                  放弃
-                </Button>
-              ) : null}
-              {snapshot.stage === "completed" ? (
-                <Button variant="outlined" endIcon={<OpenInNew />} onClick={openCompletedGroup}>
-                  打开 Group
-                </Button>
-              ) : null}
-            </Stack>
+            </Box>
           </Box>
         </Stack>
 

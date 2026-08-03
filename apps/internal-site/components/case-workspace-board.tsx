@@ -24,7 +24,6 @@ import { DndContext, PointerSensor, closestCenter, useSensor, useSensors } from 
 import { SortableContext, rectSortingStrategy } from "@dnd-kit/sortable";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { motion } from "motion/react";
 import type { CaseWorkspaceData } from "@/lib/server/repositories/content-repository";
 import { inlineEditTextSx } from "./case-workspace/inline-edit-text-sx";
 import { WorkspaceNotifications } from "./case-workspace/notifications";
@@ -134,7 +133,7 @@ export function CaseWorkspaceBoard({
   useEffect(() => {
     if (publicGroupCount === 0) {
       pushNotification(
-        "This case has no public groups yet. Use the per-group internal/public toggle below before deploying.",
+        "此 Case 暂无公开 Group，请先在列表中设为公开。",
         "warning",
         { key: "workspace-no-public-groups", sticky: true },
       );
@@ -161,8 +160,7 @@ export function CaseWorkspaceBoard({
   }
 
   /**
-   * Case summary edits stay local after the API save returns; refreshing the full route would
-   * replay the workspace entrance motion and make unrelated controls flash.
+   * Case summary edits stay local after the API save returns so unrelated controls do not flash.
    */
   function saveCaseSummary() {
     const nextSummary = caseSummaryEditorRef.current?.textContent ?? caseSummaryDraft;
@@ -200,10 +198,11 @@ export function CaseWorkspaceBoard({
   return (
     <Stack spacing={{ xs: 2.6, md: 3.3 }}>
       <Box
-        component={motion.div}
-        initial={{ opacity: 0, y: 18 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+        sx={{
+          // Render the header at its final coordinates so browser history never reveals a blank
+          // frame or moves page actions after they become clickable.
+          width: "100%",
+        }}
       >
         <Stack spacing={1.9} sx={{ width: "100%" }}>
           <Box
@@ -429,12 +428,7 @@ export function CaseWorkspaceBoard({
         </Stack>
       </Box>
 
-      <Box
-        component={motion.div}
-        initial={{ opacity: 0, y: 22 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.32, delay: 0.06, ease: [0.22, 1, 0.36, 1] }}
-      >
+      <Box>
         <Paper
           elevation={0}
           sx={{

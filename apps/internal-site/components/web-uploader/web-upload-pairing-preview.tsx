@@ -635,90 +635,101 @@ export function PairingPreviewPanel({
         p: 0,
       }}
     >
-      <Stack
-        direction="row"
-        alignItems="center"
-        justifyContent="space-between"
-        spacing={1}
-        sx={{ px: { xs: 1.7, md: 2 }, py: 1.5, borderBottom: "1px solid", borderColor: "divider" }}
+      <Box
+        sx={{
+          // Reserve the complete toolbar before scanning so mode, Heatmap, and status controls do
+          // not insert a new row or move the preview title after a directory is selected.
+          display: "grid",
+          gridTemplateColumns: { xs: "1fr", sm: "auto minmax(0, 1fr)" },
+          alignItems: "center",
+          gap: 1,
+          px: { xs: 1.7, md: 2 },
+          py: 1.5,
+          borderBottom: "1px solid",
+          borderColor: "divider",
+        }}
       >
         <Typography variant="h6">配对预览</Typography>
-        {planView ? (
-          <Stack
-            direction="row"
-            alignItems="center"
-            justifyContent="flex-end"
-            spacing={1}
-            flexWrap="wrap"
-            useFlexGap
-            sx={{ minWidth: 0 }}
+        <Box
+          sx={{
+            display: "grid",
+            gridTemplateColumns: "104px minmax(0, 1fr) 78px",
+            gap: 1,
+            alignItems: "center",
+            justifySelf: { xs: "stretch", sm: "end" },
+            width: { xs: "100%", sm: 330 },
+            minWidth: 0,
+          }}
+        >
+          {/* Automatic titles stay compact; this mode control exposes the filename fallback that
+              previously existed only as an unused formatter. */}
+          <ToggleButtonGroup
+            exclusive
+            size="small"
+            value={frameTitleMode}
+            disabled={!canReorder}
+            aria-label="Frame 标题格式"
+            onChange={(_event, nextMode: FrameTitleMode | null) => {
+              if (nextMode) {
+                onFrameTitleModeChange(nextMode);
+              }
+            }}
+            sx={{
+              height: webUploadSizes.compactControlHeight,
+              "& .MuiToggleButton-root": {
+                minWidth: 48,
+                px: 1,
+                py: 0,
+                borderRadius: webUploadRadii.control,
+                fontSize: 12,
+                lineHeight: 1,
+              },
+            }}
           >
-            {/* Automatic titles stay compact; this mode control exposes the filename fallback that
-                previously existed only as an unused formatter. */}
-            <ToggleButtonGroup
-              exclusive
-              size="small"
-              value={frameTitleMode}
-              disabled={!canReorder}
-              aria-label="Frame 标题格式"
-              onChange={(_event, nextMode: FrameTitleMode | null) => {
-                if (nextMode) {
-                  onFrameTitleModeChange(nextMode);
-                }
-              }}
+            <ToggleButton value="inferred" aria-label="自动 Frame 标题">
+              自动
+            </ToggleButton>
+            <ToggleButton value="filename" aria-label="文件名 Frame 标题">
+              文件名
+            </ToggleButton>
+          </ToggleButtonGroup>
+          <FormControl size="small" variant="outlined" sx={{ minWidth: 0 }}>
+            <Select
+              value={planView?.heatmapReferenceLabel ?? ""}
+              onChange={(event) => onHeatmapReferenceChange(event.target.value)}
+              disabled={!canReorder || (planView?.heatmapReferenceOptions.length ?? 0) <= 1}
+              displayEmpty
+              renderValue={(value) => (value ? `Heatmap: ${value}` : "Heatmap")}
               sx={{
                 height: webUploadSizes.compactControlHeight,
-                "& .MuiToggleButton-root": {
-                  minWidth: 48,
-                  px: 1,
-                  py: 0,
-                  borderRadius: webUploadRadii.control,
-                  fontSize: 12,
-                  lineHeight: 1,
+                width: "100%",
+                minWidth: 0,
+                borderRadius: webUploadRadii.control,
+                "& .MuiSelect-select": {
+                  py: 0.45,
+                  pr: "30px !important",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                  fontSize: 13,
                 },
               }}
             >
-              <ToggleButton value="inferred" aria-label="自动 Frame 标题">
-                自动
-              </ToggleButton>
-              <ToggleButton value="filename" aria-label="文件名 Frame 标题">
-                文件名
-              </ToggleButton>
-            </ToggleButtonGroup>
-            {planView.heatmapReferenceOptions.length > 1 ? (
-              <FormControl size="small" variant="outlined">
-                <Select
-                  value={planView.heatmapReferenceLabel}
-                  onChange={(event) => onHeatmapReferenceChange(event.target.value)}
-                  disabled={!canReorder}
-                  displayEmpty
-                  sx={{
-                    height: webUploadSizes.compactControlHeight,
-                    minWidth: 132,
-                    borderRadius: webUploadRadii.control,
-                    "& .MuiSelect-select": {
-                      py: 0.45,
-                      fontSize: 13,
-                    },
-                  }}
-                >
-                  {planView.heatmapReferenceOptions.map((label) => (
-                    <MenuItem key={label} value={label}>
-                      Heatmap: {label}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            ) : null}
-            <Chip
-              icon={hasBlockingIssues ? <WarningAmber /> : <CheckCircle />}
-              label={`${planView.healthyPairCount} / ${planView.frames.length}`}
-              color={hasBlockingIssues ? "warning" : "primary"}
-              sx={{ height: webUploadSizes.compactControlHeight }}
-            />
-          </Stack>
-        ) : null}
-      </Stack>
+              {(planView?.heatmapReferenceOptions ?? []).map((label) => (
+                <MenuItem key={label} value={label}>
+                  Heatmap: {label}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          <Chip
+            icon={hasBlockingIssues ? <WarningAmber /> : <CheckCircle />}
+            label={planView ? `${planView.healthyPairCount} / ${planView.frames.length}` : "0 / 0"}
+            color={planView ? (hasBlockingIssues ? "warning" : "primary") : "default"}
+            sx={{ width: 78, height: webUploadSizes.compactControlHeight }}
+          />
+        </Box>
+      </Box>
 
       <Box sx={{ flex: 1, minHeight: 0, overflow: "auto" }}>
         {planView && planView.frames.length > 0 ? (
