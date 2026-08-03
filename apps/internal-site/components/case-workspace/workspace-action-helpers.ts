@@ -1,6 +1,10 @@
 import type { MutableRefObject, TransitionStartFunction } from "react";
 import { arrayMove } from "@dnd-kit/sortable";
 import type { CaseWorkspaceData } from "@/lib/server/repositories/content-repository";
+import {
+  notifyBrowserDeploySuccess,
+  requestBrowserDeployNotificationPermission,
+} from "./browser-deploy-notifications";
 import type { WorkspaceNotificationTone } from "./use-workspace-notifications";
 
 type GroupItem = CaseWorkspaceData["groups"][number];
@@ -385,6 +389,7 @@ export function deployWorkspacePublicSite({
     return;
   }
 
+  requestBrowserDeployNotificationPermission();
   setIsDeployingPublicSite(true);
   notifications.pushNotification(
     "Republishing this case and deploying a fresh public export to Cloudflare Pages...",
@@ -406,6 +411,7 @@ export function deployWorkspacePublicSite({
         `Deployed fresh static export to Cloudflare Pages project ${result.projectName}.`,
         "success",
       );
+      notifyBrowserDeploySuccess(result.projectName);
     },
     request: async () => postJson("/api/ops/public-deploy", { caseId: data.id }),
     startTransition,

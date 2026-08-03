@@ -388,6 +388,8 @@ Web 上传链路是：
 - 顶部只保留 `Deploy Pages`
 - 这个按钮会携带当前 `caseId` 调用 `POST /api/ops/public-deploy`
 - 因此它会先 republish 当前 case，再导出并部署
+- 点击部署时会按需申请浏览器通知权限；部署成功且 workspace 已切到后台时发送系统通知，
+  前台仍使用站内通知。
 
 ## public-site 的真实路由约束
 
