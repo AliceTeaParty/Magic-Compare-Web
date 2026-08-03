@@ -59,7 +59,9 @@ import {
   buildPlanView,
   renameUploadPlanAssetLabel,
   reorderUploadPlan,
+  setUploadPlanFrameTitleMode,
   setUploadPlanHeatmapReference,
+  type FrameTitleMode,
   type PlanView,
   type UploadPlanImageColumn,
 } from "./web-upload-view-model";
@@ -517,6 +519,8 @@ export function WebUploadWorkbench({
     defaultMode: "before-after" as ViewerMode,
   });
   const [planView, setPlanView] = useState<PlanView | null>(null);
+  const [frameTitleMode, setFrameTitleMode] =
+    useState<FrameTitleMode>("inferred");
   const [generationProgress, setGenerationProgress] =
     useState<GenerationProgress | null>(null);
   const [expandedFrameId, setExpandedFrameId] = useState<string | null>(null);
@@ -580,6 +584,7 @@ export function WebUploadWorkbench({
     setSnapshot({ ...buildInitialSnapshot(), stage: "scanned" });
     setGenerationProgress(null);
     setExpandedFrameId(null);
+    setFrameTitleMode("inferred");
     setGroupMeta((current) => ({
       ...current,
       // Choosing a new directory starts a new upload intent. Refresh the inferred identity so a
@@ -739,6 +744,7 @@ export function WebUploadWorkbench({
     setPlanView(null);
     setGenerationProgress(null);
     setExpandedFrameId(null);
+    setFrameTitleMode("inferred");
     setSnapshot(buildInitialSnapshot());
   }
 
@@ -822,6 +828,19 @@ export function WebUploadWorkbench({
     }
 
     applyPlanUpdate(setUploadPlanHeatmapReference(plan, nextLabel));
+  }
+
+  function changeFrameTitleMode(nextMode: FrameTitleMode) {
+    const plan = planRef.current;
+    if (!plan || snapshot.stage !== "scanned" || nextMode === frameTitleMode) {
+      return;
+    }
+
+    // Structured recognition stays the efficient default, while filename mode is an explicit
+    // recovery path when episode/source-marker inference does not match the operator's naming.
+    setExpandedFrameId(null);
+    setFrameTitleMode(nextMode);
+    applyPlanUpdate(setUploadPlanFrameTitleMode(plan, nextMode));
   }
 
   return (
@@ -1082,8 +1101,10 @@ export function WebUploadWorkbench({
             planView={planView}
             canReorder={snapshot.stage === "scanned"}
             expandedFrameId={expandedFrameId}
+            frameTitleMode={frameTitleMode}
             hasBlockingIssues={hasBlockingIssues}
             onExpandedFrameChange={setExpandedFrameId}
+            onFrameTitleModeChange={changeFrameTitleMode}
             onHeatmapReferenceChange={changeHeatmapReference}
             onRenameColumn={renamePairingColumn}
             onReorder={reorderPairingRows}

@@ -39,6 +39,7 @@ export interface WebUploadAssetPlan {
 export interface WebUploadFramePlan {
   order: number;
   title: string;
+  inferredTitle?: string;
   caption: string;
   before: WebUploadAssetPlan;
   after: WebUploadAssetPlan;

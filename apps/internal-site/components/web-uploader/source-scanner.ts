@@ -176,7 +176,7 @@ function variantLabel(variant: string) {
   if (PRIMARY_AFTER_VARIANTS.has(normalized)) {
     return "After";
   }
-  if (normalized === "before" || normalized === "src" || normalized === "source" || normalized === "ori" || normalized === "origin") {
+  if (normalized === "before") {
     return "Before";
   }
   if (normalized === "rip") {
@@ -412,9 +412,11 @@ function alternatePriority(candidate: SourceCandidate) {
 }
 
 function assetPlan(kind: WebUploadAssetPlan["kind"], candidate: SourceCandidate): WebUploadAssetPlan {
+  // Asset kind already records the baseline role. Preserve src/source/ori suffixes in the visible
+  // column label so automatic inference reflects the operator's actual comparison variables.
   const label =
     kind === "before"
-      ? "Before"
+      ? variantLabel(candidate.variant) || "Before"
       : kind === "after"
         ? variantLabel(candidate.variant) || "After"
         : kind === "heatmap"
@@ -707,7 +709,8 @@ function buildFlatPlan(sourceRootName: string, entries: BrowserUploadFile[], ign
 function buildNestedPlan(sourceRootName: string, entries: BrowserUploadFile[], ignoredFiles: IgnoredUploadFile[], layout: NonFlatLayout): WebUploadPlan {
   const scopedEntries = (directory: string | null) =>
     directory ? entries.filter((entry) => topLevelDirectory(entry.relativePath) === directory) : [];
-  const beforeParsed = parseEntries(scopedEntries(layout.beforeDir), "source");
+  const beforeVariant = layout.beforeDir ? basename(layout.beforeDir).toLowerCase() : "source";
+  const beforeParsed = parseEntries(scopedEntries(layout.beforeDir), beforeVariant);
   const afterParsedResults = layout.afterDirs.map((directory) => {
     const directoryVariant = basename(directory).toLowerCase();
     return parseEntries(

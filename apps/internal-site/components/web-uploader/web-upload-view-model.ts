@@ -40,6 +40,8 @@ export type UploadPlanImageColumn =
   | { kind: "after" }
   | { kind: "misc"; label: string };
 
+export type FrameTitleMode = "inferred" | "filename";
+
 function stableHash(value: string) {
   let hash = 5381;
   for (let index = 0; index < value.length; index += 1) {
@@ -58,6 +60,30 @@ export function fullFrameTitleFromSourcePath(path: string) {
   const pathStem = stemFromSourcePath(path);
   const parsedFilename = parseUploadFilenameStem(pathStem);
   return parsedFilename ? `${parsedFilename.prefix} - ${parsedFilename.frame}` : pathStem;
+}
+
+/**
+ * Keeps the scanner's compact title alongside the active title so operators can switch to a
+ * filename-based fallback and return without rescanning the directory or losing other plan edits.
+ */
+export function setUploadPlanFrameTitleMode(
+  plan: WebUploadPlan,
+  mode: FrameTitleMode,
+) {
+  return {
+    ...plan,
+    frames: plan.frames.map((frame) => {
+      const inferredTitle = frame.inferredTitle ?? frame.title;
+      return {
+        ...frame,
+        inferredTitle,
+        title:
+          mode === "filename"
+            ? fullFrameTitleFromSourcePath(frame.before.source.relativePath)
+            : inferredTitle,
+      };
+    }),
+  };
 }
 
 export function frameIdForFrame(frame: WebUploadFramePlan) {

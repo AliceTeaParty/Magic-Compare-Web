@@ -7,6 +7,7 @@ import {
   getUploadPlanHeatmapReferenceOptions,
   renameUploadPlanAssetLabel,
   reorderUploadPlan,
+  setUploadPlanFrameTitleMode,
   setUploadPlanHeatmapReference,
 } from "./web-upload-view-model";
 import type {
@@ -216,6 +217,33 @@ describe("web upload view model", () => {
     expect(fullFrameTitleFromSourcePath("before/clip-0002-source.png")).toBe("clip - 0002");
     expect(fullFrameTitleFromSourcePath("before/clip_0003_source.png")).toBe("clip - 0003");
     expect(fullFrameTitleFromSourcePath("before/clip.0004.source.png")).toBe("clip - 0004");
+    expect(
+      fullFrameTitleFromSourcePath(
+        "30_ULTRAMAN_DYNA_BD_BOX_7_00008-28973-src.png",
+      ),
+    ).toBe("30_ULTRAMAN_DYNA_BD_BOX_7_00008 - 28973");
+  });
+
+  it("switches frame titles between inferred and filename modes", () => {
+    const originalPlan = plan();
+    originalPlan.frames = [
+      {
+        ...originalPlan.frames[0],
+        title: "8-28973",
+        before: {
+          ...originalPlan.frames[0].before,
+          source: image("30_ULTRAMAN_DYNA_BD_BOX_7_00008-28973-src.png"),
+        },
+      },
+    ];
+
+    const filenamePlan = setUploadPlanFrameTitleMode(originalPlan, "filename");
+    expect(filenamePlan.frames[0].title).toBe(
+      "30_ULTRAMAN_DYNA_BD_BOX_7_00008 - 28973",
+    );
+
+    const inferredPlan = setUploadPlanFrameTitleMode(filenamePlan, "inferred");
+    expect(inferredPlan.frames[0].title).toBe("8-28973");
   });
 
   it("compacts long upload filenames by preserving the head and tail", () => {

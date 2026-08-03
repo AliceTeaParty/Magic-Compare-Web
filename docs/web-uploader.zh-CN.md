@@ -15,11 +15,11 @@
 - 选择本地目录，推荐 Chrome / Edge 使用 `showDirectoryPicker()`。
 - 浏览器不支持目录选择 API 时，退回 `<input webkitdirectory>`。
 - 扫描平铺或常见 before / after 目录结构。
-- 识别 `Before`、`After`、`Rip`、`NoDeband`、`Degrain` 等对比列。
+- 从文件或目录后缀推断 `Before`、`Src`、`After`、`Rip`、`NoDeband`、`Degrain` 等对比列。
 - `out` / `output` / `after` 作为主 `After`；`rip` 保持独立 `Rip` 列，不和 `After` 混淆。
-- `Before`、`After` 和备选列的表头都可以在上传前编辑；上传开始后锁定。列名必须全局唯一，且不能命名为 `Heatmap`。
+- 基准列、主比较列和备选列的表头都可以在上传前编辑；上传开始后锁定。列名必须全局唯一，且不能命名为 `Heatmap`。
 - VSEditor 文件名允许带 `.gen.vpy` / `.m2ts` 等 source marker，也允许省略 marker。
-- VSEditor 文件名会显示为 `<episode>-<frame>`，长片名保留在 caption、文件名 tooltip 和目录信息里。
+- VSEditor 文件名默认显示为 `<episode>-<frame>`；配对预览可以切换到 `<文件名前缀> - <frame>`，并把选择写入最终上传标题。
 - 右侧 `配对预览` 可展开单行预览，并在上传前拖拽调整 frame 顺序。
 - Heatmap 参考是全局设置，只显示每个 frame 都存在的列，避免部分行静默 fallback。
 - 生成缩略图和缺失 heatmap 后，走 `group-upload-start -> prepare -> presigned PUT -> commit -> complete`。
@@ -30,7 +30,7 @@
 - `File` / `Blob` 不进入 React state；页面只保存轻量 render model。
 - 图片生成在 worker 中执行，避免阻塞主线程。
 - 右侧缩略图只在行接近视口或展开时创建 object URL，并在卸载时释放。
-- 重排序、列名修改、Heatmap 参考变化都会清空已生成缓存，保证 UI 顺序和最终上传顺序一致。
+- 重排序、Frame 标题模式、列名修改、Heatmap 参考变化都会清空已生成缓存，保证 UI 和最终上传结果一致。
 - 上传 commit 仍串行收口，减少 SQLite 写入冲突。
 - 浏览器生成的缩略图和 heatmap 在上传前只存在于当前页面内存和 object URL 中；点击放弃会清掉本地缓存并取消远端 pending job，不会写入仓库或 `public/`。
 

@@ -37,6 +37,8 @@ import {
   Paper,
   Select,
   Stack,
+  ToggleButton,
+  ToggleButtonGroup,
   Tooltip,
   Typography,
 } from "@mui/material";
@@ -56,6 +58,7 @@ import {
 import {
   frameIdForFrame,
   compactUploadFilename,
+  type FrameTitleMode,
   type FramePreviewRow,
   type PlanView,
   type UploadPlanImageColumn,
@@ -79,8 +82,10 @@ interface PairingPreviewPanelProps {
   planView: PlanView | null;
   canReorder: boolean;
   expandedFrameId: string | null;
+  frameTitleMode: FrameTitleMode;
   hasBlockingIssues: boolean;
   onExpandedFrameChange: (frameId: string | null) => void;
+  onFrameTitleModeChange: (mode: FrameTitleMode) => void;
   onHeatmapReferenceChange: (label: string) => void;
   onRenameColumn: (column: UploadPlanImageColumn, nextLabel: string) => void;
   onReorder: (activeFrameId: string, overFrameId: string | null) => void;
@@ -550,8 +555,10 @@ export function PairingPreviewPanel({
   planView,
   canReorder,
   expandedFrameId,
+  frameTitleMode,
   hasBlockingIssues,
   onExpandedFrameChange,
+  onFrameTitleModeChange,
   onHeatmapReferenceChange,
   onRenameColumn,
   onReorder,
@@ -637,7 +644,47 @@ export function PairingPreviewPanel({
       >
         <Typography variant="h6">配对预览</Typography>
         {planView ? (
-          <Stack direction="row" alignItems="center" spacing={1} flexWrap="wrap" useFlexGap>
+          <Stack
+            direction="row"
+            alignItems="center"
+            justifyContent="flex-end"
+            spacing={1}
+            flexWrap="wrap"
+            useFlexGap
+            sx={{ minWidth: 0 }}
+          >
+            {/* Automatic titles stay compact; this mode control exposes the filename fallback that
+                previously existed only as an unused formatter. */}
+            <ToggleButtonGroup
+              exclusive
+              size="small"
+              value={frameTitleMode}
+              disabled={!canReorder}
+              aria-label="Frame 标题格式"
+              onChange={(_event, nextMode: FrameTitleMode | null) => {
+                if (nextMode) {
+                  onFrameTitleModeChange(nextMode);
+                }
+              }}
+              sx={{
+                height: webUploadSizes.compactControlHeight,
+                "& .MuiToggleButton-root": {
+                  minWidth: 48,
+                  px: 1,
+                  py: 0,
+                  borderRadius: webUploadRadii.control,
+                  fontSize: 12,
+                  lineHeight: 1,
+                },
+              }}
+            >
+              <ToggleButton value="inferred" aria-label="自动 Frame 标题">
+                自动
+              </ToggleButton>
+              <ToggleButton value="filename" aria-label="文件名 Frame 标题">
+                文件名
+              </ToggleButton>
+            </ToggleButtonGroup>
             {planView.heatmapReferenceOptions.length > 1 ? (
               <FormControl size="small" variant="outlined">
                 <Select

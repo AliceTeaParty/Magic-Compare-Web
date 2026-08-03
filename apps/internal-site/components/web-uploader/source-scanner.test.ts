@@ -101,6 +101,7 @@ describe("scanBrowserUploadFiles", () => {
     );
 
     expect(plan.frames).toHaveLength(1);
+    expect(plan.frames[0].before.label).toBe("Src");
     expect(plan.frames[0].after.label).toBe("Rip");
     expect(plan.heatmapReferenceLabel).toBe("Rip");
   });
@@ -330,6 +331,23 @@ describe("scanBrowserUploadFiles", () => {
     expect(plan.frames[0].caption).toContain("WATANARE ANIME VOL1");
     expect(plan.frames[0].after.label).toBe("After");
     expect(plan.frames[0].misc.map((asset) => asset.label)).toEqual(["Rip"]);
+  });
+
+  it("preserves src and rip labels for the reported structured filename sample", () => {
+    const plan = scanBrowserUploadFiles(
+      [
+        image("30_ULTRAMAN_DYNA_BD_BOX_7_00008-28973-rip.png"),
+        image("30_ULTRAMAN_DYNA_BD_BOX_7_00008-28973-src.png"),
+        image("30_ULTRAMAN_DYNA_BD_BOX_7_00009-39089-rip.png"),
+        image("30_ULTRAMAN_DYNA_BD_BOX_7_00009-39089-src.png"),
+      ],
+      "2upload",
+    );
+
+    expect(plan.frames.map((frame) => frame.title)).toEqual(["8-28973", "9-39089"]);
+    expect(plan.frames.map((frame) => frame.before.label)).toEqual(["Src", "Src"]);
+    expect(plan.frames.map((frame) => frame.after.label)).toEqual(["Rip", "Rip"]);
+    expect(plan.issues).toEqual([]);
   });
 
   it("recognizes structured encode filenames without an explicit source marker", () => {
