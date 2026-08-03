@@ -6,6 +6,22 @@ Entries before that date are summarized at release level instead of being recons
 
 ## Unreleased
 
+## v1.9.2 - 2026-08-03
+
+Web uploader parsing and ordering patch. This release keeps filename recognition, frame ordering, and heatmap reference selection consistent across the upload plan.
+
+### Changed
+
+- Shared flat upload filename parsing across the source scanner and upload view model, with support for spaced dash, dash, underscore, and dot separators.
+- Changed flat and nested upload ordering so volume markers sort numerically, including `VOL2` before `VOL10`.
+- Updated Wrangler from `4.49.1` to `4.110.0` for current Cloudflare deployment tooling.
+
+### Fixed
+
+- Fixed generated heatmap reference defaults so they select a comparison label available on every frame instead of assuming an `After` column.
+- Fixed nested comparison-directory labels so variants such as `Rip` remain valid upload and heatmap reference columns.
+- Added an explicit upload-plan error when frames have no shared comparison column for heatmap generation.
+
 ## v1.9.1 - 2026-07-03
 
 Web uploader and internal UI polish release. This patch tightens browser-side upload recognition, adds visible build metadata, and brings Case workspace/catalog controls back into one product vocabulary.
