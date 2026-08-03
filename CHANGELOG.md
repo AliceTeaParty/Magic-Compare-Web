@@ -6,6 +6,20 @@ Entries before that date are summarized at release level instead of being recons
 
 ## Unreleased
 
+## v1.9.4 - 2026-08-03
+
+Web uploader filename fallback patch. This release keeps inferred comparison labels aligned with uploaded filenames and lets operators choose the Frame title format before uploading.
+
+### Added
+
+- Added an `自动` / `文件名` Frame title control to the Web upload pairing preview.
+
+### Fixed
+
+- Preserved explicit source labels such as `Src` instead of rewriting them to `Before` during automatic inference.
+- Preserved the scanner's inferred Frame titles when switching to filename titles so the original mode can be restored without rescanning.
+- Covered the reported `ULTRAMAN_DYNA_BD_BOX` `src` / `rip` filename set with a regression test.
+
 ## v1.9.3 - 2026-08-03
 
 AMD64 container release modernization. This release updates GHCR automation to current Node 24 actions and removes redundant image builds for the Intel N100 deployment target.
