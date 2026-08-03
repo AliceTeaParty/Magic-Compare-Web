@@ -653,7 +653,7 @@ export function PairingPreviewPanel({
         <Box
           sx={{
             display: "grid",
-            gridTemplateColumns: "104px minmax(0, 1fr) 78px",
+            gridTemplateColumns: "112px minmax(0, 1fr) 78px",
             gap: 1,
             alignItems: "center",
             justifySelf: { xs: "stretch", sm: "end" },
@@ -677,12 +677,17 @@ export function PairingPreviewPanel({
             sx={{
               height: webUploadSizes.compactControlHeight,
               "& .MuiToggleButton-root": {
-                minWidth: 48,
-                px: 1,
+                // CJK labels can break between any characters; reserve equal one-line segments so
+                // 文件名 never becomes a two-line button in the compact toolbar.
+                flex: "1 1 0",
+                minWidth: 0,
+                px: 0.5,
                 py: 0,
                 borderRadius: webUploadRadii.control,
                 fontSize: 12,
                 lineHeight: 1,
+                whiteSpace: "nowrap",
+                wordBreak: "keep-all",
               },
             }}
           >

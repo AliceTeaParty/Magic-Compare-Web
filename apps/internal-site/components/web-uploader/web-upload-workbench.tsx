@@ -538,6 +538,15 @@ export function WebUploadWorkbench({
     snapshot.stage === "paused" ||
     snapshot.stage === "failed";
   const selectedCaseExists = cases.some((item) => item.slug === selectedCaseSlug);
+  // Preserve the workspace that opened upload; a fixed catalog link discarded the operator's
+  // current Case context when they returned without uploading.
+  const returnCaseSlug =
+    initialCaseSlug && cases.some((item) => item.slug === initialCaseSlug)
+      ? initialCaseSlug
+      : null;
+  const returnHref = returnCaseSlug
+    ? `/cases/${encodeURIComponent(returnCaseSlug)}`
+    : "/";
   const hasBlockingIssues = Boolean(planView && planView.errorCount > 0);
   const canStart = Boolean(planView && planRef.current && !hasBlockingIssues);
   const canAbandon =
@@ -885,7 +894,7 @@ export function WebUploadWorkbench({
             >
               <Button
                 component={Link}
-                href="/"
+                href={returnHref}
                 variant="text"
                 startIcon={<ArrowBack />}
                 sx={{
