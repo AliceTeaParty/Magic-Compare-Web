@@ -6,6 +6,25 @@ Entries before that date are summarized at release level instead of being recons
 
 ## Unreleased
 
+## v1.9.5 - 2026-08-04
+
+Web upload and internal interaction reliability patch. This release preserves comparison-variable intent, reports background deploy completion, and keeps workbench controls stable through navigation and upload state changes.
+
+### Added
+
+- Added optional browser notifications when a Cloudflare Pages deployment finishes while the workspace is in the background.
+
+### Changed
+
+- Kept upload header actions and pairing-preview controls in stable slots across scan and runner states.
+- Changed the upload back action to return to the originating Case workspace when entered with `?case=<slug>`.
+- Kept the `自动` / `文件名` Frame title control on one line at narrow widths.
+
+### Fixed
+
+- Preserved explicit filename variants such as `src`, `rip`, and `flt` ahead of directory hints; `rip` becomes primary only when no conventional output variant exists.
+- Removed page/card entrance transforms and button hover translation that moved controls after navigation or pointer interaction.
+
 ## v1.9.4 - 2026-08-03
 
 Web uploader filename fallback patch. This release keeps inferred comparison labels aligned with uploaded filenames and lets operators choose the Frame title format before uploading.
