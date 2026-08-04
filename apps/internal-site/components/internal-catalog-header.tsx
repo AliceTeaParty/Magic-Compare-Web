@@ -7,7 +7,7 @@ export function InternalCatalogHeader() {
   return (
     <InternalPageHeader
       title="Case"
-      subtitle="改变画面即为魔法喵～"
+      subtitle="画面を変えること、それが魔法"
       actions={
         <Button
           component={Link}
