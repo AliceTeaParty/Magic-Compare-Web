@@ -7,11 +7,11 @@ import {
   Button,
   FormControl,
   InputAdornment,
-  InputLabel,
   MenuItem,
   Select,
   Stack,
   TextField,
+  Tooltip,
   Typography,
 } from "@mui/material";
 import type { CaseStatus } from "@magic-compare/content-schema";
@@ -21,6 +21,21 @@ import { FluentFolderEmoji } from "./fluent-emoji";
 
 type StatusFilter = "all" | CaseStatus;
 type SortOrder = "updated-desc" | "updated-asc" | "title";
+
+const controlSx = {
+  // Status and sort previously repeated their labels in the outline notch. The filled M3 surface
+  // keeps the icon and selected value readable without spending a second line on control chrome.
+  "& .MuiFilledInput-root": {
+    minHeight: 52,
+    borderRadius: "26px",
+    overflow: "hidden",
+    backgroundColor: "var(--mui-palette-surface-containerHigh)",
+    "&:hover": { backgroundColor: "var(--mui-palette-surface-containerHighest)" },
+    "&.Mui-focused": { backgroundColor: "var(--mui-palette-surface-containerHighest)" },
+    "&::before, &::after": { display: "none" },
+  },
+  "& .MuiFilledInput-input": { py: 1.5 },
+} as const;
 
 /** Filters the server snapshot locally so catalog controls respond without route-level loading. */
 export function CaseCatalog({ items }: { items: CaseCatalogItem[] }) {
@@ -52,64 +67,65 @@ export function CaseCatalog({ items }: { items: CaseCatalogItem[] }) {
       <Box
         sx={{
           display: "grid",
-          gridTemplateColumns: { xs: "1fr", sm: "minmax(240px, 1fr) 152px 168px" },
+          gridTemplateColumns: {
+            xs: "repeat(2, minmax(0, 1fr))",
+            sm: "minmax(240px, 1fr) 152px 168px",
+          },
           gap: 1,
           alignItems: "center",
-          p: 1.25,
-          borderRadius: 2,
-          backgroundColor: "var(--mui-palette-surface-containerLow)",
         }}
       >
         <TextField
-          size="small"
+          hiddenLabel
+          variant="filled"
           placeholder="搜索标题、Slug 或标签"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
+          sx={{ ...controlSx, gridColumn: { xs: "1 / -1", sm: "auto" } }}
           slotProps={{
             input: {
               startAdornment: (
                 <InputAdornment position="start">
-                  <Search fontSize="small" />
+                  <Search />
                 </InputAdornment>
               ),
             },
+            htmlInput: { "aria-label": "搜索 Case" },
           }}
         />
-        <FormControl size="small">
-          <InputLabel id="case-status-filter-label">状态</InputLabel>
-          <Select
-            labelId="case-status-filter-label"
-            value={status}
-            label="状态"
-            startAdornment={<FilterListOutlined sx={{ mr: 1, fontSize: 18 }} />}
-            onChange={(event) => setStatus(event.target.value as StatusFilter)}
-          >
-            <MenuItem value="all">全部状态</MenuItem>
-            <MenuItem value="draft">草稿</MenuItem>
-            <MenuItem value="internal">内部</MenuItem>
-            <MenuItem value="published">已发布</MenuItem>
-            <MenuItem value="archived">已归档</MenuItem>
-          </Select>
-        </FormControl>
-        <FormControl size="small">
-          <InputLabel id="case-sort-label">排序</InputLabel>
-          <Select
-            labelId="case-sort-label"
-            value={sortOrder}
-            label="排序"
-            startAdornment={<Sort sx={{ mr: 1, fontSize: 18 }} />}
-            onChange={(event) => setSortOrder(event.target.value as SortOrder)}
-          >
-            <MenuItem value="updated-desc">最近更新</MenuItem>
-            <MenuItem value="updated-asc">最早更新</MenuItem>
-            <MenuItem value="title">标题</MenuItem>
-          </Select>
-        </FormControl>
+        <Tooltip title="筛选状态">
+          <FormControl hiddenLabel variant="filled" sx={controlSx}>
+            <Select
+              value={status}
+              disableUnderline
+              startAdornment={<FilterListOutlined sx={{ mr: 1, fontSize: 20 }} />}
+              inputProps={{ "aria-label": "筛选 Case 状态" }}
+              onChange={(event) => setStatus(event.target.value as StatusFilter)}
+            >
+              <MenuItem value="all">全部状态</MenuItem>
+              <MenuItem value="draft">草稿</MenuItem>
+              <MenuItem value="internal">内部</MenuItem>
+              <MenuItem value="published">已发布</MenuItem>
+              <MenuItem value="archived">已归档</MenuItem>
+            </Select>
+          </FormControl>
+        </Tooltip>
+        <Tooltip title="调整排序">
+          <FormControl hiddenLabel variant="filled" sx={controlSx}>
+            <Select
+              value={sortOrder}
+              disableUnderline
+              startAdornment={<Sort sx={{ mr: 1, fontSize: 20 }} />}
+              inputProps={{ "aria-label": "Case 排序" }}
+              onChange={(event) => setSortOrder(event.target.value as SortOrder)}
+            >
+              <MenuItem value="updated-desc">最近更新</MenuItem>
+              <MenuItem value="updated-asc">最早更新</MenuItem>
+              <MenuItem value="title">标题</MenuItem>
+            </Select>
+          </FormControl>
+        </Tooltip>
       </Box>
-
-      <Typography variant="body2" color="text.secondary">
-        {visibleItems.length} 个 Case
-      </Typography>
 
       {visibleItems.length > 0 ? (
         <CaseDirectoryGrid items={visibleItems} />
@@ -135,6 +151,17 @@ export function CaseCatalog({ items }: { items: CaseCatalogItem[] }) {
           </Button>
         </Stack>
       )}
+
+      <Box
+        component="footer"
+        sx={{ display: "flex", justifyContent: "flex-end", minHeight: 20, pt: 0.5 }}
+      >
+        <Typography variant="caption" color="text.secondary">
+          {visibleItems.length === items.length
+            ? `${items.length} Case`
+            : `${visibleItems.length} / ${items.length} Case`}
+        </Typography>
+      </Box>
     </Stack>
   );
 }

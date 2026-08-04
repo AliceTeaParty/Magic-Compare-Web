@@ -2,21 +2,14 @@ import { Prisma } from "@prisma/client";
 import type { ViewerDataset } from "@magic-compare/compare-core/viewer-data";
 import { DEMO_CASE_SLUG } from "@magic-compare/shared-utils";
 import { prisma } from "@/lib/server/db/client";
-import {
-  isHiddenDemoCaseSlug,
-  shouldHideDemoContent,
-} from "@/lib/server/runtime-config";
+import { isHiddenDemoCaseSlug, shouldHideDemoContent } from "@/lib/server/runtime-config";
 import {
   buildViewerDataset,
   mapCaseCatalogItem,
   mapCaseSearchResult,
   mapCaseWorkspaceData,
 } from "./mappers";
-import type {
-  CaseCatalogItem,
-  CaseSearchResult,
-  CaseWorkspaceData,
-} from "./types";
+import type { CaseCatalogItem, CaseSearchResult, CaseWorkspaceData } from "./types";
 
 /**
  * Centralizes demo hiding so list and search flows cannot drift on whether the sample case should
@@ -34,10 +27,7 @@ function buildDemoFilter() {
  * Keeps the search route consistent with the runtime demo visibility flag so hidden demo content
  * never leaks back in through partial slug/title matches.
  */
-function buildCaseSearchWhere(
-  query: string,
-  hideDemo: boolean,
-): Prisma.CaseWhereInput | undefined {
+function buildCaseSearchWhere(query: string, hideDemo: boolean): Prisma.CaseWhereInput | undefined {
   const normalizedQuery = query.trim();
 
   if (!normalizedQuery) {
@@ -69,6 +59,32 @@ function buildCaseSearchWhere(
 }
 
 /**
+ * Fetches catalog covers in one batch because Case stores the chosen asset id without a Prisma
+ * relation. Missing asset rows intentionally resolve to no cover so stale metadata cannot break
+ * the entire directory.
+ */
+async function loadCaseCoverThumbs(caseRows: Array<{ coverAssetId: string | null }>) {
+  const coverAssetIds = [
+    ...new Set(
+      caseRows
+        .map((caseRow) => caseRow.coverAssetId)
+        .filter((assetId): assetId is string => Boolean(assetId)),
+    ),
+  ];
+
+  if (coverAssetIds.length === 0) {
+    return new Map<string, string>();
+  }
+
+  const coverAssets = await prisma.asset.findMany({
+    where: { id: { in: coverAssetIds } },
+    select: { id: true, thumbUrl: true },
+  });
+
+  return new Map(coverAssets.map((asset) => [asset.id, asset.thumbUrl]));
+}
+
+/**
  * Returns the catalog cards the internal home page needs, with public group counts precomputed
  * server-side so the UI does not learn about Prisma shapes.
  */
@@ -85,14 +101,18 @@ export async function listCases(): Promise<CaseCatalogItem[]> {
     orderBy: [{ updatedAt: "desc" }],
   });
 
-  return cases.map(mapCaseCatalogItem);
+  const coverThumbs = await loadCaseCoverThumbs(cases);
+
+  return cases.map((caseRow) =>
+    mapCaseCatalogItem(
+      caseRow,
+      caseRow.coverAssetId ? (coverThumbs.get(caseRow.coverAssetId) ?? null) : null,
+    ),
+  );
 }
 
 /** Drives the internal search palette with runtime demo-visibility filtering. */
-export async function searchCases(
-  query: string,
-  limit = 8,
-): Promise<CaseSearchResult[]> {
+export async function searchCases(query: string, limit = 8): Promise<CaseSearchResult[]> {
   const cases = await prisma.case.findMany({
     where: buildCaseSearchWhere(query, shouldHideDemoContent()),
     include: {
@@ -119,9 +139,7 @@ export async function searchCases(
  * Hides demo workspace state behind the same runtime gate used elsewhere so the internal site does
  * not accidentally expose hidden sample content through direct links.
  */
-export async function getCaseWorkspace(
-  caseSlug: string,
-): Promise<CaseWorkspaceData | null> {
+export async function getCaseWorkspace(caseSlug: string): Promise<CaseWorkspaceData | null> {
   if (isHiddenDemoCaseSlug(caseSlug)) {
     return null;
   }

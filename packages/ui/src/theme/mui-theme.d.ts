@@ -11,6 +11,14 @@ interface MagicSurfacePalette {
 }
 
 declare module "@mui/material/styles" {
+  interface PaletteColor {
+    onContainer: string;
+  }
+
+  interface SimplePaletteColorOptions {
+    onContainer?: string;
+  }
+
   interface Palette {
     surface: MagicSurfacePalette;
   }

@@ -389,6 +389,7 @@ function rolePalette(role: ReturnType<typeof buildInternalSchemeColors>["primary
     contrastText: role.onMain,
     light: role.container,
     dark: role.main,
+    onContainer: role.onContainer,
   };
 }
 
@@ -442,6 +443,7 @@ function buildInternalTheme(seedValue: string) {
     shape: { borderRadius: 8 },
     typography: {
       fontFamily: "var(--font-body)",
+      fontWeightRegular: 450,
       h1: { fontSize: "2rem", lineHeight: 1.2, fontWeight: 650, letterSpacing: 0 },
       h2: { fontSize: "1.625rem", lineHeight: 1.25, fontWeight: 650, letterSpacing: 0 },
       h3: { fontSize: "1.375rem", lineHeight: 1.3, fontWeight: 650, letterSpacing: 0 },
@@ -450,12 +452,13 @@ function buildInternalTheme(seedValue: string) {
       h6: { fontSize: "0.875rem", lineHeight: 1.45, fontWeight: 650, letterSpacing: 0 },
       subtitle1: { fontSize: "0.875rem", lineHeight: 1.45, fontWeight: 600, letterSpacing: 0 },
       subtitle2: { fontSize: "0.8125rem", lineHeight: 1.4, fontWeight: 600, letterSpacing: 0 },
-      body1: { fontSize: "0.9375rem", lineHeight: 1.55, letterSpacing: 0 },
-      body2: { fontSize: "0.8125rem", lineHeight: 1.5, letterSpacing: 0 },
+      body1: { fontSize: "0.9375rem", lineHeight: 1.55, fontWeight: 450, letterSpacing: 0 },
+      body2: { fontSize: "0.8125rem", lineHeight: 1.5, fontWeight: 450, letterSpacing: 0 },
       button: { fontSize: "0.875rem", fontWeight: 650, textTransform: "none", letterSpacing: 0 },
-      caption: { fontSize: "0.75rem", lineHeight: 1.4, letterSpacing: 0 },
+      caption: { fontSize: "0.75rem", lineHeight: 1.4, fontWeight: 450, letterSpacing: 0 },
       overline: { fontSize: "0.6875rem", lineHeight: 1.4, fontWeight: 650, letterSpacing: 0 },
     },
+    motion: { reducedMotion: "system" },
     transitions: {
       easing: {
         easeInOut: "cubic-bezier(0.2, 0, 0, 1)",
@@ -469,11 +472,28 @@ function buildInternalTheme(seedValue: string) {
       MuiCssBaseline: {
         styleOverrides: {
           "*, *::before, *::after": { boxSizing: "border-box" },
-          html: { backgroundColor: "var(--mui-palette-background-default)" },
+          html: {
+            backgroundColor: "var(--mui-palette-background-default)",
+            transition: "background-color 250ms cubic-bezier(0.2, 0, 0, 1)",
+          },
           body: {
             minWidth: 0,
             minHeight: "100vh",
+            fontWeight: 450,
             backgroundColor: "var(--mui-palette-background-default)",
+            transition:
+              "background-color 250ms cubic-bezier(0.2, 0, 0, 1), color 250ms cubic-bezier(0.2, 0, 0, 1)",
+          },
+          ".MuiPaper-root, .MuiDrawer-paper, .MuiAppBar-root, .MuiInputBase-root": {
+            // Theme switching previously disabled every transition, making the whole workbench
+            // flash. Limiting interpolation to painted colors keeps geometry and controls stable.
+            transition:
+              "background-color 250ms cubic-bezier(0.2, 0, 0, 1), color 250ms cubic-bezier(0.2, 0, 0, 1), border-color 250ms cubic-bezier(0.2, 0, 0, 1)",
+          },
+          "@media (prefers-reduced-motion: reduce)": {
+            "html, body, .MuiPaper-root, .MuiDrawer-paper, .MuiAppBar-root, .MuiInputBase-root": {
+              transitionDuration: "0.01ms !important",
+            },
           },
           "::selection": {
             color: "var(--mui-palette-primary-contrastText)",
@@ -650,7 +670,6 @@ function InternalMagicThemeProvider({ children, initialThemeSeed }: MagicThemePr
         defaultMode="system"
         modeStorageKey={INTERNAL_MODE_STORAGE_KEY}
         colorSchemeStorageKey={INTERNAL_SCHEME_STORAGE_KEY}
-        disableTransitionOnChange
       >
         <CssBaseline enableColorScheme />
         <GlobalStyles

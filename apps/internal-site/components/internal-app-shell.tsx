@@ -5,23 +5,20 @@ import { CloudUploadOutlined, FolderCopyOutlined, Menu } from "@mui/icons-materi
 import {
   AppBar,
   Box,
+  Divider,
   Drawer,
   IconButton,
   List,
-  ListItemButton,
-  ListItemIcon,
-  ListItemText,
   Stack,
   Toolbar,
   Typography,
 } from "@mui/material";
 import { MagicThemeControls } from "@magic-compare/ui";
-import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { CaseCreateButton } from "./case-create-button";
-
-const NAV_RAIL_WIDTH = 80;
-const NAV_EXTENDED_WIDTH = 224;
+import { NAV_EXTENDED_WIDTH, NAV_RAIL_WIDTH } from "./internal-layout-constants";
+import { InternalNavigationItem } from "./internal-navigation-item";
+import { InternalRouteTransition } from "./internal-route-transition";
 
 const destinations = [
   { href: "/", label: "Case", icon: <FolderCopyOutlined /> },
@@ -47,10 +44,8 @@ function NavigationContent({
         sx={{
           display: "flex",
           alignItems: "center",
-          height: 64,
+          height: 72,
           px: { sm: 1.5, md: 2 },
-          borderBottom: "1px solid",
-          borderColor: "divider",
         }}
       >
         <Box
@@ -76,59 +71,39 @@ function NavigationContent({
         </Typography>
       </Box>
 
-      <Box sx={{ p: { xs: 1.5, sm: 1, md: 1.5 }, textAlign: "center" }}>
-        <CaseCreateButton navigation />
-      </Box>
-
-      <List sx={{ px: { xs: 1, sm: 0.75, md: 1.25 }, py: 0.5 }}>
+      <List sx={{ px: { xs: 1, sm: 0.75, md: 1 }, py: 1 }}>
         {destinations.map((destination) => {
           const selected = isDestinationActive(pathname, destination.href);
           return (
-            <ListItemButton
+            <InternalNavigationItem
               key={destination.href}
-              component={Link}
               href={destination.href}
+              icon={destination.icon}
+              label={destination.label}
               selected={selected}
               onClick={onNavigate}
-              sx={{
-                minHeight: { sm: 56, md: 48 },
-                mb: 0.5,
-                borderRadius: { sm: 3, md: 3 },
-                flexDirection: { sm: "column", md: "row" },
-                justifyContent: { sm: "center", md: "flex-start" },
-                gap: { sm: 0.25, md: 0 },
-                px: { sm: 0.5, md: 1.5 },
-                color: selected ? "secondary.contrastText" : "text.secondary",
-                "&.Mui-selected": { backgroundColor: "secondary.main" },
-                "&.Mui-selected:hover": {
-                  backgroundColor:
-                    "color-mix(in srgb, currentColor 8%, var(--mui-palette-secondary-main))",
-                },
-              }}
-            >
-              <ListItemIcon
-                sx={{
-                  minWidth: { sm: 0, md: 36 },
-                  color: "inherit",
-                  justifyContent: "center",
-                }}
-              >
-                {destination.icon}
-              </ListItemIcon>
-              <ListItemText
-                primary={destination.label}
-                slotProps={{
-                  primary: {
-                    variant: "body2",
-                    sx: { fontWeight: selected ? 650 : 550, whiteSpace: "nowrap" },
-                  },
-                }}
-                sx={{ m: 0, display: { sm: "none", md: "block" } }}
-              />
-            </ListItemButton>
+            />
           );
         })}
+        <CaseCreateButton navigation />
       </List>
+
+      <Stack spacing={1.25} sx={{ mt: "auto", p: { xs: 1.5, sm: 1, md: 1.5 } }}>
+        <Divider />
+        <Typography
+          variant="caption"
+          color="text.secondary"
+          sx={{ display: { xs: "block", sm: "none", md: "block" }, px: 0.5 }}
+        >
+          外观
+        </Typography>
+        <Box sx={{ display: { xs: "block", sm: "none", md: "block" } }}>
+          <MagicThemeControls />
+        </Box>
+        <Box sx={{ display: { xs: "none", sm: "block", md: "none" } }}>
+          <MagicThemeControls compact />
+        </Box>
+      </Stack>
     </Stack>
   );
 }
@@ -161,6 +136,7 @@ export function InternalAppShell({ children }: { children: ReactNode }) {
           borderRight: "1px solid",
           borderColor: "divider",
           backgroundColor: "var(--mui-palette-surface-containerLow)",
+          transition: "background-color 250ms cubic-bezier(0.2, 0, 0, 1)",
         }}
       >
         <NavigationContent pathname={pathname} />
@@ -187,7 +163,8 @@ export function InternalAppShell({ children }: { children: ReactNode }) {
           elevation={0}
           color="transparent"
           sx={{
-            height: 64,
+            display: { xs: "block", sm: "none" },
+            height: 56,
             borderBottom: "1px solid",
             borderColor: "divider",
             // A fully opaque app bar prevents scrolling content from bleeding into text and icons at
@@ -197,7 +174,7 @@ export function InternalAppShell({ children }: { children: ReactNode }) {
         >
           <Toolbar
             disableGutters
-            sx={{ minHeight: "64px !important", px: { xs: 1.5, sm: 2, lg: 3 } }}
+            sx={{ minHeight: "56px !important", px: 1.5 }}
           >
             <IconButton
               aria-label="打开导航"
@@ -207,14 +184,11 @@ export function InternalAppShell({ children }: { children: ReactNode }) {
               <Menu />
             </IconButton>
             <Typography variant="subtitle1" sx={{ flex: 1, minWidth: 0 }} noWrap>
-              内部工作台
+              Magic Compare
             </Typography>
-            <MagicThemeControls />
           </Toolbar>
         </AppBar>
-        <Box component="section" sx={{ minWidth: 0 }}>
-          {children}
-        </Box>
+        <InternalRouteTransition>{children}</InternalRouteTransition>
       </Box>
     </Box>
   );

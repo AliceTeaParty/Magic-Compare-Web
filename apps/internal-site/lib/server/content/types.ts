@@ -9,6 +9,7 @@ export interface CaseCatalogItem {
   status: CaseStatus;
   publishedAt: string | null;
   updatedAt: string;
+  coverThumbUrl: string | null;
   groupCount: number;
   publicGroupCount: number;
 }

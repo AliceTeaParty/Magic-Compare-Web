@@ -1,24 +1,22 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Add } from "@mui/icons-material";
+import { Add, AddCircleOutlined } from "@mui/icons-material";
 import {
-  Box,
   Button,
   Dialog,
   DialogActions,
   DialogContent,
   DialogContentText,
   DialogTitle,
-  IconButton,
   Stack,
   TextField,
-  Tooltip,
 } from "@mui/material";
 import { cjkKebabCase } from "@magic-compare/shared-utils";
 import { useRouter } from "next/navigation";
 import { AppNotifications } from "./notifications/app-notifications";
 import { useAppNotifications } from "./notifications/use-app-notifications";
+import { InternalNavigationItem } from "./internal-navigation-item";
 
 const DEFAULT_CASE_SLUG = "new-case";
 const EMPTY_CASE_TITLE = "";
@@ -93,32 +91,11 @@ export function CaseCreateButton({ navigation = false }: { navigation?: boolean 
   return (
     <>
       {navigation ? (
-        <Box sx={{ width: "100%" }}>
-          <Tooltip title="新建 Case" placement="right">
-            <IconButton
-              aria-label="新建 Case"
-              onClick={() => setOpen(true)}
-              sx={{
-                display: { sm: "inline-flex", md: "none" },
-                width: 56,
-                height: 56,
-                color: "primary.contrastText",
-                backgroundColor: "primary.main",
-                "&:hover": { backgroundColor: "primary.main" },
-              }}
-            >
-              <Add />
-            </IconButton>
-          </Tooltip>
-          <Button
-            variant="contained"
-            startIcon={<Add />}
-            onClick={() => setOpen(true)}
-            sx={{ display: { sm: "none", md: "inline-flex" }, width: "100%" }}
-          >
-            新建 Case
-          </Button>
-        </Box>
+        <InternalNavigationItem
+          icon={<AddCircleOutlined />}
+          label="新建"
+          onClick={() => setOpen(true)}
+        />
       ) : (
         <Button variant="contained" startIcon={<Add />} onClick={() => setOpen(true)}>
           新建 Case

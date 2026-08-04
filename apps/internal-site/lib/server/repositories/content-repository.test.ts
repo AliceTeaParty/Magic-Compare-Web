@@ -1,17 +1,25 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { searchCases } from "./content-repository";
+import { listCases, searchCases } from "./content-repository";
 
-const { findMany, shouldHideDemoContent } = vi.hoisted(() => ({
-  findMany: vi.fn(),
+const { assetFindMany, caseFindMany, shouldHideDemoContent } = vi.hoisted(() => ({
+  assetFindMany: vi.fn(),
+  caseFindMany: vi.fn(),
   shouldHideDemoContent: vi.fn(),
 }));
 
 vi.mock("@/lib/server/db/client", () => ({
   prisma: {
     case: {
-      findMany,
+      findMany: caseFindMany,
+    },
+    asset: {
+      findMany: assetFindMany,
     },
   },
+}));
+
+vi.mock("@/lib/server/storage/internal-assets", () => ({
+  resolvePublicInternalAssetUrl: (logicalPath: string) => `https://assets.test/${logicalPath}`,
 }));
 
 vi.mock("@/lib/server/runtime-config", () => ({
@@ -21,13 +29,14 @@ vi.mock("@/lib/server/runtime-config", () => ({
 
 describe("searchCases", () => {
   beforeEach(() => {
-    findMany.mockReset();
+    assetFindMany.mockReset();
+    caseFindMany.mockReset();
     shouldHideDemoContent.mockReset();
     shouldHideDemoContent.mockReturnValue(false);
   });
 
   it("returns recent cases when the query is empty", async () => {
-    findMany.mockResolvedValue([
+    caseFindMany.mockResolvedValue([
       {
         id: "case-1",
         slug: "2026",
@@ -56,7 +65,7 @@ describe("searchCases", () => {
 
     const results = await searchCases("");
 
-    expect(findMany).toHaveBeenCalledWith({
+    expect(caseFindMany).toHaveBeenCalledWith({
       where: undefined,
       include: {
         groups: {
@@ -84,6 +93,7 @@ describe("searchCases", () => {
         status: "internal",
         publishedAt: null,
         updatedAt: "2026-03-19T08:00:00.000Z",
+        coverThumbUrl: null,
         groupCount: 2,
         publicGroupCount: 1,
         groups: [
@@ -101,11 +111,11 @@ describe("searchCases", () => {
   });
 
   it("searches slug and title with the provided limit", async () => {
-    findMany.mockResolvedValue([]);
+    caseFindMany.mockResolvedValue([]);
 
     await searchCases("2026", 5);
 
-    expect(findMany).toHaveBeenCalledWith({
+    expect(caseFindMany).toHaveBeenCalledWith({
       where: {
         OR: [
           {
@@ -140,11 +150,11 @@ describe("searchCases", () => {
 
   it("filters the fixed demo case when the env flag is enabled", async () => {
     shouldHideDemoContent.mockReturnValue(true);
-    findMany.mockResolvedValue([]);
+    caseFindMany.mockResolvedValue([]);
 
     await searchCases("", 8);
 
-    expect(findMany).toHaveBeenCalledWith({
+    expect(caseFindMany).toHaveBeenCalledWith({
       where: {
         slug: {
           not: "demo-grain-study",
@@ -166,5 +176,42 @@ describe("searchCases", () => {
       orderBy: [{ updatedAt: "desc" }],
       take: 8,
     });
+  });
+});
+
+describe("listCases", () => {
+  beforeEach(() => {
+    assetFindMany.mockReset();
+    caseFindMany.mockReset();
+    shouldHideDemoContent.mockReset();
+    shouldHideDemoContent.mockReturnValue(false);
+  });
+
+  it("adds the selected cover thumbnail without loading frame trees", async () => {
+    caseFindMany.mockResolvedValue([
+      {
+        id: "case-1",
+        slug: "2026",
+        title: "2026",
+        summary: "ACG quote",
+        tagsJson: "[]",
+        status: "internal",
+        coverAssetId: "asset-cover",
+        publishedAt: null,
+        updatedAt: new Date("2026-03-19T08:00:00.000Z"),
+        groups: [{ isPublic: true }],
+      },
+    ]);
+    assetFindMany.mockResolvedValue([
+      { id: "asset-cover", thumbUrl: "groups/2026/main/thumb.webp" },
+    ]);
+
+    const results = await listCases();
+
+    expect(assetFindMany).toHaveBeenCalledWith({
+      where: { id: { in: ["asset-cover"] } },
+      select: { id: true, thumbUrl: true },
+    });
+    expect(results[0]?.coverThumbUrl).toBe("https://assets.test/groups/2026/main/thumb.webp");
   });
 });

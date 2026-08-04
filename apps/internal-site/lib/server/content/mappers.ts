@@ -156,17 +156,20 @@ function mapGroupPreloadAssets(group: {
  * Produces the catalog card shape directly from the database row so list and search results share a
  * stable summary model instead of duplicating status/tag counting logic in multiple places.
  */
-export function mapCaseCatalogItem(caseRow: {
-  id: string;
-  slug: string;
-  title: string;
-  summary: string;
-  tagsJson: string;
-  status: string;
-  publishedAt: Date | null;
-  updatedAt: Date;
-  groups: Array<{ isPublic: boolean }>;
-}): CaseCatalogItem {
+export function mapCaseCatalogItem(
+  caseRow: {
+    id: string;
+    slug: string;
+    title: string;
+    summary: string;
+    tagsJson: string;
+    status: string;
+    publishedAt: Date | null;
+    updatedAt: Date;
+    groups: Array<{ isPublic: boolean }>;
+  },
+  coverThumbPath: string | null = null,
+): CaseCatalogItem {
   return {
     id: caseRow.id,
     slug: caseRow.slug,
@@ -176,6 +179,7 @@ export function mapCaseCatalogItem(caseRow: {
     status: asCaseStatus(caseRow.status),
     publishedAt: caseRow.publishedAt?.toISOString() ?? null,
     updatedAt: caseRow.updatedAt.toISOString(),
+    coverThumbUrl: coverThumbPath ? resolvePublicInternalAssetUrl(coverThumbPath) : null,
     groupCount: caseRow.groups.length,
     publicGroupCount: caseRow.groups.filter((group) => group.isPublic).length,
   };

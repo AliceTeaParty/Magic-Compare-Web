@@ -17,7 +17,7 @@ import { INTERNAL_THEME_PRESETS } from "./magic-color-tokens";
 import { useInternalTheme } from "./magic-theme-provider";
 
 /** Keeps theme controls stable during hydration while preserving the system-mode first visit. */
-export function MagicThemeControls() {
+export function MagicThemeControls({ compact = false }: { compact?: boolean }) {
   const { mode, setMode, systemMode } = useColorScheme();
   const { seedHex, seedValue, setSeedValue } = useInternalTheme();
   const [mounted, setMounted] = useState(false);
@@ -35,32 +35,46 @@ export function MagicThemeControls() {
     setSeedValue(`custom:${event.target.value.toUpperCase()}`);
   }
 
+  const modeControl = compact ? (
+    <Tooltip title={isDark ? "切换为浅色" : "切换为深色"} placement="right">
+      <IconButton
+        aria-label={isDark ? "切换为浅色" : "切换为深色"}
+        disabled={!mounted}
+        onClick={() => setMode(isDark ? "light" : "dark")}
+      >
+        {isDark ? <LightModeOutlined /> : <DarkModeOutlined />}
+      </IconButton>
+    </Tooltip>
+  ) : (
+    <Tooltip title={isDark ? "切换为浅色" : "切换为深色"}>
+      <Box sx={{ display: "inline-flex", alignItems: "center", height: 40 }}>
+        <LightModeOutlined sx={{ fontSize: 18, color: "text.secondary" }} />
+        <Switch
+          size="small"
+          checked={mounted && isDark}
+          disabled={!mounted}
+          onChange={() => setMode(isDark ? "light" : "dark")}
+          slotProps={{ input: { "aria-label": "切换明暗模式" } }}
+          sx={{ mx: 0.25 }}
+        />
+        <DarkModeOutlined sx={{ fontSize: 18, color: "text.secondary" }} />
+      </Box>
+    </Tooltip>
+  );
+
   return (
     <Stack
-      direction="row"
+      direction={compact ? "column" : "row"}
       sx={{
         alignItems: "center",
         flex: "0 0 auto",
-        gap: 0.25,
-        minWidth: 120,
-        height: 40,
+        gap: compact ? 0.75 : 0.25,
+        minWidth: compact ? 0 : 120,
+        minHeight: 40,
       }}
     >
-      <Tooltip title={isDark ? "切换为浅色" : "切换为深色"}>
-        <Box sx={{ display: "inline-flex", alignItems: "center", height: 40 }}>
-          <LightModeOutlined sx={{ fontSize: 18, color: "text.secondary" }} />
-          <Switch
-            size="small"
-            checked={mounted && isDark}
-            disabled={!mounted}
-            onChange={() => setMode(isDark ? "light" : "dark")}
-            slotProps={{ input: { "aria-label": "切换明暗模式" } }}
-            sx={{ mx: 0.25 }}
-          />
-          <DarkModeOutlined sx={{ fontSize: 18, color: "text.secondary" }} />
-        </Box>
-      </Tooltip>
-      <Tooltip title="主题色">
+      {modeControl}
+      <Tooltip title="主题色" placement={compact ? "right" : "bottom"}>
         <IconButton aria-label="选择主题色" onClick={openPalette}>
           <PaletteOutlined />
         </IconButton>
@@ -69,8 +83,14 @@ export function MagicThemeControls() {
         open={Boolean(anchor)}
         anchorEl={anchor}
         onClose={() => setAnchor(null)}
-        anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
-        transformOrigin={{ vertical: "top", horizontal: "right" }}
+        anchorOrigin={{
+          vertical: compact ? "top" : "bottom",
+          horizontal: compact ? "right" : "right",
+        }}
+        transformOrigin={{
+          vertical: compact ? "bottom" : "top",
+          horizontal: compact ? "left" : "right",
+        }}
         slotProps={{
           paper: {
             sx: {
