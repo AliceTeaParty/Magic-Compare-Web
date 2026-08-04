@@ -157,7 +157,7 @@ export function ABCompareStage({
         outline: active ? viewerTokens.abStage.activeOutline : "1px solid transparent",
         boxShadow: active ? viewerTokens.abStage.activeShadow : "none",
         transition:
-          "outline-color 180ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 180ms cubic-bezier(0.22, 1, 0.36, 1)",
+          "outline-color 180ms cubic-bezier(0.2, 0, 0, 1), box-shadow 180ms cubic-bezier(0.2, 0, 0, 1)",
         "&:focus-visible": {
           outline: viewerTokens.abStage.activeOutline,
           boxShadow: viewerTokens.abStage.activeShadow,

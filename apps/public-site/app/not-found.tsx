@@ -14,11 +14,21 @@ export default function NotFoundPage() {
         }}
       >
         <Stack spacing={1.5}>
-          <Typography variant="overline" color="text.secondary">
+          <Typography
+            variant="overline"
+            sx={{
+              color: "text.secondary",
+            }}
+          >
             Magic Compare
           </Typography>
           <Typography variant="h3">Group not found</Typography>
-          <Typography variant="body1" color="text.secondary">
+          <Typography
+            variant="body1"
+            sx={{
+              color: "text.secondary",
+            }}
+          >
             Public galleries are link-only. This address does not map to a published compare group.
           </Typography>
           <Button variant="outlined" disabled>

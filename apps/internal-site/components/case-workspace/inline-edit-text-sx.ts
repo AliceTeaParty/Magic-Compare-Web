@@ -1,5 +1,3 @@
-import type { SxProps, Theme } from "@mui/material";
-
 type InlineEditTextKind = "title" | "description" | "summary";
 
 /**
@@ -7,13 +5,7 @@ type InlineEditTextKind = "title" | "description" | "summary";
  * The underline is painted inside pre-reserved padding so entering edit mode never changes text
  * metrics or pushes the rows below it.
  */
-export function inlineEditTextSx({
-  active,
-  kind,
-}: {
-  active: boolean;
-  kind: InlineEditTextKind;
-}): SxProps<Theme> {
+export function inlineEditTextSx({ active, kind }: { active: boolean; kind: InlineEditTextKind }) {
   const baseSx = {
     display: "block",
     maxWidth: "100%",
@@ -35,7 +27,7 @@ export function inlineEditTextSx({
       color: "text.disabled",
       content: "attr(data-placeholder)",
     },
-  } satisfies SxProps<Theme>;
+  } as const;
 
   if (kind === "title") {
     return {

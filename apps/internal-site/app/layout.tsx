@@ -1,5 +1,7 @@
 import type { Metadata, Viewport } from "next";
+import { cookies } from "next/headers";
 import { MagicRootLayoutShell } from "@magic-compare/ui";
+import { InternalAppShell } from "@/components/internal-app-shell";
 import { loadWorkspaceEnv } from "@/lib/server/env/load-workspace-env";
 import "./globals.css";
 
@@ -21,7 +23,14 @@ export const viewport: Viewport = {
   viewportFit: "cover",
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
   loadWorkspaceEnv();
-  return <MagicRootLayoutShell>{children}</MagicRootLayoutShell>;
+  const cookieStore = await cookies();
+  const initialThemeSeed = cookieStore.get("mc_internal_theme")?.value ?? null;
+
+  return (
+    <MagicRootLayoutShell profile="internal" initialThemeSeed={initialThemeSeed} lang="zh-CN">
+      <InternalAppShell>{children}</InternalAppShell>
+    </MagicRootLayoutShell>
+  );
 }

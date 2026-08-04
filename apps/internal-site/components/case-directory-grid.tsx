@@ -19,20 +19,14 @@ export function CaseDirectoryGrid({ items }: { items: CaseCatalogItem[] }) {
         gridTemplateColumns: {
           xs: "1fr",
           md: "repeat(2, minmax(0, 1fr))",
-          xl: "repeat(2, minmax(0, 1fr))",
+          xl: "repeat(3, minmax(0, 1fr))",
         },
-        gap: { xs: 1.7, md: 2.2, xl: 2.4 },
+        gap: { xs: 1, md: 1.5 },
         alignItems: "stretch",
       }}
     >
       {items.map((item) => (
-        <CaseDirectoryCard
-          key={item.id}
-          item={item}
-          // Keep every card on the same width after the lead-card experiment proved worse for
-          // scanability than a plain equal grid.
-          isLead={false}
-        />
+        <CaseDirectoryCard key={item.id} item={item} />
       ))}
     </Box>
   );

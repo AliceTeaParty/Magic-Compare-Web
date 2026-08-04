@@ -60,6 +60,7 @@ export function useStageImageLoadState(imageUrl: string) {
       (loadState.imageUrl === imageUrl && loadState.status === "loaded"));
 
   return {
+    hasError: currentImageErrored,
     imageRef,
     markErrored,
     markLoaded,

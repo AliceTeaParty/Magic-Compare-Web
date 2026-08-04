@@ -9,14 +9,7 @@ import {
 } from "@magic-compare/compare-core";
 import type { ViewerMode } from "@magic-compare/content-schema";
 import type { ViewerAsset } from "@magic-compare/compare-core/viewer-data";
-import {
-  useEffect,
-  useMemo,
-  useRef,
-  type ReactNode,
-  type RefObject,
-  useState,
-} from "react";
+import { useEffect, useMemo, useRef, type ReactNode, type RefObject, useState } from "react";
 import { ABCompareStage } from "./ab-compare-stage";
 import { PositionedStageMedia } from "./positioned-stage-media";
 import { SwipeCompareStage } from "./swipe-compare-stage";
@@ -145,7 +138,7 @@ function StagePresentationShell({
             ? viewerTokens.stage.measuredShadow
             : "none",
         transition:
-          "width 180ms cubic-bezier(0.22, 1, 0.36, 1), height 180ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 180ms cubic-bezier(0.22, 1, 0.36, 1), border-color 180ms cubic-bezier(0.22, 1, 0.36, 1)",
+          "width 180ms cubic-bezier(0.2, 0, 0, 1), height 180ms cubic-bezier(0.2, 0, 0, 1), box-shadow 180ms cubic-bezier(0.2, 0, 0, 1), border-color 180ms cubic-bezier(0.2, 0, 0, 1)",
       }}
     >
       {children}
@@ -167,8 +160,7 @@ export function HeatmapNotice() {
         color: "text.primary",
       }}
     >
-      No heatmap for this frame. Viewer has fallen back to a primary compare
-      mode.
+      No heatmap for this frame. Viewer has fallen back to a primary compare mode.
     </Alert>
   );
 }
@@ -234,11 +226,14 @@ function ViewerStageContent({
 
   if (!beforeAsset || !afterAsset) {
     return (
-      <Stack spacing={1.5} alignItems="center">
+      <Stack
+        spacing={1.5}
+        sx={{
+          alignItems: "center",
+        }}
+      >
         <PhotoLibrary sx={{ color: "text.secondary" }} />
-        <Typography variant="body1">
-          This frame is missing its before/after pair.
-        </Typography>
+        <Typography variant="body1">This frame is missing its before/after pair.</Typography>
       </Stack>
     );
   }
@@ -267,10 +262,7 @@ function ViewerStageContent({
 
   if (mode === "heatmap" && heatmapAsset) {
     return (
-      <Box
-        ref={stageViewportRef}
-        sx={{ width: "100%", height: "100%", position: "relative" }}
-      >
+      <Box ref={stageViewportRef} sx={{ width: "100%", height: "100%", position: "relative" }}>
         <PositionedStageMedia
           asset={afterAsset}
           alt={`${afterAsset.label} base`}

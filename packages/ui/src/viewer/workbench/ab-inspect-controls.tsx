@@ -2,10 +2,7 @@
 
 import { Add, Remove } from "@mui/icons-material";
 import { Box, FormControl, IconButton, MenuItem, Select, Stack } from "@mui/material";
-import {
-  VIEWER_MAX_PRESET_SCALE,
-  VIEWER_MIN_PRESET_SCALE,
-} from "@magic-compare/compare-core";
+import { VIEWER_MAX_PRESET_SCALE, VIEWER_MIN_PRESET_SCALE } from "@magic-compare/compare-core";
 import { viewerTokens } from "./viewer-tokens";
 
 interface AbInspectControlsProps {
@@ -54,8 +51,8 @@ export function AbInspectControls({
     <Stack
       direction="row"
       spacing={1}
-      alignItems="center"
       sx={{
+        alignItems: "center",
         flexShrink: 0,
         minHeight: compactControlHeight,
       }}
@@ -105,8 +102,8 @@ export function AbInspectControls({
         <Stack
           direction="row"
           spacing={0.65}
-          alignItems="center"
           sx={{
+            alignItems: "center",
             width: "100%",
           }}
         >
@@ -115,9 +112,7 @@ export function AbInspectControls({
             aria-label="缩小 A/B 视图"
             disabled={isAtMinScale}
             onClick={() =>
-              onScaleChange(
-                Math.max(VIEWER_MIN_PRESET_SCALE, Math.floor(abScale - 0.001)),
-              )
+              onScaleChange(Math.max(VIEWER_MIN_PRESET_SCALE, Math.floor(abScale - 0.001)))
             }
             sx={{
               width: compactIconButtonSize,
@@ -157,9 +152,7 @@ export function AbInspectControls({
             aria-label="放大 A/B 视图"
             disabled={isAtMaxScale}
             onClick={() =>
-              onScaleChange(
-                Math.min(VIEWER_MAX_PRESET_SCALE, Math.ceil(abScale + 0.001)),
-              )
+              onScaleChange(Math.min(VIEWER_MAX_PRESET_SCALE, Math.ceil(abScale + 0.001)))
             }
             sx={{
               width: compactIconButtonSize,

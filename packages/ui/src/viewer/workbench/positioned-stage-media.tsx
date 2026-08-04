@@ -52,6 +52,8 @@ export function PositionedStageMedia({
   loading,
   decoding,
   fetchPriority,
+  fallbackContentPosition,
+  fallbackErrorMessage,
   opacity = 1,
   clipPath,
   prefersReducedMotion = false,
@@ -69,13 +71,15 @@ export function PositionedStageMedia({
   loading?: "eager" | "lazy";
   decoding?: "async" | "auto" | "sync";
   fetchPriority?: "high" | "low" | "auto";
+  fallbackContentPosition?: { left: string; top: string };
+  fallbackErrorMessage?: string;
   opacity?: number;
   clipPath?: string;
   prefersReducedMotion?: boolean;
   showFallback?: boolean;
   animateOpacity?: boolean;
 }) {
-  const { imageRef, markErrored, markLoaded, showImage } =
+  const { hasError, imageRef, markErrored, markLoaded, showImage } =
     useStageImageLoadState(asset.imageUrl);
 
   const resolvedClipRect = clipRect ?? mediaRect;
@@ -127,6 +131,10 @@ export function PositionedStageMedia({
       >
         {!showImage && showFallback ? (
           <StageImageFallback
+            contentPosition={fallbackContentPosition}
+            counterRotate={rotateStage}
+            errorMessage={fallbackErrorMessage}
+            errored={hasError}
             opacity={opacity}
             prefersReducedMotion={prefersReducedMotion}
           />
@@ -154,7 +162,7 @@ export function PositionedStageMedia({
             WebkitUserDrag: "none",
             transition: prefersReducedMotion || !animateOpacity
               ? "none"
-              : "opacity 160ms cubic-bezier(0.22, 1, 0.36, 1)",
+              : "opacity 160ms cubic-bezier(0.2, 0, 0, 1)",
           }}
         />
       </Box>

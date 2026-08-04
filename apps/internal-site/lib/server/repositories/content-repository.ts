@@ -14,6 +14,7 @@ export {
   reorderGroups,
   setGroupVisibility,
   updateCaseSummary,
+  updateCaseMetadata,
   updateGroupMetadata,
 } from "../content/mutation-service";
 export {

@@ -20,9 +20,7 @@ export function MagicSiteFooter({
   yearStart,
 }: MagicSiteFooterProps) {
   const yearLabel = yearStart === yearEnd ? `${yearEnd}` : `${yearStart}-${yearEnd}`;
-  const versionLabel = appVersion
-    ? `v${appVersion}${commitHash ? `-${commitHash}` : ""}`
-    : null;
+  const versionLabel = appVersion ? `v${appVersion}${commitHash ? `-${commitHash}` : ""}` : null;
 
   return (
     <Box
@@ -47,14 +45,16 @@ export function MagicSiteFooter({
         <Stack
           direction="column"
           spacing={0.9}
-          alignItems="center"
-          justifyContent="center"
-          sx={{ textAlign: "center" }}
+          sx={{
+            alignItems: "center",
+            justifyContent: "center",
+            textAlign: "center",
+          }}
         >
           <Typography
             variant="body2"
-            color="text.secondary"
             sx={{
+              color: "text.secondary",
               fontSize: "0.8rem",
               fontWeight: 400,
               letterSpacing: "0.01em",
@@ -96,10 +96,11 @@ export function MagicSiteFooter({
                 color: "text.secondary",
                 fontSize: "0.8rem",
                 fontWeight: 500,
+                // Footer links keep their geometry fixed; hover changes paint only, matching the
+                // same Material state-layer rule used by the internal workbench controls.
                 transition:
-                  "transform 180ms cubic-bezier(0.22, 1, 0.36, 1), border-color 180ms cubic-bezier(0.22, 1, 0.36, 1), color 180ms cubic-bezier(0.22, 1, 0.36, 1), background-color 180ms cubic-bezier(0.22, 1, 0.36, 1)",
+                  "border-color 150ms cubic-bezier(0.2, 0, 0, 1), color 150ms cubic-bezier(0.2, 0, 0, 1), background-color 150ms cubic-bezier(0.2, 0, 0, 1)",
                 "&:hover": {
-                  transform: "translateY(-1px)",
                   color: "primary.light",
                   borderColor: "rgba(232, 198, 246, 0.28)",
                   backgroundColor: "rgba(255,255,255,0.038)",

@@ -1,125 +1,102 @@
-import { ArrowOutward, Collections, Public } from "@mui/icons-material";
-import { Box, Button, Chip, Paper, Stack, Typography } from "@mui/material";
+import {
+  ArrowForward,
+  CollectionsOutlined,
+  PublicOutlined,
+  ScheduleOutlined,
+} from "@mui/icons-material";
+import { Box, Chip, Paper, Stack, Typography } from "@mui/material";
 import Link from "next/link";
 import type { CaseCatalogItem } from "@/lib/server/repositories/content-repository";
 
-/**
- * Keeps each catalog card structurally consistent so operators can compare cases without the grid
- * changing width hierarchy underneath them.
- */
-export function CaseDirectoryCard({
-  item,
-  isLead,
-}: {
-  item: CaseCatalogItem;
-  isLead: boolean;
-}) {
+const statusLabels = {
+  draft: "草稿",
+  internal: "内部",
+  published: "已发布",
+  archived: "已归档",
+} as const;
+
+/** Presents Case metadata in a repeatable M3 card without decorative elevation or fixed spacers. */
+export function CaseDirectoryCard({ item }: { item: CaseCatalogItem }) {
   return (
     <Paper
-      elevation={0}
+      component={Link}
+      href={`/cases/${item.slug}`}
       sx={{
-        p: { xs: 2.45, md: 3.05 },
-        borderRadius: 3.5,
-        border: "1px solid",
-        borderColor: "divider",
-        background:
-          "linear-gradient(180deg, rgba(255,255,255,0.065) 0%, rgba(255,255,255,0.025) 100%)",
-        minHeight: { xs: 246, md: 258 },
-        // Cards render at their final coordinates so navigation never exposes late or moving targets.
-        position: "relative",
-        overflow: "hidden",
+        // The catalog is scanned repeatedly, so the whole Case surface is the navigation target;
+        // the prior footer-only link made Fitts's Law work against the primary workflow.
+        display: "flex",
+        minWidth: 0,
+        minHeight: 220,
+        p: { xs: 2, md: 2.5 },
+        borderRadius: 1.5,
+        color: "text.primary",
+        textDecoration: "none",
+        backgroundColor: "var(--mui-palette-surface-containerLow)",
+        transition: "background-color 150ms cubic-bezier(0.2, 0, 0, 1)",
+        "&:hover": { backgroundColor: "var(--mui-palette-surface-container)" },
+        "&:focus-visible": {
+          outline: "3px solid var(--mui-palette-primary-main)",
+          outlineOffset: 2,
+        },
       }}
     >
-      <Stack
-        spacing={1.9}
-        sx={{ height: "100%", position: "relative", zIndex: 1 }}
-      >
+      <Stack spacing={1.5} sx={{ width: "100%", minWidth: 0 }}>
         <Stack
           direction="row"
-          justifyContent="space-between"
-          alignItems="flex-start"
-          spacing={1.4}
+          sx={{ alignItems: "flex-start", justifyContent: "space-between", gap: 1 }}
         >
-          <Box sx={{ minWidth: 0, display: "grid", gap: 0.9 }}>
-            <Typography
-              variant="h6"
-              sx={{ lineHeight: 1.02, maxWidth: isLead ? 520 : "100%" }}
-            >
+          <Box sx={{ minWidth: 0 }}>
+            <Typography variant="h3" noWrap title={item.title}>
               {item.title}
             </Typography>
-            <Typography
-              variant="caption"
-              color="text.secondary"
-              sx={{ letterSpacing: 0.5 }}
-            >
-              {/* Surface recency next to the title so operators can scan freshness before they read
-                  the full summary; this replaces a later, easier-to-miss metadata row. */}
-              Updated {new Date(item.updatedAt).toLocaleDateString()}
+            <Typography variant="caption" color="text.secondary" noWrap>
+              {item.slug}
             </Typography>
           </Box>
           <Chip
-            label={item.status}
+            label={statusLabels[item.status]}
             size="small"
             color={item.status === "published" ? "primary" : "default"}
-            sx={{ height: 34, "& .MuiChip-label": { px: 1.45 } }}
           />
         </Stack>
+
         <Typography
           variant="body2"
           color="text.secondary"
           sx={{
-            // Let real summary length and the bottom action row determine card height. The previous
-            // empty spacer kept cards aligned, but it also made the grid feel like a placeholder
-            // template instead of real content.
-            minHeight: isLead ? { xs: "auto", md: 72 } : 52,
-            maxWidth: isLead ? 620 : "100%",
-            lineHeight: 1.72,
+            display: "-webkit-box",
+            WebkitBoxOrient: "vertical",
+            WebkitLineClamp: 3,
+            overflow: "hidden",
           }}
         >
-          {item.summary || "No summary yet."}
+          {item.summary || "暂无描述。"}
         </Typography>
-        <Stack spacing={1.1} sx={{ pt: 1.35, mt: "auto" }}>
-          {/* Keep metadata and the primary action pinned to the card floor so varying summaries do
-              not make the bottom edge drift from card to card. */}
-          <Stack direction="row" spacing={0.9} flexWrap="wrap" useFlexGap>
-            <Chip
-              size="small"
-              icon={<Collections fontSize="small" />}
-              label={`${item.groupCount} groups`}
-              variant="outlined"
-              sx={{
-                height: 34,
-                pl: 0.6,
-                pr: 0.85,
-                "& .MuiChip-label": { px: 1.6 },
-                "& .MuiChip-icon": { ml: 0.95, mr: -0.35 },
-              }}
-            />
-            <Chip
-              size="small"
-              icon={<Public fontSize="small" />}
-              label={`${item.publicGroupCount} public`}
-              variant="outlined"
-              sx={{
-                height: 34,
-                pl: 0.6,
-                pr: 0.85,
-                "& .MuiChip-label": { px: 1.6 },
-                "& .MuiChip-icon": { ml: 0.95, mr: -0.35 },
-              }}
-            />
-          </Stack>
-          <Stack direction="row" spacing={1}>
-            <Button
-              component={Link}
-              href={`/cases/${item.slug}`}
-              variant="outlined"
-              endIcon={<ArrowOutward />}
-              sx={{ minHeight: 42, px: 2.2, borderRadius: 999 }}
-            >
-              Open workspace
-            </Button>
-          </Stack>
+
+        <Stack direction="row" sx={{ flexWrap: "wrap", gap: 0.75, mt: "auto" }}>
+          <Chip
+            size="small"
+            variant="outlined"
+            icon={<CollectionsOutlined fontSize="small" />}
+            label={`${item.groupCount} 个 Group`}
+          />
+          <Chip
+            size="small"
+            variant="outlined"
+            icon={<PublicOutlined fontSize="small" />}
+            label={`${item.publicGroupCount} 个公开`}
+          />
+          <Chip
+            size="small"
+            variant="outlined"
+            icon={<ScheduleOutlined fontSize="small" />}
+            label={new Date(item.updatedAt).toLocaleDateString("zh-CN")}
+          />
+        </Stack>
+
+        <Stack direction="row" sx={{ alignItems: "center", gap: 0.75, color: "primary.main" }}>
+          <Typography variant="button">打开工作区</Typography>
+          <ArrowForward fontSize="small" />
         </Stack>
       </Stack>
     </Paper>

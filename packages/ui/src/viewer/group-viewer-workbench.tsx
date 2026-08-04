@@ -23,10 +23,7 @@ import { useAbInspectState } from "./workbench/use-ab-inspect-state";
 import { useViewerStageShellState } from "./workbench/use-viewer-stage-shell-state";
 import { viewerTokens } from "./workbench/viewer-tokens";
 import { ViewerGuidePanel } from "./workbench/viewer-guide-panel";
-import {
-  readViewerGuideState,
-  writeViewerGuideState,
-} from "./workbench/viewer-guide-storage";
+import { readViewerGuideState, writeViewerGuideState } from "./workbench/viewer-guide-storage";
 import { ViewerOnboardingNudge } from "./workbench/viewer-onboarding-nudge";
 
 interface GroupViewerWorkbenchProps {
@@ -38,10 +35,7 @@ interface GroupViewerWorkbenchProps {
  * Composes the viewer shell around smaller workbench modules so layout, persistence, and keyboard
  * behavior stay centralized while rendering details live in focused subcomponents.
  */
-export function GroupViewerWorkbench({
-  dataset,
-  variant,
-}: GroupViewerWorkbenchProps) {
+export function GroupViewerWorkbench({ dataset, variant }: GroupViewerWorkbenchProps) {
   const controller = useViewerController(dataset.group);
   const {
     abSide,
@@ -93,12 +87,8 @@ export function GroupViewerWorkbench({
   // Derive stage aspect ratio from the actual content dimensions so the stage frame matches the
   // image without pillarboxing or letterboxing.  Falls back to 16:9 while assets are loading.
   const referenceAsset = afterAsset ?? beforeAsset;
-  const contentAspectRatio = referenceAsset
-    ? referenceAsset.width / referenceAsset.height
-    : 16 / 9;
-  const stageAspectRatio = resolvedRotateStage
-    ? 1 / contentAspectRatio
-    : contentAspectRatio;
+  const contentAspectRatio = referenceAsset ? referenceAsset.width / referenceAsset.height : 16 / 9;
+  const stageAspectRatio = resolvedRotateStage ? 1 / contentAspectRatio : contentAspectRatio;
   const stageShell = useViewerStageShellState({
     aspectRatio: stageAspectRatio,
     prefersReducedMotion: resolvedPrefersReducedMotion,
@@ -198,9 +188,9 @@ export function GroupViewerWorkbench({
   return (
     <Box
       sx={{
-        minHeight: "100svh",
-        px: { xs: 1.25, md: 2.5 },
-        py: { xs: 1.25, md: 2.25 },
+        minHeight: variant === "internal" ? "calc(100svh - 64px)" : "100svh",
+        px: variant === "internal" ? 0 : { xs: 1.25, md: 2.5 },
+        py: variant === "internal" ? 0 : { xs: 1.25, md: 2.25 },
         background: viewerTokens.workbench.pageWash,
       }}
     >
@@ -211,18 +201,19 @@ export function GroupViewerWorkbench({
           maxWidth: "100%",
           display: "grid",
           gridTemplateColumns:
-            sidebarOpen && resolvedShowDesktopSidebar
-              ? "minmax(0, 1fr) 320px"
-              : "1fr",
+            sidebarOpen && resolvedShowDesktopSidebar ? "minmax(0, 1fr) 320px" : "1fr",
           gridTemplateRows: "auto minmax(0, auto)",
+          // A min-height grid stretches auto tracks by default, which made the viewer header absorb
+          // the unused viewport height and pushed the stage far below its controls.
+          alignContent: "start",
           minHeight: {
-            xs: "calc(100svh - 20px)",
-            md: "calc(100svh - 36px)",
+            xs: variant === "internal" ? "calc(100svh - 64px)" : "calc(100svh - 20px)",
+            md: variant === "internal" ? "calc(100svh - 64px)" : "calc(100svh - 36px)",
           },
           overflow: "hidden",
-          border: "1px solid",
+          border: variant === "internal" ? 0 : "1px solid",
           borderColor: "divider",
-          borderRadius: 3,
+          borderRadius: variant === "internal" ? 0 : 3,
           background: viewerTokens.workbench.panelSurface,
         }}
       >
@@ -231,6 +222,7 @@ export function GroupViewerWorkbench({
           abSide={abSide}
           canUseHeatmap={availableModes.includes("heatmap")}
           caseTitle={dataset.caseMeta.title}
+          caseSlug={dataset.caseMeta.slug}
           guideOpen={guideOpen}
           groupTitle={dataset.group.title}
           hideStageScrollControl={resolvedHideStageScrollControl}
@@ -242,6 +234,7 @@ export function GroupViewerWorkbench({
           onScrollStageIntoView={stageShell.scrollStageIntoView}
           onToggleSidebar={toggleSidebar}
           sidebarOpen={sidebarOpen}
+          variant={variant}
         />
 
         <Box
@@ -306,9 +299,17 @@ export function GroupViewerWorkbench({
                 <Stack
                   direction={{ xs: "column", md: "row" }}
                   spacing={2}
-                  alignItems="center"
+                  sx={{
+                    alignItems: "center",
+                  }}
                 >
-                  <Stack direction="row" spacing={1} alignItems="center">
+                  <Stack
+                    direction="row"
+                    spacing={1}
+                    sx={{
+                      alignItems: "center",
+                    }}
+                  >
                     <Tune fontSize="small" />
                     <Typography variant="body2">Opacity</Typography>
                   </Stack>
@@ -318,11 +319,7 @@ export function GroupViewerWorkbench({
                     value={overlayOpacity}
                     onChange={(_, value) =>
                       setOverlayOpacity(
-                        clampNumber(
-                          Array.isArray(value) ? value[0] : value,
-                          20,
-                          95,
-                        ),
+                        clampNumber(Array.isArray(value) ? value[0] : value, 20, 95),
                       )
                     }
                     valueLabelDisplay="auto"

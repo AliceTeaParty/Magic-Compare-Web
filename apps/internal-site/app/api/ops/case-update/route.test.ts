@@ -1,19 +1,22 @@
 import { describe, expect, it, vi } from "vitest";
 import { POST } from "./route";
 
-const { updateCaseSummary } = vi.hoisted(() => ({
-  updateCaseSummary: vi.fn(),
+const { updateCaseMetadata } = vi.hoisted(() => ({
+  updateCaseMetadata: vi.fn(),
 }));
 
 vi.mock("@/lib/server/repositories/content-repository", () => ({
-  updateCaseSummary,
+  updateCaseMetadata,
 }));
 
 describe("POST /api/ops/case-update", () => {
   it("updates a case summary", async () => {
-    updateCaseSummary.mockResolvedValue({
+    updateCaseMetadata.mockResolvedValue({
       caseSlug: "mono",
+      title: "Mono",
       summary: "Updated summary",
+      tags: [],
+      status: "internal",
     });
 
     const response = await POST(
@@ -32,12 +35,16 @@ describe("POST /api/ops/case-update", () => {
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({
       caseSlug: "mono",
+      title: "Mono",
       summary: "Updated summary",
+      tags: [],
+      status: "internal",
     });
-    expect(updateCaseSummary).toHaveBeenCalledWith(
-      "mono",
-      " Updated summary ",
-    );
+    expect(updateCaseMetadata).toHaveBeenCalledWith("mono", {
+      title: undefined,
+      summary: " Updated summary ",
+      tags: undefined,
+    });
   });
 
   it("rejects invalid payloads", async () => {
@@ -58,7 +65,7 @@ describe("POST /api/ops/case-update", () => {
   });
 
   it("keeps repository errors in the 400 range", async () => {
-    updateCaseSummary.mockRejectedValue(new Error("Case not found."));
+    updateCaseMetadata.mockRejectedValue(new Error("Case not found."));
 
     const response = await POST(
       new Request("http://localhost:3000/api/ops/case-update", {

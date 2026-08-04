@@ -179,6 +179,8 @@ export function SwipeCompareStage({
         userSelect: "none",
       }}
     >
+      {/* Error labels sit in their visible half so the divider handle cannot cover two stacked
+          messages when both internal assets are unavailable. */}
       <PositionedStageMedia
         asset={beforeAsset}
         alt={`${beforeAsset.label} image`}
@@ -187,6 +189,8 @@ export function SwipeCompareStage({
         loading="eager"
         decoding="async"
         fetchPriority="high"
+        fallbackContentPosition={{ left: "75%", top: "50%" }}
+        fallbackErrorMessage={`${beforeAsset.label} 素材加载失败`}
         prefersReducedMotion={prefersReducedMotion}
       />
       <PositionedStageMedia
@@ -197,6 +201,8 @@ export function SwipeCompareStage({
         loading="eager"
         decoding="async"
         fetchPriority="high"
+        fallbackContentPosition={{ left: "25%", top: "50%" }}
+        fallbackErrorMessage={`${afterAsset.label} 素材加载失败`}
         prefersReducedMotion={prefersReducedMotion}
         clipPath={
           isVertical

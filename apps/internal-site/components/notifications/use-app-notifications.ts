@@ -152,7 +152,7 @@ export function useAppNotifications() {
    * "workspace is busy" indicator.
    */
   const showWorkspaceSavingNotification = useCallback(() => {
-    pushNotification("Saving workspace updates...", "info", {
+    pushNotification("正在保存工作区更新…", "info", {
       key: "workspace-saving",
       sticky: true,
     });

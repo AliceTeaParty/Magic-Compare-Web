@@ -32,11 +32,7 @@ const guideSections = [
   },
   {
     title: "操作",
-    items: [
-      "Swipe：拖动分割线。",
-      "A/B：选中主图后缩放或拖动。",
-      "Heatmap：调整叠加强度。",
-    ],
+    items: ["Swipe：拖动分割线。", "A/B：选中主图后缩放或拖动。", "Heatmap：调整叠加强度。"],
   },
   {
     title: "快捷键",
@@ -55,11 +51,7 @@ const guideSections = [
  * Presents the viewer guide as a replayable help surface instead of a blocking tour, matching the
  * inspection workflow where users need immediate access to the image.
  */
-export function ViewerGuidePanel({
-  open,
-  onClose,
-  onComplete,
-}: ViewerGuidePanelProps) {
+export function ViewerGuidePanel({ open, onClose, onComplete }: ViewerGuidePanelProps) {
   const theme = useTheme();
   const useBottomDrawer = useMediaQuery(theme.breakpoints.down("sm"), {
     noSsr: true,
@@ -73,18 +65,20 @@ export function ViewerGuidePanel({
       open={open}
       onClose={onClose}
       ModalProps={{ keepMounted: true }}
-      PaperProps={{
-        sx: {
-          width: useBottomDrawer ? "100%" : 360,
-          maxWidth: "100%",
-          maxHeight: useBottomDrawer ? "78svh" : "100%",
-          borderTopLeftRadius: useBottomDrawer ? 16 : 0,
-          borderTopRightRadius: useBottomDrawer ? 16 : 0,
-          background: viewerTokens.guide.panelSurface,
-          backgroundImage: "none",
-          borderLeft: useBottomDrawer ? 0 : "1px solid",
-          borderTop: useBottomDrawer ? "1px solid" : 0,
-          borderColor: "divider",
+      slotProps={{
+        paper: {
+          sx: {
+            width: useBottomDrawer ? "100%" : 360,
+            maxWidth: "100%",
+            maxHeight: useBottomDrawer ? "78svh" : "100%",
+            borderTopLeftRadius: useBottomDrawer ? 16 : 0,
+            borderTopRightRadius: useBottomDrawer ? 16 : 0,
+            background: viewerTokens.guide.panelSurface,
+            backgroundImage: "none",
+            borderLeft: useBottomDrawer ? 0 : "1px solid",
+            borderTop: useBottomDrawer ? "1px solid" : 0,
+            borderColor: "divider",
+          },
         },
       }}
     >
@@ -95,7 +89,13 @@ export function ViewerGuidePanel({
           pb: { xs: 2.5, sm: 3 },
         }}
       >
-        <Stack direction="row" alignItems="center" justifyContent="space-between">
+        <Stack
+          direction="row"
+          sx={{
+            alignItems: "center",
+            justifyContent: "space-between",
+          }}
+        >
           <Box>
             <Typography id="viewer-guide-title" variant="h6">
               快速引导
@@ -103,7 +103,9 @@ export function ViewerGuidePanel({
             <Typography
               id="viewer-guide-description"
               variant="body2"
-              color="text.secondary"
+              sx={{
+                color: "text.secondary",
+              }}
             >
               了解对比图页面的核心操作。
             </Typography>
@@ -123,10 +125,7 @@ export function ViewerGuidePanel({
                 backgroundColor: viewerTokens.guide.subtleSurface,
               }}
             >
-              <Typography
-                variant="subtitle2"
-                sx={{ mb: 0.9, fontWeight: 700 }}
-              >
+              <Typography variant="subtitle2" sx={{ mb: 0.9, fontWeight: 700 }}>
                 {section.title}
               </Typography>
               <Stack component="ul" spacing={0.7} sx={{ m: 0, pl: 2.4 }}>
@@ -135,8 +134,10 @@ export function ViewerGuidePanel({
                     key={item}
                     component="li"
                     variant="body2"
-                    color="text.secondary"
-                    sx={{ pl: 0.2 }}
+                    sx={{
+                      color: "text.secondary",
+                      pl: 0.2,
+                    }}
                   >
                     {item}
                   </Typography>
@@ -148,7 +149,13 @@ export function ViewerGuidePanel({
 
         <Divider />
 
-        <Stack direction="row" spacing={1} justifyContent="flex-end">
+        <Stack
+          direction="row"
+          spacing={1}
+          sx={{
+            justifyContent: "flex-end",
+          }}
+        >
           <Button color="inherit" onClick={onClose}>
             关闭
           </Button>

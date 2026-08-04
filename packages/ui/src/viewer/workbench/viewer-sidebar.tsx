@@ -69,7 +69,12 @@ function GroupLinks({
         </MuiLink>
       ))}
       {groups.length === 0 ? (
-        <Typography variant="body2" color="text.secondary">
+        <Typography
+          variant="body2"
+          sx={{
+            color: "text.secondary",
+          }}
+        >
           {currentGroup.title}
         </Typography>
       ) : null}
@@ -110,8 +115,10 @@ function ViewerSidebarContent({
           <Stack spacing={0.85}>
             <Typography
               variant="body2"
-              color="text.secondary"
-              sx={{ fontWeight: 500 }}
+              sx={{
+                color: "text.secondary",
+                fontWeight: 500,
+              }}
             >
               Group navigator
             </Typography>
@@ -129,11 +136,7 @@ function ViewerSidebarContent({
             >
               Back to workspace
             </Button>
-            <GroupLinks
-              currentGroup={currentGroup}
-              groups={groups}
-              onGroupIntent={onGroupIntent}
-            />
+            <GroupLinks currentGroup={currentGroup} groups={groups} onGroupIntent={onGroupIntent} />
           </Stack>
           <Divider />
         </>
@@ -142,13 +145,20 @@ function ViewerSidebarContent({
       <Stack spacing={0.75}>
         <Typography
           variant="body2"
-          color="text.secondary"
-          sx={{ fontWeight: 500 }}
+          sx={{
+            color: "text.secondary",
+            fontWeight: 500,
+          }}
         >
           Frame details
         </Typography>
         <Typography variant="subtitle1">{currentFrame?.title}</Typography>
-        <Typography variant="body2" color="text.secondary">
+        <Typography
+          variant="body2"
+          sx={{
+            color: "text.secondary",
+          }}
+        >
           {currentFrame?.caption || "No frame note."}
         </Typography>
       </Stack>
@@ -158,8 +168,10 @@ function ViewerSidebarContent({
       <Stack spacing={0.75}>
         <Typography
           variant="body2"
-          color="text.secondary"
-          sx={{ fontWeight: 500 }}
+          sx={{
+            color: "text.secondary",
+            fontWeight: 500,
+          }}
         >
           Asset metadata
         </Typography>
@@ -179,21 +191,30 @@ function ViewerSidebarContent({
         <>
           <Divider />
           <Stack spacing={0.75}>
-            <Typography variant="body2" color="text.secondary">
+            <Typography
+              variant="body2"
+              sx={{
+                color: "text.secondary",
+              }}
+            >
               Publish status
             </Typography>
             <Chip
               label={publishStatus.status}
-              color={
-                publishStatus.status === "published" ? "primary" : "default"
-              }
+              color={publishStatus.status === "published" ? "primary" : "default"}
               size="small"
               sx={{ alignSelf: "flex-start" }}
             />
-            <Stack direction="row" spacing={0.6} alignItems="center" useFlexGap>
+            <Stack
+              direction="row"
+              spacing={0.6}
+              useFlexGap
+              sx={{
+                alignItems: "center",
+              }}
+            >
               <Typography variant="body2">
-                Public slug:{" "}
-                {publishStatus.publicSlug ?? "Pending first publish"}
+                Public slug: {publishStatus.publicSlug ?? "Pending first publish"}
               </Typography>
               {publishStatus.publicUrl ? (
                 <Tooltip title="Open published page in a new tab">
@@ -213,7 +234,8 @@ function ViewerSidebarContent({
                       borderRadius: 999,
                       border: "1px solid",
                       borderColor: "divider",
-                      backgroundColor: "background.raised",
+                      backgroundColor:
+                        variant === "internal" ? "surface.containerHigh" : "var(--mc-bg-raised)",
                     }}
                   >
                     <OpenInNew sx={{ fontSize: 16 }} />
@@ -221,7 +243,12 @@ function ViewerSidebarContent({
                 </Tooltip>
               ) : null}
             </Stack>
-            <Typography variant="body2" color="text.secondary">
+            <Typography
+              variant="body2"
+              sx={{
+                color: "text.secondary",
+              }}
+            >
               {formatUtcDate(publishStatus.publishedAt ?? null)}
             </Typography>
           </Stack>
@@ -286,7 +313,8 @@ export function ViewerSidebar({
             sx={{
               borderLeft: "1px solid",
               borderColor: "divider",
-              backgroundColor: "rgba(255,255,255,0.03)",
+              backgroundColor:
+                variant === "internal" ? "surface.containerLow" : "rgba(255,255,255,0.03)",
             }}
           >
             <ViewerSidebarContent {...contentProps} />
@@ -299,13 +327,16 @@ export function ViewerSidebar({
         open={sidebarOpen && !showDesktopSidebar}
         onClose={closeSidebar}
         ModalProps={{ keepMounted: true }}
-        PaperProps={{
-          sx: {
-            width: "min(88vw, 360px)",
-            borderLeft: "1px solid",
-            borderColor: "divider",
-            backgroundColor: "rgba(20, 33, 70, 0.98)",
-            backgroundImage: "none",
+        slotProps={{
+          paper: {
+            sx: {
+              width: "min(88vw, 360px)",
+              borderLeft: "1px solid",
+              borderColor: "divider",
+              backgroundColor:
+                variant === "internal" ? "surface.container" : "rgba(20, 33, 70, 0.98)",
+              backgroundImage: "none",
+            },
           },
         }}
       >

@@ -1,7 +1,9 @@
 "use client";
 
-import { Box, Stack, Typography } from "@mui/material";
+import { ArrowBack } from "@mui/icons-material";
+import { Box, Button, Stack, Typography } from "@mui/material";
 import type { ViewerMode } from "@magic-compare/content-schema";
+import Link from "next/link";
 import { ViewerToolbar } from "./viewer-toolbar";
 
 interface ViewerHeaderProps {
@@ -9,6 +11,7 @@ interface ViewerHeaderProps {
   abSide: "before" | "after";
   canUseHeatmap: boolean;
   caseTitle: string;
+  caseSlug: string;
   guideOpen: boolean;
   groupTitle: string;
   hideStageScrollControl: boolean;
@@ -20,6 +23,7 @@ interface ViewerHeaderProps {
   onScrollStageIntoView: () => void;
   onToggleSidebar: () => void;
   sidebarOpen: boolean;
+  variant: "public" | "internal";
 }
 
 /**
@@ -31,6 +35,7 @@ export function ViewerHeader({
   abSide,
   canUseHeatmap,
   caseTitle,
+  caseSlug,
   guideOpen,
   groupTitle,
   hideStageScrollControl,
@@ -42,6 +47,7 @@ export function ViewerHeader({
   onScrollStageIntoView,
   onToggleSidebar,
   sidebarOpen,
+  variant,
 }: ViewerHeaderProps) {
   return (
     <Box
@@ -57,31 +63,51 @@ export function ViewerHeader({
         p: { xs: 1.75, md: 3 },
         borderBottom: "1px solid",
         borderColor: "divider",
+        backgroundColor:
+          variant === "internal" ? "var(--mui-palette-surface-container)" : undefined,
         background:
-          "linear-gradient(180deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.018) 100%)",
+          variant === "public"
+            ? "linear-gradient(180deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.018) 100%)"
+            : undefined,
       }}
     >
-      <Stack spacing={0.2} sx={{ minWidth: 0, pr: { sm: 2 } }}>
-        <Typography
-          variant="h4"
-          noWrap
-          sx={{
-            lineHeight: 1.18,
-            // padding-bottom gives descenders (p, g, y…) room before overflow:hidden
-            // clips them; noWrap relies on overflow:hidden for ellipsis truncation.
-            paddingBottom: "0.18em",
-          }}
-        >
-          {groupTitle}
-        </Typography>
-        <Typography
-          variant="body2"
-          color="text.secondary"
-          noWrap
-          sx={{ mt: "0.25em", pl: "0.08em" }}
-        >
-          {caseTitle}
-        </Typography>
+      <Stack direction="row" sx={{ minWidth: 0, alignItems: "center", gap: 1 }}>
+        {variant === "internal" ? (
+          <Button
+            component={Link}
+            href={`/cases/${caseSlug}`}
+            variant="text"
+            startIcon={<ArrowBack />}
+            sx={{ flex: "0 0 auto", color: "text.secondary" }}
+          >
+            工作区
+          </Button>
+        ) : null}
+        <Stack spacing={0.2} sx={{ minWidth: 0, pr: { sm: 2 } }}>
+          <Typography
+            variant={variant === "internal" ? "h5" : "h4"}
+            noWrap
+            sx={{
+              lineHeight: 1.18,
+              // padding-bottom gives descenders (p, g, y...) room before overflow:hidden
+              // clips them; noWrap relies on overflow:hidden for ellipsis truncation.
+              paddingBottom: "0.18em",
+            }}
+          >
+            {groupTitle}
+          </Typography>
+          <Typography
+            variant="body2"
+            noWrap
+            sx={{
+              color: "text.secondary",
+              mt: "0.25em",
+              pl: "0.08em",
+            }}
+          >
+            {caseTitle}
+          </Typography>
+        </Stack>
       </Stack>
 
       <ViewerToolbar
@@ -98,6 +124,7 @@ export function ViewerHeader({
         onScrollStageIntoView={onScrollStageIntoView}
         onToggleSidebar={onToggleSidebar}
         sidebarOpen={sidebarOpen}
+        variant={variant}
       />
     </Box>
   );

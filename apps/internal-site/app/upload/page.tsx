@@ -1,4 +1,4 @@
-import { Container } from "@mui/material";
+import { InternalPageShell } from "@/components/internal-page-shell";
 import { WebUploadWorkbench } from "@/components/web-uploader/web-upload-workbench";
 import { listCases } from "@/lib/server/repositories/content-repository";
 
@@ -11,21 +11,12 @@ interface UploadPageProps {
 }
 
 export default async function WebUploadPage({ searchParams }: UploadPageProps) {
-  const [params, cases] = await Promise.all([
-    searchParams,
-    listCases().catch(() => []),
-  ]);
+  const [params, cases] = await Promise.all([searchParams, listCases().catch(() => [])]);
   const caseParam = Array.isArray(params.case) ? params.case[0] : params.case;
 
   return (
-    <Container
-      maxWidth="xl"
-      sx={{
-        py: { xs: 3.5, md: 5 },
-        px: { xs: 2, md: 3 },
-      }}
-    >
+    <InternalPageShell>
       <WebUploadWorkbench cases={cases} initialCaseSlug={caseParam ?? null} />
-    </Container>
+    </InternalPageShell>
   );
 }

@@ -1,5 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createCase, updateCaseSummary, updateGroupMetadata } from "./content-repository";
+import {
+  createCase,
+  updateCaseMetadata,
+  updateCaseSummary,
+  updateGroupMetadata,
+} from "./content-repository";
 
 const { caseCreate, caseUpdate, caseFindUnique, groupUpdate } = vi.hoisted(() => ({
   caseCreate: vi.fn(),
@@ -100,6 +105,51 @@ describe("updateCaseSummary", () => {
     expect(result).toEqual({
       caseSlug: "mono",
       summary: "Updated summary",
+    });
+  });
+});
+
+describe("updateCaseMetadata", () => {
+  beforeEach(() => {
+    caseUpdate.mockReset();
+  });
+
+  it("normalizes editable fields without changing routing or publication fields", async () => {
+    caseUpdate.mockResolvedValue({
+      slug: "mono",
+      title: "Mono Study",
+      summary: "Updated summary",
+      tagsJson: '["grain","1080p"]',
+      status: "internal",
+    });
+
+    const result = await updateCaseMetadata("mono", {
+      title: " Mono Study ",
+      summary: " Updated summary ",
+      tags: ["grain", " 1080p ", "grain", ""],
+    });
+
+    expect(caseUpdate).toHaveBeenCalledWith({
+      where: { slug: "mono" },
+      data: {
+        title: "Mono Study",
+        summary: "Updated summary",
+        tagsJson: '["grain","1080p"]',
+      },
+      select: {
+        slug: true,
+        title: true,
+        summary: true,
+        tagsJson: true,
+        status: true,
+      },
+    });
+    expect(result).toEqual({
+      caseSlug: "mono",
+      title: "Mono Study",
+      summary: "Updated summary",
+      tags: ["grain", "1080p"],
+      status: "internal",
     });
   });
 });

@@ -12,10 +12,7 @@ interface ViewerOnboardingNudgeProps {
  * Offers a first-run guide entry without blocking the inspection stage, so experienced users can
  * skip it and new users can learn the surface from the real viewer.
  */
-export function ViewerOnboardingNudge({
-  onDismiss,
-  onOpenGuide,
-}: ViewerOnboardingNudgeProps) {
+export function ViewerOnboardingNudge({ onDismiss, onOpenGuide }: ViewerOnboardingNudgeProps) {
   return (
     <Paper
       elevation={0}
@@ -35,7 +32,13 @@ export function ViewerOnboardingNudge({
         <Typography variant="body2" sx={{ fontWeight: 650 }}>
           第一次使用？查看快速引导。
         </Typography>
-        <Stack direction="row" spacing={1} justifyContent="flex-end">
+        <Stack
+          direction="row"
+          spacing={1}
+          sx={{
+            justifyContent: "flex-end",
+          }}
+        >
           <Button
             size="small"
             variant="text"
@@ -45,12 +48,7 @@ export function ViewerOnboardingNudge({
           >
             跳过
           </Button>
-          <Button
-            size="small"
-            variant="contained"
-            onClick={onOpenGuide}
-            sx={{ minWidth: 56 }}
-          >
+          <Button size="small" variant="contained" onClick={onOpenGuide} sx={{ minWidth: 56 }}>
             引导
           </Button>
         </Stack>

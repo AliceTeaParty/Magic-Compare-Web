@@ -23,6 +23,7 @@ import {
   Close,
   DragIndicator,
   EditOutlined,
+  ErrorOutlined,
   KeyboardArrowDown,
   WarningAmber,
 } from "@mui/icons-material";
@@ -42,11 +43,8 @@ import {
   Tooltip,
   Typography,
 } from "@mui/material";
-import type {
-  BrowserUploadFile,
-  WebUploadFramePlan,
-  WebUploadPlan,
-} from "./web-upload-types";
+import { FluentFolderEmoji } from "../fluent-emoji";
+import type { BrowserUploadFile, WebUploadFramePlan, WebUploadPlan } from "./web-upload-types";
 import {
   webUploadColors,
   webUploadMotion,
@@ -102,13 +100,7 @@ function alternateAssetForLabel(frame: WebUploadFramePlan | null, label: string)
   return frame?.misc.find((asset) => asset.label === label) ?? null;
 }
 
-function SmallLazyThumbnail({
-  alt,
-  source,
-}: {
-  alt: string;
-  source: BrowserUploadFile | null;
-}) {
+function SmallLazyThumbnail({ alt, source }: { alt: string; source: BrowserUploadFile | null }) {
   const rootRef = useRef<HTMLSpanElement | null>(null);
   const [isVisible, setIsVisible] = useState(false);
   const [url, setUrl] = useState<string | null>(null);
@@ -184,7 +176,13 @@ function SmallLazyThumbnail({
 function ImageCell({ muted = false, path, source }: ImageCellProps) {
   if (!path) {
     return (
-      <Typography variant="body2" color="text.disabled" noWrap>
+      <Typography
+        variant="body2"
+        noWrap
+        sx={{
+          color: "text.disabled",
+        }}
+      >
         —
       </Typography>
     );
@@ -218,21 +216,15 @@ function ImageCell({ muted = false, path, source }: ImageCellProps) {
 
 function IssueStatus({ row }: { row: FramePreviewRow }) {
   if (row.hasError) {
-    return <Typography aria-label="错误" sx={{ userSelect: "none" }}>⛔</Typography>;
+    return <ErrorOutlined color="error" fontSize="small" />;
   }
   if (row.hasWarning) {
-    return <Typography aria-label="警告" sx={{ userSelect: "none" }}>⚠️</Typography>;
+    return <WarningAmber color="warning" fontSize="small" />;
   }
-  return <Typography aria-label="可用" sx={{ userSelect: "none" }}>✅</Typography>;
+  return <CheckCircle color="success" fontSize="small" />;
 }
 
-function ExpandedPreview({
-  frame,
-  urls,
-}: {
-  frame: WebUploadFramePlan;
-  urls: PreviewUrls | null;
-}) {
+function ExpandedPreview({ frame, urls }: { frame: WebUploadFramePlan; urls: PreviewUrls | null }) {
   return (
     <Collapse in={Boolean(urls)} timeout={180} unmountOnExit>
       <Box
@@ -425,7 +417,7 @@ function SortablePairingRow({
   };
   const imageColumnCount = 2 + alternateColumns.length;
   const imageColumnMin = alternateColumns.length >= 2 ? 118 : 150;
-  const desktopGridColumns = `38px 54px minmax(88px, 0.58fr) repeat(${imageColumnCount}, minmax(${imageColumnMin}px, 1fr)) 54px 34px`;
+  const desktopGridColumns = `42px 54px minmax(88px, 0.58fr) repeat(${imageColumnCount}, minmax(${imageColumnMin}px, 1fr)) 54px 40px`;
 
   return (
     <Box
@@ -462,7 +454,8 @@ function SortablePairingRow({
         sx={{
           display: "grid",
           gridTemplateColumns: {
-            xs: "34px 44px minmax(0, 1fr) 32px",
+            // Drag and expand controls keep a 40px acquisition target even in the dense mobile row.
+            xs: "40px 44px minmax(0, 1fr) 40px",
             md: desktopGridColumns,
           },
           gap: { xs: 0.75, md: 1 },
@@ -497,7 +490,12 @@ function SortablePairingRow({
             </IconButton>
           </span>
         </Tooltip>
-        <Typography variant="body2" color="text.secondary">
+        <Typography
+          variant="body2"
+          sx={{
+            color: "text.secondary",
+          }}
+        >
           {String(row.order + 1).padStart(3, "0")}
         </Typography>
         <Typography variant="body2" noWrap title={row.title}>
@@ -513,10 +511,7 @@ function SortablePairingRow({
           const alternate = row.alternateAfter.find((item) => item.label === label);
           const alternateAsset = alternateAssetForLabel(previewFrame, label);
           return (
-            <Box
-              key={label}
-              sx={{ display: { xs: "none", md: "block" }, minWidth: 0 }}
-            >
+            <Box key={label} sx={{ display: { xs: "none", md: "block" }, minWidth: 0 }}>
               <ImageCell
                 muted={!alternate}
                 path={alternate?.path ?? null}
@@ -541,10 +536,7 @@ function SortablePairingRow({
         />
       </Box>
       {previewFrame ? (
-        <ExpandedPreview
-          frame={previewFrame}
-          urls={expanded ? previewUrls : null}
-        />
+        <ExpandedPreview frame={previewFrame} urls={expanded ? previewUrls : null} />
       ) : null}
     </Box>
   );
@@ -586,7 +578,7 @@ export function PairingPreviewPanel({
   }, [planView?.frames]);
   const imageColumnCount = 2 + alternateColumns.length;
   const imageColumnMin = alternateColumns.length >= 2 ? 118 : 150;
-  const desktopGridColumns = `38px 54px minmax(88px, 0.58fr) repeat(${imageColumnCount}, minmax(${imageColumnMin}px, 1fr)) 54px 34px`;
+  const desktopGridColumns = `42px 54px minmax(88px, 0.58fr) repeat(${imageColumnCount}, minmax(${imageColumnMin}px, 1fr)) 54px 40px`;
 
   useEffect(() => {
     if (!expandedFrame) {
@@ -626,8 +618,8 @@ export function PairingPreviewPanel({
     <Paper
       elevation={0}
       sx={{
-        minHeight: { xs: 420, lg: "calc(100vh - 156px)" },
-        maxHeight: { lg: "calc(100vh - 156px)" },
+        minHeight: { xs: 280, lg: "calc(100vh - 224px)" },
+        maxHeight: { lg: "calc(100vh - 160px)" },
         display: "flex",
         flexDirection: "column",
         overflow: "hidden",
@@ -637,10 +629,8 @@ export function PairingPreviewPanel({
     >
       <Box
         sx={{
-          // Reserve the complete toolbar before scanning so mode, Heatmap, and status controls do
-          // not insert a new row or move the preview title after a directory is selected.
           display: "grid",
-          gridTemplateColumns: { xs: "1fr", sm: "auto minmax(0, 1fr)" },
+          gridTemplateColumns: { xs: "1fr", md: "auto minmax(0, 1fr)" },
           alignItems: "center",
           gap: 1,
           px: { xs: 1.7, md: 2 },
@@ -649,91 +639,99 @@ export function PairingPreviewPanel({
           borderColor: "divider",
         }}
       >
-        <Typography variant="h6">配对预览</Typography>
-        <Box
-          sx={{
-            display: "grid",
-            gridTemplateColumns: "112px minmax(0, 1fr) 78px",
-            gap: 1,
-            alignItems: "center",
-            justifySelf: { xs: "stretch", sm: "end" },
-            width: { xs: "100%", sm: 330 },
-            minWidth: 0,
-          }}
-        >
-          {/* Automatic titles stay compact; this mode control exposes the filename fallback that
-              previously existed only as an unused formatter. */}
-          <ToggleButtonGroup
-            exclusive
-            size="small"
-            value={frameTitleMode}
-            disabled={!canReorder}
-            aria-label="Frame 标题格式"
-            onChange={(_event, nextMode: FrameTitleMode | null) => {
-              if (nextMode) {
-                onFrameTitleModeChange(nextMode);
-              }
-            }}
+        <Typography variant="h4">配对预览</Typography>
+        {planView ? (
+          <Box
             sx={{
-              height: webUploadSizes.compactControlHeight,
-              "& .MuiToggleButton-root": {
-                // CJK labels can break between any characters; reserve equal one-line segments so
-                // 文件名 never becomes a two-line button in the compact toolbar.
-                flex: "1 1 0",
-                minWidth: 0,
-                px: 0.5,
-                py: 0,
-                borderRadius: webUploadRadii.control,
-                fontSize: 12,
-                lineHeight: 1,
-                whiteSpace: "nowrap",
-                wordBreak: "keep-all",
-              },
+              display: "flex",
+              flexWrap: "wrap",
+              gap: 1,
+              alignItems: "center",
+              justifyContent: { xs: "flex-start", md: "flex-end" },
+              minWidth: 0,
             }}
           >
-            <ToggleButton value="inferred" aria-label="自动 Frame 标题">
-              自动
-            </ToggleButton>
-            <ToggleButton value="filename" aria-label="文件名 Frame 标题">
-              文件名
-            </ToggleButton>
-          </ToggleButtonGroup>
-          <FormControl size="small" variant="outlined" sx={{ minWidth: 0 }}>
-            <Select
-              value={planView?.heatmapReferenceLabel ?? ""}
-              onChange={(event) => onHeatmapReferenceChange(event.target.value)}
-              disabled={!canReorder || (planView?.heatmapReferenceOptions.length ?? 0) <= 1}
-              displayEmpty
-              renderValue={(value) => (value ? `Heatmap: ${value}` : "Heatmap")}
+            {/* Automatic titles stay compact; this mode control exposes the filename fallback that
+              previously existed only as an unused formatter. */}
+            <ToggleButtonGroup
+              exclusive
+              size="small"
+              value={frameTitleMode}
+              disabled={!canReorder}
+              aria-label="Frame 标题格式"
+              onChange={(_event, nextMode: FrameTitleMode | null) => {
+                if (nextMode) {
+                  onFrameTitleModeChange(nextMode);
+                }
+              }}
               sx={{
                 height: webUploadSizes.compactControlHeight,
-                width: "100%",
-                minWidth: 0,
-                borderRadius: webUploadRadii.control,
-                "& .MuiSelect-select": {
-                  py: 0.45,
-                  pr: "30px !important",
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
+                width: 168,
+                "& .MuiToggleButton-root": {
+                  // CJK labels can break between any characters; reserve equal one-line segments so
+                  // 文件名 never becomes a two-line button in the compact toolbar.
+                  flex: "1 1 0",
+                  minWidth: 0,
+                  px: 0.5,
+                  py: 0,
+                  borderRadius: webUploadRadii.control,
+                  fontSize: 12,
+                  lineHeight: 1,
                   whiteSpace: "nowrap",
-                  fontSize: 13,
+                  wordBreak: "keep-all",
                 },
               }}
             >
-              {(planView?.heatmapReferenceOptions ?? []).map((label) => (
-                <MenuItem key={label} value={label}>
-                  Heatmap: {label}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-          <Chip
-            icon={hasBlockingIssues ? <WarningAmber /> : <CheckCircle />}
-            label={planView ? `${planView.healthyPairCount} / ${planView.frames.length}` : "0 / 0"}
-            color={planView ? (hasBlockingIssues ? "warning" : "primary") : "default"}
-            sx={{ width: 78, height: webUploadSizes.compactControlHeight }}
-          />
-        </Box>
+              <ToggleButton value="inferred" aria-label="自动 Frame 标题">
+                自动
+              </ToggleButton>
+              <ToggleButton value="filename" aria-label="文件名 Frame 标题">
+                文件名
+              </ToggleButton>
+            </ToggleButtonGroup>
+            <FormControl
+              size="small"
+              variant="outlined"
+              sx={{ minWidth: 184, flex: "1 1 184px", maxWidth: 260 }}
+            >
+              <Select
+                value={planView?.heatmapReferenceLabel ?? ""}
+                onChange={(event) => onHeatmapReferenceChange(event.target.value)}
+                disabled={!canReorder || (planView?.heatmapReferenceOptions.length ?? 0) <= 1}
+                displayEmpty
+                renderValue={(value) => (value ? `Heatmap: ${value}` : "Heatmap")}
+                sx={{
+                  height: webUploadSizes.compactControlHeight,
+                  width: "100%",
+                  minWidth: 0,
+                  borderRadius: webUploadRadii.control,
+                  "& .MuiSelect-select": {
+                    py: 0.45,
+                    pr: "30px !important",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                    fontSize: 13,
+                  },
+                }}
+              >
+                {(planView?.heatmapReferenceOptions ?? []).map((label) => (
+                  <MenuItem key={label} value={label}>
+                    Heatmap: {label}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            <Chip
+              icon={hasBlockingIssues ? <WarningAmber /> : <CheckCircle />}
+              label={
+                planView ? `${planView.healthyPairCount} / ${planView.frames.length}` : "0 / 0"
+              }
+              color={planView ? (hasBlockingIssues ? "warning" : "primary") : "default"}
+              sx={{ minWidth: 78, height: webUploadSizes.compactControlHeight }}
+            />
+          </Box>
+        ) : null}
       </Box>
 
       <Box sx={{ flex: 1, minHeight: 0, overflow: "auto" }}>
@@ -750,7 +748,7 @@ export function PairingPreviewPanel({
                 sx={{
                   display: "grid",
                   gridTemplateColumns: {
-                    xs: "34px 44px minmax(0, 1fr) 32px",
+                    xs: "40px 44px minmax(0, 1fr) 40px",
                     md: desktopGridColumns,
                   },
                   gap: { xs: 0.75, md: 1 },
@@ -788,7 +786,9 @@ export function PairingPreviewPanel({
                     <EditableColumnHeader
                       canEdit={canReorder}
                       label={label}
-                      onRename={(_label, nextLabel) => onRenameColumn({ kind: "misc", label }, nextLabel)}
+                      onRename={(_label, nextLabel) =>
+                        onRenameColumn({ kind: "misc", label }, nextLabel)
+                      }
                     />
                   </Box>
                 ))}
@@ -814,14 +814,31 @@ export function PairingPreviewPanel({
             </SortableContext>
           </DndContext>
         ) : (
-          <Typography color="text.secondary" sx={{ px: 2, py: 2.5 }}>
-            选择文件夹后显示配对结果。
-          </Typography>
+          <Stack
+            sx={{
+              alignItems: "center",
+              justifyContent: "center",
+              minHeight: 220,
+              px: 2,
+              py: 4,
+              textAlign: "center",
+            }}
+            spacing={1}
+          >
+            <FluentFolderEmoji size={64} />
+            <Typography variant="h4">等待素材目录</Typography>
+            <Typography variant="body2" color="text.secondary">
+              选择文件夹后会显示 Frame、变量列和配对状态。
+            </Typography>
+          </Stack>
         )}
       </Box>
 
       {planView?.issues.length ? (
-        <Stack spacing={0.7} sx={{ px: 1.5, py: 1.25, borderTop: "1px solid", borderColor: "divider" }}>
+        <Stack
+          spacing={0.7}
+          sx={{ px: 1.5, py: 1.25, borderTop: "1px solid", borderColor: "divider" }}
+        >
           {planView.issues.slice(0, 3).map((issue, index) => (
             <Alert key={`${issue.path}-${index}`} severity={issue.severity} sx={{ py: 0.45 }}>
               {issue.message}
@@ -831,7 +848,12 @@ export function PairingPreviewPanel({
             </Alert>
           ))}
           {planView.issues.length > 3 ? (
-            <Typography variant="caption" color="text.secondary">
+            <Typography
+              variant="caption"
+              sx={{
+                color: "text.secondary",
+              }}
+            >
               还有 {planView.issues.length - 3} 个问题未显示。
             </Typography>
           ) : null}

@@ -1,31 +1,46 @@
 "use client";
 
-import { Box } from "@mui/material";
+import { BrokenImageOutlined } from "@mui/icons-material";
+import { Box, Stack, Typography } from "@mui/material";
 
 /**
  * Renders the local stage skeleton only while the selected image has no loaded pixels available.
  */
 export function StageImageFallback({
+  contentPosition = { left: "50%", top: "50%" },
+  counterRotate = false,
+  errorMessage = "素材加载失败，请检查内部素材服务。",
+  errored,
   opacity,
   prefersReducedMotion,
 }: {
+  contentPosition?: { left: string; top: string };
+  counterRotate?: boolean;
+  errorMessage?: string;
+  errored: boolean;
   opacity: number;
   prefersReducedMotion: boolean;
 }) {
   return (
     <Box
-      aria-hidden
+      aria-hidden={!errored}
+      role={errored ? "status" : undefined}
       sx={{
         position: "absolute",
         inset: 0,
         overflow: "hidden",
         opacity,
-        background:
-          "linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.025))",
+        display: "grid",
+        placeItems: "center",
+        color: "text.secondary",
+        backgroundColor: "var(--mui-palette-surface-containerHigh)",
         "&::before": {
           content: '""',
           position: "absolute",
           inset: 0,
+          // An actual load failure is terminal for the current URL, so the progress shimmer must
+          // stop instead of implying that usable pixels will eventually arrive.
+          display: errored ? "none" : "block",
           backgroundImage: [
             "linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.08) 48%, transparent 96%)",
             "linear-gradient(90deg, rgba(255,255,255,0.12) 0 18%, transparent 18% 24%, rgba(255,255,255,0.08) 24% 52%, transparent 52% 59%, rgba(255,255,255,0.1) 59% 82%, transparent 82%)",
@@ -37,7 +52,7 @@ export function StageImageFallback({
           backgroundRepeat: "no-repeat",
           animation: prefersReducedMotion
             ? "none"
-            : "magic-stage-skeleton-sweep 1250ms cubic-bezier(0.22, 1, 0.36, 1) infinite",
+            : "magic-stage-skeleton-sweep 1250ms cubic-bezier(0.2, 0, 0, 1) infinite",
         },
         "@keyframes magic-stage-skeleton-sweep": {
           "0%": {
@@ -48,6 +63,31 @@ export function StageImageFallback({
           },
         },
       }}
-    />
+    >
+      {errored ? (
+        <Stack
+          spacing={0.75}
+          sx={{
+            position: "absolute",
+            left: contentPosition.left,
+            top: contentPosition.top,
+            // Portrait inspection rotates media pixels, but system feedback must stay upright in
+            // screen coordinates so it remains readable without rotating the device.
+            transform: counterRotate
+              ? "translate(-50%, -50%) rotate(-90deg)"
+              : "translate(-50%, -50%)",
+            alignItems: "center",
+            width: "min(80%, 320px)",
+            px: 2,
+            textAlign: "center",
+          }}
+        >
+          <BrokenImageOutlined />
+          <Typography variant="body2" color="inherit">
+            {errorMessage}
+          </Typography>
+        </Stack>
+      ) : null}
+    </Box>
   );
 }

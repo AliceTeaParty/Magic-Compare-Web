@@ -1,22 +1,21 @@
 "use client";
 
+import { type ChangeEvent, useEffect, useRef, useState } from "react";
 import {
-  type ChangeEvent,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
-import {
-  ArrowBack,
+  CheckCircleOutlined,
   CloudUpload,
-  DeleteOutline,
+  DeleteOutlined,
   FolderOpen,
+  HourglassTop,
+  InfoOutlined,
+  MoreVert,
   OpenInNew,
   Pause,
   Refresh,
+  WarningAmber,
 } from "@mui/icons-material";
 import {
+  Alert,
   Box,
   Button,
   Chip,
@@ -24,26 +23,27 @@ import {
   IconButton,
   InputLabel,
   LinearProgress,
+  ListItemIcon,
+  Menu,
   MenuItem,
   Paper,
   Select,
   Stack,
   TextField,
-  Tooltip,
   Typography,
 } from "@mui/material";
 import type { ViewerMode } from "@magic-compare/content-schema";
 import { cjkKebabCase } from "@magic-compare/shared-utils";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { CaseCatalogItem } from "@/lib/server/repositories/content-repository";
+import { CaseCreateButton } from "../case-create-button";
+import { InternalPageHeader } from "../internal-page-shell";
 import { AppNotifications } from "../notifications/app-notifications";
 import { useAppNotifications } from "../notifications/use-app-notifications";
 import type { GenerationProgress } from "./asset-generator";
 import { scanBrowserUploadFiles } from "./source-scanner";
 import { WebUploadRunner } from "./upload-runner";
 import {
-  webUploadColors,
   webUploadFieldSx,
   webUploadPanelSx,
   webUploadRadii,
@@ -68,8 +68,6 @@ import {
   type UploadPlanImageColumn,
 } from "./web-upload-view-model";
 
-const DEFAULT_NEW_CASE_SLUG = "new-case";
-const DEFAULT_NEW_CASE_TITLE = "New Case";
 const INPUT_HASH_STORAGE_PREFIX = "magic_compare_web_upload:";
 const UPLOAD_QUEUE_VISIBLE_LIMIT = 12;
 const BROWSER_RECOMMENDATION_MESSAGE = "推荐使用 Chrome / Edge 选择整个目录上传。";
@@ -113,46 +111,19 @@ function buildInitialSnapshot(): UploadRunnerSnapshot {
   };
 }
 
-function guessCaseTitle(slug: string) {
-  return slug
-    .split("-")
-    .filter(Boolean)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" ");
-}
-
-function getCaseInput(
-  cases: CaseCatalogItem[],
-  selectedCaseSlug: string,
-  newCase: { slug: string; title: string; summary: string },
-) {
+function getCaseInput(cases: CaseCatalogItem[], selectedCaseSlug: string) {
   const existing = cases.find((item) => item.slug === selectedCaseSlug);
-  if (existing) {
-    return {
-      slug: existing.slug,
-      title: existing.title,
-      summary: existing.summary,
-      tags: existing.tags,
-      coverAssetLabel: null,
-    };
-  }
-
-  const slug = normalizeSlug(
-    newCase.slug || selectedCaseSlug || DEFAULT_NEW_CASE_SLUG,
-    DEFAULT_NEW_CASE_SLUG,
-  );
+  if (!existing) throw new Error("请先新建并选择目标 Case。");
   return {
-    slug,
-    title: newCase.title.trim() || guessCaseTitle(slug) || DEFAULT_NEW_CASE_TITLE,
-    summary: newCase.summary.trim(),
-    tags: [],
+    slug: existing.slug,
+    title: existing.title,
+    summary: existing.summary,
+    tags: existing.tags,
     coverAssetLabel: null,
   };
 }
 
-async function readDirectoryHandle(
-  handle: BrowserDirectoryHandle,
-): Promise<BrowserUploadFile[]> {
+async function readDirectoryHandle(handle: BrowserDirectoryHandle): Promise<BrowserUploadFile[]> {
   const entries: BrowserUploadFile[] = [];
 
   async function walk(directory: BrowserDirectoryHandle, prefix: string) {
@@ -219,6 +190,14 @@ function stageLabel(stage: UploadRunnerSnapshot["stage"]) {
   return "待上传";
 }
 
+function UploadStageIcon({ marker }: { marker: string }) {
+  if (marker === "!") return <WarningAmber fontSize="small" />;
+  if (marker === "✓") return <CheckCircleOutlined fontSize="small" />;
+  if (marker === "◐") return <HourglassTop fontSize="small" />;
+  if (marker === "↑") return <CloudUpload fontSize="small" />;
+  return <FolderOpen fontSize="small" />;
+}
+
 function UploadQueue({ snapshot }: { snapshot: UploadRunnerSnapshot }) {
   if (snapshot.frames.length === 0) {
     return null;
@@ -227,8 +206,7 @@ function UploadQueue({ snapshot }: { snapshot: UploadRunnerSnapshot }) {
   return (
     <Stack spacing={0.75}>
       {snapshot.frames.slice(0, UPLOAD_QUEUE_VISIBLE_LIMIT).map((frame) => {
-        const progress =
-          frame.totalFiles > 0 ? (frame.completedFiles / frame.totalFiles) * 100 : 0;
+        const progress = frame.totalFiles > 0 ? (frame.completedFiles / frame.totalFiles) * 100 : 0;
         return (
           <Box
             key={frame.frameOrder}
@@ -263,7 +241,13 @@ function UploadQueue({ snapshot }: { snapshot: UploadRunnerSnapshot }) {
               sx={{ height: webUploadSizes.progressHeight, borderRadius: 999 }}
             />
             {frame.error ? (
-              <Typography variant="caption" color="error.main" sx={{ gridColumn: "1 / -1" }}>
+              <Typography
+                variant="caption"
+                sx={{
+                  color: "error.main",
+                  gridColumn: "1 / -1",
+                }}
+              >
                 {frame.error}
               </Typography>
             ) : null}
@@ -271,7 +255,12 @@ function UploadQueue({ snapshot }: { snapshot: UploadRunnerSnapshot }) {
         );
       })}
       {snapshot.frames.length > UPLOAD_QUEUE_VISIBLE_LIMIT ? (
-        <Typography variant="caption" color="text.secondary">
+        <Typography
+          variant="caption"
+          sx={{
+            color: "text.secondary",
+          }}
+        >
           仅显示前 {UPLOAD_QUEUE_VISIBLE_LIMIT} 项；其余{" "}
           {snapshot.frames.length - UPLOAD_QUEUE_VISIBLE_LIMIT} 个 frame 会继续上传。
         </Typography>
@@ -355,7 +344,11 @@ function uploadStageCopy({
   };
 }
 
-function UploadMetric({ label, value, tone = "default" }: {
+function UploadMetric({
+  label,
+  value,
+  tone = "default",
+}: {
   label: string;
   value: number | string;
   tone?: "default" | "warning";
@@ -381,8 +374,12 @@ function UploadMetric({ label, value, tone = "default" }: {
       </Typography>
       <Typography
         variant="body2"
-        color="text.secondary"
-        sx={{ mt: 0.35, fontSize: { xs: "0.82rem", md: "0.88rem" }, lineHeight: 1.15 }}
+        sx={{
+          color: "text.secondary",
+          mt: 0.35,
+          fontSize: { xs: "0.82rem", md: "0.88rem" },
+          lineHeight: 1.15,
+        }}
       >
         {label}
       </Typography>
@@ -436,7 +433,7 @@ function UploadDetails({
               userSelect: "none",
             }}
           >
-            {current.marker}
+            <UploadStageIcon marker={current.marker} />
           </Box>
           <Typography
             variant="body2"
@@ -490,10 +487,7 @@ function UploadDetails({
  * Presents upload as a focused workbench. Heavy File/Blob data stays in refs and the upload runner;
  * React only keeps compact render models so large directories do not become component state.
  */
-export function WebUploadWorkbench({
-  cases,
-  initialCaseSlug,
-}: WebUploadWorkbenchProps) {
+export function WebUploadWorkbench({ cases, initialCaseSlug }: WebUploadWorkbenchProps) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement | null>(null);
   const planRef = useRef<WebUploadPlan | null>(null);
@@ -501,19 +495,14 @@ export function WebUploadWorkbench({
   const runnerRef = useRef<WebUploadRunner | null>(null);
   const unsubscribeRunnerRef = useRef<(() => void) | null>(null);
   const generationAbortRef = useRef<AbortController | null>(null);
-  const { dismissNotification, notifications, pushNotification } =
-    useAppNotifications();
+  const { dismissNotification, notifications, pushNotification } = useAppNotifications();
   const [selectedCaseSlug, setSelectedCaseSlug] = useState(() => {
     if (initialCaseSlug && cases.some((item) => item.slug === initialCaseSlug)) {
       return initialCaseSlug;
     }
-    return cases[0]?.slug ?? DEFAULT_NEW_CASE_SLUG;
+    return cases[0]?.slug ?? "";
   });
-  const [newCase, setNewCase] = useState({
-    slug: cases.length === 0 ? DEFAULT_NEW_CASE_SLUG : "",
-    title: cases.length === 0 ? DEFAULT_NEW_CASE_TITLE : "",
-    summary: "",
-  });
+  const [actionMenuAnchor, setActionMenuAnchor] = useState<HTMLElement | null>(null);
   const [groupMeta, setGroupMeta] = useState({
     slug: "uploaded-group",
     title: "Uploaded Group",
@@ -521,14 +510,10 @@ export function WebUploadWorkbench({
     defaultMode: "before-after" as ViewerMode,
   });
   const [planView, setPlanView] = useState<PlanView | null>(null);
-  const [frameTitleMode, setFrameTitleMode] =
-    useState<FrameTitleMode>("inferred");
-  const [generationProgress, setGenerationProgress] =
-    useState<GenerationProgress | null>(null);
+  const [frameTitleMode, setFrameTitleMode] = useState<FrameTitleMode>("inferred");
+  const [generationProgress, setGenerationProgress] = useState<GenerationProgress | null>(null);
   const [expandedFrameId, setExpandedFrameId] = useState<string | null>(null);
-  const [snapshot, setSnapshot] = useState<UploadRunnerSnapshot>(() =>
-    buildInitialSnapshot(),
-  );
+  const [snapshot, setSnapshot] = useState<UploadRunnerSnapshot>(() => buildInitialSnapshot());
 
   // Failed uploads can be resumed against the existing server job. Keep metadata locked there too
   // so visible inputs cannot drift away from the payload already owned by the runner.
@@ -541,33 +526,23 @@ export function WebUploadWorkbench({
   // Preserve the workspace that opened upload; a fixed catalog link discarded the operator's
   // current Case context when they returned without uploading.
   const returnCaseSlug =
-    initialCaseSlug && cases.some((item) => item.slug === initialCaseSlug)
-      ? initialCaseSlug
-      : null;
-  const returnHref = returnCaseSlug
-    ? `/cases/${encodeURIComponent(returnCaseSlug)}`
-    : "/";
+    initialCaseSlug && cases.some((item) => item.slug === initialCaseSlug) ? initialCaseSlug : null;
+  const returnHref = returnCaseSlug ? `/cases/${encodeURIComponent(returnCaseSlug)}` : "/";
   const hasBlockingIssues = Boolean(planView && planView.errorCount > 0);
-  const canStart = Boolean(planView && planRef.current && !hasBlockingIssues);
+  const canStart = Boolean(selectedCaseExists && planView && planRef.current && !hasBlockingIssues);
   const canAbandon =
-    Boolean(planRef.current) &&
-    snapshot.stage !== "idle" &&
-    snapshot.stage !== "completed";
+    Boolean(planRef.current) && snapshot.stage !== "idle" && snapshot.stage !== "completed";
   const overallProgress =
     snapshot.totalFiles > 0 ? (snapshot.completedFiles / snapshot.totalFiles) * 100 : 0;
 
-  const caseOptions = useMemo(
-    () => [
-      ...cases.map((item) => ({ slug: item.slug, label: item.title })),
-      { slug: DEFAULT_NEW_CASE_SLUG, label: "新建 Case" },
-    ],
-    [cases],
-  );
-
   useEffect(() => {
-    pushNotification(BROWSER_RECOMMENDATION_MESSAGE, "info", {
-      key: "web-upload-browser-recommendation",
-    });
+    // Browser guidance is contextual: Chromium users already have the preferred directory picker,
+    // so showing the recommendation on every visit only covers useful upload information.
+    if (!(window as DirectoryPickerWindow).showDirectoryPicker) {
+      pushNotification(BROWSER_RECOMMENDATION_MESSAGE, "info", {
+        key: "web-upload-browser-recommendation",
+      });
+    }
   }, [pushNotification]);
 
   useEffect(() => {
@@ -632,11 +607,9 @@ export function WebUploadWorkbench({
       if (error instanceof DOMException && error.name === "AbortError") {
         return;
       }
-      pushNotification(
-        error instanceof Error ? error.message : "读取目录失败。",
-        "error",
-        { key: "web-upload-directory-error" },
-      );
+      pushNotification(error instanceof Error ? error.message : "读取目录失败。", "error", {
+        key: "web-upload-directory-error",
+      });
     }
   }
 
@@ -694,7 +667,7 @@ export function WebUploadWorkbench({
 
     try {
       const frames = await ensureGeneratedFrames();
-      const caseInput = getCaseInput(cases, selectedCaseSlug, newCase);
+      const caseInput = getCaseInput(cases, selectedCaseSlug);
       const runner =
         runnerRef.current ??
         new WebUploadRunner({
@@ -856,111 +829,92 @@ export function WebUploadWorkbench({
 
   return (
     <>
-      <Stack spacing={{ xs: 3.1, md: 4.2 }}>
-        <Stack sx={{ width: "100%" }}>
-          <Box
-            sx={{
-              display: "grid",
-              gridTemplateColumns: { xs: "1fr", md: "minmax(0, 1fr) auto" },
-              gap: { xs: 1.5, md: 2 },
-              alignItems: "end",
-              pb: { xs: 2.75, md: 3.4 },
-              borderBottom: "1px solid",
-              borderColor: "divider",
-            }}
-          >
-            <Typography
-              variant="h2"
-              component="h1"
-              sx={{ lineHeight: 1, textWrap: "balance" }}
-            >
-              上传对比
-            </Typography>
-            <Box
-              sx={{
-                // Fixed action columns keep every button at the same screen coordinate while the
-                // upload runner changes state or exposes the destructive abandon action.
-                display: "grid",
-                gridTemplateColumns: "92px 42px 132px",
-                gap: 1,
-                alignItems: "center",
-                justifySelf: { xs: "start", md: "end" },
-                "& .MuiButton-root": {
-                  minHeight: 42,
-                  width: "100%",
-                  px: 1.25,
-                },
-              }}
-            >
-              <Button
-                component={Link}
-                href={returnHref}
-                variant="text"
-                startIcon={<ArrowBack />}
-                sx={{
-                  color: "text.secondary",
-                  "&:hover": {
-                    color: "text.primary",
-                    backgroundColor: webUploadSurfaces.buttonHover,
-                  },
-                }}
-              >
-                返回
-              </Button>
-              <Tooltip title={canAbandon ? "放弃本次上传" : ""}>
-                <Box
-                  component="span"
-                  sx={{
-                    width: 42,
-                    height: 42,
-                    visibility: canAbandon ? "visible" : "hidden",
-                  }}
-                >
-                  <IconButton
-                    aria-label="放弃本次上传"
-                    color="warning"
-                    disabled={!canAbandon}
-                    onClick={abandonUpload}
-                    sx={{ width: 42, height: 42 }}
-                  >
-                    <DeleteOutline />
-                  </IconButton>
-                </Box>
-              </Tooltip>
+      <Stack spacing={2.5}>
+        <InternalPageHeader
+          backHref={returnHref}
+          eyebrow="上传工作台"
+          title="上传对比"
+          subtitle="选择 Case 与素材目录，确认配对结果后上传。"
+          actions={
+            <>
               {snapshot.stage === "completed" ? (
                 <Button
                   variant="contained"
                   endIcon={<OpenInNew />}
                   onClick={openCompletedGroup}
+                  sx={{ minWidth: 140 }}
                 >
                   打开 Group
                 </Button>
               ) : snapshot.stage === "uploading" ? (
-                <Button variant="outlined" startIcon={<Pause />} onClick={pauseUpload}>
-                  暂停
+                <Button
+                  variant="contained"
+                  startIcon={<Pause />}
+                  onClick={pauseUpload}
+                  sx={{ minWidth: 140 }}
+                >
+                  暂停上传
                 </Button>
               ) : (
                 <Button
                   variant="contained"
                   startIcon={snapshot.stage === "failed" ? <Refresh /> : <CloudUpload />}
-                  disabled={!canStart || snapshot.stage === "generating"}
+                  disabled={!canStart}
+                  loading={snapshot.stage === "generating"}
                   onClick={startOrResumeUpload}
-                  sx={{
-                    color: webUploadColors.primaryButtonText,
-                    fontWeight: 650,
-                    "&.Mui-disabled": {
-                      color: webUploadColors.primaryButtonDisabledText,
-                    },
-                  }}
+                  sx={{ minWidth: 140 }}
                 >
-                  {snapshot.stage === "paused" || snapshot.stage === "failed"
-                    ? "继续上传"
-                    : "开始上传"}
+                  {snapshot.stage === "generating"
+                    ? "正在准备"
+                    : snapshot.stage === "paused" || snapshot.stage === "failed"
+                      ? "继续上传"
+                  : "开始上传"}
                 </Button>
               )}
-            </Box>
-          </Box>
-        </Stack>
+              <Box
+                aria-hidden={!canAbandon}
+                sx={{
+                  // The menu owns a fixed slot after the primary action, so it can become available
+                  // without moving the upload button or leaving a leading gap in the mobile header.
+                  width: 40,
+                  height: 40,
+                  flex: "0 0 auto",
+                  visibility: canAbandon ? "visible" : "hidden",
+                  pointerEvents: canAbandon ? "auto" : "none",
+                }}
+              >
+                <IconButton
+                  aria-label="上传操作"
+                  tabIndex={canAbandon ? 0 : -1}
+                  disabled={!canAbandon}
+                  onClick={(event) => setActionMenuAnchor(event.currentTarget)}
+                >
+                  <MoreVert />
+                </IconButton>
+              </Box>
+              <Menu
+                anchorEl={actionMenuAnchor}
+                open={Boolean(actionMenuAnchor) && canAbandon}
+                onClose={() => setActionMenuAnchor(null)}
+              >
+                <MenuItem
+                  disabled={!canAbandon}
+                  onClick={() => {
+                    setActionMenuAnchor(null);
+                    void abandonUpload();
+                  }}
+                >
+                  <ListItemIcon>
+                    <DeleteOutlined fontSize="small" />
+                  </ListItemIcon>
+                  放弃本次上传
+                </MenuItem>
+              </Menu>
+            </>
+          }
+        />
+
+        <AppNotifications notifications={notifications} onDismiss={dismissNotification} />
 
         <Box
           sx={{
@@ -973,14 +927,16 @@ export function WebUploadWorkbench({
           <Stack spacing={1.4}>
             <Paper elevation={0} sx={webUploadPanelSx}>
               <Stack spacing={1.45} sx={webUploadFieldSx}>
-                <Typography variant="h6">对比信息</Typography>
+                <Stack direction="row" sx={{ alignItems: "center", gap: 1 }}>
+                  <InfoOutlined color="primary" fontSize="small" />
+                  <Typography variant="h4">对比信息</Typography>
+                </Stack>
 
                 <Button
                   variant="outlined"
                   startIcon={<FolderOpen />}
                   disabled={isLocked}
                   onClick={chooseDirectory}
-                  sx={{ borderRadius: 999 }}
                 >
                   选择文件夹
                 </Button>
@@ -993,59 +949,28 @@ export function WebUploadWorkbench({
                   {...({ webkitdirectory: "", directory: "" } as Record<string, string>)}
                 />
 
-                <FormControl fullWidth size="small">
-                  <InputLabel id="web-upload-case-label">目标目录</InputLabel>
+                {cases.length === 0 ? (
+                  <Stack spacing={1}>
+                    <Alert severity="warning">上传前需要先创建一个 Case。</Alert>
+                    <CaseCreateButton />
+                  </Stack>
+                ) : null}
+
+                <FormControl fullWidth size="small" disabled={cases.length === 0 || isLocked}>
+                  <InputLabel id="web-upload-case-label">目标 Case</InputLabel>
                   <Select
                     labelId="web-upload-case-label"
-                    label="目标目录"
+                    label="目标 Case"
                     value={selectedCaseSlug}
-                    disabled={isLocked}
                     onChange={(event) => setSelectedCaseSlug(event.target.value)}
                   >
-                    {caseOptions.map((option) => (
-                      <MenuItem key={option.slug} value={option.slug}>
-                        {option.label}
+                    {cases.map((item) => (
+                      <MenuItem key={item.slug} value={item.slug}>
+                        {item.title}
                       </MenuItem>
                     ))}
                   </Select>
                 </FormControl>
-
-                {!selectedCaseExists ? (
-                  <Stack spacing={1.1}>
-                    <TextField
-                      label="目录 Slug"
-                      size="small"
-                      value={newCase.slug}
-                      disabled={isLocked}
-                      onChange={(event) =>
-                        setNewCase((current) => ({
-                          ...current,
-                          slug: normalizeSlug(event.target.value, DEFAULT_NEW_CASE_SLUG),
-                        }))
-                      }
-                    />
-                    <TextField
-                      label="目录标题"
-                      size="small"
-                      value={newCase.title}
-                      disabled={isLocked}
-                      onChange={(event) =>
-                        setNewCase((current) => ({ ...current, title: event.target.value }))
-                      }
-                    />
-                    <TextField
-                      label="目录描述"
-                      size="small"
-                      multiline
-                      minRows={2}
-                      value={newCase.summary}
-                      disabled={isLocked}
-                      onChange={(event) =>
-                        setNewCase((current) => ({ ...current, summary: event.target.value }))
-                      }
-                    />
-                  </Stack>
-                ) : null}
 
                 <TextField
                   label="Slug"
@@ -1087,8 +1012,15 @@ export function WebUploadWorkbench({
 
             <Paper elevation={0} sx={webUploadPanelSx}>
               <Stack spacing={1.35}>
-                <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1}>
-                  <Typography variant="h6">上传详情</Typography>
+                <Stack
+                  direction="row"
+                  spacing={1}
+                  sx={{
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                  }}
+                >
+                  <Typography variant="h4">上传详情</Typography>
                   <Chip
                     label={stageLabel(snapshot.stage)}
                     color={
@@ -1127,7 +1059,6 @@ export function WebUploadWorkbench({
           />
         </Box>
       </Stack>
-      <AppNotifications notifications={notifications} onDismiss={dismissNotification} />
     </>
   );
 }

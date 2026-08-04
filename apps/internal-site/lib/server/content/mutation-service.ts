@@ -189,6 +189,40 @@ export async function updateCaseSummary(caseSlug: string, summary: string) {
   };
 }
 
+/** Updates operator-managed Case metadata while leaving slug and publication state immutable. */
+export async function updateCaseMetadata(
+  caseSlug: string,
+  metadata: { title?: string; summary?: string; tags?: string[] },
+) {
+  const data: { title?: string; summary?: string; tagsJson?: string } = {};
+
+  if (metadata.title !== undefined) {
+    const title = metadata.title.trim();
+    if (!title) throw new Error("Case title is required.");
+    data.title = title;
+  }
+  if (metadata.summary !== undefined) data.summary = metadata.summary.trim();
+  if (metadata.tags !== undefined) {
+    const tags = [...new Set(metadata.tags.map((tag) => tag.trim()).filter(Boolean))];
+    data.tagsJson = JSON.stringify(tags);
+  }
+  if (Object.keys(data).length === 0) throw new Error("No Case metadata to update.");
+
+  const caseRow = await prisma.case.update({
+    where: { slug: caseSlug },
+    data,
+    select: { slug: true, title: true, summary: true, tagsJson: true, status: true },
+  });
+
+  return {
+    caseSlug: caseRow.slug,
+    title: caseRow.title,
+    summary: caseRow.summary,
+    tags: JSON.parse(caseRow.tagsJson) as string[],
+    status: caseRow.status,
+  };
+}
+
 /**
  * Updates group display metadata after resolving the group through its case, preserving slugs and
  * all publish/upload fields so existing viewer and public URLs remain stable.

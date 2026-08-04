@@ -8,11 +8,12 @@ import {
   Dialog,
   DialogActions,
   DialogContent,
+  DialogContentText,
   DialogTitle,
-  Divider,
+  IconButton,
   Stack,
   TextField,
-  Typography,
+  Tooltip,
 } from "@mui/material";
 import { cjkKebabCase } from "@magic-compare/shared-utils";
 import { useRouter } from "next/navigation";
@@ -20,87 +21,63 @@ import { AppNotifications } from "./notifications/app-notifications";
 import { useAppNotifications } from "./notifications/use-app-notifications";
 
 const DEFAULT_CASE_SLUG = "new-case";
-const DEFAULT_CASE_TITLE = "New Case";
+const EMPTY_CASE_TITLE = "";
 const CASE_SUMMARY_MAX_LENGTH = 160;
-const caseDialogFieldSx = {
-  "& .MuiOutlinedInput-root": {
-    borderRadius: 1.5,
-    backgroundColor: "rgba(255,255,255,0.035)",
-  },
-  "& .MuiFormHelperText-root": {
-    mx: 0,
-  },
-} as const;
 
 function normalizeSlug(value: string) {
   return cjkKebabCase(value, DEFAULT_CASE_SLUG);
 }
 
-/**
- * Keeps Case creation on the catalog surface rather than hiding it inside upload. A new Case starts
- * as metadata only; upload and publish remain separate explicit operations.
- */
-export function CaseCreateButton() {
+/** Provides the single Case creation flow used by both navigation and catalog actions. */
+export function CaseCreateButton({ navigation = false }: { navigation?: boolean }) {
   const router = useRouter();
   const notifications = useAppNotifications();
   const [open, setOpen] = useState(false);
-  const [title, setTitle] = useState(DEFAULT_CASE_TITLE);
-  const [slug, setSlug] = useState(DEFAULT_CASE_SLUG);
+  const [title, setTitle] = useState(EMPTY_CASE_TITLE);
+  const [slug, setSlug] = useState("");
   const [summary, setSummary] = useState("");
   const [slugTouched, setSlugTouched] = useState(false);
   const [isPending, startTransition] = useTransition();
   const normalizedTitle = title.trim();
   const normalizedSlug = normalizeSlug(slug);
-  const normalizedSummary = summary.trim();
   const hasSummaryError = summary.length > CASE_SUMMARY_MAX_LENGTH;
   const canSubmit = Boolean(normalizedTitle && normalizedSlug && !hasSummaryError);
 
   function resetDraft() {
-    setTitle(DEFAULT_CASE_TITLE);
-    setSlug(DEFAULT_CASE_SLUG);
+    // Blank drafts prevent a fast double click from creating a generic, hard-to-identify Case.
+    setTitle(EMPTY_CASE_TITLE);
+    setSlug("");
     setSummary("");
     setSlugTouched(false);
   }
 
   function closeDialog() {
-    if (isPending) {
-      return;
-    }
-
+    if (isPending) return;
     setOpen(false);
     resetDraft();
   }
 
-  /**
-   * Navigates to the new workspace only after the server accepts the slug, so the catalog never
-   * routes users into a case shell that does not exist yet.
-   */
+  /** Navigates only after creation succeeds so the shell never opens a missing workspace. */
   function submitCase() {
-    if (!canSubmit) {
-      return;
-    }
+    if (!canSubmit) return;
 
     startTransition(async () => {
       try {
         const response = await fetch("/api/ops/case-create", {
           method: "POST",
-          headers: {
-            "content-type": "application/json",
-          },
+          headers: { "content-type": "application/json" },
           body: JSON.stringify({
             slug: normalizedSlug,
             title: normalizedTitle,
-            summary: normalizedSummary,
+            summary: summary.trim(),
           }),
         });
-
         if (!response.ok) {
           const payload = await response.json().catch(() => null);
           throw new Error(payload?.error || "创建 Case 失败。");
         }
 
         const result = (await response.json()) as { caseSlug?: string };
-        notifications.pushNotification("Case 已创建。", "success");
         setOpen(false);
         resetDraft();
         router.push(`/cases/${result.caseSlug ?? normalizedSlug}`);
@@ -115,66 +92,78 @@ export function CaseCreateButton() {
 
   return (
     <>
-      <Button
-        variant="outlined"
-        startIcon={<Add />}
-        onClick={() => setOpen(true)}
-        sx={{ minHeight: 42 }}
-      >
-        新建 Case
-      </Button>
+      {navigation ? (
+        <Box sx={{ width: "100%" }}>
+          <Tooltip title="新建 Case" placement="right">
+            <IconButton
+              aria-label="新建 Case"
+              onClick={() => setOpen(true)}
+              sx={{
+                display: { sm: "inline-flex", md: "none" },
+                width: 56,
+                height: 56,
+                color: "primary.contrastText",
+                backgroundColor: "primary.main",
+                "&:hover": { backgroundColor: "primary.main" },
+              }}
+            >
+              <Add />
+            </IconButton>
+          </Tooltip>
+          <Button
+            variant="contained"
+            startIcon={<Add />}
+            onClick={() => setOpen(true)}
+            sx={{ display: { sm: "none", md: "inline-flex" }, width: "100%" }}
+          >
+            新建 Case
+          </Button>
+        </Box>
+      ) : (
+        <Button variant="contained" startIcon={<Add />} onClick={() => setOpen(true)}>
+          新建 Case
+        </Button>
+      )}
+
       <Dialog
         open={open}
         onClose={closeDialog}
         fullWidth
         maxWidth="sm"
-        PaperProps={{
-          elevation: 0,
-          sx: {
-            borderRadius: 3,
-            border: "1px solid",
-            borderColor: "divider",
-            background:
-              "linear-gradient(180deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.025) 100%), #081838",
-            overflow: "hidden",
+        slotProps={{
+          paper: {
+            sx: {
+              border: "1px solid",
+              borderColor: "divider",
+              backgroundColor: "var(--mui-palette-surface-containerHigh)",
+            },
           },
         }}
       >
-        <DialogTitle sx={{ px: { xs: 2, sm: 2.4 }, pt: 2.1, pb: 1.2 }}>
-          <Stack spacing={0.45}>
-            <Typography variant="h6" component="span">
-              新建 Case
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              先创建内部工作区，上传和发布保持独立操作。
-            </Typography>
-          </Stack>
-        </DialogTitle>
-        <Divider />
-        <DialogContent sx={{ px: { xs: 2, sm: 2.4 }, py: 2.2 }}>
-          <Stack spacing={1.75}>
+        <DialogTitle>新建 Case</DialogTitle>
+        <DialogContent>
+          <DialogContentText sx={{ mb: 2 }}>创建内部工作区后，再上传对比组。</DialogContentText>
+          <Stack spacing={2}>
             <TextField
               label="标题"
+              placeholder="例如：2026 夏季动画"
               value={title}
               disabled={isPending}
               autoFocus
               fullWidth
-              sx={caseDialogFieldSx}
               onChange={(event) => {
                 const nextTitle = event.target.value;
                 setTitle(nextTitle);
-                if (!slugTouched) {
-                  setSlug(normalizeSlug(nextTitle));
-                }
+                if (!slugTouched) setSlug(normalizeSlug(nextTitle));
               }}
             />
             <TextField
               label="Slug"
+              placeholder="根据标题自动生成"
               value={slug}
               disabled={isPending}
-              helperText="用于内部路由，保存后不在此处修改。"
+              helperText="用于内部路由，创建后保持不变。"
               fullWidth
-              sx={caseDialogFieldSx}
               onChange={(event) => {
                 setSlugTouched(true);
                 setSlug(normalizeSlug(event.target.value));
@@ -186,44 +175,22 @@ export function CaseCreateButton() {
               disabled={isPending}
               multiline
               minRows={3}
-              helperText={
-                <Box
-                  component="span"
-                  sx={{
-                    color: hasSummaryError ? "error.main" : "text.secondary",
-                    display: "block",
-                    fontVariantNumeric: "tabular-nums",
-                    textAlign: "right",
-                  }}
-                >
-                  {summary.length}/{CASE_SUMMARY_MAX_LENGTH}
-                </Box>
-              }
               error={hasSummaryError}
+              helperText={`${summary.length}/${CASE_SUMMARY_MAX_LENGTH}`}
               fullWidth
-              sx={caseDialogFieldSx}
               onChange={(event) => setSummary(event.target.value)}
             />
           </Stack>
         </DialogContent>
-        <DialogActions
-          sx={{
-            borderTop: "1px solid",
-            borderColor: "divider",
-            gap: 1,
-            justifyContent: "flex-end",
-            px: { xs: 2, sm: 2.4 },
-            py: 1.55,
-          }}
-        >
-          <Button onClick={closeDialog} disabled={isPending} sx={{ minHeight: 40 }}>
+        <DialogActions sx={{ px: 3, pb: 2.5 }}>
+          <Button onClick={closeDialog} disabled={isPending}>
             取消
           </Button>
           <Button
             variant="contained"
             onClick={submitCase}
-            disabled={isPending || !canSubmit}
-            sx={{ minHeight: 40 }}
+            disabled={!canSubmit}
+            loading={isPending}
           >
             创建
           </Button>

@@ -1,108 +1,7 @@
-import {
-  CheckCircleOutline,
-  Close,
-  ErrorOutline,
-  InfoOutlined,
-  WarningAmber,
-} from "@mui/icons-material";
-import { Box, IconButton, Paper, Stack } from "@mui/material";
-import { AnimatePresence, motion } from "motion/react";
+import { Alert, Snackbar, Stack } from "@mui/material";
 import type { AppNotification } from "./use-app-notifications";
 
-/**
- * Renders a single workspace toast with tone-specific chrome so action feedback remains readable
- * even when several long-running operations are active.
- */
-function AppNotificationCard({
-  notification,
-  index,
-  onDismiss,
-}: {
-  notification: AppNotification;
-  index: number;
-  onDismiss: (id: string) => void;
-}) {
-  const icon =
-    notification.tone === "success" ? (
-      <CheckCircleOutline fontSize="small" />
-    ) : notification.tone === "warning" ? (
-      <WarningAmber fontSize="small" />
-    ) : notification.tone === "error" ? (
-      <ErrorOutline fontSize="small" />
-    ) : (
-      <InfoOutlined fontSize="small" />
-    );
-
-  return (
-    <Paper
-      component={motion.div}
-      layout
-      initial={{ opacity: 0, y: 14, scale: 0.98 }}
-      animate={{ opacity: index === 3 ? 0.8 : 1, y: 0, scale: 1 }}
-      exit={{ opacity: 0, y: 10, scale: 0.98 }}
-      transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
-      elevation={0}
-      sx={{
-        minWidth: { xs: "min(92vw, 320px)", sm: 360 },
-        borderRadius: 2.75,
-        border: "1px solid",
-        borderColor:
-          notification.tone === "error"
-            ? "error.main"
-            : notification.tone === "warning"
-              ? "warning.main"
-              : notification.tone === "success"
-                ? "primary.main"
-                : "divider",
-        backgroundColor:
-          notification.tone === "error"
-            ? "rgba(127, 29, 29, 0.92)"
-            : notification.tone === "warning"
-              ? "rgba(96, 61, 11, 0.92)"
-              : notification.tone === "success"
-                ? "rgba(31, 49, 92, 0.94)"
-                : "rgba(17, 28, 61, 0.94)",
-        boxShadow: "0 18px 42px rgba(0,0,0,0.28)",
-      }}
-    >
-      <Stack
-        direction="row"
-        spacing={1.1}
-        alignItems="flex-start"
-        sx={{ px: 1.5, py: 1.2 }}
-      >
-        <Box sx={{ color: "text.primary", pt: 0.1 }}>{icon}</Box>
-        <Box sx={{ flex: 1, minWidth: 0 }}>
-          <Box
-            component="p"
-            sx={{
-              m: 0,
-              color: "text.primary",
-              fontSize: "0.92rem",
-              lineHeight: 1.5,
-            }}
-          >
-            {notification.message}
-          </Box>
-        </Box>
-        {!notification.sticky ? (
-          <IconButton
-            size="small"
-            onClick={() => onDismiss(notification.id)}
-            sx={{ width: 28, height: 28, mt: "-2px" }}
-          >
-            <Close sx={{ fontSize: 16 }} />
-          </IconButton>
-        ) : null}
-      </Stack>
-    </Paper>
-  );
-}
-
-/**
- * Keeps toast stacking fixed to the viewport edge so workspace actions can report progress without
- * shifting the underlying board layout.
- */
+/** Keeps persistent guidance in document flow and limits transient feedback to one snackbar. */
 export function AppNotifications({
   notifications,
   onDismiss,
@@ -110,37 +9,42 @@ export function AppNotifications({
   notifications: AppNotification[];
   onDismiss: (id: string) => void;
 }) {
+  const stickyNotifications = notifications.filter((notification) => notification.sticky);
+  const transientNotification = notifications.find((notification) => !notification.sticky) ?? null;
+
   return (
-    <Box
-      sx={{
-        position: "fixed",
-        right: { xs: 12, md: 20 },
-        bottom: { xs: 12, md: 20 },
-        zIndex: 1600,
-        pointerEvents: "none",
-      }}
-    >
-      <Stack
-        direction="column-reverse"
-        spacing={1}
-        sx={{
-          alignItems: "flex-end",
-          "& > *": {
-            pointerEvents: "auto",
-          },
+    <>
+      {stickyNotifications.length > 0 ? (
+        <Stack spacing={1}>
+          {stickyNotifications.map((notification) => (
+            <Alert key={notification.id} severity={notification.tone} variant="standard">
+              {notification.message}
+            </Alert>
+          ))}
+        </Stack>
+      ) : null}
+      <Snackbar
+        open={Boolean(transientNotification)}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+        onClose={(_event, reason) => {
+          // Escape should dismiss the active Material notification; clickaway stays ignored so an
+          // unrelated workspace click cannot erase feedback before the operator reads it.
+          if (reason !== "clickaway" && transientNotification) {
+            onDismiss(transientNotification.id);
+          }
         }}
       >
-        <AnimatePresence initial={false}>
-          {notifications.map((notification, index) => (
-            <AppNotificationCard
-              key={notification.id}
-              notification={notification}
-              index={index}
-              onDismiss={onDismiss}
-            />
-          ))}
-        </AnimatePresence>
-      </Stack>
-    </Box>
+        {transientNotification ? (
+          <Alert
+            severity={transientNotification.tone}
+            variant="filled"
+            onClose={() => onDismiss(transientNotification.id)}
+            sx={{ width: "min(92vw, 440px)" }}
+          >
+            {transientNotification.message}
+          </Alert>
+        ) : undefined}
+      </Snackbar>
+    </>
   );
 }

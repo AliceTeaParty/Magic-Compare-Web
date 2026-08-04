@@ -61,10 +61,14 @@ function ThumbnailButton({
           : viewerTokens.filmstrip.inactiveCardSurface,
         boxShadow: isActive ? viewerTokens.filmstrip.activeCardInset : "none",
         p: 1.1,
+        // Hover feedback changes the M3 state layer only; moving thumbnails made the filmstrip feel
+        // unstable and changed the pointer target while scanning adjacent frames.
         transition:
-          "transform 180ms cubic-bezier(0.22, 1, 0.36, 1), border-color 180ms cubic-bezier(0.22, 1, 0.36, 1), background-color 180ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 180ms cubic-bezier(0.22, 1, 0.36, 1)",
+          "border-color 150ms cubic-bezier(0.2, 0, 0, 1), background-color 150ms cubic-bezier(0.2, 0, 0, 1), box-shadow 150ms cubic-bezier(0.2, 0, 0, 1)",
         "&:hover": {
-          transform: "translateY(-3px)",
+          backgroundColor: isActive
+            ? viewerTokens.filmstrip.activeCardSurface
+            : "var(--mui-palette-surface-containerHigh)",
         },
       }}
     >
@@ -108,12 +112,20 @@ function ThumbnailButton({
           </Box>
         )}
       </Box>
-      <Stack spacing={0.1} alignItems="center">
+      <Stack
+        spacing={0.1}
+        sx={{
+          alignItems: "center",
+        }}
+      >
         <Typography
           variant="body2"
-          fontWeight={600}
           noWrap
-          sx={{ width: "100%", textAlign: "center" }}
+          sx={{
+            fontWeight: 600,
+            width: "100%",
+            textAlign: "center",
+          }}
         >
           {frame.title}
         </Typography>
@@ -221,7 +233,7 @@ export function ViewerFilmstrip({
             transition:
               isDragging || prefersReducedMotion
                 ? "none"
-                : "transform 220ms cubic-bezier(0.22, 1, 0.36, 1)",
+                : "transform 220ms cubic-bezier(0.2, 0, 0, 1)",
           }}
         >
           {frames.map((frame, index) => (
@@ -229,9 +241,7 @@ export function ViewerFilmstrip({
               key={frame.id}
               frame={frame}
               isActive={frame.id === currentFrameId}
-              isNearActive={
-                activeIndex === -1 || Math.abs(index - activeIndex) <= 8
-              }
+              isNearActive={activeIndex === -1 || Math.abs(index - activeIndex) <= 8}
               onClick={() => handleFrameSelection(frame.id)}
               onIntent={() => onFrameIntent(frame)}
             />
@@ -292,7 +302,7 @@ export function ViewerFilmstrip({
                 transition:
                   isDragging || prefersReducedMotion
                     ? "none"
-                    : "transform 180ms cubic-bezier(0.22, 1, 0.36, 1), width 180ms cubic-bezier(0.22, 1, 0.36, 1)",
+                    : "transform 180ms cubic-bezier(0.2, 0, 0, 1), width 180ms cubic-bezier(0.2, 0, 0, 1)",
                 boxShadow: viewerTokens.filmstrip.scrollbarThumbRing,
               }}
             />

@@ -37,34 +37,36 @@
 
 ## P1
 
-- [ ] Catalog 增加 `search + status filter + updated sort`
-  当前 catalog 只有卡片流，case 数量上来后会强迫用户逐卡扫描，缺少快速分流能力。
-  当前先不做。这项属于信息增强。
+- [x] 修复高频工作流的目标尺寸、状态反馈和移动端动作换行
+      Catalog 卡片使用整面导航；Group 编辑前后的动作坐标保持不变；上传菜单按会话状态进入交互树；异步按钮显示 loading；删除使用统一确认 Dialog。
 
-- [ ] Viewer header 增加常驻的 `Back to workspace`
-  现在返回 workspace 的主入口藏在 details drawer 内，手机端尤其不利于快速回退。
+- [x] Catalog 增加 `search + status filter + updated sort`
+      目录使用客户端搜索、状态筛选和更新时间排序，直接复用服务端首屏返回的完整 Case 列表。
 
-- [ ] 重构 viewer 工具栏的信息层级
-  将模式切换和页面级动作明确分组，降低纯图标按钮的理解成本，尤其是滚动到 stage 的动作。
+- [x] Viewer header 增加常驻的 `Back to workspace`
+      Internal viewer header 提供固定的工作区返回入口，details drawer 保留 Group 导航。
 
-- [ ] 重新梳理 workspace 中 group 行的操作优先级
-  当前 `Internal / Public / Open` 和页面级主按钮同时争夺注意力，需要更明确地区分状态、跳转和次级动作。
+- [x] 重构 viewer 工具栏的信息层级
+      模式切换使用 connected control，主图、引导和详情操作使用固定图标槽，A/B 控件占用固定次级行。
+
+- [x] 重新梳理 workspace 中 group 行的操作优先级
+      可见性作为状态控件，打开作为行主动作，编辑和删除改为带 tooltip 的次级图标动作。
 
 ## P2
 
 - [x] 统一 internal UI chrome 的产品语言
-  统一 `Internal catalog`、`Case workspace`、`Deploy Pages`、`Back to catalog`、`Open workspace` 等公共界面文案的语言策略，不影响内容标题自身语言。
+      统一 `Internal catalog`、`Case workspace`、`Deploy Pages`、`Back to catalog`、`Open workspace` 等公共界面文案的语言策略，不影响内容标题自身语言。
 
 - [x] 提升 catalog 卡片的信息辨识度
-  目前摘要内容重复，导致列表更像样式样张而不是工作台；优先展示最近变更、备注或风险提示等真实工作信息。
+      目前摘要内容重复，导致列表更像样式样张而不是工作台；优先展示最近变更、备注或风险提示等真实工作信息。
 
 - [x] 给 viewer 的首次使用提示增加可复看入口或常驻弱提示
-  当前 1 秒轻提示过于瞬时，第一次没看到后几乎没有低打扰的重新发现机制。
+      当前 1 秒轻提示过于瞬时，第一次没看到后几乎没有低打扰的重新发现机制。
 
 ## P3
 
 - [x] 补齐站点 favicon
-  当前本地走查仍会请求 `favicon.ico` 并返回 `404`，不影响核心任务，但会拉低完成度。
+      当前本地走查仍会请求 `favicon.ico` 并返回 `404`，不影响核心任务，但会拉低完成度。
 
 ## 审计上下文
 
