@@ -3,16 +3,23 @@
 import { FitScreen, HelpOutlined, ViewSidebar } from "@mui/icons-material";
 import { Box, IconButton, Stack, ToggleButton, ToggleButtonGroup, Tooltip } from "@mui/material";
 import type { ViewerMode } from "@magic-compare/content-schema";
+import type { ViewerAsset } from "@magic-compare/compare-core/viewer-data";
 import { AbInspectControls } from "./ab-inspect-controls";
+import { ComparisonAssetControls } from "./comparison-asset-controls";
 
 interface ViewerToolbarProps {
   abScale: number;
   abSide: "before" | "after";
+  afterAsset: ViewerAsset | undefined;
+  beforeAsset: ViewerAsset | undefined;
   canUseHeatmap: boolean;
+  comparisonAssetKey: string | undefined;
+  comparisonAssets: ViewerAsset[];
   guideOpen: boolean;
   hideStageScrollControl: boolean;
   mode: ViewerMode;
   onAbSideChange: (side: "before" | "after") => void;
+  onComparisonAssetChange: (assetKey: string) => void;
   onOpenGuide: () => void;
   onModeChange: (mode: ViewerMode) => void;
   onScaleChange: (nextScale: number) => void;
@@ -29,11 +36,16 @@ interface ViewerToolbarProps {
 export function ViewerToolbar({
   abScale,
   abSide,
+  afterAsset,
+  beforeAsset,
   canUseHeatmap,
+  comparisonAssetKey,
+  comparisonAssets,
   guideOpen,
   hideStageScrollControl,
   mode,
   onAbSideChange,
+  onComparisonAssetChange,
   onOpenGuide,
   onModeChange,
   onScaleChange,
@@ -193,6 +205,27 @@ export function ViewerToolbar({
         </Tooltip>
       </Stack>
 
+      {beforeAsset && comparisonAssetKey && comparisonAssets.length > 1 ? (
+        <Box
+          sx={{
+            display: "flex",
+            justifyContent: { xs: "flex-start", sm: "flex-end" },
+            width: "100%",
+            minWidth: 0,
+          }}
+        >
+          {/* Extra uploaded variables used to disappear after import. Keep the entire target set
+              visible here so switching Rip/Flt never depends on opening the metadata drawer. */}
+          <ComparisonAssetControls
+            baselineAsset={beforeAsset}
+            comparisonAssetKey={comparisonAssetKey}
+            comparisonAssets={comparisonAssets}
+            disabled={mode === "heatmap"}
+            onComparisonAssetChange={onComparisonAssetChange}
+          />
+        </Box>
+      ) : null}
+
       <Box
         sx={{
           display: "flex",
@@ -207,6 +240,8 @@ export function ViewerToolbar({
         <AbInspectControls
           abScale={abScale}
           abSide={abSide}
+          afterLabel={afterAsset?.label ?? "After"}
+          beforeLabel={beforeAsset?.label ?? "Before"}
           onAbSideChange={handleAbSideChange}
           onScaleChange={handleScaleChange}
         />

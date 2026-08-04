@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ViewerMode } from "@magic-compare/content-schema";
 import {
+  getComparisonAssetKey,
   type ViewerAsset,
   type ViewerFrame,
   type ViewerGroup,
@@ -30,10 +31,14 @@ export interface ViewerController {
   setMode: (nextMode: ViewerMode) => void;
   setOverlayOpacity: (value: number) => void;
   setAbSide: (side: "before" | "after") => void;
+  setComparisonAssetKey: (assetKey: string) => void;
   toggleSidebar: () => void;
   closeSidebar: () => void;
   beforeAsset: ViewerAsset | undefined;
   afterAsset: ViewerAsset | undefined;
+  comparisonAssetKey: string | undefined;
+  comparisonAssets: ViewerAsset[];
+  heatmapReferenceAsset: ViewerAsset | undefined;
   heatmapAsset: ViewerAsset | undefined;
 }
 
@@ -49,6 +54,9 @@ export function useViewerController(group: ViewerGroup): ViewerController {
   const [mode, setModeState] = useState<ViewerMode>(group.defaultMode);
   const [overlayOpacity, setOverlayOpacityState] = useState<number>(58);
   const [abSide, setAbSideState] = useState<"before" | "after">("after");
+  const [comparisonAssetPreferenceKey, setComparisonAssetPreferenceKey] = useState<
+    string | undefined
+  >();
   const [sidebarOpen, setSidebarOpenState] = useState(false);
 
   // Import/publish changes can remove frames out from under the viewer, so selection repair has to
@@ -64,10 +72,19 @@ export function useViewerController(group: ViewerGroup): ViewerController {
     () => buildFrameState(frames, currentFrameId),
     [currentFrameId, frames],
   );
-  const { afterAsset, beforeAsset, heatmapAsset } = useMemo(
-    () => buildFrameAssets(currentFrame),
-    [currentFrame],
+  const {
+    afterAsset,
+    beforeAsset,
+    comparisonAssets,
+    heatmapAsset,
+    heatmapReferenceAsset,
+  } = useMemo(
+    () => buildFrameAssets(currentFrame, comparisonAssetPreferenceKey),
+    [comparisonAssetPreferenceKey, currentFrame],
   );
+  const comparisonAssetKey = afterAsset
+    ? getComparisonAssetKey(afterAsset)
+    : undefined;
   const framesRef = useRef(frames);
   const currentFrameRef = useRef(currentFrame);
   const currentFrameIndexRef = useRef(currentFrameIndex);
@@ -143,6 +160,14 @@ export function useViewerController(group: ViewerGroup): ViewerController {
   }, []);
 
   /**
+   * Stores the semantic column key rather than a frame-local asset id so Rip/Flt selection remains
+   * stable while stepping through frames. Missing keys fall back when the next frame resolves.
+   */
+  const setComparisonAssetKey = useCallback((assetKey: string): void => {
+    setComparisonAssetPreferenceKey(assetKey);
+  }, []);
+
+  /**
    * Allows callers to explicitly synchronize sidebar state from persisted preferences without
    * depending on the raw React state setter.
    */
@@ -182,10 +207,14 @@ export function useViewerController(group: ViewerGroup): ViewerController {
       setMode,
       setOverlayOpacity,
       setAbSide,
+      setComparisonAssetKey,
       toggleSidebar,
       closeSidebar,
       beforeAsset,
       afterAsset,
+      comparisonAssetKey,
+      comparisonAssets,
+      heatmapReferenceAsset,
       heatmapAsset,
     }),
     [
@@ -196,12 +225,16 @@ export function useViewerController(group: ViewerGroup): ViewerController {
       closeSidebar,
       currentFrame,
       currentFrameIndex,
+      comparisonAssetKey,
+      comparisonAssets,
       frames,
       heatmapAsset,
+      heatmapReferenceAsset,
       mode,
       overlayOpacity,
       selectFrame,
       setAbSide,
+      setComparisonAssetKey,
       setMode,
       setOverlayOpacity,
       setSidebarOpen,

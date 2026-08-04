@@ -65,6 +65,7 @@ export function ABCompareStage({
     rotateStage,
     setPanZoomState,
   });
+  const activeAsset = side === "before" ? beforeAsset : afterAsset;
 
   useEffect(() => {
     const stageNode = stageSurfaceRef.current;
@@ -140,7 +141,7 @@ export function ABCompareStage({
       aria-pressed={active}
       aria-label={
         active
-          ? `A/B inspect stage. Showing ${side}. Press Enter or Space to switch sides.`
+          ? `A/B inspect stage. Showing ${activeAsset.label}. Press Enter or Space to switch sides.`
           : "A/B inspect stage. Press Enter or Space to activate inspection."
       }
       onClick={handleClick}

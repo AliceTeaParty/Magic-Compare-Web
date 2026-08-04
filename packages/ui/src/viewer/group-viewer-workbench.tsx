@@ -2,7 +2,7 @@
 
 import { Tune } from "@mui/icons-material";
 import { Box, Paper, Slider, Stack, Typography } from "@mui/material";
-import { cycleAbSide } from "@magic-compare/compare-core";
+import { cycleAbSide, getComparisonAssetKey } from "@magic-compare/compare-core";
 import { useViewerController } from "@magic-compare/compare-core/use-viewer-controller";
 import type { ViewerDataset } from "@magic-compare/compare-core/viewer-data";
 import { clampNumber } from "@magic-compare/shared-utils";
@@ -45,12 +45,16 @@ export function GroupViewerWorkbench({ dataset, variant }: GroupViewerWorkbenchP
     closeSidebar,
     currentFrameIndex,
     currentFrame,
+    comparisonAssetKey,
+    comparisonAssets,
     frames,
     heatmapAsset,
+    heatmapReferenceAsset,
     mode,
     overlayOpacity,
     selectFrame,
     setAbSide,
+    setComparisonAssetKey,
     setMode,
     setOverlayOpacity,
     setSidebarOpen,
@@ -86,7 +90,11 @@ export function GroupViewerWorkbench({ dataset, variant }: GroupViewerWorkbenchP
   } = useViewerMediaPreferences();
   // Derive stage aspect ratio from the actual content dimensions so the stage frame matches the
   // image without pillarboxing or letterboxing.  Falls back to 16:9 while assets are loading.
-  const referenceAsset = afterAsset ?? beforeAsset;
+  const activeAfterAsset = mode === "heatmap" ? heatmapReferenceAsset : afterAsset;
+  const activeComparisonAssetKey = activeAfterAsset
+    ? getComparisonAssetKey(activeAfterAsset)
+    : comparisonAssetKey;
+  const referenceAsset = activeAfterAsset ?? beforeAsset;
   const contentAspectRatio = referenceAsset ? referenceAsset.width / referenceAsset.height : 16 / 9;
   const stageAspectRatio = resolvedRotateStage ? 1 / contentAspectRatio : contentAspectRatio;
   const stageShell = useViewerStageShellState({
@@ -220,14 +228,19 @@ export function GroupViewerWorkbench({ dataset, variant }: GroupViewerWorkbenchP
         <ViewerHeader
           abScale={abDisplayedScale}
           abSide={abSide}
+          afterAsset={activeAfterAsset}
+          beforeAsset={beforeAsset}
           canUseHeatmap={availableModes.includes("heatmap")}
           caseTitle={dataset.caseMeta.title}
           caseSlug={dataset.caseMeta.slug}
+          comparisonAssetKey={activeComparisonAssetKey}
+          comparisonAssets={comparisonAssets}
           guideOpen={guideOpen}
           groupTitle={dataset.group.title}
           hideStageScrollControl={resolvedHideStageScrollControl}
           mode={mode}
           onAbSideChange={setAbSide}
+          onComparisonAssetChange={setComparisonAssetKey}
           onOpenGuide={openViewerGuide}
           onModeChange={setMode}
           onScaleChange={setAbScale}
@@ -276,7 +289,7 @@ export function GroupViewerWorkbench({ dataset, variant }: GroupViewerWorkbenchP
                 <ViewerStage
                   abSide={abSide}
                   abStageActive={abStageActive}
-                  afterAsset={afterAsset}
+                  afterAsset={activeAfterAsset}
                   beforeAsset={beforeAsset}
                   devicePixelRatio={devicePixelRatio}
                   heatmapAsset={heatmapAsset}

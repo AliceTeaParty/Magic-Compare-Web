@@ -3,20 +3,26 @@
 import { ArrowBack } from "@mui/icons-material";
 import { Box, Button, Stack, Typography } from "@mui/material";
 import type { ViewerMode } from "@magic-compare/content-schema";
+import type { ViewerAsset } from "@magic-compare/compare-core/viewer-data";
 import Link from "next/link";
 import { ViewerToolbar } from "./viewer-toolbar";
 
 interface ViewerHeaderProps {
   abScale: number;
   abSide: "before" | "after";
+  afterAsset: ViewerAsset | undefined;
+  beforeAsset: ViewerAsset | undefined;
   canUseHeatmap: boolean;
   caseTitle: string;
   caseSlug: string;
+  comparisonAssetKey: string | undefined;
+  comparisonAssets: ViewerAsset[];
   guideOpen: boolean;
   groupTitle: string;
   hideStageScrollControl: boolean;
   mode: ViewerMode;
   onAbSideChange: (side: "before" | "after") => void;
+  onComparisonAssetChange: (assetKey: string) => void;
   onOpenGuide: () => void;
   onModeChange: (mode: ViewerMode) => void;
   onScaleChange: (nextScale: number) => void;
@@ -33,14 +39,19 @@ interface ViewerHeaderProps {
 export function ViewerHeader({
   abScale,
   abSide,
+  afterAsset,
+  beforeAsset,
   canUseHeatmap,
   caseTitle,
   caseSlug,
+  comparisonAssetKey,
+  comparisonAssets,
   guideOpen,
   groupTitle,
   hideStageScrollControl,
   mode,
   onAbSideChange,
+  onComparisonAssetChange,
   onOpenGuide,
   onModeChange,
   onScaleChange,
@@ -113,11 +124,16 @@ export function ViewerHeader({
       <ViewerToolbar
         abScale={abScale}
         abSide={abSide}
+        afterAsset={afterAsset}
+        beforeAsset={beforeAsset}
         canUseHeatmap={canUseHeatmap}
+        comparisonAssetKey={comparisonAssetKey}
+        comparisonAssets={comparisonAssets}
         guideOpen={guideOpen}
         hideStageScrollControl={hideStageScrollControl}
         mode={mode}
         onAbSideChange={onAbSideChange}
+        onComparisonAssetChange={onComparisonAssetChange}
         onOpenGuide={onOpenGuide}
         onModeChange={onModeChange}
         onScaleChange={onScaleChange}

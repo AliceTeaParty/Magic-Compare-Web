@@ -1,6 +1,8 @@
 import { orderByNumericOrder } from "@magic-compare/shared-utils";
 import {
   findAsset,
+  getComparisonAssetKey,
+  getComparisonTargetAssets,
   getAvailableModes,
   type ViewerAsset,
   type ViewerFrame,
@@ -61,22 +63,52 @@ export function buildFrameState(
  * Resolves the assets the viewer panes care about and hides the raw `findAsset` lookups from the
  * state hook so the hook can stay focused on selection rules.
  */
-export function buildFrameAssets(currentFrame: ViewerFrame | undefined): {
+export function buildFrameAssets(
+  currentFrame: ViewerFrame | undefined,
+  preferredComparisonAssetKey?: string,
+): {
   afterAsset: ViewerAsset | undefined;
   beforeAsset: ViewerAsset | undefined;
+  comparisonAssets: ViewerAsset[];
+  heatmapReferenceAsset: ViewerAsset | undefined;
   heatmapAsset: ViewerAsset | undefined;
 } {
   if (!currentFrame) {
     return {
       beforeAsset: undefined,
       afterAsset: undefined,
+      comparisonAssets: [],
+      heatmapReferenceAsset: undefined,
       heatmapAsset: undefined,
     };
   }
 
+  const comparisonAssets = getComparisonTargetAssets(currentFrame);
+  const primaryAfterAsset = findAsset(currentFrame, "after") ?? comparisonAssets[0];
+  const afterAsset =
+    comparisonAssets.find(
+      (asset) => getComparisonAssetKey(asset) === preferredComparisonAssetKey,
+    ) ?? primaryAfterAsset;
+  const heatmapAsset = findAsset(currentFrame, "heatmap");
+
+  // Browser-generated heatmaps record the source filename in their note. Match that reference
+  // back to the uploaded column so selecting another comparison target cannot mislabel the overlay.
+  const heatmapReferencePath = heatmapAsset?.note.includes(" vs ")
+    ? heatmapAsset.note.split(" vs ").at(-1)
+    : undefined;
+  const heatmapReferenceAsset =
+    comparisonAssets.find(
+      (asset) =>
+        Boolean(heatmapReferencePath) &&
+        Boolean(asset.note) &&
+        heatmapReferencePath?.endsWith(asset.note),
+    ) ?? primaryAfterAsset;
+
   return {
     beforeAsset: findAsset(currentFrame, "before"),
-    afterAsset: findAsset(currentFrame, "after"),
-    heatmapAsset: findAsset(currentFrame, "heatmap"),
+    afterAsset,
+    comparisonAssets,
+    heatmapReferenceAsset,
+    heatmapAsset,
   };
 }

@@ -1,9 +1,10 @@
 "use client";
 
-import type {
-  ViewerAsset,
-  ViewerAssetPreloadHint,
-  ViewerFrame,
+import {
+  getComparisonTargetAssets,
+  type ViewerAsset,
+  type ViewerAssetPreloadHint,
+  type ViewerFrame,
 } from "@magic-compare/compare-core/viewer-data";
 import type { ViewerMode } from "@magic-compare/content-schema";
 import { useCallback, useEffect, useMemo, useRef } from "react";
@@ -107,16 +108,17 @@ function getPreloadAssetsForFrame(
   }
 
   const beforeAsset = frame.assets.find((asset) => asset.kind === "before");
-  const afterAsset = frame.assets.find((asset) => asset.kind === "after");
   const heatmapAsset = frame.assets.find((asset) => asset.kind === "heatmap");
 
   if (mode === "heatmap") {
-    return [afterAsset, heatmapAsset].filter(
+    return [...getComparisonTargetAssets(frame), heatmapAsset].filter(
       (asset): asset is ViewerAsset => Boolean(asset),
     );
   }
 
-  return [beforeAsset, afterAsset].filter(
+  // Preload every uploaded output for the bounded current/neighbor frame window so switching from
+  // Rip to Flt updates the inspection stage immediately instead of revealing an unloaded column.
+  return [beforeAsset, ...getComparisonTargetAssets(frame)].filter(
     (asset): asset is ViewerAsset => Boolean(asset),
   );
 }

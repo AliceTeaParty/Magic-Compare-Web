@@ -8,6 +8,8 @@ import { viewerTokens } from "./viewer-tokens";
 interface AbInspectControlsProps {
   abScale: number;
   abSide: "before" | "after";
+  afterLabel: string;
+  beforeLabel: string;
   onAbSideChange: (side: "before" | "after") => void;
   onScaleChange: (nextScale: number) => void;
 }
@@ -19,6 +21,8 @@ interface AbInspectControlsProps {
 export function AbInspectControls({
   abScale,
   abSide,
+  afterLabel,
+  beforeLabel,
   onAbSideChange,
   onScaleChange,
 }: AbInspectControlsProps) {
@@ -88,8 +92,10 @@ export function AbInspectControls({
             onChange={(event) => handleAbSideChange(event.target.value)}
             inputProps={{ "aria-label": "选择 A/B 侧" }}
           >
-            <MenuItem value="before">Before</MenuItem>
-            <MenuItem value="after">After</MenuItem>
+            {/* The A/B side selector must name the active variables; fixed Before/After copy made
+                a selected Flt target look as if the third upload had disappeared. */}
+            <MenuItem value="before">{beforeLabel}</MenuItem>
+            <MenuItem value="after">{afterLabel}</MenuItem>
           </Select>
         </FormControl>
       </Box>

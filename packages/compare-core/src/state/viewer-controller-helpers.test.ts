@@ -45,7 +45,7 @@ const frames = [
       {
         id: "before-2",
         kind: "before" as const,
-        label: "Before",
+        label: "Src",
         imageUrl: "/before-2.png",
         thumbUrl: "/before-2-thumb.png",
         width: 1920,
@@ -56,7 +56,7 @@ const frames = [
       {
         id: "after-2",
         kind: "after" as const,
-        label: "After",
+        label: "Rip",
         imageUrl: "/after-2.png",
         thumbUrl: "/after-2-thumb.png",
         width: 1920,
@@ -72,7 +72,18 @@ const frames = [
         thumbUrl: "/heatmap-2-thumb.png",
         width: 1920,
         height: 1080,
-        note: "",
+        note: "Auto-generated from frame-2-src.png vs frame-2-flt.png",
+        isPrimaryDisplay: false,
+      },
+      {
+        id: "flt-2",
+        kind: "misc" as const,
+        label: "Flt",
+        imageUrl: "/flt-2.png",
+        thumbUrl: "/flt-2-thumb.png",
+        width: 1920,
+        height: 1080,
+        note: "frame-2-flt.png",
         isPrimaryDisplay: false,
       },
     ],
@@ -96,7 +107,21 @@ describe("viewer-controller-helpers", () => {
     expect(buildFrameAssets(frames[1])).toEqual({
       beforeAsset: frames[1].assets[0],
       afterAsset: frames[1].assets[1],
+      comparisonAssets: [frames[1].assets[1], frames[1].assets[3]],
+      heatmapReferenceAsset: frames[1].assets[3],
       heatmapAsset: frames[1].assets[2],
     });
+  });
+
+  it("selects an uploaded misc variable as the active comparison target", () => {
+    expect(buildFrameAssets(frames[1], "misc:flt")).toMatchObject({
+      beforeAsset: frames[1].assets[0],
+      afterAsset: frames[1].assets[3],
+      comparisonAssets: [frames[1].assets[1], frames[1].assets[3]],
+    });
+  });
+
+  it("falls back to the primary after asset when a frame lacks the preferred variable", () => {
+    expect(buildFrameAssets(frames[0], "misc:flt").afterAsset).toBe(frames[0].assets[1]);
   });
 });

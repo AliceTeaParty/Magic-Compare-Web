@@ -83,6 +83,36 @@ export function getPrimaryAssets(frame: ViewerFrame): ViewerAsset[] {
   return frame.assets.filter((asset) => asset.isPrimaryDisplay);
 }
 
+/**
+ * Uses semantic column identity instead of row-specific database ids so a selected comparison
+ * target can follow the reviewer while they move between frames in the same group.
+ */
+export function getComparisonAssetKey(asset: ViewerAsset): string {
+  return `${asset.kind}:${asset.label.trim().toLowerCase()}`;
+}
+
+/**
+ * Returns every derived image that can occupy the comparison side. Heatmaps and crops have
+ * different inspection semantics, so they remain outside the ordinary source/output selector.
+ */
+export function getComparisonTargetAssets(frame: ViewerFrame): ViewerAsset[] {
+  const seenKeys = new Set<string>();
+
+  return frame.assets.filter((asset) => {
+    if (asset.kind !== "after" && asset.kind !== "misc") {
+      return false;
+    }
+
+    const key = getComparisonAssetKey(asset);
+    if (seenKeys.has(key)) {
+      return false;
+    }
+
+    seenKeys.add(key);
+    return true;
+  });
+}
+
 export function hasHeatmap(frame: ViewerFrame): boolean {
   return Boolean(findAsset(frame, "heatmap"));
 }
