@@ -1,16 +1,23 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { useEffect, useState, useTransition } from "react";
-import { CloudUploadOutlined, SettingsOutlined, UploadFileOutlined } from "@mui/icons-material";
+import {
+  CloudUploadOutlined,
+  CollectionsOutlined,
+  PublicOutlined,
+  SettingsOutlined,
+  UploadFileOutlined,
+} from "@mui/icons-material";
 import {
   Box,
   Button,
-  Chip,
   Dialog,
   DialogActions,
   DialogContent,
   DialogContentText,
   DialogTitle,
+  IconButton,
   List,
   Stack,
   Tooltip,
@@ -29,6 +36,18 @@ import { useCaseWorkspaceActions } from "./case-workspace/use-case-workspace-act
 import { useWorkspaceNotifications } from "./case-workspace/use-workspace-notifications";
 
 type GroupItem = CaseWorkspaceData["groups"][number];
+
+/** Displays workspace totals as quiet metadata instead of form-like outlined controls. */
+function WorkspaceMetric({ icon, label }: { icon: ReactNode; label: string }) {
+  return (
+    <Stack direction="row" sx={{ alignItems: "center", gap: 0.6, color: "text.secondary" }}>
+      {icon}
+      <Typography variant="caption" sx={{ whiteSpace: "nowrap" }}>
+        {label}
+      </Typography>
+    </Stack>
+  );
+}
 
 /** Organizes Group review and Case settings as an M3 primary/supporting pane layout. */
 export function CaseWorkspaceBoard({
@@ -90,19 +109,20 @@ export function CaseWorkspaceBoard({
     <>
       <InternalPageHeader
         backHref="/"
-        eyebrow="Case 工作区"
+        compact
         title={caseTitle}
         subtitle={caseSummary || "暂无描述。"}
         actions={
           <>
-            <Button
-              variant="outlined"
-              startIcon={<SettingsOutlined />}
-              onClick={() => setSettingsOpen(true)}
-              sx={{ display: { lg: "none" } }}
-            >
-              管理 Case
-            </Button>
+            <Tooltip title="管理 Case">
+              <IconButton
+                aria-label="管理 Case"
+                onClick={() => setSettingsOpen(true)}
+                sx={{ display: { lg: "none" } }}
+              >
+                <SettingsOutlined />
+              </IconButton>
+            </Tooltip>
             <Button
               component={Link}
               href={`/upload?case=${encodeURIComponent(data.slug)}`}
@@ -118,11 +138,7 @@ export function CaseWorkspaceBoard({
                   variant="contained"
                   startIcon={<CloudUploadOutlined />}
                   loading={isDeployingPublicSite}
-                  disabled={
-                    isPending ||
-                    !canDeployPublicSite ||
-                    publicGroupCount === 0
-                  }
+                  disabled={isPending || !canDeployPublicSite || publicGroupCount === 0}
                   onClick={deployPublicSite}
                 >
                   部署 Pages
@@ -136,9 +152,9 @@ export function CaseWorkspaceBoard({
       <Box
         sx={{
           display: "grid",
-          gridTemplateColumns: { xs: "minmax(0, 1fr)", lg: "minmax(0, 1fr) 320px" },
+          gridTemplateColumns: { xs: "minmax(0, 1fr)", lg: "minmax(0, 1fr) 336px" },
           gap: { xs: 2, lg: 2.5 },
-          pt: 2.5,
+          pt: 2,
           alignItems: "start",
         }}
       >
@@ -147,7 +163,7 @@ export function CaseWorkspaceBoard({
           <Stack
             direction={{ xs: "column", sm: "row" }}
             sx={{
-              alignItems: { xs: "flex-start", sm: "center" },
+              alignItems: { xs: "flex-start", sm: "flex-end" },
               justifyContent: "space-between",
               gap: 1,
             }}
@@ -158,9 +174,15 @@ export function CaseWorkspaceBoard({
                 拖动调整顺序，设置公开范围，进入 Viewer 检查素材。
               </Typography>
             </Box>
-            <Stack direction="row" sx={{ flexWrap: "wrap", gap: 0.75 }}>
-              <Chip label={`${groups.length} 个 Group`} variant="outlined" />
-              <Chip label={`${publicGroupCount} 个公开`} variant="outlined" />
+            <Stack direction="row" sx={{ flexWrap: "wrap", gap: 1.5, minHeight: 24 }}>
+              <WorkspaceMetric
+                icon={<CollectionsOutlined sx={{ fontSize: 17 }} />}
+                label={`${groups.length} Group`}
+              />
+              <WorkspaceMetric
+                icon={<PublicOutlined sx={{ fontSize: 17 }} />}
+                label={`${publicGroupCount} 公开`}
+              />
             </Stack>
           </Stack>
 
@@ -180,7 +202,7 @@ export function CaseWorkspaceBoard({
                 items={groups.map((group) => group.id)}
                 strategy={rectSortingStrategy}
               >
-                <List sx={{ display: "grid", gap: 1, p: 0 }}>
+                <List sx={{ display: "grid", gap: 1.25, p: 0 }}>
                   {groups.map((group) => (
                     <SortableGroupRow
                       key={group.id}
@@ -202,8 +224,10 @@ export function CaseWorkspaceBoard({
                 alignItems: "center",
                 py: 7,
                 textAlign: "center",
-                backgroundColor: "var(--mui-palette-surface-containerLow)",
-                borderRadius: 1.5,
+                backgroundColor: "var(--mui-palette-surface-containerHigh)",
+                border: "1px solid",
+                borderColor: "divider",
+                borderRadius: 2,
               }}
             >
               <Typography variant="h4">还没有 Group</Typography>

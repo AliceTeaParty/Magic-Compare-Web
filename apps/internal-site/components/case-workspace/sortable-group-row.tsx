@@ -6,6 +6,7 @@ import {
   EditOutlined,
   LockOutlined,
   OpenInNew,
+  PhotoLibraryOutlined,
   Public,
 } from "@mui/icons-material";
 import {
@@ -83,17 +84,19 @@ export function SortableGroupRow({
     backgroundColor: "transparent",
     "&:hover": { backgroundColor: "action.hover" },
     "&.Mui-selected": {
-      color: "secondary.contrastText",
-      backgroundColor: "secondary.main",
+      color: "primary.onContainer",
+      backgroundColor: "primary.light",
     },
-    "&.Mui-selected:hover": { backgroundColor: "secondary.main" },
+    "&.Mui-selected:hover": {
+      backgroundColor: "color-mix(in srgb, currentColor 8%, var(--mui-palette-primary-light))",
+    },
     "&.Mui-disabled": {
       color: "text.secondary",
       opacity: 0.6,
     },
     "&.Mui-selected.Mui-disabled": {
-      color: "secondary.contrastText",
-      backgroundColor: "secondary.main",
+      color: "primary.onContainer",
+      backgroundColor: "primary.light",
       opacity: 1,
     },
   };
@@ -270,9 +273,11 @@ export function SortableGroupRow({
         elevation={0}
         sx={{
           width: "100%",
-          p: { xs: 1.55, md: 1.8 },
-          borderRadius: 1.5,
-          backgroundColor: "var(--mui-palette-surface-containerLow)",
+          overflow: "hidden",
+          border: "1px solid",
+          borderColor: "divider",
+          borderRadius: 2,
+          backgroundColor: "var(--mui-palette-surface-containerHigh)",
         }}
       >
         <Stack
@@ -280,6 +285,7 @@ export function SortableGroupRow({
           spacing={{ xs: 1.15, md: 1.4 }}
           sx={{
             alignItems: "stretch",
+            p: { xs: 1.5, md: 1.75 },
           }}
         >
           <Tooltip title="拖动调整此 Case 内的顺序。">
@@ -291,13 +297,12 @@ export function SortableGroupRow({
                 // A dedicated narrow handle column makes the draggable region obvious without
                 // turning the whole row into an accidental drag target.
                 alignSelf: { xs: "flex-start", md: "stretch" },
-                color: "text.secondary",
-                opacity: 0.78,
+                color: "primary.main",
                 width: compactHandleSize,
                 minWidth: compactHandleSize,
                 height: compactHandleSize,
                 borderRadius: 1.5,
-                backgroundColor: "var(--mui-palette-surface-container)",
+                backgroundColor: "var(--mui-palette-surface-containerHighest)",
               }}
             >
               <DragIndicator />
@@ -307,10 +312,8 @@ export function SortableGroupRow({
             sx={{
               flex: 1,
               minWidth: 0,
-              // Keep title/description above metadata and actions so medium-width layouts do not
-              // collapse into one noisy line of chips, toggles, and links.
-              display: "grid",
-              gap: 1.2,
+              // The identity block is kept separate from the fixed action band below so editing
+              // text cannot move the visibility and Viewer controls.
             }}
           >
             <Box sx={{ minWidth: 0 }}>
@@ -410,211 +413,222 @@ export function SortableGroupRow({
                 ) : null}
               </Box>
             </Box>
-            <Stack
-              direction={{ xs: "column", sm: "row" }}
-              spacing={{ xs: 1.05, sm: 1.2 }}
-              useFlexGap
+          </Box>
+        </Stack>
+        <Stack
+          direction={{ xs: "column", sm: "row" }}
+          spacing={{ xs: 1.05, sm: 1.2 }}
+          useFlexGap
+          sx={{
+            // A full-width footer gives metadata and commands a stable home while keeping the
+            // Group identity visually dominant and preventing edit-mode layout shifts.
+            width: "100%",
+            px: { xs: 1.5, md: 1.75 },
+            py: 1.1,
+            borderTop: "1px solid",
+            borderColor: "divider",
+            backgroundColor: "var(--mui-palette-surface-containerHighest)",
+            justifyContent: "space-between",
+            alignItems: { xs: "stretch", sm: "center" },
+            flexWrap: "wrap",
+          }}
+        >
+          {/* Let metadata and actions share one line as soon as there is enough physical room;
+                  a fixed lg cutoff made medium-width workspaces wrap long before they needed to. */}
+          <Stack
+            direction="row"
+            spacing={0.85}
+            useFlexGap
+            sx={{
+              flexWrap: "wrap",
+              alignItems: "center",
+            }}
+          >
+            {visibleExtraAssetLabels.map((label) => (
+              <Chip
+                key={label}
+                size="small"
+                label={label}
+                sx={{
+                  height: 30,
+                  border: 0,
+                  color: "primary.onContainer",
+                  backgroundColor: "primary.light",
+                  "& .MuiChip-label": { px: 1.2 },
+                }}
+              />
+            ))}
+            {hiddenExtraAssetLabelCount > 0 ? (
+              <Chip
+                size="small"
+                label={`+${hiddenExtraAssetLabelCount}`}
+                sx={{
+                  height: 30,
+                  border: 0,
+                  backgroundColor: "var(--mui-palette-surface-containerHigh)",
+                  "& .MuiChip-label": { px: 1.2 },
+                }}
+              />
+            ) : null}
+            <Stack direction="row" sx={{ alignItems: "center", gap: 0.6, color: "text.secondary" }}>
+              <PhotoLibraryOutlined sx={{ fontSize: 17 }} />
+              <Typography variant="caption" sx={{ whiteSpace: "nowrap" }}>
+                {group.frameCount} frames
+              </Typography>
+            </Stack>
+          </Stack>
+          <Stack
+            direction="row"
+            spacing={0.6}
+            useFlexGap
+            sx={{
+              flexWrap: "wrap",
+              alignItems: "center",
+            }}
+          >
+            {/* These controls act on one group only, so they stay visually grouped here instead
+                    of competing with workspace-level actions in the page header. */}
+            <ToggleButtonGroup
+              exclusive
+              size="small"
+              onPointerDown={stopPointerPropagation}
+              onClick={stopClickPropagation}
               sx={{
-                // On phones the title stays aligned after the drag handle, while the denser
-                // metadata/action band reclaims that handle column so all controls fit one row.
-                width: { xs: "calc(100% + 51px)", sm: "auto" },
-                ml: { xs: "-51px", sm: 0 },
-                justifyContent: "space-between",
-                alignItems: { xs: "stretch", sm: "center" },
-                flexWrap: "wrap",
+                alignItems: "center",
+                gap: 0,
+                minHeight: compactControlHeight,
+                overflow: "visible",
+                px: 0.25,
+                py: 0.25,
+                borderRadius: 2.5,
+                backgroundColor: "var(--mui-palette-surface-containerHigh)",
+                "& .MuiToggleButtonGroup-grouped": {
+                  m: 0,
+                  border: 0,
+                  borderRadius: 2.5,
+                  "&:not(:first-of-type)": {
+                    borderLeft: 0,
+                    ml: 0,
+                  },
+                },
+              }}
+              value={group.isPublic ? "public" : "internal"}
+              onChange={handleVisibilityChange}
+            >
+              <ToggleButton
+                value="internal"
+                disabled={isPending || isEditing}
+                sx={visibilityButtonSx}
+              >
+                <LockOutlined sx={{ mr: 0.55, fontSize: 14.5 }} />
+                内部
+              </ToggleButton>
+              <ToggleButton
+                value="public"
+                disabled={isPending || isEditing}
+                sx={visibilityButtonSx}
+              >
+                <Public sx={{ mr: 0.55, fontSize: 14.5 }} />
+                公开
+              </ToggleButton>
+            </ToggleButtonGroup>
+            <Box
+              sx={{
+                display: "inline-flex",
+                justifyContent: "flex-start",
+                alignItems: "center",
+                // Reserving the control slot keeps Internal/Public/Open from shifting when
+                // the row switches between the Edit button and save/cancel icon pair.
+                minWidth: { xs: 84, md: 80 },
+                height: compactControlHeight,
+                lineHeight: 0,
               }}
             >
-              {/* Let metadata and actions share one line as soon as there is enough physical room;
-                  a fixed lg cutoff made medium-width workspaces wrap long before they needed to. */}
-              <Stack
-                direction="row"
-                spacing={0.85}
-                useFlexGap
-                sx={{
-                  flexWrap: "wrap",
-                  alignItems: "center",
-                }}
-              >
-                {visibleExtraAssetLabels.map((label) => (
-                  <Chip
-                    key={label}
-                    size="small"
-                    label={label}
-                    variant="outlined"
-                    sx={{ height: 34, "& .MuiChip-label": { px: 1.35 } }}
-                  />
-                ))}
-                {hiddenExtraAssetLabelCount > 0 ? (
-                  <Chip
-                    size="small"
-                    label={`+${hiddenExtraAssetLabelCount}`}
-                    variant="outlined"
-                    sx={{ height: 34, "& .MuiChip-label": { px: 1.35 } }}
-                  />
-                ) : null}
-                <Chip
-                  size="small"
-                  label={`${group.frameCount} frames`}
-                  variant="outlined"
-                  sx={{ height: 36, "& .MuiChip-label": { px: 1.35 } }}
-                />
-              </Stack>
-              <Stack
-                direction="row"
-                spacing={0.6}
-                useFlexGap
-                sx={{
-                  flexWrap: "wrap",
-                  alignItems: "center",
-                }}
-              >
-                {/* These controls act on one group only, so they stay visually grouped here instead
-                    of competing with workspace-level actions in the page header. */}
-                <ToggleButtonGroup
-                  exclusive
-                  size="small"
-                  onPointerDown={stopPointerPropagation}
-                  onClick={stopClickPropagation}
-                  sx={{
-                    alignItems: "center",
-                    gap: 0,
-                    minHeight: compactControlHeight,
-                    overflow: "visible",
-                    px: 0.25,
-                    py: 0.25,
-                    borderRadius: 2.5,
-                    border: "1px solid",
-                    borderColor: "divider",
-                    backgroundColor: "var(--mui-palette-surface-containerHigh)",
-                    "& .MuiToggleButtonGroup-grouped": {
-                      m: 0,
-                      border: 0,
-                      borderRadius: 2.5,
-                      "&:not(:first-of-type)": {
-                        borderLeft: 0,
-                        ml: 0,
-                      },
-                    },
-                  }}
-                  value={group.isPublic ? "public" : "internal"}
-                  onChange={handleVisibilityChange}
-                >
-                  <ToggleButton
-                    value="internal"
-                    disabled={isPending || isEditing}
-                    sx={visibilityButtonSx}
-                  >
-                    <LockOutlined sx={{ mr: 0.55, fontSize: 14.5 }} />
-                    内部
-                  </ToggleButton>
-                  <ToggleButton
-                    value="public"
-                    disabled={isPending || isEditing}
-                    sx={visibilityButtonSx}
-                  >
-                    <Public sx={{ mr: 0.55, fontSize: 14.5 }} />
-                    公开
-                  </ToggleButton>
-                </ToggleButtonGroup>
-                <Box
-                  sx={{
-                    display: "inline-flex",
-                    justifyContent: "flex-start",
-                    alignItems: "center",
-                    // Reserving the control slot keeps Internal/Public/Open from shifting when
-                    // the row switches between the Edit button and save/cancel icon pair.
-                    minWidth: { xs: 84, md: 80 },
-                    height: compactControlHeight,
-                    lineHeight: 0,
-                  }}
-                >
-                  {isEditing ? (
-                    <>
-                      <IconButton
-                        size="small"
-                        aria-label="保存 Group 元数据"
-                        disabled={isPending || hasMetadataError}
-                        onPointerDown={stopPointerPropagation}
-                        onClick={(event) => {
-                          stopClickPropagation(event);
-                          saveMetadataEdit();
-                        }}
-                        sx={{
-                          width: compactControlHeight,
-                          height: compactControlHeight,
-                          borderRadius: 999,
-                        }}
-                      >
-                        <Check fontSize="small" />
-                      </IconButton>
-                      <IconButton
-                        size="small"
-                        aria-label="取消编辑 Group 元数据"
-                        disabled={isPending}
-                        onPointerDown={stopPointerPropagation}
-                        onClick={(event) => {
-                          stopClickPropagation(event);
-                          cancelMetadataEdit();
-                        }}
-                        sx={{
-                          width: compactControlHeight,
-                          height: compactControlHeight,
-                          borderRadius: 999,
-                        }}
-                      >
-                        <Close fontSize="small" />
-                      </IconButton>
-                    </>
-                  ) : (
-                    <Tooltip title="编辑 Group">
-                      <IconButton
-                        size="small"
-                        aria-label="编辑 Group"
-                        disabled={isPending}
-                        onPointerDown={stopPointerPropagation}
-                        onClick={(event) => {
-                          stopClickPropagation(event);
-                          startMetadataEdit();
-                        }}
-                        sx={{
-                          width: compactControlHeight,
-                          height: compactControlHeight,
-                        }}
-                      >
-                        <EditOutlined fontSize="small" />
-                      </IconButton>
-                    </Tooltip>
-                  )}
-                </Box>
-                <Tooltip title="删除 Group">
+              {isEditing ? (
+                <>
                   <IconButton
                     size="small"
-                    color="warning"
-                    aria-label="删除 Group"
-                    disabled={isPending || isEditing}
+                    aria-label="保存 Group 元数据"
+                    disabled={isPending || hasMetadataError}
                     onPointerDown={stopPointerPropagation}
-                    onClick={handleDeleteClick}
-                    sx={{ width: compactControlHeight, height: compactControlHeight }}
+                    onClick={(event) => {
+                      stopClickPropagation(event);
+                      saveMetadataEdit();
+                    }}
+                    sx={{
+                      width: compactControlHeight,
+                      height: compactControlHeight,
+                      borderRadius: 999,
+                    }}
                   >
-                    <DeleteOutlined fontSize="small" />
+                    <Check fontSize="small" />
                   </IconButton>
-                </Tooltip>
-                <Tooltip title="打开 Viewer">
                   <IconButton
-                    component={Link}
-                    href={`/cases/${caseSlug}/groups/${group.slug}`}
-                    aria-label="打开 Viewer"
-                    disabled={isPending || isEditing}
+                    size="small"
+                    aria-label="取消编辑 Group 元数据"
+                    disabled={isPending}
                     onPointerDown={stopPointerPropagation}
-                    onClick={handleOpenClick}
-                    sx={{ width: compactControlHeight, height: compactControlHeight }}
+                    onClick={(event) => {
+                      stopClickPropagation(event);
+                      cancelMetadataEdit();
+                    }}
+                    sx={{
+                      width: compactControlHeight,
+                      height: compactControlHeight,
+                      borderRadius: 999,
+                    }}
                   >
-                    <OpenInNew fontSize="small" />
+                    <Close fontSize="small" />
+                  </IconButton>
+                </>
+              ) : (
+                <Tooltip title="编辑 Group">
+                  <IconButton
+                    size="small"
+                    aria-label="编辑 Group"
+                    disabled={isPending}
+                    onPointerDown={stopPointerPropagation}
+                    onClick={(event) => {
+                      stopClickPropagation(event);
+                      startMetadataEdit();
+                    }}
+                    sx={{
+                      width: compactControlHeight,
+                      height: compactControlHeight,
+                    }}
+                  >
+                    <EditOutlined fontSize="small" />
                   </IconButton>
                 </Tooltip>
-              </Stack>
-            </Stack>
-          </Box>
+              )}
+            </Box>
+            <Tooltip title="删除 Group">
+              <IconButton
+                size="small"
+                color="warning"
+                aria-label="删除 Group"
+                disabled={isPending || isEditing}
+                onPointerDown={stopPointerPropagation}
+                onClick={handleDeleteClick}
+                sx={{ width: compactControlHeight, height: compactControlHeight }}
+              >
+                <DeleteOutlined fontSize="small" />
+              </IconButton>
+            </Tooltip>
+            <Tooltip title="打开 Viewer">
+              <IconButton
+                component={Link}
+                href={`/cases/${caseSlug}/groups/${group.slug}`}
+                aria-label="打开 Viewer"
+                disabled={isPending || isEditing}
+                onPointerDown={stopPointerPropagation}
+                onClick={handleOpenClick}
+                sx={{ width: compactControlHeight, height: compactControlHeight }}
+              >
+                <OpenInNew fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          </Stack>
         </Stack>
       </Paper>
     </ListItem>

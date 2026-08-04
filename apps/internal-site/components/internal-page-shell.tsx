@@ -1,11 +1,12 @@
 import type { ReactNode } from "react";
 import { ArrowBack } from "@mui/icons-material";
-import { Box, Button, Stack, Typography } from "@mui/material";
+import { Box, Button, IconButton, Stack, Tooltip, Typography } from "@mui/material";
 import Link from "next/link";
 
 interface InternalPageHeaderProps {
   actions?: ReactNode;
   backHref?: string;
+  compact?: boolean;
   eyebrow?: string;
   subtitle?: ReactNode;
   title: ReactNode;
@@ -15,6 +16,7 @@ interface InternalPageHeaderProps {
 export function InternalPageHeader({
   actions,
   backHref,
+  compact = false,
   eyebrow,
   subtitle,
   title,
@@ -25,16 +27,26 @@ export function InternalPageHeader({
       sx={{
         display: "grid",
         gridTemplateColumns: { xs: "minmax(0, 1fr)", md: "minmax(0, 1fr) auto" },
-        alignItems: "end",
-        gap: { xs: 2, md: 3 },
-        minHeight: { xs: 120, md: 112 },
-        py: { xs: 2.5, md: 3 },
+        alignItems: compact ? "center" : "end",
+        gap: { xs: compact ? 1.5 : 2, md: compact ? 2 : 3 },
+        minHeight: compact ? { xs: 96, md: 88 } : { xs: 120, md: 112 },
+        py: compact ? { xs: 1.75, md: 2 } : { xs: 2.5, md: 3 },
         borderBottom: "1px solid",
         borderColor: "divider",
       }}
     >
-      <Stack spacing={0.5} sx={{ minWidth: 0 }}>
-        {backHref ? (
+      <Stack
+        direction={compact ? "row" : "column"}
+        spacing={compact ? 1.25 : 0.5}
+        sx={{ minWidth: 0, alignItems: compact ? "center" : "flex-start" }}
+      >
+        {backHref && compact ? (
+          <Tooltip title="返回 Case 列表">
+            <IconButton component={Link} href={backHref} aria-label="返回 Case 列表">
+              <ArrowBack />
+            </IconButton>
+          </Tooltip>
+        ) : backHref ? (
           <Button
             component={Link}
             href={backHref}
@@ -46,24 +58,26 @@ export function InternalPageHeader({
             返回
           </Button>
         ) : null}
-        {eyebrow ? (
-          <Typography variant="overline" color="text.secondary" noWrap>
-            {eyebrow}
+        <Stack spacing={compact ? 0.25 : 0.5} sx={{ minWidth: 0 }}>
+          {eyebrow ? (
+            <Typography variant="overline" color="text.secondary" noWrap>
+              {eyebrow}
+            </Typography>
+          ) : null}
+          <Typography
+            component="h1"
+            variant="h2"
+            noWrap
+            title={typeof title === "string" ? title : undefined}
+          >
+            {title}
           </Typography>
-        ) : null}
-        <Typography
-          component="h1"
-          variant="h2"
-          noWrap
-          title={typeof title === "string" ? title : undefined}
-        >
-          {title}
-        </Typography>
-        {subtitle ? (
-          <Typography component="div" variant="body2" color="text.secondary" sx={{ minWidth: 0 }}>
-            {subtitle}
-          </Typography>
-        ) : null}
+          {subtitle ? (
+            <Typography component="div" variant="body2" color="text.secondary" sx={{ minWidth: 0 }}>
+              {subtitle}
+            </Typography>
+          ) : null}
+        </Stack>
       </Stack>
       <Box
         sx={{

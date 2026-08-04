@@ -34,6 +34,12 @@
 - 站点级 header action 要同源。Catalog、Case workspace、Upload 的返回、上传、部署、新建入口应共享相近高度、圆角和文案权重，避免某一页出现“嵌套胶囊按钮”或孤立按钮组。
 - Dialog 不是普通表单套壳。`新建 Case` 这类高频 internal 操作要继承工作台 surface、divider、字段密度和 action hierarchy，不能退回默认浅色 MUI 弹窗。
 - 版本号、commit hash 属于低权重运行信息。它应和 footer copyright 同级显示，不应因为字号、字重或间距看起来像另一个品牌或状态标签。
+- 工作区页头只保留页面身份、返回导航和页面级动作。`Case 工作区` 这类重复 eyebrow 会增加高度但不提供新信息；紧凑形态应让返回图标与标题同排，并继续为右侧动作保留独立网格列。
+- 数量和状态摘要不要伪装成筛选器。`1 Group`、`0 公开` 这类只读指标使用图标与低权重文本即可，描边 Chip 会让它们看起来可以点击，也会抢走主操作的注意力。
+- 高频工作台条目适合拆成身份区和固定操作底栏。标题、描述在上层，素材标签、帧数、公开范围和行级动作在独立 tonal footer；编辑态只改变身份区，底栏坐标保持不变。
+- 选中态必须成对使用主题的 container / on-container 角色。直接使用饱和 `main` 色容易在个性化 seed 和深色模式下变成突兀色块；hover 只增加 state layer，不改变尺寸和位置。
+- Slug、发布状态等不可编辑信息不应放进 disabled TextField。禁用输入框会暗示“当前不可编辑”，并引入多余的 label、outline 和低对比文字；带图标的只读 metadata row 更符合实际语义。
+- Case 设置在宽屏作为 sticky supporting pane，在窄屏作为右侧 Drawer；两种容器复用同一份表单内容和草稿状态，避免响应式切换时重建表单、丢失输入或产生 hydration 分支。
 
 ## P1
 
@@ -50,7 +56,7 @@
       模式切换使用 connected control，主图、引导和详情操作使用固定图标槽，A/B 控件占用固定次级行。
 
 - [x] 重新梳理 workspace 中 group 行的操作优先级
-      可见性作为状态控件，打开作为行主动作，编辑和删除改为带 tooltip 的次级图标动作。
+      可见性作为 container 色状态控件，打开作为行主动作，编辑和删除改为带 tooltip 的次级图标动作；身份区与操作底栏分层，编辑前后动作坐标保持不变。
 
 ## P2
 
@@ -79,3 +85,11 @@
 - 审计视口：
   - `1440x960`
   - `390x844`
+
+## Case 工作区复核
+
+- 复核日期：`2026-08-04`
+- 复核环境：本地 `internal-site` 开发服务器 + in-app browser
+- 复核页面：`/cases/ikoku-nikki`
+- 已验证状态：浅色、深色、Group 编辑、取消编辑、生产构建
+- 当前限制：in-app browser 固定为桌面视口；窄屏行为由响应式结构和 Drawer 分支检查，未取得本轮手机尺寸截图

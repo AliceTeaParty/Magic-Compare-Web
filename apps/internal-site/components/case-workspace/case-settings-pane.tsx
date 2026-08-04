@@ -1,12 +1,19 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { useEffect, useState, useTransition } from "react";
-import { Close, DeleteOutlined, SaveOutlined, SettingsOutlined } from "@mui/icons-material";
 import {
-  Alert,
+  Close,
+  DeleteOutlined,
+  InfoOutlined,
+  RadioButtonCheckedRounded,
+  SaveOutlined,
+  SettingsOutlined,
+  TagRounded,
+} from "@mui/icons-material";
+import {
   Box,
   Button,
-  Chip,
   Dialog,
   DialogActions,
   DialogContent,
@@ -29,6 +36,29 @@ const statusLabels = {
   published: "已发布",
   archived: "已归档",
 } as const;
+
+/** Keeps immutable Case identity out of editable text fields while preserving easy scanning. */
+function SettingsMetadataRow({
+  icon,
+  label,
+  value,
+}: {
+  icon: ReactNode;
+  label: string;
+  value: string;
+}) {
+  return (
+    <Stack direction="row" sx={{ minWidth: 0, alignItems: "center", gap: 1, minHeight: 32 }}>
+      <Box sx={{ display: "flex", color: "primary.main" }}>{icon}</Box>
+      <Typography variant="body2" color="text.secondary">
+        {label}
+      </Typography>
+      <Typography variant="subtitle2" noWrap sx={{ minWidth: 0, ml: "auto" }} title={value}>
+        {value}
+      </Typography>
+    </Stack>
+  );
+}
 
 interface CaseSettingsPaneProps {
   data: Pick<CaseWorkspaceData, "slug" | "status"> & {
@@ -133,7 +163,7 @@ export function CaseSettingsPane({
     <Stack sx={{ height: "100%", minHeight: 0 }}>
       <Stack
         direction="row"
-        sx={{ alignItems: "center", justifyContent: "space-between", gap: 1, px: 2.5, py: 1.5 }}
+        sx={{ alignItems: "center", justifyContent: "space-between", gap: 1, px: 2.25, py: 1.75 }}
       >
         <Stack direction="row" sx={{ alignItems: "center", gap: 1 }}>
           <SettingsOutlined color="primary" />
@@ -148,41 +178,55 @@ export function CaseSettingsPane({
         </IconButton>
       </Stack>
       <Divider />
-      <Stack spacing={2} sx={{ p: 2.5, overflowY: "auto" }}>
+      <Stack spacing={1.75} sx={{ p: 2.25, overflowY: "auto" }}>
         <TextField
+          size="small"
           label="标题"
           value={title}
           disabled={isPending}
           onChange={(event) => setTitle(event.target.value)}
         />
         <TextField
+          size="small"
           label="描述"
           value={summary}
           multiline
-          minRows={4}
+          minRows={3}
           disabled={isPending}
           error={summary.length > 160}
           helperText={`${summary.length}/160`}
           onChange={(event) => setSummary(event.target.value)}
         />
         <TextField
+          size="small"
           label="标签"
           value={tagsText}
           disabled={isPending}
           helperText="使用英文逗号分隔"
           onChange={(event) => setTagsText(event.target.value)}
         />
-        <TextField label="Slug" value={data.slug} disabled />
-        <Stack direction="row" sx={{ alignItems: "center", justifyContent: "space-between" }}>
-          <Typography variant="body2" color="text.secondary">
-            发布状态
-          </Typography>
-          <Chip
-            label={statusLabels[data.status]}
-            color={data.status === "published" ? "primary" : "default"}
+        <Stack
+          spacing={0.5}
+          sx={{
+            px: 1.25,
+            py: 0.75,
+            borderRadius: 1.5,
+            backgroundColor: "var(--mui-palette-surface-containerHighest)",
+          }}
+        >
+          <SettingsMetadataRow
+            icon={<TagRounded sx={{ fontSize: 18 }} />}
+            label="Slug"
+            value={data.slug}
+          />
+          <SettingsMetadataRow
+            icon={<RadioButtonCheckedRounded sx={{ fontSize: 18 }} />}
+            label="发布状态"
+            value={statusLabels[data.status]}
           />
         </Stack>
         <Button
+          fullWidth
           variant="contained"
           startIcon={<SaveOutlined />}
           disabled={!canSave}
@@ -194,11 +238,25 @@ export function CaseSettingsPane({
 
         <Divider sx={{ my: 1 }} />
         {data.groupCount > 0 ? (
-          <Alert severity="info">删除 Case 前需要先删除其中的全部 Group。</Alert>
+          <Stack
+            direction="row"
+            sx={{
+              alignItems: "flex-start",
+              gap: 1,
+              p: 1.25,
+              borderRadius: 1.5,
+              color: "text.secondary",
+              backgroundColor: "var(--mui-palette-surface-containerHighest)",
+            }}
+          >
+            <InfoOutlined sx={{ mt: 0.1, fontSize: 18, flexShrink: 0 }} />
+            <Typography variant="caption">删除 Case 前需要先删除其中的全部 Group。</Typography>
+          </Stack>
         ) : null}
         <Button
+          fullWidth
           color="error"
-          variant="outlined"
+          variant="text"
           startIcon={<DeleteOutlined />}
           disabled={isPending || data.groupCount > 0}
           onClick={() => setConfirmDelete(true)}
@@ -218,9 +276,13 @@ export function CaseSettingsPane({
           // surface is visible without replacing the rendered subtree after mount.
           display: { xs: "none", lg: "block" },
           minWidth: 0,
-          borderRadius: 1.5,
+          position: "sticky",
+          top: 16,
           overflow: "hidden",
-          backgroundColor: "var(--mui-palette-surface-containerLow)",
+          border: "1px solid",
+          borderColor: "divider",
+          borderRadius: 2,
+          backgroundColor: "var(--mui-palette-surface-containerHigh)",
         }}
       >
         {content}
@@ -235,7 +297,7 @@ export function CaseSettingsPane({
           paper: {
             sx: {
               width: "min(92vw, 400px)",
-              backgroundColor: "var(--mui-palette-surface-containerLow)",
+              backgroundColor: "var(--mui-palette-surface-containerHigh)",
             },
           },
         }}
