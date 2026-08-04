@@ -5,11 +5,13 @@ import { ListItemButton, ListItemIcon, ListItemText } from "@mui/material";
 import Link from "next/link";
 
 interface InternalNavigationItemProps {
+  disabled?: boolean;
   href?: string;
   icon: ReactNode;
   label: string;
   onClick?: () => void;
   selected?: boolean;
+  title?: string;
 }
 
 const navigationItemSx = {
@@ -41,11 +43,13 @@ const navigationItemSx = {
 
 /** Keeps global destinations and the global create action on one M3 rail geometry. */
 export function InternalNavigationItem({
+  disabled = false,
   href,
   icon,
   label,
   onClick,
   selected = false,
+  title,
 }: InternalNavigationItemProps) {
   const content = (
     <>
@@ -89,8 +93,10 @@ export function InternalNavigationItem({
       <ListItemButton
         component={Link}
         href={href}
+        disabled={disabled}
         selected={selected}
         onClick={onClick}
+        title={title}
         sx={navigationItemSx}
       >
         {content}
@@ -99,7 +105,13 @@ export function InternalNavigationItem({
   }
 
   return (
-    <ListItemButton selected={selected} onClick={onClick} sx={navigationItemSx}>
+    <ListItemButton
+      disabled={disabled}
+      selected={selected}
+      onClick={onClick}
+      title={title}
+      sx={navigationItemSx}
+    >
       {content}
     </ListItemButton>
   );

@@ -1,11 +1,11 @@
 import {
+  ArrowForwardRounded,
   Check,
   Close,
   DeleteOutlined,
   DragIndicator,
   EditOutlined,
   LockOutlined,
-  OpenInNew,
   PhotoLibraryOutlined,
   Public,
 } from "@mui/icons-material";
@@ -32,10 +32,14 @@ import { inlineEditTextSx } from "./inline-edit-text-sx";
 type GroupItem = CaseWorkspaceData["groups"][number];
 const GROUP_TITLE_MAX_LENGTH = 16;
 const GROUP_DESCRIPTION_MAX_LENGTH = 40;
-
-function limitText(value: string, maxLength: number) {
-  return value.slice(0, maxLength);
-}
+const metadataChipSx = {
+  height: 30,
+  border: 0,
+  color: "text.secondary",
+  backgroundColor: "var(--mui-palette-surface-containerHigh)",
+  "& .MuiChip-icon": { ml: 1, color: "inherit", fontSize: 17 },
+  "& .MuiChip-label": { px: 1.15 },
+} as const;
 
 /**
  * Lets the editor show temporary overflow while keeping save validation strict, which is easier to
@@ -68,19 +72,18 @@ export function SortableGroupRow({
   onToggleVisibility: (group: GroupItem) => void;
   onDelete: (group: GroupItem) => void;
 }) {
-  // Workspace rows do a lot of work on mobile, so drag, visibility, and open controls share a
-  // single 40px+ baseline instead of the older mixed 32/36px targets.
-  const compactControlHeight = { xs: 42, md: 40 };
-  const compactHandleSize = { xs: 42, md: 40 };
+  // Touch layouts retain a 40px target while desktop controls use the denser 36px workbench row.
+  const compactControlHeight = { xs: 40, md: 36 };
+  const compactHandleSize = { xs: 40, md: 36 };
   const visibilityButtonHeight = compactControlHeight;
   const visibilityButtonSx = {
     minHeight: visibilityButtonHeight,
-    px: "8px",
+    px: "10px",
     py: 0,
     border: "0 !important",
     boxShadow: "none",
     color: "text.secondary",
-    fontSize: "0.84rem",
+    fontSize: "0.8125rem",
     backgroundColor: "transparent",
     "&:hover": { backgroundColor: "action.hover" },
     "&.Mui-selected": {
@@ -101,15 +104,15 @@ export function SortableGroupRow({
     },
   };
   const [isEditing, setIsEditing] = useState(false);
-  const [draftTitle, setDraftTitle] = useState(limitText(group.title, GROUP_TITLE_MAX_LENGTH));
-  const [draftDescription, setDraftDescription] = useState(
-    limitText(group.description, GROUP_DESCRIPTION_MAX_LENGTH),
-  );
+  // Existing metadata can predate current limits. Preserve it in the editor so opening and saving
+  // cannot silently truncate server data; the counters and save validation surface the overflow.
+  const [draftTitle, setDraftTitle] = useState(group.title);
+  const [draftDescription, setDraftDescription] = useState(group.description);
   const titleEditorRef = useRef<HTMLElement | null>(null);
   const descriptionEditorRef = useRef<HTMLElement | null>(null);
   const editSeedRef = useRef({
-    title: limitText(group.title, GROUP_TITLE_MAX_LENGTH),
-    description: limitText(group.description, GROUP_DESCRIPTION_MAX_LENGTH),
+    title: group.title,
+    description: group.description,
   });
   const isTitleOverLimit = isOverLimit(draftTitle, GROUP_TITLE_MAX_LENGTH);
   const isDescriptionOverLimit = isOverLimit(draftDescription, GROUP_DESCRIPTION_MAX_LENGTH);
@@ -123,8 +126,8 @@ export function SortableGroupRow({
 
   useEffect(() => {
     if (!isEditing) {
-      setDraftTitle(limitText(group.title, GROUP_TITLE_MAX_LENGTH));
-      setDraftDescription(limitText(group.description, GROUP_DESCRIPTION_MAX_LENGTH));
+      setDraftTitle(group.title);
+      setDraftDescription(group.description);
     }
   }, [group.description, group.title, isEditing]);
 
@@ -187,14 +190,12 @@ export function SortableGroupRow({
    * cannot leak stale text into the inline editor.
    */
   function startMetadataEdit() {
-    const nextTitle = limitText(group.title, GROUP_TITLE_MAX_LENGTH);
-    const nextDescription = limitText(group.description, GROUP_DESCRIPTION_MAX_LENGTH);
     editSeedRef.current = {
-      title: nextTitle,
-      description: nextDescription,
+      title: group.title,
+      description: group.description,
     };
-    setDraftTitle(nextTitle);
-    setDraftDescription(nextDescription);
+    setDraftTitle(group.title);
+    setDraftDescription(group.description);
     setIsEditing(true);
   }
 
@@ -203,8 +204,8 @@ export function SortableGroupRow({
    * committed metadata snapshot, not whatever contentEditable currently contains.
    */
   function cancelMetadataEdit() {
-    setDraftTitle(limitText(group.title, GROUP_TITLE_MAX_LENGTH));
-    setDraftDescription(limitText(group.description, GROUP_DESCRIPTION_MAX_LENGTH));
+    setDraftTitle(group.title);
+    setDraftDescription(group.description);
     setIsEditing(false);
   }
 
@@ -424,7 +425,7 @@ export function SortableGroupRow({
             // Group identity visually dominant and preventing edit-mode layout shifts.
             width: "100%",
             px: { xs: 1.5, md: 1.75 },
-            py: 1.1,
+            py: 0.75,
             borderTop: "1px solid",
             borderColor: "divider",
             backgroundColor: "var(--mui-palette-surface-containerHighest)",
@@ -445,45 +446,27 @@ export function SortableGroupRow({
             }}
           >
             {visibleExtraAssetLabels.map((label) => (
-              <Chip
-                key={label}
-                size="small"
-                label={label}
-                sx={{
-                  height: 30,
-                  border: 0,
-                  color: "primary.onContainer",
-                  backgroundColor: "primary.light",
-                  "& .MuiChip-label": { px: 1.2 },
-                }}
-              />
+              <Chip key={label} size="small" label={label} sx={metadataChipSx} />
             ))}
             {hiddenExtraAssetLabelCount > 0 ? (
-              <Chip
-                size="small"
-                label={`+${hiddenExtraAssetLabelCount}`}
-                sx={{
-                  height: 30,
-                  border: 0,
-                  backgroundColor: "var(--mui-palette-surface-containerHigh)",
-                  "& .MuiChip-label": { px: 1.2 },
-                }}
-              />
+              <Chip size="small" label={`+${hiddenExtraAssetLabelCount}`} sx={metadataChipSx} />
             ) : null}
-            <Stack direction="row" sx={{ alignItems: "center", gap: 0.6, color: "text.secondary" }}>
-              <PhotoLibraryOutlined sx={{ fontSize: 17 }} />
-              <Typography variant="caption" sx={{ whiteSpace: "nowrap" }}>
-                {group.frameCount} frames
-              </Typography>
-            </Stack>
+            <Chip
+              size="small"
+              icon={<PhotoLibraryOutlined />}
+              label={`${group.frameCount} frames`}
+              sx={metadataChipSx}
+            />
           </Stack>
           <Stack
             direction="row"
             spacing={0.6}
             useFlexGap
             sx={{
-              flexWrap: "wrap",
+              width: { xs: "100%", sm: "auto" },
+              flexWrap: "nowrap",
               alignItems: "center",
+              justifyContent: "space-between",
             }}
           >
             {/* These controls act on one group only, so they stay visually grouped here instead
@@ -497,15 +480,13 @@ export function SortableGroupRow({
                 alignItems: "center",
                 gap: 0,
                 minHeight: compactControlHeight,
-                overflow: "visible",
-                px: 0.25,
-                py: 0.25,
-                borderRadius: 2.5,
+                overflow: "hidden",
+                borderRadius: 999,
                 backgroundColor: "var(--mui-palette-surface-containerHigh)",
                 "& .MuiToggleButtonGroup-grouped": {
                   m: 0,
                   border: 0,
-                  borderRadius: 2.5,
+                  borderRadius: 999,
                   "&:not(:first-of-type)": {
                     borderLeft: 0,
                     ml: 0,
@@ -535,99 +516,97 @@ export function SortableGroupRow({
             <Box
               sx={{
                 display: "inline-flex",
-                justifyContent: "flex-start",
+                justifyContent: "flex-end",
                 alignItems: "center",
-                // Reserving the control slot keeps Internal/Public/Open from shifting when
-                // the row switches between the Edit button and save/cancel icon pair.
-                minWidth: { xs: 84, md: 80 },
+                gap: 0.5,
+                // The action cluster keeps a stable right edge. Normal mode fills all three
+                // positions; edit mode replaces the cluster with save/cancel aligned to the end.
+                width: { xs: 128, md: 116 },
+                flex: "0 0 auto",
                 height: compactControlHeight,
                 lineHeight: 0,
               }}
             >
               {isEditing ? (
                 <>
-                  <IconButton
-                    size="small"
-                    aria-label="保存 Group 元数据"
-                    disabled={isPending || hasMetadataError}
-                    onPointerDown={stopPointerPropagation}
-                    onClick={(event) => {
-                      stopClickPropagation(event);
-                      saveMetadataEdit();
-                    }}
-                    sx={{
-                      width: compactControlHeight,
-                      height: compactControlHeight,
-                      borderRadius: 999,
-                    }}
-                  >
-                    <Check fontSize="small" />
-                  </IconButton>
-                  <IconButton
-                    size="small"
-                    aria-label="取消编辑 Group 元数据"
-                    disabled={isPending}
-                    onPointerDown={stopPointerPropagation}
-                    onClick={(event) => {
-                      stopClickPropagation(event);
-                      cancelMetadataEdit();
-                    }}
-                    sx={{
-                      width: compactControlHeight,
-                      height: compactControlHeight,
-                      borderRadius: 999,
-                    }}
-                  >
-                    <Close fontSize="small" />
-                  </IconButton>
+                  <Tooltip title="保存 Group">
+                    <IconButton
+                      size="small"
+                      color="primary"
+                      aria-label="保存 Group 元数据"
+                      disabled={isPending || hasMetadataError}
+                      onPointerDown={stopPointerPropagation}
+                      onClick={(event) => {
+                        stopClickPropagation(event);
+                        saveMetadataEdit();
+                      }}
+                      sx={{ width: compactControlHeight, height: compactControlHeight }}
+                    >
+                      <Check fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
+                  <Tooltip title="取消编辑">
+                    <IconButton
+                      size="small"
+                      aria-label="取消编辑 Group 元数据"
+                      disabled={isPending}
+                      onPointerDown={stopPointerPropagation}
+                      onClick={(event) => {
+                        stopClickPropagation(event);
+                        cancelMetadataEdit();
+                      }}
+                      sx={{ width: compactControlHeight, height: compactControlHeight }}
+                    >
+                      <Close fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
                 </>
               ) : (
-                <Tooltip title="编辑 Group">
-                  <IconButton
-                    size="small"
-                    aria-label="编辑 Group"
-                    disabled={isPending}
-                    onPointerDown={stopPointerPropagation}
-                    onClick={(event) => {
-                      stopClickPropagation(event);
-                      startMetadataEdit();
-                    }}
-                    sx={{
-                      width: compactControlHeight,
-                      height: compactControlHeight,
-                    }}
-                  >
-                    <EditOutlined fontSize="small" />
-                  </IconButton>
-                </Tooltip>
+                <>
+                  <Tooltip title="编辑 Group">
+                    <IconButton
+                      size="small"
+                      aria-label="编辑 Group"
+                      disabled={isPending}
+                      onPointerDown={stopPointerPropagation}
+                      onClick={(event) => {
+                        stopClickPropagation(event);
+                        startMetadataEdit();
+                      }}
+                      sx={{ width: compactControlHeight, height: compactControlHeight }}
+                    >
+                      <EditOutlined fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
+                  <Tooltip title="删除 Group">
+                    <IconButton
+                      size="small"
+                      color="error"
+                      aria-label="删除 Group"
+                      disabled={isPending}
+                      onPointerDown={stopPointerPropagation}
+                      onClick={handleDeleteClick}
+                      sx={{ width: compactControlHeight, height: compactControlHeight }}
+                    >
+                      <DeleteOutlined fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
+                  <Tooltip title="打开 Viewer">
+                    <IconButton
+                      component={Link}
+                      href={`/cases/${caseSlug}/groups/${group.slug}`}
+                      aria-label="打开 Viewer"
+                      disabled={isPending}
+                      onPointerDown={stopPointerPropagation}
+                      onClick={handleOpenClick}
+                      sx={{ width: compactControlHeight, height: compactControlHeight }}
+                    >
+                      <ArrowForwardRounded fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
+                </>
               )}
             </Box>
-            <Tooltip title="删除 Group">
-              <IconButton
-                size="small"
-                color="warning"
-                aria-label="删除 Group"
-                disabled={isPending || isEditing}
-                onPointerDown={stopPointerPropagation}
-                onClick={handleDeleteClick}
-                sx={{ width: compactControlHeight, height: compactControlHeight }}
-              >
-                <DeleteOutlined fontSize="small" />
-              </IconButton>
-            </Tooltip>
-            <Tooltip title="打开 Viewer">
-              <IconButton
-                component={Link}
-                href={`/cases/${caseSlug}/groups/${group.slug}`}
-                aria-label="打开 Viewer"
-                disabled={isPending || isEditing}
-                onPointerDown={stopPointerPropagation}
-                onClick={handleOpenClick}
-                sx={{ width: compactControlHeight, height: compactControlHeight }}
-              >
-                <OpenInNew fontSize="small" />
-              </IconButton>
-            </Tooltip>
           </Stack>
         </Stack>
       </Paper>

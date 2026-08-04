@@ -474,6 +474,9 @@ function buildInternalTheme(seedValue: string) {
           "*, *::before, *::after": { boxSizing: "border-box" },
           html: {
             backgroundColor: "var(--mui-palette-background-default)",
+            // Catalog routes scroll while short workspaces may not. Reserving the scrollbar gutter
+            // prevents the shared header divider and right-aligned actions from shifting by 17px.
+            scrollbarGutter: "stable",
             transition: "background-color 250ms cubic-bezier(0.2, 0, 0, 1)",
           },
           body: {

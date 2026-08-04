@@ -1,10 +1,16 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { CloudUploadOutlined, FolderCopyOutlined, Menu } from "@mui/icons-material";
+import {
+  CloudSyncOutlined,
+  CloudUploadOutlined,
+  FolderCopyOutlined,
+  Menu,
+} from "@mui/icons-material";
 import {
   AppBar,
   Box,
+  CircularProgress,
   Divider,
   Drawer,
   IconButton,
@@ -19,6 +25,10 @@ import { CaseCreateButton } from "./case-create-button";
 import { NAV_EXTENDED_WIDTH, NAV_RAIL_WIDTH } from "./internal-layout-constants";
 import { InternalNavigationItem } from "./internal-navigation-item";
 import { InternalRouteTransition } from "./internal-route-transition";
+import {
+  CaseDeployNavigationActionContext,
+  type CaseDeployNavigationAction,
+} from "./internal-shell-actions";
 
 const destinations = [
   { href: "/", label: "Case", icon: <FolderCopyOutlined /> },
@@ -32,9 +42,11 @@ function isDestinationActive(pathname: string, href: string) {
 
 /** Uses one navigation model for the modal drawer, rail, and extended rail. */
 function NavigationContent({
+  caseDeployAction,
   pathname,
   onNavigate,
 }: {
+  caseDeployAction: CaseDeployNavigationAction | null;
   pathname: string;
   onNavigate?: () => void;
 }) {
@@ -44,8 +56,11 @@ function NavigationContent({
         sx={{
           display: "flex",
           alignItems: "center",
+          // The compact rail has no wordmark, so its logo must be centered in the full 80px
+          // column. The modal drawer gets a real leading inset instead of touching the viewport.
+          justifyContent: { xs: "flex-start", sm: "center", md: "flex-start" },
           height: 72,
-          px: { sm: 1.5, md: 2 },
+          px: { xs: 2, sm: 0, md: 2 },
         }}
       >
         <Box
@@ -86,6 +101,24 @@ function NavigationContent({
           );
         })}
         <CaseCreateButton navigation />
+        {caseDeployAction ? (
+          <InternalNavigationItem
+            disabled={caseDeployAction.disabled}
+            icon={
+              caseDeployAction.loading ? (
+                <CircularProgress color="inherit" size={20} thickness={5} />
+              ) : (
+                <CloudSyncOutlined />
+              )
+            }
+            label="部署"
+            onClick={() => {
+              caseDeployAction.onClick();
+              onNavigate?.();
+            }}
+            title={caseDeployAction.disabledReason || "部署 Pages"}
+          />
+        ) : null}
       </List>
 
       <Stack spacing={1.25} sx={{ mt: "auto", p: { xs: 1.5, sm: 1, md: 1.5 } }}>
@@ -112,84 +145,88 @@ function NavigationContent({
 export function InternalAppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [caseDeployAction, setCaseDeployAction] = useState<CaseDeployNavigationAction | null>(null);
 
   return (
-    <Box
-      sx={{
-        minHeight: "100vh",
-        display: "grid",
-        gridTemplateColumns: {
-          xs: "minmax(0, 1fr)",
-          sm: `${NAV_RAIL_WIDTH}px minmax(0, 1fr)`,
-          md: `${NAV_EXTENDED_WIDTH}px minmax(0, 1fr)`,
-        },
-      }}
-    >
+    <CaseDeployNavigationActionContext.Provider value={setCaseDeployAction}>
       <Box
-        component="nav"
         sx={{
-          display: { xs: "none", sm: "block" },
-          position: "sticky",
-          top: 0,
-          height: "100vh",
-          overflow: "hidden",
-          borderRight: "1px solid",
-          borderColor: "divider",
-          backgroundColor: "var(--mui-palette-surface-containerLow)",
-          transition: "background-color 250ms cubic-bezier(0.2, 0, 0, 1)",
-        }}
-      >
-        <NavigationContent pathname={pathname} />
-      </Box>
-
-      <Drawer
-        open={mobileOpen}
-        onClose={() => setMobileOpen(false)}
-        slotProps={{
-          paper: {
-            sx: {
-              width: "min(84vw, 304px)",
-              backgroundColor: "var(--mui-palette-surface-containerLow)",
-            },
+          minHeight: "100vh",
+          display: "grid",
+          gridTemplateColumns: {
+            xs: "minmax(0, 1fr)",
+            sm: `${NAV_RAIL_WIDTH}px minmax(0, 1fr)`,
+            md: `${NAV_EXTENDED_WIDTH}px minmax(0, 1fr)`,
           },
         }}
       >
-        <NavigationContent pathname={pathname} onNavigate={() => setMobileOpen(false)} />
-      </Drawer>
-
-      <Box sx={{ minWidth: 0 }}>
-        <AppBar
-          position="sticky"
-          elevation={0}
-          color="transparent"
+        <Box
+          component="nav"
           sx={{
-            display: { xs: "block", sm: "none" },
-            height: 56,
-            borderBottom: "1px solid",
+            display: { xs: "none", sm: "block" },
+            position: "sticky",
+            top: 0,
+            height: "100vh",
+            overflow: "hidden",
+            borderRight: "1px solid",
             borderColor: "divider",
-            // A fully opaque app bar prevents scrolling content from bleeding into text and icons at
-            // the viewport edge, which was especially visible in the narrow workbench layout.
-            backgroundColor: "var(--mui-palette-surface-container)",
+            backgroundColor: "var(--mui-palette-surface-containerLow)",
+            transition: "background-color 250ms cubic-bezier(0.2, 0, 0, 1)",
           }}
         >
-          <Toolbar
-            disableGutters
-            sx={{ minHeight: "56px !important", px: 1.5 }}
+          <NavigationContent caseDeployAction={caseDeployAction} pathname={pathname} />
+        </Box>
+
+        <Drawer
+          open={mobileOpen}
+          onClose={() => setMobileOpen(false)}
+          slotProps={{
+            paper: {
+              sx: {
+                width: "min(84vw, 304px)",
+                backgroundColor: "var(--mui-palette-surface-containerLow)",
+              },
+            },
+          }}
+        >
+          <NavigationContent
+            caseDeployAction={caseDeployAction}
+            pathname={pathname}
+            onNavigate={() => setMobileOpen(false)}
+          />
+        </Drawer>
+
+        <Box sx={{ minWidth: 0 }}>
+          <AppBar
+            position="sticky"
+            elevation={0}
+            color="transparent"
+            sx={{
+              display: { xs: "block", sm: "none" },
+              height: 56,
+              borderBottom: "1px solid",
+              borderColor: "divider",
+              // A fully opaque app bar prevents scrolling content from bleeding into text and icons at
+              // the viewport edge, which was especially visible in the narrow workbench layout.
+              backgroundColor: "var(--mui-palette-surface-container)",
+            }}
           >
-            <IconButton
-              aria-label="打开导航"
-              onClick={() => setMobileOpen(true)}
-              sx={{ display: { xs: "inline-flex", sm: "none" }, mr: 0.75 }}
-            >
-              <Menu />
-            </IconButton>
-            <Typography variant="subtitle1" sx={{ flex: 1, minWidth: 0 }} noWrap>
-              Magic Compare
-            </Typography>
-          </Toolbar>
-        </AppBar>
-        <InternalRouteTransition>{children}</InternalRouteTransition>
+            <Toolbar disableGutters sx={{ minHeight: "56px !important", px: 1.5 }}>
+              <IconButton
+                aria-label="打开导航"
+                onClick={() => setMobileOpen(true)}
+                sx={{ display: { xs: "inline-flex", sm: "none" }, mr: 0.75 }}
+              >
+                <Menu />
+              </IconButton>
+              <Typography variant="subtitle1" sx={{ flex: 1, minWidth: 0 }} noWrap>
+                Magic Compare
+              </Typography>
+            </Toolbar>
+          </AppBar>
+          <InternalRouteTransition>{children}</InternalRouteTransition>
+        </Box>
       </Box>
-    </Box>
+    </CaseDeployNavigationActionContext.Provider>
   );
 }

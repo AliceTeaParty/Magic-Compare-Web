@@ -4,8 +4,10 @@ import type { ReactNode } from "react";
 import { useEffect, useState, useTransition } from "react";
 import {
   Close,
+  CollectionsOutlined,
   DeleteOutlined,
   InfoOutlined,
+  PublicOutlined,
   RadioButtonCheckedRounded,
   SaveOutlined,
   SettingsOutlined,
@@ -14,11 +16,6 @@ import {
 import {
   Box,
   Button,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogContentText,
-  DialogTitle,
   Divider,
   Drawer,
   IconButton,
@@ -29,6 +26,7 @@ import {
 import { useRouter } from "next/navigation";
 import type { CaseWorkspaceData } from "@/lib/server/repositories/content-repository";
 import type { AppNotificationTone } from "../notifications/use-app-notifications";
+import { DestructiveConfirmationDialog } from "./destructive-confirmation-dialog";
 
 const statusLabels = {
   draft: "草稿",
@@ -63,6 +61,7 @@ function SettingsMetadataRow({
 interface CaseSettingsPaneProps {
   data: Pick<CaseWorkspaceData, "slug" | "status"> & {
     groupCount: number;
+    publicGroupCount: number;
     summary: string;
     tags: string[];
     title: string;
@@ -91,7 +90,13 @@ export function CaseSettingsPane({
     .split(",")
     .map((tag) => tag.trim())
     .filter(Boolean);
-  const canSave = Boolean(title.trim()) && summary.length <= 160;
+  // An unchanged primary button looks actionable and competes with deletion; enable it only when
+  // the normalized form differs from the committed Case metadata.
+  const hasMetadataChanges =
+    title !== data.title ||
+    summary !== data.summary ||
+    tags.join("\u0000") !== data.tags.join("\u0000");
+  const canSave = Boolean(title.trim()) && summary.length <= 160 && hasMetadataChanges;
 
   useEffect(() => {
     setTitle(data.title);
@@ -205,15 +210,18 @@ export function CaseSettingsPane({
           helperText="使用英文逗号分隔"
           onChange={(event) => setTagsText(event.target.value)}
         />
-        <Stack
-          spacing={0.5}
-          sx={{
-            px: 1.25,
-            py: 0.75,
-            borderRadius: 1.5,
-            backgroundColor: "var(--mui-palette-surface-containerHighest)",
-          }}
-        >
+        <Divider />
+        <Stack spacing={0.25} sx={{ px: 0.25 }}>
+          <SettingsMetadataRow
+            icon={<CollectionsOutlined sx={{ fontSize: 18 }} />}
+            label="Group"
+            value={String(data.groupCount)}
+          />
+          <SettingsMetadataRow
+            icon={<PublicOutlined sx={{ fontSize: 18 }} />}
+            label="公开"
+            value={String(data.publicGroupCount)}
+          />
           <SettingsMetadataRow
             icon={<TagRounded sx={{ fontSize: 18 }} />}
             label="Slug"
@@ -225,44 +233,38 @@ export function CaseSettingsPane({
             value={statusLabels[data.status]}
           />
         </Stack>
-        <Button
-          fullWidth
-          variant="contained"
-          startIcon={<SaveOutlined />}
-          disabled={!canSave}
-          loading={isPending}
-          onClick={saveMetadata}
-        >
-          保存设置
-        </Button>
-
-        <Divider sx={{ my: 1 }} />
-        {data.groupCount > 0 ? (
-          <Stack
-            direction="row"
-            sx={{
-              alignItems: "flex-start",
-              gap: 1,
-              p: 1.25,
-              borderRadius: 1.5,
-              color: "text.secondary",
-              backgroundColor: "var(--mui-palette-surface-containerHighest)",
-            }}
+        <Divider />
+        <Stack spacing={0.5}>
+          <Button
+            fullWidth
+            variant="contained"
+            startIcon={<SaveOutlined />}
+            disabled={!canSave}
+            loading={isPending}
+            onClick={saveMetadata}
           >
-            <InfoOutlined sx={{ mt: 0.1, fontSize: 18, flexShrink: 0 }} />
-            <Typography variant="caption">删除 Case 前需要先删除其中的全部 Group。</Typography>
-          </Stack>
-        ) : null}
-        <Button
-          fullWidth
-          color="error"
-          variant="text"
-          startIcon={<DeleteOutlined />}
-          disabled={isPending || data.groupCount > 0}
-          onClick={() => setConfirmDelete(true)}
-        >
-          删除 Case
-        </Button>
+            保存设置
+          </Button>
+          <Button
+            fullWidth
+            color="error"
+            variant="text"
+            startIcon={<DeleteOutlined />}
+            disabled={isPending || data.groupCount > 0}
+            onClick={() => setConfirmDelete(true)}
+          >
+            删除 Case
+          </Button>
+          {data.groupCount > 0 ? (
+            <Stack
+              direction="row"
+              sx={{ alignItems: "flex-start", gap: 0.75, px: 0.5, color: "text.secondary" }}
+            >
+              <InfoOutlined sx={{ mt: 0.05, fontSize: 16, flexShrink: 0 }} />
+              <Typography variant="caption">删除前需先清空全部 Group。</Typography>
+            </Stack>
+          ) : null}
+        </Stack>
       </Stack>
     </Stack>
   );
@@ -305,27 +307,14 @@ export function CaseSettingsPane({
         {content}
       </Drawer>
 
-      <Dialog
+      <DestructiveConfirmationDialog
+        description={`将永久删除「${data.title}」的元数据。`}
+        loading={isPending}
+        onCancel={() => setConfirmDelete(false)}
+        onConfirm={deleteCase}
         open={confirmDelete}
-        onClose={() => {
-          if (!isPending) setConfirmDelete(false);
-        }}
-        maxWidth="xs"
-        fullWidth
-      >
-        <DialogTitle>删除 Case？</DialogTitle>
-        <DialogContent>
-          <DialogContentText>将永久删除「{data.title}」的元数据。</DialogContentText>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setConfirmDelete(false)} disabled={isPending}>
-            取消
-          </Button>
-          <Button color="error" variant="contained" onClick={deleteCase} loading={isPending}>
-            删除
-          </Button>
-        </DialogActions>
-      </Dialog>
+        title="删除 Case？"
+      />
     </>
   );
 }

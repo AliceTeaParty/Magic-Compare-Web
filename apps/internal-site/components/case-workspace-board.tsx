@@ -1,53 +1,22 @@
 "use client";
 
-import type { ReactNode } from "react";
 import { useEffect, useState, useTransition } from "react";
-import {
-  CloudUploadOutlined,
-  CollectionsOutlined,
-  PublicOutlined,
-  SettingsOutlined,
-  UploadFileOutlined,
-} from "@mui/icons-material";
-import {
-  Box,
-  Button,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogContentText,
-  DialogTitle,
-  IconButton,
-  List,
-  Stack,
-  Tooltip,
-  Typography,
-} from "@mui/material";
+import { SettingsOutlined } from "@mui/icons-material";
+import { Box, IconButton, List, Stack, Tooltip, Typography } from "@mui/material";
 import { DndContext, PointerSensor, closestCenter, useSensor, useSensors } from "@dnd-kit/core";
 import { SortableContext, rectSortingStrategy } from "@dnd-kit/sortable";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import type { CaseWorkspaceData } from "@/lib/server/repositories/content-repository";
 import { InternalPageHeader } from "./internal-page-shell";
 import { CaseSettingsPane } from "./case-workspace/case-settings-pane";
+import { DestructiveConfirmationDialog } from "./case-workspace/destructive-confirmation-dialog";
 import { WorkspaceNotifications } from "./case-workspace/notifications";
 import { SortableGroupRow } from "./case-workspace/sortable-group-row";
 import { useCaseWorkspaceActions } from "./case-workspace/use-case-workspace-actions";
 import { useWorkspaceNotifications } from "./case-workspace/use-workspace-notifications";
+import { useCaseDeployNavigationAction } from "./internal-shell-actions";
 
 type GroupItem = CaseWorkspaceData["groups"][number];
-
-/** Displays workspace totals as quiet metadata instead of form-like outlined controls. */
-function WorkspaceMetric({ icon, label }: { icon: ReactNode; label: string }) {
-  return (
-    <Stack direction="row" sx={{ alignItems: "center", gap: 0.6, color: "text.secondary" }}>
-      {icon}
-      <Typography variant="caption" sx={{ whiteSpace: "nowrap" }}>
-        {label}
-      </Typography>
-    </Stack>
-  );
-}
 
 /** Organizes Group review and Case settings as an M3 primary/supporting pane layout. */
 export function CaseWorkspaceBoard({
@@ -101,6 +70,15 @@ export function CaseWorkspaceBoard({
       ? "至少公开一个 Group 后才能部署。"
       : "";
 
+  // Deployment belongs to the persistent navigation; the workspace only owns its live state and
+  // mutation handler so route-specific server data does not leak into the app shell.
+  useCaseDeployNavigationAction({
+    disabled: isPending || isDeployingPublicSite || !canDeployPublicSite || publicGroupCount === 0,
+    disabledReason: deployUnavailableReason,
+    loading: isDeployingPublicSite,
+    onClick: deployPublicSite,
+  });
+
   function handleGroupDragEnd(activeId: string, overId: string | null) {
     reorderCaseGroups(activeId, overId);
   }
@@ -108,46 +86,22 @@ export function CaseWorkspaceBoard({
   return (
     <>
       <InternalPageHeader
-        backHref="/"
-        compact
         title={caseTitle}
         subtitle={caseSummary || "暂无描述。"}
         actions={
-          <>
-            <Tooltip title="管理 Case">
-              <IconButton
-                aria-label="管理 Case"
-                onClick={() => setSettingsOpen(true)}
-                sx={{ display: { lg: "none" } }}
-              >
-                <SettingsOutlined />
-              </IconButton>
-            </Tooltip>
-            <Button
-              component={Link}
-              href={`/upload?case=${encodeURIComponent(data.slug)}`}
-              variant="outlined"
-              startIcon={<UploadFileOutlined />}
-              disabled={isPending || isDeployingPublicSite}
+          <Tooltip title="管理 Case">
+            <IconButton
+              aria-label="管理 Case"
+              onClick={() => setSettingsOpen(true)}
+              sx={{ display: { lg: "none" } }}
             >
-              上传对比
-            </Button>
-            <Tooltip title={deployUnavailableReason}>
-              <span>
-                <Button
-                  variant="contained"
-                  startIcon={<CloudUploadOutlined />}
-                  loading={isDeployingPublicSite}
-                  disabled={isPending || !canDeployPublicSite || publicGroupCount === 0}
-                  onClick={deployPublicSite}
-                >
-                  部署 Pages
-                </Button>
-              </span>
-            </Tooltip>
-          </>
+              <SettingsOutlined />
+            </IconButton>
+          </Tooltip>
         }
       />
+
+      <WorkspaceNotifications notifications={notifications} onDismiss={dismissNotification} />
 
       <Box
         sx={{
@@ -159,33 +113,6 @@ export function CaseWorkspaceBoard({
         }}
       >
         <Stack spacing={2} sx={{ minWidth: 0 }}>
-          <WorkspaceNotifications notifications={notifications} onDismiss={dismissNotification} />
-          <Stack
-            direction={{ xs: "column", sm: "row" }}
-            sx={{
-              alignItems: { xs: "flex-start", sm: "flex-end" },
-              justifyContent: "space-between",
-              gap: 1,
-            }}
-          >
-            <Box>
-              <Typography variant="h3">Group</Typography>
-              <Typography variant="body2" color="text.secondary">
-                拖动调整顺序，设置公开范围，进入 Viewer 检查素材。
-              </Typography>
-            </Box>
-            <Stack direction="row" sx={{ flexWrap: "wrap", gap: 1.5, minHeight: 24 }}>
-              <WorkspaceMetric
-                icon={<CollectionsOutlined sx={{ fontSize: 17 }} />}
-                label={`${groups.length} Group`}
-              />
-              <WorkspaceMetric
-                icon={<PublicOutlined sx={{ fontSize: 17 }} />}
-                label={`${publicGroupCount} 公开`}
-              />
-            </Stack>
-          </Stack>
-
           {groups.length > 0 ? (
             <DndContext
               id={`case-workspace-${data.slug}-groups`}
@@ -231,17 +158,6 @@ export function CaseWorkspaceBoard({
               }}
             >
               <Typography variant="h4">还没有 Group</Typography>
-              <Typography variant="body2" color="text.secondary">
-                上传一组素材后会显示在这里。
-              </Typography>
-              <Button
-                component={Link}
-                href={`/upload?case=${encodeURIComponent(data.slug)}`}
-                variant="contained"
-                startIcon={<UploadFileOutlined />}
-              >
-                上传对比
-              </Button>
             </Stack>
           )}
         </Stack>
@@ -253,6 +169,7 @@ export function CaseWorkspaceBoard({
             slug: data.slug,
             status: data.status,
             groupCount: groups.length,
+            publicGroupCount,
             title: caseTitle,
             summary: caseSummary,
             tags: caseTags,
@@ -266,40 +183,18 @@ export function CaseWorkspaceBoard({
         />
       </Box>
 
-      {/* A shared M3 dialog replaces per-row native prompts so the destructive action keeps the
-          same wording, focus behavior, and pending feedback as the rest of the workbench. */}
-      <Dialog
-        open={Boolean(pendingDeleteGroup)}
-        onClose={() => {
-          if (!isPending) setPendingDeleteGroup(null);
+      <DestructiveConfirmationDialog
+        description={`将删除「${pendingDeleteGroup?.title ?? ""}」的内部素材和已发布输出。`}
+        loading={isPending}
+        onCancel={() => setPendingDeleteGroup(null)}
+        onConfirm={() => {
+          if (!pendingDeleteGroup) return;
+          deleteGroup(pendingDeleteGroup);
+          setPendingDeleteGroup(null);
         }}
-        maxWidth="xs"
-        fullWidth
-      >
-        <DialogTitle>删除 Group？</DialogTitle>
-        <DialogContent>
-          <DialogContentText>
-            将删除「{pendingDeleteGroup?.title}」的内部素材和已发布输出。
-          </DialogContentText>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setPendingDeleteGroup(null)} disabled={isPending}>
-            取消
-          </Button>
-          <Button
-            color="error"
-            variant="contained"
-            loading={isPending}
-            onClick={() => {
-              if (!pendingDeleteGroup) return;
-              deleteGroup(pendingDeleteGroup);
-              setPendingDeleteGroup(null);
-            }}
-          >
-            删除
-          </Button>
-        </DialogActions>
-      </Dialog>
+        open={Boolean(pendingDeleteGroup)}
+        title="删除 Group？"
+      />
     </>
   );
 }
