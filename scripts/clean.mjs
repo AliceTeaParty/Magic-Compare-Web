@@ -7,7 +7,9 @@ const workspaceRoot = path.resolve(scriptDir, "..");
 
 const safeGeneratedPaths = [
   "apps/internal-site/.next",
+  "apps/internal-site/.next-dev",
   "apps/public-site/.next",
+  "apps/public-site/.next-dev",
   "apps/public-site/out",
   "apps/public-site/public/published",
   "tools/uploader/.build",

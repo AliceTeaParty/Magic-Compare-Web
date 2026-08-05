@@ -8,10 +8,14 @@
 
 # testing
 /coverage
+/playwright-report/
+/test-results/
 
 # next.js
 /.next/
 **/.next/
+/.next-dev/
+**/.next-dev/
 /.nuxt/
 **/.nuxt/
 /out/
@@ -71,3 +75,5 @@ dist/
 docker-data/
 internal-site.readonly.db
 .agents/skills/
+
+.playwright-cli/

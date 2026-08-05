@@ -4,6 +4,8 @@ docs
 tools
 .env
 .next
+.next-dev
+**/.next-dev
 .turbo
 .venv
 node_modules

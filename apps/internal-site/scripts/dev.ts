@@ -5,17 +5,15 @@ import {
   isInternalAssetStorageConfigured,
   shouldHideDemoContent,
 } from "../lib/server/runtime-config";
+import { initializeSqliteDatabase } from "../prisma/init-db";
 
 function commandName(base: string): string {
   return process.platform === "win32" ? `${base}.cmd` : base;
 }
 
-/**
- * Keeps local bootstrap consistent with the workspace package manager entrypoints so dev startup
- * exercises the same schema/seed commands developers would run manually.
- */
-function runPnpm(script: "db:push" | "db:seed"): void {
-  execFileSync(commandName("pnpm"), [script], {
+/** Runs the network-backed demo repair only for the explicit bootstrap command. */
+function runDemoSeed(): void {
+  execFileSync(commandName("pnpm"), ["db:seed"], {
     cwd: process.cwd(),
     stdio: "inherit",
     env: process.env,
@@ -23,13 +21,21 @@ function runPnpm(script: "db:push" | "db:seed"): void {
 }
 
 /**
- * Keeps local dev startup aligned with the real demo workflow by always re-running the idempotent
- * seed step after schema sync. Only checking SQLite content is insufficient because a fresh S3
- * volume can still leave the viewer with metadata but no actual images.
+ * Schema sync is local and cheap enough for every start. Demo repair touches SQLite, object storage,
+ * and published bundles, so it only runs when `dev:bootstrap` explicitly requests it.
  */
-function ensureLocalDataReady(): void {
+function ensureLocalDataReady(seedDemo: boolean): void {
   loadWorkspaceEnv();
-  runPnpm("db:push");
+  const schemaStartedAt = performance.now();
+  initializeSqliteDatabase();
+  console.log(`SQLite schema ready in ${Math.round(performance.now() - schemaStartedAt)}ms.`);
+
+  if (!seedDemo) {
+    console.log(
+      "Demo seed skipped. Run `pnpm dev:bootstrap` when the bundled sample needs repair.",
+    );
+    return;
+  }
 
   if (shouldHideDemoContent()) {
     console.log("Skipping demo seed because MAGIC_COMPARE_HIDE_DEMO is enabled.");
@@ -41,7 +47,7 @@ function ensureLocalDataReady(): void {
     return;
   }
 
-  runPnpm("db:seed");
+  runDemoSeed();
 }
 
 /**
@@ -53,7 +59,8 @@ async function startNextDev(): Promise<void> {
     const child = spawn(commandName("next"), ["dev"], {
       cwd: process.cwd(),
       stdio: "inherit",
-      env: process.env,
+      // A shell-level production value makes Next dev select the wrong behavior and emit warnings.
+      env: { ...process.env, NODE_ENV: "development" },
     });
 
     child.on("exit", (code, signal) => {
@@ -79,7 +86,8 @@ async function startNextDev(): Promise<void> {
  * browser session on a metadata-only workspace with broken images.
  */
 async function main() {
-  ensureLocalDataReady();
+  const seedDemo = process.argv.slice(2).includes("--seed");
+  ensureLocalDataReady(seedDemo);
   await startNextDev();
 }
 

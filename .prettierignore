@@ -1,7 +1,10 @@
 # Build outputs
 .next/
+.next-dev/
 out/
 dist/
+playwright-report/
+test-results/
 build/
 
 # Dependencies
