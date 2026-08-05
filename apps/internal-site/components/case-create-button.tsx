@@ -94,6 +94,7 @@ export function CaseCreateButton({ navigation = false }: { navigation?: boolean 
       {navigation ? (
         <InternalNavigationItem
           icon={<AddCircleOutlined />}
+          iconFeedback="create"
           label="新建"
           onClick={() => setOpen(true)}
         />

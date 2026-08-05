@@ -1,20 +1,53 @@
 "use client";
 
-import type { ReactNode } from "react";
-import { ListItemButton, ListItemIcon, ListItemText } from "@mui/material";
+import { useState, type ReactNode } from "react";
+import { keyframes } from "@emotion/react";
+import { Box, ListItemButton, ListItemIcon, ListItemText } from "@mui/material";
 import Link from "next/link";
 import { NAV_RAIL_MEDIA_QUERY } from "./internal-layout-constants";
+
+type NavigationIconFeedback = "case" | "workspace" | "upload" | "create";
 
 interface InternalNavigationItemProps {
   disabled?: boolean;
   emphasized?: boolean;
   href?: string;
   icon: ReactNode;
+  iconFeedback?: NavigationIconFeedback;
   label: string;
   onClick?: () => void;
   selected?: boolean;
   title?: string;
 }
+
+const caseFeedback = keyframes`
+  0% { transform: rotate(0deg) scaleY(1); }
+  45% { transform: rotate(-5deg) translateY(1px) scaleY(0.92); }
+  100% { transform: rotate(0deg) translateY(0) scaleY(1); }
+`;
+
+const workspaceFeedback = keyframes`
+  0% { transform: rotate(-5deg) scale(0.88); clip-path: inset(18% 18% 18% 18%); }
+  100% { transform: rotate(0deg) scale(1); clip-path: inset(0 0 0 0); }
+`;
+
+const uploadFeedback = keyframes`
+  0% { transform: translateY(2px); }
+  42% { transform: translateY(-3px); }
+  100% { transform: translateY(0); }
+`;
+
+const createFeedback = keyframes`
+  0% { transform: rotate(-90deg); }
+  100% { transform: rotate(0deg); }
+`;
+
+const navigationFeedbackAnimations = {
+  case: `${caseFeedback} 260ms cubic-bezier(0.2, 0, 0, 1)`,
+  workspace: `${workspaceFeedback} 240ms cubic-bezier(0, 0, 0, 1)`,
+  upload: `${uploadFeedback} 260ms cubic-bezier(0.2, 0, 0, 1)`,
+  create: `${createFeedback} 220ms cubic-bezier(0, 0, 0, 1)`,
+} satisfies Record<NavigationIconFeedback, string>;
 
 const navigationItemSx = {
   minHeight: 52,
@@ -71,11 +104,20 @@ export function InternalNavigationItem({
   emphasized = false,
   href,
   icon,
+  iconFeedback,
   label,
   onClick,
   selected = false,
   title,
 }: InternalNavigationItemProps) {
+  const [feedbackSequence, setFeedbackSequence] = useState(0);
+
+  /** Restarts only the icon's semantic feedback while leaving the rail indicator geometry fixed. */
+  function handleActivation() {
+    if (iconFeedback) setFeedbackSequence((current) => current + 1);
+    onClick?.();
+  }
+
   const content = (
     <>
       <ListItemIcon
@@ -94,7 +136,23 @@ export function InternalNavigationItem({
           [NAV_RAIL_MEDIA_QUERY]: { width: 56 },
         }}
       >
-        {icon}
+        <Box
+          key={feedbackSequence}
+          component="span"
+          className="internal-navigation-glyph"
+          sx={{
+            display: "grid",
+            placeItems: "center",
+            transformOrigin: "50% 70%",
+            animation:
+              feedbackSequence > 0 && iconFeedback
+                ? navigationFeedbackAnimations[iconFeedback]
+                : "none",
+            "@media (prefers-reduced-motion: reduce)": { animation: "none" },
+          }}
+        >
+          {icon}
+        </Box>
       </ListItemIcon>
       <ListItemText
         primary={label}
@@ -122,7 +180,7 @@ export function InternalNavigationItem({
         href={href}
         disabled={disabled}
         selected={selected}
-        onClick={onClick}
+        onClick={handleActivation}
         title={title}
         sx={{ ...navigationItemSx, color: emphasized ? "primary.main" : "text.secondary" }}
       >
@@ -135,7 +193,7 @@ export function InternalNavigationItem({
     <ListItemButton
       disabled={disabled}
       selected={selected}
-      onClick={onClick}
+      onClick={handleActivation}
       title={title}
       sx={{ ...navigationItemSx, color: emphasized ? "primary.main" : "text.secondary" }}
     >

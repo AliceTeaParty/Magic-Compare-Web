@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import { FitScreen, HelpOutlined, Opacity, ViewSidebar } from "@mui/icons-material";
 import {
   Box,
@@ -14,11 +15,13 @@ import {
 import type { ViewerMode } from "@magic-compare/content-schema";
 import type { ViewerAsset } from "@magic-compare/compare-core/viewer-data";
 import { clampNumber } from "@magic-compare/shared-utils";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { AbInspectControls } from "./ab-inspect-controls";
 import { ComparisonAssetControls } from "./comparison-asset-controls";
 
 const compactControlHeight = { xs: 42, md: 40 } as const;
 const tripleControlWidth = 144;
+const MODE_ORDER: Record<ViewerMode, number> = { "before-after": 0, "a-b": 1, heatmap: 2 };
 
 interface ViewerUtilityControlsProps {
   compact?: boolean;
@@ -238,6 +241,14 @@ export function ViewerToolbar({
   sidebarOpen,
   variant,
 }: ViewerToolbarProps) {
+  const prefersReducedMotion = useReducedMotion();
+  const previousModeRef = useRef(mode);
+  const modeDirection = MODE_ORDER[mode] >= MODE_ORDER[previousModeRef.current] ? 1 : -1;
+
+  useEffect(() => {
+    previousModeRef.current = mode;
+  }, [mode]);
+
   /**
    * Routes side selection through the parent controller so A/B state stays in sync with keyboard
    * shortcuts and stage tap cycling.
@@ -358,45 +369,93 @@ export function ViewerToolbar({
 
       <Box
         sx={{
+          position: "relative",
           width: "100%",
           minWidth: 0,
+          height: compactControlHeight,
           minHeight: compactControlHeight,
           display: "flex",
           alignItems: "center",
           justifyContent: "flex-end",
           // Only the active mode owns this row, preventing unrelated controls from scattering
-          // between the title and the right edge of the header.
+          // between the title and the right edge of the header. The fixed slot also lets outgoing
+          // and incoming mode tools transition without moving the header or stage.
         }}
       >
-        {mode === "before-after" ? (
-          beforeAsset && comparisonAssetKey && comparisonAssets.length > 0 ? (
-            <ComparisonAssetControls
-              baselineAsset={beforeAsset}
-              comparisonAssetKey={comparisonAssetKey}
-              comparisonAssets={comparisonAssets}
-              onComparisonAssetChange={onComparisonAssetChange}
-            />
-          ) : null
-        ) : mode === "a-b" ? (
-          beforeAsset && comparisonAssetKey && comparisonAssets.length > 0 ? (
-            <AbInspectControls
-              abScale={abScale}
-              abSide={abSide}
-              baselineAsset={beforeAsset}
-              comparisonAssetKey={comparisonAssetKey}
-              comparisonAssets={comparisonAssets}
-              onAbSideChange={handleAbSideChange}
-              onComparisonAssetChange={onComparisonAssetChange}
-              onScaleChange={handleScaleChange}
-            />
-          ) : null
-        ) : (
-          <HeatmapOpacityControls
-            onChange={onOverlayOpacityChange}
-            value={overlayOpacity}
-            variant={variant}
-          />
-        )}
+        <AnimatePresence initial={false} mode="wait">
+          <Box
+            key={mode}
+            component={motion.div}
+            data-viewer-contextual-controls={mode}
+            initial={
+              prefersReducedMotion
+                ? false
+                : {
+                    opacity: 0,
+                    x: modeDirection * 10,
+                    clipPath:
+                      modeDirection > 0
+                        ? "inset(0 0 0 12% round 999px)"
+                        : "inset(0 12% 0 0 round 999px)",
+                  }
+            }
+            animate={{ opacity: 1, x: 0, clipPath: "inset(0 0 0 0 round 999px)" }}
+            exit={
+              prefersReducedMotion
+                ? { opacity: 1 }
+                : {
+                    opacity: 0,
+                    x: modeDirection * -6,
+                    clipPath:
+                      modeDirection > 0
+                        ? "inset(0 12% 0 0 round 999px)"
+                        : "inset(0 0 0 12% round 999px)",
+                    transition: { duration: 0.1, ease: [0.3, 0, 1, 1] },
+                  }
+            }
+            transition={
+              prefersReducedMotion ? { duration: 0 } : { duration: 0.18, ease: [0.2, 0, 0, 1] }
+            }
+            sx={{
+              position: "absolute",
+              inset: 0,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "flex-end",
+              minWidth: 0,
+            }}
+          >
+            {mode === "before-after" ? (
+              beforeAsset && comparisonAssetKey && comparisonAssets.length > 0 ? (
+                <ComparisonAssetControls
+                  baselineAsset={beforeAsset}
+                  comparisonAssetKey={comparisonAssetKey}
+                  comparisonAssets={comparisonAssets}
+                  onComparisonAssetChange={onComparisonAssetChange}
+                />
+              ) : null
+            ) : mode === "a-b" ? (
+              beforeAsset && comparisonAssetKey && comparisonAssets.length > 0 ? (
+                <AbInspectControls
+                  abScale={abScale}
+                  abSide={abSide}
+                  baselineAsset={beforeAsset}
+                  comparisonAssetKey={comparisonAssetKey}
+                  comparisonAssets={comparisonAssets}
+                  onAbSideChange={handleAbSideChange}
+                  onComparisonAssetChange={onComparisonAssetChange}
+                  onScaleChange={handleScaleChange}
+                />
+              ) : null
+            ) : (
+              <HeatmapOpacityControls
+                onChange={onOverlayOpacityChange}
+                value={overlayOpacity}
+                variant={variant}
+              />
+            )}
+          </Box>
+        </AnimatePresence>
       </Box>
     </Stack>
   );

@@ -40,8 +40,13 @@ import {
 } from "./case-workspace/browser-deploy-notifications";
 
 const destinations = [
-  { href: "/", label: "Case", icon: <FolderCopyOutlined /> },
-  { href: "/upload", label: "上传", icon: <CloudUploadOutlined /> },
+  { href: "/", label: "Case", icon: <FolderCopyOutlined />, iconFeedback: "case" },
+  {
+    href: "/upload",
+    label: "上传",
+    icon: <CloudUploadOutlined />,
+    iconFeedback: "upload",
+  },
 ] as const;
 
 function isDestinationActive(pathname: string, href: string) {
@@ -160,6 +165,7 @@ function NavigationContent({
               key={destination.href}
               href={destination.href}
               icon={destination.icon}
+              iconFeedback={destination.iconFeedback}
               label={destination.label}
               selected={selected}
               onClick={onNavigate}
@@ -177,6 +183,7 @@ function NavigationContent({
               disabled={!currentCaseWorkspaceHref}
               href={currentCaseWorkspaceHref ?? undefined}
               icon={<DashboardOutlined />}
+              iconFeedback="workspace"
               label="工作区"
               selected={
                 Boolean(currentCaseWorkspaceHref) &&
