@@ -8,13 +8,29 @@ type PublicAssetLike = {
   thumbUrl: string;
 };
 
-type PublicFrameLike = {
-  title: string;
-  assets: PublicAssetLike[];
-};
-
 const decoder = new TextDecoder("utf-8");
 const KEY_ASSET_KINDS = new Set(["before", "after", "heatmap"]);
+const STORAGE_VALIDATION_CONCURRENCY = 8;
+
+export function isKeyCompareAssetKind(kind: string): boolean {
+  return KEY_ASSET_KINDS.has(kind);
+}
+
+/** Runs remote object checks with a fixed worker count so large legacy groups gain concurrency
+ * without materializing hundreds of simultaneous R2 requests. */
+async function validateWithConcurrency(tasks: Array<() => Promise<void>>): Promise<void> {
+  let nextIndex = 0;
+  const workerCount = Math.min(STORAGE_VALIDATION_CONCURRENCY, tasks.length);
+  await Promise.all(
+    Array.from({ length: workerCount }, async () => {
+      while (nextIndex < tasks.length) {
+        const task = tasks[nextIndex];
+        nextIndex += 1;
+        await task();
+      }
+    }),
+  );
+}
 
 function hasPrefix(bytes: Uint8Array, signature: number[]): boolean {
   return signature.every((value, index) => bytes[index] === value);
@@ -79,29 +95,32 @@ export async function assertLikelyImageAssetUrl(assetUrl: string): Promise<void>
  * turn every misc/crop object into a second full validation pass.
  */
 export async function assertLikelyImportManifestAssets(manifest: ImportManifest): Promise<void> {
+  const tasks: Array<() => Promise<void>> = [];
   for (const groupEntry of manifest.groups) {
     for (const frameEntry of groupEntry.frames) {
       for (const assetEntry of frameEntry.assets) {
-        if (!KEY_ASSET_KINDS.has(assetEntry.kind)) {
+        if (!isKeyCompareAssetKind(assetEntry.kind)) {
           continue;
         }
-        await assertLikelyImageAssetUrl(assetEntry.imageUrl);
-        await assertLikelyImageAssetUrl(assetEntry.thumbUrl);
+        tasks.push(
+          () => assertLikelyImageAssetUrl(assetEntry.imageUrl),
+          () => assertLikelyImageAssetUrl(assetEntry.thumbUrl),
+        );
       }
     }
   }
+  await validateWithConcurrency(tasks);
 }
 
-/**
- * Publish re-checks only the public compare assets so a corrupted bucket object cannot silently
- * slip into the generated public manifest after import time.
- */
-export async function assertLikelyPublicFrameAssets(frame: PublicFrameLike): Promise<void> {
-  for (const asset of frame.assets) {
-    if (!KEY_ASSET_KINDS.has(asset.kind)) {
-      continue;
-    }
-    await assertLikelyImageAssetUrl(asset.imageUrl);
-    await assertLikelyImageAssetUrl(asset.thumbUrl);
-  }
+/** Validates a publish batch as one bounded queue rather than waiting for every frame in series. */
+export async function assertLikelyPublicAssets(assets: PublicAssetLike[]): Promise<void> {
+  const tasks = assets.flatMap((asset) =>
+    isKeyCompareAssetKind(asset.kind)
+      ? [
+          () => assertLikelyImageAssetUrl(asset.imageUrl),
+          () => assertLikelyImageAssetUrl(asset.thumbUrl),
+        ]
+      : [],
+  );
+  await validateWithConcurrency(tasks);
 }

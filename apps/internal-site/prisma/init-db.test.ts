@@ -31,16 +31,18 @@ describe("init-db", () => {
 
     const database = new DatabaseSync(databasePath);
     try {
-      const indexes = database.prepare(`
+      const indexes = database
+        .prepare(
+          `
         SELECT "name", "sql"
         FROM "sqlite_master"
         WHERE "type" = 'index'
-      `).all() as Array<{ name: string; sql: string | null }>;
+      `,
+        )
+        .all() as Array<{ name: string; sql: string | null }>;
 
       expect(indexes.some((index) => index.name === "Case_updatedAt_idx")).toBe(true);
-      expect(
-        indexes.some((index) => index.name === "Group_caseId_isPublic_idx"),
-      ).toBe(true);
+      expect(indexes.some((index) => index.name === "Group_caseId_isPublic_idx")).toBe(true);
       expect(
         indexes.some(
           (index) => index.name === "GroupUploadJob_groupId_status_expiresAt_updatedAt_idx",
@@ -49,6 +51,10 @@ describe("init-db", () => {
       expect(
         indexes.find((index) => index.name === "GroupUploadJob_groupId_active_key")?.sql,
       ).toContain(`WHERE "status" = 'active'`);
+      const assetColumns = database.prepare(`PRAGMA table_info("Asset")`).all() as Array<{
+        name: string;
+      }>;
+      expect(assetColumns.some((column) => column.name === "storageValidatedAt")).toBe(true);
     } finally {
       database.close();
     }
@@ -148,16 +154,24 @@ describe("init-db", () => {
 
     const migrated = new DatabaseSync(databasePath);
     try {
-      const jobs = migrated.prepare(`
+      const jobs = migrated
+        .prepare(
+          `
         SELECT "id", "status"
         FROM "GroupUploadJob"
         ORDER BY "updatedAt" DESC
-      `).all() as Array<{ id: string; status: string }>;
-      const frameJobs = migrated.prepare(`
+      `,
+        )
+        .all() as Array<{ id: string; status: string }>;
+      const frameJobs = migrated
+        .prepare(
+          `
         SELECT "id", "status"
         FROM "FrameUploadJob"
         ORDER BY "id" ASC
-      `).all() as Array<{ id: string; status: string }>;
+      `,
+        )
+        .all() as Array<{ id: string; status: string }>;
 
       expect(jobs).toEqual([
         { id: "job-new", status: "active" },

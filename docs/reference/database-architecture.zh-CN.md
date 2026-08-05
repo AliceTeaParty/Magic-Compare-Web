@@ -57,6 +57,8 @@
 
 - 只保存**已提交**的当前权威内容。
 - `prepare` 阶段不会先写这里；只有 `commit` 成功后才替换对应 frame 行和 asset 行。
+- `Asset.storageValidatedAt` 记录原图和缩略图已经通过对象签名检查；新上传和 manifest 导入立即写入，旧素材在首次发布成功后补写。
+- 当前对象路径以 frame revision UUID 创建且不会原地修改；替换路径会创建新 Asset 行，因此新的校验状态从空值开始。
 
 ### `GroupUploadJob`
 

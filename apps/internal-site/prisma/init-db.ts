@@ -172,6 +172,7 @@ CREATE TABLE IF NOT EXISTS "Asset" (
   "note" TEXT NOT NULL DEFAULT '',
   "isPublic" BOOLEAN NOT NULL DEFAULT true,
   "isPrimaryDisplay" BOOLEAN NOT NULL DEFAULT false,
+  "storageValidatedAt" DATETIME,
   FOREIGN KEY ("frameId") REFERENCES "Frame" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
 
@@ -220,6 +221,10 @@ CREATE INDEX IF NOT EXISTS "FrameUploadJob_groupUploadJobId_status_idx"
 
   ensureColumns(database, "Frame", [
     { name: "storagePrefix", sql: `"storagePrefix" TEXT NOT NULL DEFAULT ''` },
+  ]);
+
+  ensureColumns(database, "Asset", [
+    { name: "storageValidatedAt", sql: `"storageValidatedAt" DATETIME` },
   ]);
 
   ensureColumns(database, "GroupUploadJob", [

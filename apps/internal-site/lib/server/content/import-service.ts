@@ -3,7 +3,10 @@ import { posix as pathPosix } from "node:path";
 import type { ImportManifest } from "@magic-compare/content-schema";
 import { validateImportManifest } from "@/lib/server/validators/import-manifest";
 import { prisma } from "@/lib/server/db/client";
-import { assertLikelyImportManifestAssets } from "@/lib/server/storage/internal-asset-sanity";
+import {
+  assertLikelyImportManifestAssets,
+  isKeyCompareAssetKind,
+} from "@/lib/server/storage/internal-asset-sanity";
 import { buildLogicalStoragePath } from "@/lib/server/storage/internal-assets";
 import { stringifyTags } from "./mappers";
 
@@ -162,6 +165,9 @@ export async function applyImportManifest(rawManifest: unknown) {
             note: assetEntry.note,
             isPublic: assetEntry.isPublic,
             isPrimaryDisplay: assetEntry.isPrimaryDisplay,
+            // Import validates key comparison objects before writing any rows; preserve that work so
+            // the first publish does not repeat remote reads for the same immutable paths.
+            storageValidatedAt: isKeyCompareAssetKind(assetEntry.kind) ? new Date() : null,
           },
         });
 
