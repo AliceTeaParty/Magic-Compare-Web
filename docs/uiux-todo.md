@@ -130,9 +130,10 @@
 - 复核页面：`/cases/ikoku-nikki/groups/tv`、`/cases/ultraman-tiga/groups/tv`、`/cases/ultraman-tiga/groups/movie`、`/cases/ultraman-gaia/groups/movie`
 - 已验证状态：浅色、深色、`Src / Rip / Flt` 三变量切换、滑动、A/B、热图、详情侧栏、当前 Case 工作区导航、浏览器本地时间、桌面 `112px` header、Group dataset 原位切换、浏览器前进后退、单一局部加载反馈、窄屏无横向溢出、宽窄侧栏 surface 层级、颜色面板和嵌套 Drawer 无滚动条位移、模式切换不推动主图与胶片条
 
-## 上传工作台复核
+## 上传工作台：需要大改
 
 - 复核日期：`2026-08-05`
 - 复核环境：本地 `internal-site` 开发服务器 + in-app browser
 - 复核页面：`/upload`
-- 已验证状态：浅色、深色、未选择目录、四阶段任务带、桌面 `1440x1000`、移动端 `390x844`、无横向溢出
+- 当前结论：整体信息结构、流程表达和交互体验需要重新设计，现版不作为后续页面的设计基线。
+- 技术走查记录：浅色、深色、未选择目录、四阶段任务带、桌面 `1440x1000`、移动端 `390x844`、无横向溢出
