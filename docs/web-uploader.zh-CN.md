@@ -2,8 +2,6 @@
 
 这份文档记录当前推荐的上传入口：`internal-site` 的 `/upload` 页面。
 
-旧 Python uploader 已进入 FINAL / 弃用维护期。除兼容性、安全性或阻塞旧流程的问题外，新的上传能力默认补到 Web 工作台。
-
 ## 入口
 
 - 页面：`/upload`
@@ -44,21 +42,9 @@
 - 手动编辑 slug 时仍遵守内部 slug 规则：小写字母、数字、单连字符。
 - 公开 `publicSlug` 仍由发布流程生成，不由上传页直接写入。
 
-## 仍未迁移的 legacy CLI 能力
-
-以下能力仍属于旧 Python uploader，当前 Web 工作台不承诺完全等价：
-
-- YAML 工作目录和外部编辑器确认。
-- `--report-json`、`--reset-session` 等 CLI 运维参数。
-- `delete-case` / `delete-group` 命令式维护入口。
-- 面向无浏览器环境的离线批处理。
-
-这些能力后续是否迁移，应按真实使用频率重新评估，不默认照搬 CLI。
-
 ## 相关实现
 
 - 页面：`apps/internal-site/app/upload/page.tsx`
 - 工作台：`apps/internal-site/components/web-uploader/`
 - 上传 API：`apps/internal-site/app/api/ops/group-upload-*`
 - 上传服务：`apps/internal-site/lib/server/uploads/`
-- 旧 CLI 文档：`docs/uploader/`

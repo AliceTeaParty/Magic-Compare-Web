@@ -16,7 +16,6 @@ Magic-Compare-Web (~28K LOC, monorepo)
 │   ├── shared-utils/    (155 LOC)   — 工具函数：slug 构建、排序、日期格式化
 │   ├── compare-core/    (1.1K LOC)  — 查看器状态管理 (useViewerController) + 数据/Stage 工具
 │   └── ui/              (4.8K LOC)  — 共享 MUI 暗色主题、查看器 Workbench (Stage/Filmstrip/Sidebar)
-├── tools/uploader/      (5.4K LOC, Python) — CLI：扫描本地图片目录 → presigned PUT → 调 API 完成导入
 ├── scripts/             — clean、sync-published、export-public、deploy-public、route-aliases
 ├── docker/              — Dockerfile + compose (dev/ci override)
 └── docs/                — 23 篇文档，含 INDEX.md 索引、workflow-guide、api-endpoints 等
@@ -34,13 +33,10 @@ Magic-Compare-Web (~28K LOC, monorepo)
 |------|-----|
 | `apps/internal-site/lib/server/uploads/upload-service-helpers.ts` | 681 |
 | `apps/internal-site/lib/server/uploads/upload-service.ts` | 427 |
-| `tools/uploader/src/upload_executor.py` | 826 |
 
 **问题：**
 - `upload-service-helpers.ts` 包含 15 条直接 Prisma 查询 + 多步事务，`clearGroupForRestart()` (L268-315) 依赖 frame→group→job 的更新顺序，如 frame 成功但 group 失败会产生不一致状态
-- `upload_executor.py` 用 ThreadPoolExecutor + RLock，20+ 嵌套闭包共享 `UploadRuntimeState`，异常处理仅捕获 `str(error)` 丢失 traceback
 - Upload 状态用字符串字面量 `"pending"/"committed"/"failed"`，无类型守卫或判别联合
-- Python 端的 resume 逻辑 (L322) 通过 `frame.order == frame_order` 匹配，int/str 类型不一致时静默跳过
 
 ### 2. ~~Viewer Stage 渲染与手势交互~~（**已部分修复**，风险 MEDIUM → LOW）
 
@@ -50,24 +46,11 @@ Magic-Compare-Web (~28K LOC, monorepo)
 - `group-viewer-workbench.tsx` 仍含 18+ 状态变量协调，缺少不变量验证
 - useEffect 依赖跨 7 个 hook，变更一处易产生连锁 re-render
 
-### 3. Python Wizard 交互向导（风险 LOW / 收益 MEDIUM / 改动范围 MEDIUM）
-
-| 文件 | LOC |
-|------|-----|
-| `tools/uploader/src/wizard.py` | 865 |
-| `tools/uploader/src/source_parser.py` | 657 |
-| `tools/uploader/src/commands.py` | 570 |
-
-**问题：**
-- `wizard.py` 是全仓最大单文件，9 个嵌套辅助函数管理状态转移，`_choose_case()` (L321-399) 有 4 层 while→if→if 嵌套
-- 各 stage 函数直接变异共享 `UploaderConfig`，与 `rich` 终端 UI 紧耦合
-- `source_parser.py` 有 4 层帧匹配逻辑
-
-### 4. ~~API 路由错误处理模板~~（**已修复**）
+### 3. ~~API 路由错误处理模板~~（**已修复**）
 
 ~~15 个 `/api/ops/*/route.ts` 全部使用同一 catch 模式~~ → **已提取 `withApiRoute()` wrapper (83c89bd)，实现 ZodError→400 / `classifyError` 自定义分级 / fallback→500 + 服务端日志。public-export/deploy 路由使用 `PublicSiteOperationConflictError` → 409。所有 15 个路由已覆盖测试。**
 
-### 5. Publish 管线 + content-repository 伪抽象层（风险 MEDIUM / 收益 MEDIUM / 改动范围 LARGE）
+### 4. Publish 管线 + content-repository 伪抽象层（风险 MEDIUM / 收益 MEDIUM / 改动范围 LARGE）
 
 | 文件 | LOC |
 |------|-----|
@@ -107,9 +90,7 @@ Magic-Compare-Web (~28K LOC, monorepo)
 
 | 文件 | 函数 | LOC | 说明 |
 |------|------|-----|------|
-| `wizard.py` | 整体模块 | 865 | 应拆为 orchestrator + stage handlers |
 | ~~`viewer-stage.tsx`~~ | ~~`SwipeCompareStage`~~ | ~~200~~ | **已修复** — 提取为独立文件 `swipe-compare-stage.tsx` (218 行) |
-| `upload_executor.py` | `execute_upload()` | ~300 | 线程池状态机 |
 | `upload-service-helpers.ts` | `ensureCaseAndGroup()` | 105 | L408-512，4 层嵌套条件 |
 | `import-service.ts` | `applyImportManifest()` | 94 | 3 层嵌套循环 |
 | `init-db.ts` | `initializeSqliteSchema()` | 123 | SQL DDL 字符串，可拆出 |
@@ -172,13 +153,12 @@ Magic-Compare-Web (~28K LOC, monorepo)
 
 | # | 任务 | 风险 | 收益 | 范围 | 关键文件 | 注意事项 | 状态 |
 |---|------|------|------|------|----------|----------|------|
-| 1 | **Upload 状态机类型化**：用 TypeScript discriminated union 替代字符串字面量状态，Python 端用 Enum 替代 str | MEDIUM | HIGH | ~10 files | `upload-service-helpers.ts`, `upload-service.ts`, `upload_executor.py`, `contracts.ts` | 需同步 TS 和 Python 两端；先加类型约束再逐步迁移 | |
+| 1 | **Upload 状态机类型化**：用 TypeScript discriminated union 替代字符串字面量状态 | MEDIUM | HIGH | ~4 files | `upload-service-helpers.ts`, `upload-service.ts`, `contracts.ts` | 先加类型约束，再逐步迁移 | |
 | 2 | ~~**拆分 `viewer-stage.tsx`**~~ | MEDIUM | HIGH | 3-5 new files | `packages/ui/src/viewer/workbench/viewer-stage.tsx` | 855 → 387 行 | **已完成** (0971aa5) |
 | 3 | **Repository 层实体化**：将 44 条 Prisma 查询收归 repository 方法，services 只调 repository | HIGH | HIGH | ~10 files | `content-repository.ts` + 8 service files | 改动面最大，需逐个迁移并保持测试绿灯；分 4-5 个 PR 推进 |
-| 4 | **拆分 `wizard.py`**：拆为 orchestrator + 独立 stage module（choose_case、confirm_plan、resolve_layout 等） | LOW | MEDIUM | 3-5 new files | `tools/uploader/src/wizard.py` | Python 端相对独立，风险较低；已有 23 个测试文件覆盖 |
-| 5 | **`subtitle` 字段正式下线**：从 schema、seed、import、publish 全链路移除，schema 版本号 bump | MEDIUM | LOW | 14 files | `content-schema/src/index.ts` 起，向上 14 文件 | 需确认无外部消费者依赖此字段；建议先在 PublishManifest 中标为 optional → 下个版本删除 |
-| 6 | ~~**API 错误分级**：区分 400 (validation) / 404 (not found) / 409 (conflict) / 500 (runtime)，增加服务端错误日志~~ | MEDIUM | MEDIUM | 15 route files + 共享 error types | `apps/internal-site/app/api/ops/*/route.ts` | **已完成** — `withApiRoute()` 已实现 ZodError→400 / classifyError / fallback→500 分级，public-export/deploy 使用 409 冲突码 |
+| 4 | **`subtitle` 字段正式下线**：从 schema、seed、import、publish 全链路移除，schema 版本号 bump | MEDIUM | LOW | 14 files | `content-schema/src/index.ts` 起，向上 14 文件 | 需确认无外部消费者依赖此字段；建议先在 PublishManifest 中标为 optional → 下个版本删除 |
+| 5 | ~~**API 错误分级**：区分 400 (validation) / 404 (not found) / 409 (conflict) / 500 (runtime)，增加服务端错误日志~~ | MEDIUM | MEDIUM | 15 route files + 共享 error types | `apps/internal-site/app/api/ops/*/route.ts` | **已完成** — `withApiRoute()` 已实现 ZodError→400 / classifyError / fallback→500 分级，public-export/deploy 使用 409 冲突码 |
 
 ---
 
-**总体评价：** 架构清晰、文档质量高、类型安全性好。低风险清理任务已全部完成（7/7），高收益重构已完成 4/6。剩余核心债务集中在 upload 状态机的类型安全和 repository 层的伪抽象，建议在恢复开发时按 upload 类型化 → repository 实体化的顺序推进。
+**总体评价：** 架构清晰、文档质量高、类型安全性好。低风险清理任务已全部完成（7/7），高收益重构已完成 2/5。剩余核心债务集中在 upload 状态机的类型安全和 repository 层的伪抽象，建议按 upload 类型化 → repository 实体化的顺序推进。

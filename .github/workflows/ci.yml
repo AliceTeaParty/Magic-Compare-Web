@@ -12,8 +12,6 @@ on:
     paths:
       - "apps/**"
       - "packages/**"
-      - "tools/uploader/**"
-      - "docs/uploader/**"
       - "scripts/**"
       - "docker/**"
       - ".env.example"
@@ -29,8 +27,6 @@ on:
     paths:
       - "apps/**"
       - "packages/**"
-      - "tools/uploader/**"
-      - "docs/uploader/**"
       - "scripts/**"
       - "docker/**"
       - ".env.example"
@@ -55,34 +51,9 @@ defaults:
 env:
   NODE_VERSION: "24.13.1"
   PNPM_VERSION: "10.32.1"
-  PYTHON_VERSION: "3.12"
   CI_COMPOSE_ARGS: -f docker-compose.yml -f docker/ci.compose.override.yml
 
 jobs:
-  verify-uploader:
-    name: Verify Uploader
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v6
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-          cache: pip
-          cache-dependency-path: tools/uploader/pyproject.toml
-
-      - name: Install uploader dependencies
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install -e ./tools/uploader
-
-      - name: Run uploader unit tests
-        run: cd tools/uploader && python -m unittest discover -s tests
-
   verify:
     name: Verify Workspace
     runs-on: ubuntu-latest

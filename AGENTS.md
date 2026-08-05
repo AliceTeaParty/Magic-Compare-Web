@@ -7,7 +7,6 @@
 - 命令分步执行，不要把大量命令用 `&&`、`;` 或长脚本串成一坨。尤其是 git、workflow、registry、发布相关操作，要保留可见检查点。
 - 不要凭记忆做框架细节。Next.js、MUI、Prisma、dnd-kit、Cloudflare 等实现细节优先查官方文档或项目 MCP 指南。
 - `mcp-vector-search` 只能作为定位和审查线索；复杂度、dead-code、AI review 结果都必须回到源码、测试或浏览器验证复核。
-- 旧 Python uploader 已标记 `弃用`。除兼容性、安全或阻塞旧流程的问题外，新增上传能力默认投向跨平台 Web workspace。
 - 测试投入要匹配风险：关键链路、状态机、viewer/workspace 交互值得测试；弃用横幅、低风险文案等细枝末节不需要专门测试。
 
 ## 常用命令
@@ -51,7 +50,6 @@ Next 开发服务器使用各应用的 `.next-dev`，生产构建、Docker 与�
 
 仓库分三条独立责任线，不能混用：
 
-- `tools/uploader/`：历史 Python CLI。扫描本地目录，通过 internal-site 的 frame-level upload API 签发 presigned PUT、上传对象并提交 frame。它不是网站运行时的一部分。
 - `apps/internal-site/`：带服务端能力的 Next.js 内部工作站。负责 case catalog、case workspace、group viewer、`/api/ops/*`、SQLite/Prisma metadata、S3/R2 内部素材访问、publish bundle 生成，以及显式 public export/deploy 触发。
 - `apps/public-site/`：静态导出站点。只读取 `content/published/groups/*/manifest.json` 并服务 `/g/[publicSlug]`，没有 catalog、上传 UI 或写接口。
 
@@ -88,7 +86,7 @@ Next 开发服务器使用各应用的 `.next-dev`，生产构建、Docker 与�
 - 提交规范：`docs/commit-guide.md`
 - MCP 工具顺序：`docs/mcp-usage-guide.md`
 - UI/UX 待办与经验：`docs/uiux-todo.md`
-- uploader 历史文档：`docs/uploader/`
+- Web 上传文档：`docs/web-uploader.zh-CN.md`
 
 阅读 `docs/` 时，先看标题和前 10 行判断相关性；真正修改或调试该主题时再读完整文档。
 

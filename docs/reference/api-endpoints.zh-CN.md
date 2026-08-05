@@ -8,7 +8,7 @@
 - 当前仓库里，internal-site 的服务端 API 仅位于 `apps/internal-site/app/api/ops/*`。
 - 这些端点当前全部使用 `POST`，没有额外的 `GET` / `PUT` / `DELETE` 路由。
 - 新上传链路里的二进制文件不会再发到 internal-site；`group-upload-frame-prepare` 返回的是对象存储 presigned PUT URL，客户端随后直传到 S3-compatible 存储。
-- 当前代码里没有单独的 route-level 鉴权中间件；远程调用通常由部署侧入口控制。uploader 在远端模式下会附带 `CF-Access-Client-Id` 和 `CF-Access-Client-Secret` 请求头。
+- 当前代码里没有单独的 route-level 鉴权中间件；远程调用通常由部署侧入口控制。
 
 ## 错误约定
 
@@ -22,7 +22,7 @@
 | ------------------------------------------ | ------------------------------------------------- |
 | `POST /api/ops/case-list`                  | 列出当前全部 case                                 |
 | `POST /api/ops/case-groups`                | 列出某个 case 下当前全部 group                    |
-| `POST /api/ops/case-search`                | 搜索 case，供 uploader / 内部站选择已有 case 使用 |
+| `POST /api/ops/case-search`                | 搜索 case，供内部站选择已有 case 使用          |
 | `POST /api/ops/case-create`                | 新建一个空的 internal case                        |
 | `POST /api/ops/case-update`                | 修改 case summary                                 |
 | `POST /api/ops/case-delete`                | 删除空 case                                       |
@@ -605,7 +605,7 @@
 - `pendingPrefix` 的中间层目录使用 `frameOrder + 1`，因此 `frameOrder=12` 时路径里会出现 `/13/`。
 - 如果这个 frame 在当前 job 下已经存在旧的 pending revision，服务端会先删掉旧 pending 前缀，再签发新 URL。
 - 如果该 frame 已经是 `committed`，这个接口会返回 `400`，避免重复 prepare。
-- presign 组装和对象路径命名都在服务端完成，uploader 不会自行决定最终 bucket key。
+- presign 组装和对象路径命名都在服务端完成，客户端不自行决定最终 bucket key。
 
 ### `POST /api/ops/group-upload-frame-commit`
 

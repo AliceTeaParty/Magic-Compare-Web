@@ -10,8 +10,7 @@
 - `public-site` 是静态导出目标，构建产物可直接推到 Cloudflare Pages。
 - 内部原图、缩略图和 heatmap 已经统一走 S3-compatible 存储，不再使用 `.runtime` 或 `public/internal-assets`。
 - demo 是受控样本，不代表真实业务导入流程。
-- 真实内容的推荐链路是：`Web uploader -> group-upload-start -> frame prepare/upload/commit -> group-upload-complete -> internal-site -> case-publish -> public-export/public-deploy`。
-- 旧 Python uploader 已进入 FINAL / 弃用维护期，但仍复用同一组 frame-level 上传 API。
+- 真实内容的推荐链路是：`Web upload -> group-upload-start -> frame prepare/upload/commit -> group-upload-complete -> internal-site -> case-publish -> public-export/public-deploy`。
 - `public-export` 和 `public-deploy` 必须显式触发，它们不是 `case-publish` 的隐式副作用。
 
 ## 当前架构中的真实分工
@@ -141,7 +140,6 @@ pnpm db:seed
 真实内容来自：
 
 - `/upload` Web 上传工作台
-- `magic-compare-uploader`
 - `POST /api/ops/group-upload-start`
 - `POST /api/ops/group-upload-frame-prepare`
 - `POST /api/ops/group-upload-frame-commit`
@@ -185,7 +183,7 @@ pnpm dev
 
 两个应用的 Next 开发产物写入 `.next-dev`。`pnpm build`、`pnpm typecheck`、Docker 构建和公开部署继续使用 `.next`，因此生产构建不再删除运行中开发服务器的缓存。类型检查使用 `next typegen + tsc`，不会执行页面数据收集和静态导出。
 
-提交前使用 `pnpm check` 统一执行格式检查、lint、类型检查和 Vitest。本地 Chromium 冒烟测试使用 `pnpm test:e2e`；它使用隔离 SQLite 与固定公开 manifest，不进入默认 CI。
+提交前使用 `pnpm check` 统一执行格式检查、lint、类型检查和 Vitest。本地 Chromium 冒烟测试使用 `pnpm test:e2e`；它使用隔离 SQLite、固定公开 manifest 和 `.next-e2e`，可以在日常 `.next-dev` 服务器运行时执行，不进入默认 CI。
 
 ## Docker 生产运行的真实路径
 
@@ -218,11 +216,15 @@ compose 当前会做这些事：
 - 基础 `docker-compose.yml` 默认通过 `MAGIC_COMPARE_INTERNAL_SITE_IMAGE` 拉取 GHCR 运行时镜像
 - `docker/dev.compose.override.yml` 才会把 `internal-site` / `internal-site-init` 切换成本地 `build`
 - 数据目录现在统一通过 `.env` 控制；留空时走 Docker named volumes，填写宿主机路径时走 bind mount
-- `internal-site` 容器本身只负责：
+- `internal-site` 常驻进程直接由 Node 启动 Next，不保留 pnpm 包装进程：
 
 ```bash
-pnpm --filter @magic-compare/internal-site start
+node apps/internal-site/node_modules/next/dist/bin/next start apps/internal-site --hostname 0.0.0.0
 ```
+
+- 默认 old-space 上限为 384MiB，容器内存和 swap 上限同为 1536MiB，`MALLOC_ARENA_MAX=2`
+- public-site 构建和 Wrangler 只在部署时启动，分别使用 1024MiB 和 384MiB old-space 上限
+- `/api/healthz` 返回无缓存 `204`，健康检查每 90 秒调用一次，不查询 SQLite 或渲染页面
 
 ### 当前 Docker 里的持久化目录
 
@@ -278,41 +280,34 @@ Docker 用：
 
 ## 上传链路的真实顺序
 
-当前推荐入口是 `internal-site` 的 `/upload` Web 工作台。旧 Python uploader 仍可用于 legacy 导入和补救，但不再作为新增上传能力的默认承载面。
+当前推荐入口是 `internal-site` 的 `/upload` Web 工作台。
 
 Web 上传链路是：
 
 1. 浏览器扫描本地目录，识别 `Before / After / Rip / NoDeband / Degrain` 等列并生成配对计划
 2. 在右侧 `配对预览` 中确认问题、列名、顺序和全局 heatmap 参考
-3. worker 生成缩略图和缺失 heatmap
-4. 必要时用 `AbortController` 放弃本地生成或上传
-5. 调用 `POST /api/ops/group-upload-start`
-6. 按 frame 调用 `POST /api/ops/group-upload-frame-prepare`
-7. 浏览器用返回的 presigned PUT URL 直接上传该 frame 的原图与缩略图
-8. 调用 `POST /api/ops/group-upload-frame-commit`
-9. 全部 frame 完成后调用 `POST /api/ops/group-upload-complete`
-10. 如果用户放弃任务，调用 `POST /api/ops/group-upload-cancel`，取消 active job 并清理未提交 pending 前缀
+3. worker 完整解码全部源图，检查同帧尺寸并计算 SHA-256；这个阶段不创建远端 job，也不 PUT
+4. 预检通过后以 `stream-v2` 调用 `POST /api/ops/group-upload-start`
+5. 1 到 3 个 worker 逐帧生成缩略图和缺失 heatmap
+6. 一帧生成完成后立即调用 prepare，全局最多 6 路、单帧最多 3 路 PUT
+7. 该 frame 的 PUT 全部成功后串行 commit，并释放衍生 Blob
+8. 全部 frame 完成后调用 `POST /api/ops/group-upload-complete`
+9. 暂停会终止 worker 和 PUT；放弃还会调用 cancel 清理未提交 pending 前缀
 
 关键约束：
 
-- Web 上传和 legacy uploader 都不把图先落到 internal-site 本地目录，也不调用服务器二进制上传代理
+- Web 上传不把图先落到 internal-site 本地目录，也不调用服务器二进制上传代理
 - Web 上传的 `File` / `Blob` 不进入 React state；React 只保存轻量渲染模型
 - Web 上传的 heatmap 参考是全局设置，只能选择所有 frame 都存在的列
 - Web 上传的 VSEditor 行标题使用 `<episode>-<frame>`，长片名保留在 caption / tooltip 中
 - 远端内部站只支持 Cloudflare Service Token，不再走 `cloudflared` 人工登录链路
 - 新上传对象统一放在 `/groups/<group-storage-uuid>/<frame-order>/<frame-revision-uuid>/...`
-- 已存在的 case metadata 仍以数据库为准；uploader 不会覆盖已有 case 的 title / summary / tags
+- 已存在的 case metadata 仍以数据库为准；Web 上传不会覆盖已有 case 的 title / summary / tags
 - group 默认内部草稿；公开开关不再来自 `case.yaml` / `group.yaml`
 - 浏览器实际访问图片时，会由 internal/public 站点将逻辑路径解析成 `MAGIC_COMPARE_S3_PUBLIC_BASE_URL` 下的公网绝对 URL
 - 生产环境里的 `MAGIC_COMPARE_S3_PUBLIC_BASE_URL` 应指向 Cloudflare 代理的图片域名，不应直接使用裸 `r2.dev` 或 `cloudflarestorage.com` 桶域名
 - public-export/public-deploy 不再打包图片，Pages 只发布静态页面和 manifest
 - `public-site` 公开页默认不应被搜索引擎索引；页面层防爬通过 metadata / `robots.txt` 声明，真正的图片拦截和限流交给 Cloudflare
-- legacy uploader 的 upload session 固定放在工作目录 `.magic-compare/upload-session.json`
-- legacy wizard 当前显示的是**文件级**上传进度：总体文件条 + 当前并发/最近 frame 状态 + skipped/retried/failed 计数
-- legacy wizard 的百分比行只显示 `进度：N%`，不再附加额外提示语
-- legacy `sync` 命令仍保持轻量输出，不显示同等复杂的实时进度 UI
-- legacy uploader 会复用一个共享 HTTP client，并用流式 PUT 上传文件，避免大图整文件读入内存
-- Web 上传和 legacy uploader 都可以并发处理多个 frame 的 prepare/upload，但 commit 仍串行执行，避免 internal-site 的 SQLite 写冲突
 
 ## 页脚版本信息
 
@@ -330,8 +325,6 @@ Web 上传链路是：
 - `lib/server/uploads/upload-service-helpers.ts`：承接作业装载、group 重置、presign 组装、frame 状态 guard、complete 收尾
 - `lib/server/storage/internal-assets.ts`：只负责 S3-compatible 读写、presign、按前缀删除，不负责业务状态切换
 - `components/web-uploader/`：只负责浏览器目录扫描、预览、生成、上传 runner 和轻量状态展示
-- `tools/uploader/src/wizard.py`：legacy CLI 交互向导和工作目录确认
-- `tools/uploader/src/upload_executor.py`：legacy CLI 的 start -> per-frame prepare/upload/commit -> complete 执行状态机，其中 prepare/upload 可并发，commit 串行收口
 
 新增上传逻辑时，优先把“副作用顺序”塞进 helper，而不是继续往 route 或单个主流程函数里追加分支。
 
@@ -341,10 +334,9 @@ Web 上传链路是：
 
 - 不要恢复 internal-site 二进制上传代理；上传工具只能拿 presigned URL 后直传对象存储
 - 不要在 `upload-service.ts` 里混入大段 Prisma 明细和对象存储清理细节；新增分支优先落到 helper
-- 不要把新的上传体验继续扩展到 Python CLI；优先补齐 `/upload` Web 工作台
+- 新的上传体验优先补齐 `/upload` Web 工作台
 - 不要把 viewer 的键盘、cookie、viewport、A/B outside-click 副作用重新塞回 `group-viewer-workbench.tsx`
 - 不要让 workspace action 自己管理 toast timer、optimistic rollback、transition 样板；复用 action helper 和 notification hook
-- 不要把 uploader 的 session 读写、frame 状态推进和 Rich 输出重新揉进一个超长函数
 
 ## 发布、导出、部署三件事要分清
 
@@ -361,6 +353,8 @@ Web 上传链路是：
 结果：
 
 - `content/published` 或 `MAGIC_COMPARE_PUBLISHED_ROOT` 更新
+
+发布只查询公开 Group、Frame 和 manifest 所需字段。新上传或 manifest 导入在对象检查成功后写入 `Asset.storageValidatedAt`；旧素材首次发布以 8 路并发检查未记录的原图和缩略图，后续发布信任 UUID 不可变路径，不再重复读取 R2。日志记录查询、校验和总耗时以及信任/新增校验数量。
 
 它**不会**自动部署公开站。
 
@@ -521,7 +515,7 @@ internal-site 即使运行在开发模式，也会让 public-site 子构建显�
 推荐顺序：
 
 1. 先提交功能、UI、文档修正。
-2. 再提交 `CHANGELOG.md`、根 `package.json`、`tools/uploader/pyproject.toml` 的发版元数据。
+2. 再提交 `CHANGELOG.md` 和根 `package.json` 的发版元数据。
 3. 在发版提交上打 `vX.Y.Z` annotated tag。
 4. 分步推送 `main` 和 tag。
 5. 用 `gh run list` 确认 `CI`、`GHCR Docker`、`Dependency Graph` 等远端任务状态。
@@ -586,7 +580,7 @@ docker build --platform linux/amd64 -f docker/internal-site.Dockerfile -t magic-
 
 - 使用 Node 24 runtime 的 actions：`setup-buildx-action@v4`、`build-push-action@v7`、`upload-artifact@v7`
 - 只构建 `linux/amd64`，与 Intel N100 / Debian 12 目标机一致，不安装 QEMU
-- 构建上下文排除文档和弃用的 Python uploader，保留 Web workspace、共享包、发布内容与运行脚本
+- 构建上下文排除文档，保留 Web workspace、共享包、发布内容与运行脚本
 - Buildx 先构建并 `load` 本地 smoke 镜像，通过 `type=gha,mode=max` 缓存完整构建层
 - `docker compose --no-build` 跑通 `internal-site-init -> internal-site`，确保 smoke 测试的是 Buildx 产物
 - 只验证运行路径和健康探活，不替代 `public:export`
@@ -628,17 +622,13 @@ docker build --platform linux/amd64 -f docker/internal-site.Dockerfile -t magic-
 - `AGENTS.md`（架构分工、viewer 布局约束）
 - `docs/workflow-guide.md`（本文档，"已经踩过的坑"节）
 
-### 做 uploader 或导入链路
+### 做 Web 上传或导入链路
 
 先看：
 
 - `docs/web-uploader.zh-CN.md`
 - `docs/reference/database-architecture.zh-CN.md`
 - `docs/reference/demo-vs-real.zh-CN.md`
-- `docs/uploader/README.md`（legacy Python uploader）
-- `docs/uploader/vseditor-workflow.zh-CN.md`（legacy VSEditor CLI 流程）
-- `docs/uploader/boundaries-and-env-split.zh-CN.md`
-- `docs/uploader/distribution.zh-CN.md`
 
 ### 做部署、Docker、Pages、CI
 
@@ -657,7 +647,7 @@ docker build --platform linux/amd64 -f docker/internal-site.Dockerfile -t magic-
 
 把这个仓库理解成三段最安全：
 
-1. `uploader + S3` 负责把真实素材变成内部可读内容
+1. `Web upload + S3` 负责把真实素材变成内部可读内容
 2. `internal-site` 负责管理、查看、发布和导出
 3. `public-site` 只负责静态消费已发布 bundle
 

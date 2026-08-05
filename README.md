@@ -74,8 +74,6 @@ pnpm dev
 
 Local tooling uses Node `24.13.x` and pnpm `10.32.1`. `pnpm dev` checks the environment, synchronizes the SQLite schema, and starts the internal site without uploading or repairing demo data. Use `pnpm dev:bootstrap` when the demo needs repair, or `pnpm dev:all` for two-site development.
 
-The root `.env.example` is only for the website/runtime side. The Python uploader keeps its own template at `tools/uploader/.env.example`.
-
 Local entry points:
 
 - internal site: `http://localhost:3000`
@@ -127,7 +125,6 @@ Result:
 - imported review data is available in the internal site workspace
 - internal assets live in S3-compatible storage; the database keeps logical `/groups/...` paths while browser-facing URLs resolve from `MAGIC_COMPARE_S3_PUBLIC_BASE_URL`
 - current Web upload usage lives in `docs/web-uploader.zh-CN.md`
-- legacy Python uploader usage lives in `docs/uploader/README.md`
 - a Chinese note about the difference between built-in demo content and real case/group flows lives in `docs/reference/demo-vs-real.zh-CN.md`
 
 ### 📦 Publish Workflow
@@ -174,9 +171,6 @@ packages/
   content-schema/
   shared-utils/
   ui/
-
-tools/
-  uploader/
 
 content/
   published/
@@ -261,17 +255,6 @@ Shared viewer workbench and theme:
 - main stage
 - filmstrip rail
 - right sidebar
-
-### tools/uploader
-
-Legacy Python CLI that:
-
-- validates a local case directory
-- generates thumbnails
-- uses frame-level upload APIs and presigned PUT URLs
-- remains available for old import flows and emergency recovery
-
-New upload work should target the Web uploader. Legacy CLI docs live at `docs/uploader/README.md`.
 
 </details>
 
@@ -554,8 +537,6 @@ This is used for:
 ## 🔗 Related Docs
 
 - [Web uploader guide (Simplified Chinese)](./docs/web-uploader.zh-CN.md)
-- [Uploader README](./docs/uploader/README.md)
-- [VSEditor workflow guide (Simplified Chinese)](./docs/uploader/vseditor-workflow.zh-CN.md)
 - [Demo vs real case/group flow (Simplified Chinese)](./docs/reference/demo-vs-real.zh-CN.md)
 - [Chinese root README](./README.zh-CN.md)
 

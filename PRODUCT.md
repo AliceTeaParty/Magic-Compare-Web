@@ -15,7 +15,7 @@ Magic Compare serves internal operators and reviewers who inspect before/after i
 
 The product makes large visual comparison sets browsable, inspectable, and publishable without mixing internal asset operations with the static public viewer. Success means users can move through frames and groups quickly while trusting that the visible image state reflects the selected comparison target.
 
-Near-term product development prioritizes filling Web capabilities in the internal workspace and viewer. The legacy Python uploader remains available for existing import flows, but new upload and metadata-management work should default toward the cross-platform Web surface.
+Near-term product development prioritizes the Web upload workspace, internal workspace, and viewer.
 
 ## Brand Personality
 
@@ -29,7 +29,7 @@ Avoid decorative dashboards, oversized hero language, gratuitous animation, stoc
 
 - Keep image inspection primary; chrome supports the task and should stay quiet.
 - Prefer immediate, truthful feedback over blank waiting states.
-- Preserve internal-site, public-site, and legacy uploader boundaries.
+- Preserve internal-site, public-site, and Web upload boundaries.
 - Optimize perceived speed without replacing original assets as the inspection source of truth.
 - Use familiar product UI patterns before inventing custom affordances.
 - Make inline metadata edits feel stable and document-like: no layout jump, no full-page flash, no hidden save ambiguity.

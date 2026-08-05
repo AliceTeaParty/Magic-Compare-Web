@@ -5,7 +5,7 @@
 ## 先看结论
 
 - `demo` 是仓库内置的开发 / 演示样本，不代表正常业务导入流程。
-- 真实 `case / group` 来自 Web 上传工作台、legacy uploader 或内部上传 API，同步后才进入数据库与对象存储。
+- 真实 `case / group` 来自 Web 上传工作台或内部上传 API，同步后才进入数据库与对象存储。
 - `demo` 的目标是让仓库开箱即用，方便本地开发、UI 联调、公开站静态导出验证。
 - 真实内容的目标是支撑日常工作流，数据生命周期由导入、排序、发布、删除驱动。
 
@@ -31,7 +31,7 @@ demo 的原始文件固定存放在：
 
 - `apps/internal-site/prisma/demo-assets/`
 
-这些文件是 seed 的稳定输入，不依赖 uploader，也不依赖当前 `content/published` 中是否已经有最新发布产物。
+这些文件是 seed 的稳定输入，不依赖上传工具，也不依赖当前 `content/published` 中是否已经有最新发布产物。
 
 ### 2. seed 会把 demo 写入数据库与 S3
 
@@ -67,7 +67,6 @@ pnpm db:seed
 真实内容通常从：
 
 - `/upload` Web 上传工作台
-- `magic-compare-uploader`
 - `POST /api/ops/group-upload-start`
 - `POST /api/ops/group-upload-frame-prepare`
 - `POST /api/ops/group-upload-frame-commit`
@@ -90,8 +89,6 @@ pnpm db:seed
 4. 在浏览器 worker 中生成缩略图和缺失 heatmap
 5. 通过 frame-level upload API 申请 presigned PUT URL 并直传对象存储
 6. 按 frame commit，最后 complete 整个 group
-
-旧 Python uploader 仍可用于 legacy 导入或临时补救，但不再是新增上传能力的默认方向。
 
 这里的数据是“用户输入驱动”的，而不是像 demo 一样由仓库写死。
 
@@ -164,7 +161,7 @@ pnpm db:seed
 ### 业务内容层
 
 - 所有真实 case / group
-- 由 Web 上传工作台、legacy uploader 和内部站维护
+- 由 Web 上传工作台和内部站维护
 - 用于真实导入、查看、排序、发布与删除
 
 ## 开发时应该怎么用
@@ -206,7 +203,7 @@ pnpm dev:internal
 http://localhost:3000/upload
 ```
 
-这样验证的是当前推荐的实际导入和资产写入流程。若需要验证旧 CLI，再单独运行 `magic-compare-uploader`。
+这样验证的是当前推荐的实际导入和资产写入流程。
 
 ### 你在调公开站导出
 
@@ -228,6 +225,5 @@ http://localhost:3000/upload
 - demo seed：`apps/internal-site/prisma/seed.ts`
 - demo 原始素材：`apps/internal-site/prisma/demo-assets/`
 - 真实导入入口：`apps/internal-site/app/upload/page.tsx`
-- legacy uploader：`tools/uploader/`
 - published bundle：`content/published/groups/`
 - 公开站读取逻辑：`apps/public-site/lib/content.ts`

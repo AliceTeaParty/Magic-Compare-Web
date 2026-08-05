@@ -74,8 +74,6 @@ pnpm dev
 
 本地工具链使用 Node `24.13.x` 和 pnpm `10.32.1`。`pnpm dev` 会检查环境、同步 SQLite schema 并启动 internal-site，不会上传或修复 demo。需要 demo 时运行 `pnpm dev:bootstrap`；需要同时联调公开站时运行 `pnpm dev:all`。
 
-根目录 `.env.example` 只服务于网站 / 运行时。Python uploader 使用自己独立的 `tools/uploader/.env.example`。
-
 本地访问入口：
 
 - internal-site：`http://localhost:3000`
@@ -127,7 +125,6 @@ pnpm dev
 - 导入后的 review 数据可直接在 internal-site 工作区查看
 - 内部素材真实对象落在 S3-compatible 存储；数据库保留逻辑路径 `/groups/...`，浏览器实际访问地址由 `MAGIC_COMPARE_S3_PUBLIC_BASE_URL` 解析
 - 当前推荐的 Web 上传方式见 `docs/web-uploader.zh-CN.md`
-- 旧 Python uploader 的使用方式见 `docs/uploader/README.md`
 - demo 与真实内容处理流程的区别见 `docs/reference/demo-vs-real.zh-CN.md`
 
 ### 📦 发布流程
@@ -174,9 +171,6 @@ packages/
   content-schema/
   shared-utils/
   ui/
-
-tools/
-  uploader/
 
 content/
   published/
@@ -261,23 +255,6 @@ content/
 - 主图舞台
 - 胶片缩略图带
 - 右侧信息栏
-
-### tools/uploader
-
-历史 Python CLI，负责：
-
-- 校验本地 case 目录
-- 把源图、缩略图和 heatmap 直接上传到 S3-compatible 存储
-- 生成缩略图
-- 调用 frame-level 上传 API 并使用 presigned PUT URL
-- 继续服务旧导入流程和临时补救
-
-新的上传能力默认投向 Web 上传工作台。旧 CLI 独立文档：`docs/uploader/README.md`。
-
-如果你要从 VSEditor 已保存的平铺导图目录开始整理并导入，可直接参考：
-
-- `docs/uploader/vseditor-workflow.zh-CN.md`
-- `docs/reference/demo-vs-real.zh-CN.md`
 
 </details>
 
@@ -560,8 +537,6 @@ pnpm typecheck
 ## 🔗 相关文档
 
 - [Web 上传工作台](./docs/web-uploader.zh-CN.md)
-- [Uploader README](./docs/uploader/README.md)
-- [VSEditor 平铺导图工作流](./docs/uploader/vseditor-workflow.zh-CN.md)
 - [Demo 与真实 Case / Group 流程差异](./docs/reference/demo-vs-real.zh-CN.md)
 - [CI / GHCR 接入复盘](./docs/archive/ci-ghcr-lessons.zh-CN.md)
 - [English root README](./README.md)

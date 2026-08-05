@@ -12,7 +12,6 @@ const safeGeneratedPaths = [
   "apps/public-site/.next-dev",
   "apps/public-site/out",
   "apps/public-site/public/published",
-  "tools/uploader/.build",
   "dist",
   "coverage",
   ".turbo",

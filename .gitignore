@@ -70,7 +70,6 @@ content/published/
 apps/public-site/public/published/
 apps/public-site/out/
 apps/internal-site/prisma/*.db*
-tools/uploader/.build/
 dist/
 docker-data/
 internal-site.readonly.db

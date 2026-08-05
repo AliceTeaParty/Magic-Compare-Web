@@ -13,7 +13,7 @@
 ```bash
 git switch -c codex/<topic>
 git add -A
-git commit -m "refactor: switch uploader to frame-level presigned uploads"
+git commit -m "refactor: improve web upload frame processing"
 ```
 
 说明：
@@ -45,12 +45,13 @@ git commit -m "refactor: switch uploader to frame-level presigned uploads"
 <type>: <summary>
 ```
 
-必要时可以追加 1-3 行补充，说明本次提交覆盖的关键链路：
+对于复杂变更，不能只用一行说明。
+说明本次提交覆盖的关键链路：
 
 ```text
-refactor: switch uploader to frame-level presigned uploads
+refactor: improve web upload frame processing
 
-- remove internal binary upload proxy and import-sync dependency from uploader
+- remove the legacy CLI upload path
 - add group-upload start/prepare/commit/complete API flow
 - move Docker/runtime defaults to external R2-style S3 storage
 ```
