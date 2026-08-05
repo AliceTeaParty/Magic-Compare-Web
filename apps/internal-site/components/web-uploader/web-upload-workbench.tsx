@@ -38,7 +38,6 @@ import { useRouter } from "next/navigation";
 import type { CaseCatalogItem } from "@/lib/server/repositories/content-repository";
 import { CaseCreateButton } from "../case-create-button";
 import { InternalPageHeader } from "../internal-page-shell";
-import { AppNotifications } from "../notifications/app-notifications";
 import { useAppNotifications } from "../notifications/use-app-notifications";
 import type { GenerationProgress } from "./asset-generator";
 import { scanBrowserUploadFiles } from "./source-scanner";
@@ -495,7 +494,7 @@ export function WebUploadWorkbench({ cases, initialCaseSlug }: WebUploadWorkbenc
   const runnerRef = useRef<WebUploadRunner | null>(null);
   const unsubscribeRunnerRef = useRef<(() => void) | null>(null);
   const generationAbortRef = useRef<AbortController | null>(null);
-  const { dismissNotification, notifications, pushNotification } = useAppNotifications();
+  const { pushNotification } = useAppNotifications();
   const [selectedCaseSlug, setSelectedCaseSlug] = useState(() => {
     if (initialCaseSlug && cases.some((item) => item.slug === initialCaseSlug)) {
       return initialCaseSlug;
@@ -914,7 +913,6 @@ export function WebUploadWorkbench({ cases, initialCaseSlug }: WebUploadWorkbenc
           }
         />
 
-        <AppNotifications notifications={notifications} onDismiss={dismissNotification} />
 
         <Box
           sx={{

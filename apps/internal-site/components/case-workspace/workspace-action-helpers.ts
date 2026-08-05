@@ -1,7 +1,7 @@
 import type { MutableRefObject, TransitionStartFunction } from "react";
 import { arrayMove } from "@dnd-kit/sortable";
 import type { CaseWorkspaceData } from "@/lib/server/repositories/content-repository";
-import type { WorkspaceNotificationTone } from "./use-workspace-notifications";
+import type { AppNotificationTone } from "../notifications/use-app-notifications";
 
 type GroupItem = CaseWorkspaceData["groups"][number];
 
@@ -9,7 +9,7 @@ export interface NotificationApi {
   dismissNotification: (notificationId: string) => void;
   pushNotification: (
     message: string,
-    tone: WorkspaceNotificationTone,
+    tone: AppNotificationTone,
     options?: { key?: string; sticky?: boolean },
   ) => void;
   showWorkspaceSavingNotification: () => void;

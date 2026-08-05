@@ -32,8 +32,8 @@
 - 可编辑列名必须保持列语义唯一。不要允许备选列重命名为 `Before` / `After` / `Heatmap` 或现有列名，否则全局 heatmap 参考和表格阅读都会变得含糊。
 - 上传页局部样式超过三处复用时先抽本地 tokens / primitives。面板 surface、控件圆角、列表行、缩略图这类语义稳定的值不要继续散落在 `sx` 里。
 - 站点级 header action 要同源。Catalog、Case workspace、Upload 的返回、上传、部署、新建入口应共享相近高度、圆角和文案权重，避免某一页出现“嵌套胶囊按钮”或孤立按钮组。
-- Dialog 不是普通表单套壳。`新建 Case` 这类高频 internal 操作要继承工作台 surface、divider、字段密度和 action hierarchy，不能退回默认浅色 MUI 弹窗。
-- 版本号、commit hash 属于低权重运行信息。它应和 footer copyright 同级显示，不应因为字号、字重或间距看起来像另一个品牌或状态标签。
+- Dialog 不是普通表单套壳。`新建 Case` 这类高频 internal 操作要继承工作台 surface、divider、字段密度和 action hierarchy；标题必须显式高于 supporting text，不能依赖页面继承字号。
+- 版本号、commit hash 属于低权重运行信息。它应从构建环境进入持久导航的 utility 区，与 footer copyright 同级显示；短版本常驻，完整 build identity 放入 tooltip。
 - 同级路由的页头必须复用同一高度和 divider 坐标。全局导航已经能回到父级时，工作区不再重复返回按钮；为单页另设 compact header 会让目录与工作区切换时分割线上下跳动。
 - 长目录与短工作区切换时要为根滚动容器设置 `scrollbar-gutter: stable`。只统一 header 高度仍会因滚动条出现与消失造成约 17px 的可用宽度变化，让 divider 右端和页面级动作横向抖动。
 - 数量和状态摘要不要伪装成筛选器。`1 Group`、`0 公开` 这类只读指标属于 Case 设置元数据，使用图标与低权重文本即可；放在列表标题旁或使用描边 Chip 都会让它们看起来可以点击。
@@ -46,7 +46,7 @@
 - 全局导航在所有桌面断点保持 `80px` rail，不因窗口变宽扩展为带横向标签的侧栏。移动端使用 modal drawer，并以整行 container 表示当前目的地；两种形态复用同一导航顺序和动作状态。
 - 部署入口始终占用固定导航位置并使用主题主色。它执行不带 `caseId` 的全站部署，仅在请求进行中临时禁用，空 Group 页面和非 Case 路由不会改变可用性。
 - 当前 Case 工作区入口同样始终占用固定导航位置。没有 Case 上下文时显示禁用态，进入 Case 及其 Viewer 子路由后原位启用和选中，避免全局目的地顺序变化。
-- 异步保存、部署等短期状态使用固定定位的 Snackbar / Alert，不进入列表文档流。否则“正在保存”出现和消失会推动全部 Group，造成内容位置变化。
+- 异步保存、部署等短期状态由应用外壳上的单一 Provider 管理，并通过 Portal 固定到视口；页面只负责推送消息，不各自渲染通知层。否则 transformed 路由容器会把 `position: fixed` 变成局部定位，或让多个队列在不同位置重复出现。
 - 删除确认框必须让动作名称成为主标题，删除范围和后果作为较小、较轻的 supporting text；Case 和 Group 复用同一组件，避免两套字号和字重再次分叉。
 - Inline editor 的新长度上限不能在进入编辑态时裁切旧数据。完整展示超限值、显示计数并禁用保存，只有用户主动修正后才写回，避免“打开再保存”静默破坏元数据。
 - Viewer 的模式专属控件必须占用固定 contextual slot。A/B 缩放和热图透明度在同一位置替换，首次提示悬浮在主图上方；不能用隐藏整行或在主图下方插入控件来维持稳定，否则会浪费空间或推动胶片条。
@@ -56,7 +56,7 @@
 - Viewer 标题列使用零 flex 基准并限制为可用剩余宽度，宽屏和窄屏都由 CSS 单行省略。页面已经设置 `scrollbar-gutter: stable` 时，帮助和移动详情 Drawer 应关闭 MUI 的额外 scroll lock 补偿，避免重复增加 body 右内边距。
 - 同一 Case 内切换 Group 属于 Viewer 数据更新，不是整页层级跳转。路由过渡容器应按 Case Viewer scope 复用 React subtree，不渲染重复的 outgoing 页面；这样详情栏、模式和检查状态不会因 Group slug 改变而重置。
 - 路由加载只能有一个全局反馈源。根级 `loading.tsx` 不得再把页面替换成带内边距的嵌套骨架；顶边进度条延迟短暂显示，让已预取的快速切换直接完成，慢请求仍及时反馈。
-- Popover、Menu、Select 这类锚定面板不应锁定文档滚动；短暂选择不值得让整页横向位移。Drawer、Dialog 这类阻断式面板使用共享的根节点滚动锁，并以引用计数支持嵌套；宽度补偿只加到主内容，不能让 MUI 默认给 `body` 增加约 17px 内边距并挤压固定侧栏。
+- Popover、Menu、Select 这类锚定面板不应锁定文档滚动；短暂选择不值得让整页横向位移。Drawer、Dialog 这类阻断式面板使用共享的根节点滚动锁，并以引用计数支持嵌套；锁定期间保留根节点的 stable scrollbar gutter，不再向 `body` 或 `main` 注入宽度补偿。
 - 同一 supporting pane 在宽屏 `aside` 和窄屏 Drawer 中必须复用内容结构与 surface 层级。Drawer 可以因触控和模态语义使用更宽面板、全高滚动、遮罩与滑入动效，但外层 surface 不能与内部 tonal list 使用同一角色，否则列表底色会消失。
 - 移动端 Viewer 详情与帮助使用模态 Drawer 时由共享根节点锁阻止背景滚动，不能保留一条挤压内容宽度的页面滚动条。发布状态使用足量内边距的低强调状态容器，公开 Slug 直接承担文字链接语义。
 - Viewer 胶片条是高频扫描工具，缩略图密度应高于普通内容卡片。选中态使用主题 container / on-container，图片 `alt` 留空并由按钮提供唯一名称，避免读屏名称重复；hover 只改变 state layer，不抬升卡片。

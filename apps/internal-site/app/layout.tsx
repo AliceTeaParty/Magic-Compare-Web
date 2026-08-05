@@ -30,7 +30,12 @@ export default async function RootLayout({ children }: { children: React.ReactNo
 
   return (
     <MagicRootLayoutShell profile="internal" initialThemeSeed={initialThemeSeed} lang="zh-CN">
-      <InternalAppShell>{children}</InternalAppShell>
+      <InternalAppShell
+        appVersion={process.env.MAGIC_COMPARE_APP_VERSION}
+        commitHash={process.env.MAGIC_COMPARE_COMMIT_SHA}
+      >
+        {children}
+      </InternalAppShell>
     </MagicRootLayoutShell>
   );
 }

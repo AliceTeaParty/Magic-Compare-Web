@@ -15,7 +15,6 @@ import {
 import { cjkKebabCase } from "@magic-compare/shared-utils";
 import { useRootScrollLock } from "@magic-compare/ui";
 import { useRouter } from "next/navigation";
-import { AppNotifications } from "./notifications/app-notifications";
 import { useAppNotifications } from "./notifications/use-app-notifications";
 import { InternalNavigationItem } from "./internal-navigation-item";
 
@@ -121,9 +120,26 @@ export function CaseCreateButton({ navigation = false }: { navigation?: boolean 
           },
         }}
       >
-        <DialogTitle>新建 Case</DialogTitle>
+        <DialogTitle
+          sx={{
+            // Explicit M3 dialog hierarchy prevents inherited body typography from making the
+            // supporting sentence look larger than the task title.
+            px: 3,
+            pt: 3,
+            pb: 1.25,
+            fontSize: "1.25rem",
+            fontWeight: 700,
+            lineHeight: 1.3,
+          }}
+        >
+          新建 Case
+        </DialogTitle>
         <DialogContent>
-          <DialogContentText sx={{ mb: 2 }}>创建内部工作区后，再上传对比组。</DialogContentText>
+          <DialogContentText
+            sx={{ mb: 2, color: "text.secondary", fontSize: "0.875rem", lineHeight: 1.6 }}
+          >
+            创建内部工作区后，再上传对比组。
+          </DialogContentText>
           <Stack spacing={2}>
             <TextField
               label="标题"
@@ -177,10 +193,6 @@ export function CaseCreateButton({ navigation = false }: { navigation?: boolean 
           </Button>
         </DialogActions>
       </Dialog>
-      <AppNotifications
-        notifications={notifications.notifications}
-        onDismiss={notifications.dismissNotification}
-      />
     </>
   );
 }

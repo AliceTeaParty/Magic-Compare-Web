@@ -1,5 +1,7 @@
 import {
+  createContext,
   useCallback,
+  useContext,
   useRef,
   useState,
   type Dispatch,
@@ -19,6 +21,20 @@ export interface AppNotification {
   tone: AppNotificationTone;
   sticky?: boolean;
 }
+
+export interface AppNotificationsApi {
+  notifications: AppNotification[];
+  dismissNotification: (notificationId: string) => void;
+  pushNotification: (
+    message: string,
+    tone: AppNotificationTone,
+    options?: { key?: string; sticky?: boolean },
+  ) => void;
+  showWorkspaceSavingNotification: () => void;
+  dismissWorkspaceSavingNotification: () => void;
+}
+
+export const AppNotificationsContext = createContext<AppNotificationsApi | null>(null);
 
 const MAX_VISIBLE_NOTIFICATIONS = 4;
 const NOTIFICATION_TIMEOUT_MS = 4200;
@@ -143,7 +159,7 @@ function useNotificationQueue() {
  * Centralizes internal-site toast lifecycle so pages can share replacement, capping, and timer
  * behavior without reimplementing page-local notification stacks.
  */
-export function useAppNotifications() {
+export function useAppNotificationQueue(): AppNotificationsApi {
   const { notifications, dismissNotification, pushNotification } =
     useNotificationQueue();
 
@@ -172,4 +188,17 @@ export function useAppNotifications() {
     showWorkspaceSavingNotification,
     dismissWorkspaceSavingNotification,
   };
+}
+
+/**
+ * Reads the shell-owned notification queue so route content cannot create a fixed layer inside the
+ * transformed page-transition container and accidentally anchor feedback to a local page box.
+ */
+export function useAppNotifications() {
+  const context = useContext(AppNotificationsContext);
+  if (!context) {
+    throw new Error("useAppNotifications must be used within AppNotificationsProvider.");
+  }
+
+  return context;
 }

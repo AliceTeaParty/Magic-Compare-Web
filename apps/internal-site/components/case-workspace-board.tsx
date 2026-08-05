@@ -10,10 +10,9 @@ import type { CaseWorkspaceData } from "@/lib/server/repositories/content-reposi
 import { InternalPageHeader } from "./internal-page-shell";
 import { CaseSettingsPane } from "./case-workspace/case-settings-pane";
 import { DestructiveConfirmationDialog } from "./case-workspace/destructive-confirmation-dialog";
-import { WorkspaceNotifications } from "./case-workspace/notifications";
 import { SortableGroupRow } from "./case-workspace/sortable-group-row";
 import { useCaseWorkspaceActions } from "./case-workspace/use-case-workspace-actions";
-import { useWorkspaceNotifications } from "./case-workspace/use-workspace-notifications";
+import { useAppNotifications } from "./notifications/use-app-notifications";
 
 type GroupItem = CaseWorkspaceData["groups"][number];
 
@@ -28,8 +27,8 @@ export function CaseWorkspaceBoard({ data }: { data: CaseWorkspaceData }) {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [pendingDeleteGroup, setPendingDeleteGroup] = useState<GroupItem | null>(null);
   const [isPending, startTransition] = useTransition();
-  const workspaceNotifications = useWorkspaceNotifications();
-  const { dismissNotification, notifications, pushNotification } = workspaceNotifications;
+  const workspaceNotifications = useAppNotifications();
+  const { pushNotification } = workspaceNotifications;
   const {
     publicGroupCount,
     toggleGroupVisibility,
@@ -76,8 +75,6 @@ export function CaseWorkspaceBoard({ data }: { data: CaseWorkspaceData }) {
           </Tooltip>
         }
       />
-
-      <WorkspaceNotifications notifications={notifications} onDismiss={dismissNotification} />
 
       <Box
         sx={{

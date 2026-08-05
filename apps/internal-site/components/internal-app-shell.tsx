@@ -18,6 +18,7 @@ import {
   List,
   Stack,
   Toolbar,
+  Tooltip,
   Typography,
   useMediaQuery,
 } from "@mui/material";
@@ -31,7 +32,7 @@ import {
 } from "./internal-layout-constants";
 import { InternalNavigationItem } from "./internal-navigation-item";
 import { InternalRouteTransition } from "./internal-route-transition";
-import { AppNotifications } from "./notifications/app-notifications";
+import { AppNotificationsProvider } from "./notifications/app-notifications-provider";
 import { useAppNotifications } from "./notifications/use-app-notifications";
 import {
   notifyBrowserDeploySuccess,
@@ -54,13 +55,54 @@ function getCurrentCaseWorkspaceHref(pathname: string) {
   return caseSlug ? `/cases/${caseSlug}` : null;
 }
 
+/** Keeps build identity in the persistent utility area without turning it into page content. */
+function BuildVersionLabel({
+  appVersion,
+  commitHash,
+}: {
+  appVersion?: string | null;
+  commitHash?: string | null;
+}) {
+  if (!appVersion) return null;
+
+  const shortLabel = `v${appVersion}`;
+  const fullLabel = commitHash
+    ? `Magic Compare ${shortLabel} (${commitHash})`
+    : `Magic Compare ${shortLabel}`;
+
+  return (
+    <Tooltip title={fullLabel} placement="right">
+      <Typography
+        component="div"
+        variant="caption"
+        sx={{
+          width: "100%",
+          px: 0.75,
+          color: "text.disabled",
+          fontVariantNumeric: "tabular-nums",
+          lineHeight: 1.4,
+          textAlign: "left",
+          whiteSpace: "nowrap",
+          [NAV_RAIL_MEDIA_QUERY]: { px: 0, textAlign: "center" },
+        }}
+      >
+        {shortLabel}
+      </Typography>
+    </Tooltip>
+  );
+}
+
 /** Uses one navigation model for the modal drawer and compact desktop rail. */
 function NavigationContent({
+  appVersion,
+  commitHash,
   isDeployingPublicSite,
   onDeployPublicSite,
   pathname,
   onNavigate,
 }: {
+  appVersion?: string | null;
+  commitHash?: string | null;
   isDeployingPublicSite: boolean;
   onDeployPublicSite: () => void;
   pathname: string;
@@ -176,18 +218,27 @@ function NavigationContent({
         <Box sx={{ display: "none", [NAV_RAIL_MEDIA_QUERY]: { display: "block" } }}>
           <MagicThemeControls compact />
         </Box>
+        <BuildVersionLabel appVersion={appVersion} commitHash={commitHash} />
       </Stack>
     </Stack>
   );
 }
 
 /** Provides one adaptive scaffold so route changes replace content without moving global chrome. */
-export function InternalAppShell({ children }: { children: ReactNode }) {
+function InternalAppShellScaffold({
+  appVersion,
+  children,
+  commitHash,
+}: {
+  appVersion?: string | null;
+  children: ReactNode;
+  commitHash?: string | null;
+}) {
   const pathname = usePathname();
   const railVisible = useMediaQuery(`(min-width:${NAV_RAIL_MIN_WIDTH}px)`);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [isDeployingPublicSite, setIsDeployingPublicSite] = useState(false);
-  const { dismissNotification, notifications, pushNotification } = useAppNotifications();
+  const { dismissNotification, pushNotification } = useAppNotifications();
   const mobileDrawerOpen = mobileOpen && !railVisible;
   useRootScrollLock(mobileDrawerOpen);
 
@@ -255,6 +306,8 @@ export function InternalAppShell({ children }: { children: ReactNode }) {
           }}
         >
           <NavigationContent
+            appVersion={appVersion}
+            commitHash={commitHash}
             isDeployingPublicSite={isDeployingPublicSite}
             onDeployPublicSite={() => void deployPublicSite()}
             pathname={pathname}
@@ -279,6 +332,8 @@ export function InternalAppShell({ children }: { children: ReactNode }) {
           }}
         >
           <NavigationContent
+            appVersion={appVersion}
+            commitHash={commitHash}
             isDeployingPublicSite={isDeployingPublicSite}
             onDeployPublicSite={() => void deployPublicSite()}
             pathname={pathname}
@@ -318,7 +373,25 @@ export function InternalAppShell({ children }: { children: ReactNode }) {
           <InternalRouteTransition>{children}</InternalRouteTransition>
         </Box>
       </Box>
-      <AppNotifications notifications={notifications} onDismiss={dismissNotification} />
     </>
+  );
+}
+
+/** Mounts the feedback provider above animated route content so every page shares one queue. */
+export function InternalAppShell({
+  appVersion,
+  children,
+  commitHash,
+}: {
+  appVersion?: string | null;
+  children: ReactNode;
+  commitHash?: string | null;
+}) {
+  return (
+    <AppNotificationsProvider>
+      <InternalAppShellScaffold appVersion={appVersion} commitHash={commitHash}>
+        {children}
+      </InternalAppShellScaffold>
+    </AppNotificationsProvider>
   );
 }
