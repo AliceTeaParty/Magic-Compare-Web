@@ -3,6 +3,7 @@
 import { CheckCircleOutlineRounded, CheckRounded, CollectionsOutlined } from "@mui/icons-material";
 import {
   Box,
+  CircularProgress,
   Divider,
   Drawer,
   Link as MuiLink,
@@ -17,7 +18,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
 import { findAsset, getComparisonTargetAssets } from "@magic-compare/compare-core/viewer-data";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type MouseEvent as ReactMouseEvent } from "react";
 import type {
   ViewerAsset,
   ViewerDataset,
@@ -77,10 +78,16 @@ function GroupLinks({
   currentGroup,
   groups,
   onGroupIntent,
+  onGroupNavigate,
+  onGroupPrefetch,
+  pendingGroupHref,
 }: {
   currentGroup: ViewerGroup;
   groups: ViewerDataset["siblingGroups"];
   onGroupIntent: (assets: ViewerDataset["siblingGroups"][number]["preloadAssets"]) => void;
+  onGroupNavigate?: (href: string) => void;
+  onGroupPrefetch?: (href: string) => void;
+  pendingGroupHref?: string | null;
 }) {
   const router = useRouter();
 
@@ -89,8 +96,34 @@ function GroupLinks({
    * while only the target group's small first-frame hint is handed to the image preloader.
    */
   function handleGroupIntent(group: ViewerDataset["siblingGroups"][number]) {
-    router.prefetch(group.href);
+    if (onGroupPrefetch) {
+      onGroupPrefetch(group.href);
+    } else {
+      router.prefetch(group.href);
+    }
     onGroupIntent(group.preloadAssets);
+  }
+
+  /** Intercepts only an ordinary primary click; browser-native new-tab and modifier behavior stays. */
+  function handleGroupClick(
+    event: ReactMouseEvent<HTMLAnchorElement>,
+    group: ViewerDataset["siblingGroups"][number],
+  ) {
+    if (
+      !onGroupNavigate ||
+      event.defaultPrevented ||
+      event.button !== 0 ||
+      event.metaKey ||
+      event.ctrlKey ||
+      event.shiftKey ||
+      event.altKey
+    ) {
+      return;
+    }
+
+    event.preventDefault();
+    // The current row also reaches the controller so it can cancel a slower pending switch.
+    onGroupNavigate(group.href);
   }
 
   return (
@@ -110,8 +143,12 @@ function GroupLinks({
           key={group.id}
           component={Link}
           href={group.href}
+          prefetch={onGroupNavigate ? false : undefined}
           selected={group.isCurrent}
           aria-current={group.isCurrent ? "page" : undefined}
+          aria-busy={pendingGroupHref === group.href || undefined}
+          data-viewer-group-link={onGroupNavigate ? "" : undefined}
+          onClick={(event) => handleGroupClick(event, group)}
           onFocus={() => handleGroupIntent(group)}
           onMouseEnter={() => handleGroupIntent(group)}
           onTouchStart={() => handleGroupIntent(group)}
@@ -168,7 +205,9 @@ function GroupLinks({
               },
             }}
           />
-          {group.isCurrent ? (
+          {pendingGroupHref === group.href ? (
+            <CircularProgress aria-hidden="true" color="inherit" size={18} thickness={5} />
+          ) : group.isCurrent ? (
             <CheckRounded aria-hidden="true" sx={{ ml: 1, fontSize: 18 }} />
           ) : null}
         </ListItemButton>
@@ -209,6 +248,9 @@ function ViewerSidebarContent({
   groups,
   heatmapAsset,
   onGroupIntent,
+  onGroupNavigate,
+  onGroupPrefetch,
+  pendingGroupHref,
   publishStatus,
   variant,
 }: {
@@ -217,6 +259,9 @@ function ViewerSidebarContent({
   groups: ViewerDataset["siblingGroups"];
   heatmapAsset: ViewerAsset | undefined;
   onGroupIntent: (assets: ViewerDataset["siblingGroups"][number]["preloadAssets"]) => void;
+  onGroupNavigate?: (href: string) => void;
+  onGroupPrefetch?: (href: string) => void;
+  pendingGroupHref?: string | null;
   publishStatus: ViewerDataset["publishStatus"];
   variant: "public" | "internal";
 }) {
@@ -237,7 +282,14 @@ function ViewerSidebarContent({
             >
               Group
             </Typography>
-            <GroupLinks currentGroup={currentGroup} groups={groups} onGroupIntent={onGroupIntent} />
+            <GroupLinks
+              currentGroup={currentGroup}
+              groups={groups}
+              onGroupIntent={onGroupIntent}
+              onGroupNavigate={onGroupNavigate}
+              onGroupPrefetch={onGroupPrefetch}
+              pendingGroupHref={pendingGroupHref}
+            />
           </Stack>
           <Divider />
         </>
@@ -373,6 +425,9 @@ interface ViewerSidebarProps {
   groups: ViewerDataset["siblingGroups"];
   heatmapAsset: ViewerAsset | undefined;
   onGroupIntent: (assets: ViewerDataset["siblingGroups"][number]["preloadAssets"]) => void;
+  onGroupNavigate?: (href: string) => void;
+  onGroupPrefetch?: (href: string) => void;
+  pendingGroupHref?: string | null;
   publishStatus: ViewerDataset["publishStatus"];
   showDesktopSidebar: boolean;
   sidebarOpen: boolean;
@@ -390,6 +445,9 @@ export function ViewerSidebar({
   groups,
   heatmapAsset,
   onGroupIntent,
+  onGroupNavigate,
+  onGroupPrefetch,
+  pendingGroupHref,
   publishStatus,
   showDesktopSidebar,
   sidebarOpen,
@@ -402,6 +460,9 @@ export function ViewerSidebar({
     groups,
     heatmapAsset,
     onGroupIntent,
+    onGroupNavigate,
+    onGroupPrefetch,
+    pendingGroupHref,
     publishStatus,
     variant,
   };

@@ -42,6 +42,9 @@ function isRouteNavigation(event: globalThis.MouseEvent): boolean {
   if (!(target instanceof Element)) return false;
   const anchor = target.closest<HTMLAnchorElement>("a[href]");
   if (!anchor || anchor.target === "_blank" || anchor.hasAttribute("download")) return false;
+  // Internal Viewer links own a localized data transition; a global progress line would make the
+  // unchanged workbench look like another page navigation before React handles the click.
+  if (anchor.hasAttribute("data-viewer-group-link")) return false;
 
   const nextUrl = new URL(anchor.href, window.location.href);
   const currentUrl = new URL(window.location.href);

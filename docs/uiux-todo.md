@@ -55,7 +55,8 @@
 - 窄屏 Viewer 工具栏按模式、工具、变量、模式上下文分行，每一行都限制在容器宽度内。桌面打开过的 supporting pane 偏好不能在移动端恢复成首屏遮挡 Drawer；移动端关闭后仍允许用户主动打开。
 - Viewer 桌面端按“视图工具、模式”排列两个三联组；移动端只保留帮助和详情两联组，并把它放进标题行右侧。标题与描述始终单行省略，不能为了容纳工具造成换行或 header 高度跳变。
 - Viewer 标题列使用零 flex 基准并限制为可用剩余宽度，宽屏和窄屏都由 CSS 单行省略。页面已经设置 `scrollbar-gutter: stable` 时，帮助和移动详情 Drawer 应关闭 MUI 的额外 scroll lock 补偿，避免重复增加 body 右内边距。
-- 同一 Case 内切换 Group 属于 Viewer 数据更新，不是整页层级跳转。路由过渡容器应按 Case Viewer scope 复用 React subtree，不渲染重复的 outgoing 页面；这样详情栏、模式和检查状态不会因 Group slug 改变而重置。
+- 同一 Case 内切换 Group 属于 Viewer 数据更新，不是整页层级跳转。普通点击先从内部 dataset API 读取并缓存目标 Group，再原位更新 Viewer 和 History URL；不替换 Server Component 页面树。新标签页、直接访问和跨层级导航仍使用标准路由。这样详情栏、模式和检查状态不会因 Group slug 改变而重置，前进后退也能复用同一缓存。
+- 同级异步导航要合并 hover、focus、touch 与 click 产生的重复请求，并用递增序号只提交最后一次选择。加载期间重新点击当前项应取消待提交目标；否则慢请求可能在用户改变主意后把界面反向切回。
 - 路由加载只能有一个全局反馈源。根级 `loading.tsx` 不得再把页面替换成带内边距的嵌套骨架；顶边进度条延迟短暂显示，让已预取的快速切换直接完成，慢请求仍及时反馈。
 - Popover、Menu、Select 这类锚定面板不应锁定文档滚动；短暂选择不值得让整页横向位移。Drawer、Dialog 这类阻断式面板使用共享的根节点滚动锁，并以引用计数支持嵌套；锁定期间保留根节点的 stable scrollbar gutter，不再向 `body` 或 `main` 注入宽度补偿。
 - 同一 supporting pane 在宽屏 `aside` 和窄屏 Drawer 中必须复用内容结构与 surface 层级。Drawer 可以因触控和模态语义使用更宽面板、全高滚动、遮罩与滑入动效，但外层 surface 不能与内部 tonal list 使用同一角色，否则列表底色会消失。
@@ -120,5 +121,5 @@
 
 - 复核日期：`2026-08-05`
 - 复核环境：本地 `internal-site` 开发服务器 + in-app browser
-- 复核页面：`/cases/ikoku-nikki/groups/tv`、`/cases/ultraman-tiga/groups/tv`、`/cases/ultraman-tiga/groups/movie`
-- 已验证状态：浅色、深色、`Src / Rip / Flt` 三变量切换、滑动、A/B、热图、详情侧栏、当前 Case 工作区导航、浏览器本地时间、桌面 `112px` header、Group 路由连续切换、单一顶边加载反馈、窄屏无横向溢出、宽窄侧栏 surface 层级、颜色面板和嵌套 Drawer 无滚动条位移、模式切换不推动主图与胶片条
+- 复核页面：`/cases/ikoku-nikki/groups/tv`、`/cases/ultraman-tiga/groups/tv`、`/cases/ultraman-tiga/groups/movie`、`/cases/ultraman-gaia/groups/movie`
+- 已验证状态：浅色、深色、`Src / Rip / Flt` 三变量切换、滑动、A/B、热图、详情侧栏、当前 Case 工作区导航、浏览器本地时间、桌面 `112px` header、Group dataset 原位切换、浏览器前进后退、单一局部加载反馈、窄屏无横向溢出、宽窄侧栏 surface 层级、颜色面板和嵌套 Drawer 无滚动条位移、模式切换不推动主图与胶片条

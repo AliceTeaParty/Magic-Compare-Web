@@ -26,6 +26,9 @@ import { ViewerOnboardingNudge } from "./workbench/viewer-onboarding-nudge";
 
 interface GroupViewerWorkbenchProps {
   dataset: ViewerDataset;
+  onGroupNavigate?: (href: string) => void;
+  onGroupPrefetch?: (href: string) => void;
+  pendingGroupHref?: string | null;
   variant: "public" | "internal";
 }
 
@@ -33,7 +36,13 @@ interface GroupViewerWorkbenchProps {
  * Composes the viewer shell around smaller workbench modules so layout, persistence, and keyboard
  * behavior stay centralized while rendering details live in focused subcomponents.
  */
-export function GroupViewerWorkbench({ dataset, variant }: GroupViewerWorkbenchProps) {
+export function GroupViewerWorkbench({
+  dataset,
+  onGroupNavigate,
+  onGroupPrefetch,
+  pendingGroupHref,
+  variant,
+}: GroupViewerWorkbenchProps) {
   const controller = useViewerController(dataset.group);
   const {
     abSide,
@@ -216,7 +225,7 @@ export function GroupViewerWorkbench({ dataset, variant }: GroupViewerWorkbenchP
           maxWidth: "100%",
           display: "grid",
           gridTemplateColumns:
-            sidebarOpen && resolvedShowDesktopSidebar ? "minmax(0, 1fr) 320px" : "1fr",
+            sidebarOpen && resolvedShowDesktopSidebar ? "minmax(0, 1fr) 320px" : "minmax(0, 1fr)",
           gridTemplateRows: "auto minmax(0, auto)",
           // A min-height grid stretches auto tracks by default, which made the viewer header absorb
           // the unused viewport height and pushed the stage far below its controls.
@@ -347,6 +356,9 @@ export function GroupViewerWorkbench({ dataset, variant }: GroupViewerWorkbenchP
           closeSidebar={closeSidebar}
           variant={variant}
           onGroupIntent={imagePreloader.preloadGroupHint}
+          onGroupNavigate={onGroupNavigate}
+          onGroupPrefetch={onGroupPrefetch}
+          pendingGroupHref={pendingGroupHref}
         />
         <ViewerGuidePanel
           open={guideOpen}
