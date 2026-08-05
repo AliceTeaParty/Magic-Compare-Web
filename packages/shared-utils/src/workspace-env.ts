@@ -16,7 +16,9 @@ export function loadWorkspaceEnvFromModule(fromModuleUrl: string, levelsUp: numb
   }
 
   for (const fileName of [".env.local", ".env"]) {
-    const envFilePath = path.join(workspaceRoot, fileName);
+    // Local env files are a development fallback; deployment values come from process.env and
+    // must not make Turbopack trace the entire workspace into the server bundle.
+    const envFilePath = path.join(/* turbopackIgnore: true */ workspaceRoot, fileName);
     if (!existsSync(envFilePath)) {
       continue;
     }

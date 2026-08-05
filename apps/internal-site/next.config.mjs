@@ -1,12 +1,12 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import type { NextConfig } from "next";
-import { resolveMagicCompareBuildEnv } from "../build-metadata";
+import { resolveMagicCompareBuildEnv } from "../build-metadata.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.join(__dirname, "../..");
 
-const nextConfig: NextConfig = {
+/** @type {import("next").NextConfig} */
+const nextConfig = {
   env: resolveMagicCompareBuildEnv(repoRoot),
   outputFileTracingRoot: repoRoot,
   transpilePackages: [

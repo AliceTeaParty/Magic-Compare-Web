@@ -2,21 +2,17 @@ import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 
-interface RootPackageJson {
-  version?: string;
-}
-
-function readRootPackageVersion(repoRoot: string) {
+function readRootPackageVersion(repoRoot) {
   try {
     const rawPackageJson = readFileSync(path.join(repoRoot, "package.json"), "utf8");
-    const packageJson = JSON.parse(rawPackageJson) as RootPackageJson;
+    const packageJson = JSON.parse(rawPackageJson);
     return packageJson.version?.trim() || "";
   } catch {
     return "";
   }
 }
 
-function readShortGitHash(repoRoot: string) {
+function readShortGitHash(repoRoot) {
   try {
     return execFileSync("git", ["-C", repoRoot, "rev-parse", "--short", "HEAD"], {
       encoding: "utf8",
@@ -31,8 +27,8 @@ function readShortGitHash(repoRoot: string) {
  * Next config runs in Node, so build metadata is injected there instead of teaching shared UI
  * packages how to read package.json or shell out to git.
  */
-export function resolveMagicCompareBuildEnv(repoRoot: string) {
-  const env: Record<string, string> = {};
+export function resolveMagicCompareBuildEnv(repoRoot) {
+  const env = {};
   const version = process.env.MAGIC_COMPARE_APP_VERSION?.trim() || readRootPackageVersion(repoRoot);
   const commitHash = process.env.MAGIC_COMPARE_COMMIT_SHA?.trim() || readShortGitHash(repoRoot);
 
