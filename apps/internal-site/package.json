@@ -15,8 +15,8 @@
     "db:seed": "DATABASE_URL=${DATABASE_URL:-file:./dev.db} tsx prisma/seed.ts"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.1103.0",
-    "@aws-sdk/s3-request-presigner": "^3.1103.0",
+    "@aws-sdk/client-s3": "^3.1104.0",
+    "@aws-sdk/s3-request-presigner": "^3.1104.0",
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
@@ -26,8 +26,8 @@
     "@magic-compare/content-schema": "workspace:*",
     "@magic-compare/shared-utils": "workspace:*",
     "@magic-compare/ui": "workspace:*",
-    "@mui/icons-material": "^9.2.0",
-    "@mui/material": "^9.2.0",
+    "@mui/icons-material": "^9.3.0",
+    "@mui/material": "^9.3.0",
     "@prisma/client": "^6.19.3",
     "motion": "^12.43.0",
     "next": "^16.3.0",

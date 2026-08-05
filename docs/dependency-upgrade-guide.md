@@ -2,7 +2,7 @@
 
 本文记录 workspace 的依赖升级批次、当前基线和迁移检查项。更新依赖时先确认实际安装版本与官方迁移文档，再按责任边界拆分提交。
 
-最后更新：2026-08-05。
+最后更新：2026-08-06。
 
 ## 当前基线
 
@@ -15,9 +15,9 @@
 | Vitest                         | `4.1.10`                       |
 | Playwright                     | `1.62.1`                       |
 | ESLint / React Hooks plugin    | `10.8.0` / `7.1.1`             |
-| Prettier / tsx                 | `3.9.6` / `4.23.6`             |
-| Wrangler / Motion              | `4.118.0` / `12.43.0`          |
-| AWS S3 client / presigner      | `3.1103.0`                     |
+| Prettier / tsx                 | `3.9.6` / `4.23.8`             |
+| Wrangler / Motion              | `4.119.0` / `12.43.0`          |
+| AWS S3 client / presigner      | `3.1104.0`                     |
 
 本地、CI 与 Docker 统一使用 Node `24.13.x`，pnpm 固定为 `10.32.1`，`@types/node` 保持 Node 24 版本线。TypeScript 7、Prisma 7 和 pnpm 11 属于后续独立迁移，不进入常规补丁更新。
 
