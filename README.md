@@ -107,6 +107,8 @@ Demo content:
 - internal assets live in external S3-compatible storage configured by `MAGIC_COMPARE_S3_*` (Cloudflare R2 or any S3-compatible service)
 - published bundles still live under `MAGIC_COMPARE_PUBLISHED_ROOT`
 - static public exports are mirrored into `MAGIC_COMPARE_PUBLIC_EXPORT_DIR`
+- the resident Next process runs directly under Node with a 512MiB default old-space limit; public build and Wrangler have separate, overrideable limits that apply only to their transient child processes
+- Compose leaves container burst memory to the host, uses `/api/healthz`, limits allocator arena retention, and persists public build/output caches on disk
 
 <a id="workflow-overview"></a>
 
@@ -116,8 +118,8 @@ Demo content:
 
 1. Open the internal Web uploader at `/upload`, or `/upload?case=<caseSlug>` from a case workspace.
 2. Select a local directory and review the pairing preview before uploading.
-3. Generate thumbnails and missing heatmaps in the browser worker.
-4. Use `group-upload-start -> frame prepare -> presigned PUT -> frame commit -> group-upload-complete`.
+3. Complete source decode, dimensions, SHA-256, and heatmap-plan validation before the first network write.
+4. Stream each generated frame through `group-upload-start -> frame prepare -> presigned PUT -> frame commit -> group-upload-complete`.
 5. Let the internal site update case/group metadata and switch each committed frame to the new object-storage revision.
 
 Result:
@@ -449,6 +451,7 @@ Note:
 - startup runs `dev:doctor` and calls `apps/internal-site/prisma/init-db.ts` directly
 - Prisma remains the runtime ORM
 - development output uses `.next-dev`; builds and type checks use `.next`, so they can run concurrently
+- Playwright uses `.next-e2e`, so browser smoke tests do not stop or overwrite a running development server
 
 ### 3. Repair demo content when needed
 
