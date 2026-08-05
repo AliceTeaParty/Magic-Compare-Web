@@ -2,15 +2,23 @@
 
 import { Add, Remove } from "@mui/icons-material";
 import { Box, FormControl, IconButton, MenuItem, Select, Stack } from "@mui/material";
-import { VIEWER_MAX_PRESET_SCALE, VIEWER_MIN_PRESET_SCALE } from "@magic-compare/compare-core";
-import { viewerTokens } from "./viewer-tokens";
+import {
+  getComparisonAssetKey,
+  VIEWER_MAX_PRESET_SCALE,
+  VIEWER_MIN_PRESET_SCALE,
+} from "@magic-compare/compare-core";
+import type { ViewerAsset } from "@magic-compare/compare-core/viewer-data";
+
+const BASELINE_ASSET_VALUE = "__baseline__";
 
 interface AbInspectControlsProps {
   abScale: number;
   abSide: "before" | "after";
-  afterLabel: string;
-  beforeLabel: string;
+  baselineAsset: ViewerAsset;
+  comparisonAssetKey: string;
+  comparisonAssets: ViewerAsset[];
   onAbSideChange: (side: "before" | "after") => void;
+  onComparisonAssetChange: (assetKey: string) => void;
   onScaleChange: (nextScale: number) => void;
 }
 
@@ -21,9 +29,11 @@ interface AbInspectControlsProps {
 export function AbInspectControls({
   abScale,
   abSide,
-  afterLabel,
-  beforeLabel,
+  baselineAsset,
+  comparisonAssetKey,
+  comparisonAssets,
   onAbSideChange,
+  onComparisonAssetChange,
   onScaleChange,
 }: AbInspectControlsProps) {
   const isAtMinScale = abScale <= VIEWER_MIN_PRESET_SCALE;
@@ -31,7 +41,8 @@ export function AbInspectControls({
   // Match the viewer toolbar target size so mode switching and zoom adjustment feel like one
   // control family instead of mixing desktop-tight and touch-friendly hit areas.
   const compactControlHeight = { xs: 42, md: 40 };
-  const compactIconButtonSize = { xs: 42, md: 40 };
+  const tripleControlWidth = 144;
+  const selectedAssetValue = abSide === "before" ? BASELINE_ASSET_VALUE : comparisonAssetKey;
 
   /**
    * The internal zoom state is multiplier-based, but the UI presents it as a percentage because
@@ -42,19 +53,29 @@ export function AbInspectControls({
   }
 
   /**
-   * MUI Select values arrive as strings at runtime, so keep the union guard explicit instead of
-   * relying on a cast that would hide a future option mismatch.
+   * Maps one image selector onto the controller's target and A/B-side states. Selecting a target
+   * changes the comparison asset before revealing its after side, while the baseline needs no
+   * target mutation.
    */
-  function handleAbSideChange(value: unknown) {
-    if (value === "before" || value === "after") {
-      onAbSideChange(value);
+  function handleAssetChange(value: unknown) {
+    if (value === BASELINE_ASSET_VALUE) {
+      onAbSideChange("before");
+      return;
+    }
+
+    if (
+      typeof value === "string" &&
+      comparisonAssets.some((asset) => getComparisonAssetKey(asset) === value)
+    ) {
+      onComparisonAssetChange(value);
+      onAbSideChange("after");
     }
   }
 
   return (
     <Stack
       direction="row"
-      spacing={1}
+      spacing={0.75}
       sx={{
         alignItems: "center",
         flexShrink: 0,
@@ -63,7 +84,8 @@ export function AbInspectControls({
     >
       <Box
         sx={{
-          width: 104,
+          width: 128,
+          height: compactControlHeight,
           minHeight: compactControlHeight,
         }}
       >
@@ -74,11 +96,20 @@ export function AbInspectControls({
             "& .MuiOutlinedInput-root": {
               height: compactControlHeight,
               minHeight: compactControlHeight,
+              boxSizing: "border-box",
+              borderRadius: 999,
+              backgroundColor: "surface.containerHigh",
+              // Keep the outline inside the fixed control height so its lower edge is never clipped.
+              "& .MuiOutlinedInput-notchedOutline": {
+                borderColor: "divider",
+              },
             },
             "& .MuiSelect-select": {
               display: "flex",
               alignItems: "center",
-              minHeight: { xs: "42px !important", md: "40px !important" },
+              height: "100%",
+              minHeight: "0 !important",
+              boxSizing: "border-box",
               py: "0 !important",
               pl: 1.5,
               pr: 3.75,
@@ -88,29 +119,44 @@ export function AbInspectControls({
           }}
         >
           <Select
-            value={abSide}
-            onChange={(event) => handleAbSideChange(event.target.value)}
-            inputProps={{ "aria-label": "选择 A/B 侧" }}
+            value={selectedAssetValue}
+            onChange={(event) => handleAssetChange(event.target.value)}
+            inputProps={{ "aria-label": "选择 A/B 图片" }}
           >
-            {/* The A/B side selector must name the active variables; fixed Before/After copy made
-                a selected Flt target look as if the third upload had disappeared. */}
-            <MenuItem value="before">{beforeLabel}</MenuItem>
-            <MenuItem value="after">{afterLabel}</MenuItem>
+            {/* A single selector exposes every uploaded variable without requiring a second target
+                control to remain visible beside the mode-specific A/B tools. */}
+            <MenuItem value={BASELINE_ASSET_VALUE}>{baselineAsset.label}</MenuItem>
+            {comparisonAssets.map((asset) => {
+              const assetKey = getComparisonAssetKey(asset);
+              return (
+                <MenuItem key={assetKey} value={assetKey}>
+                  {asset.label}
+                </MenuItem>
+              );
+            })}
           </Select>
         </FormControl>
       </Box>
       <Box
         sx={{
-          width: 168,
+          width: tripleControlWidth,
+          height: compactControlHeight,
           minHeight: compactControlHeight,
         }}
       >
-        <Stack
-          direction="row"
-          spacing={0.65}
+        <Box
           sx={{
             alignItems: "center",
             width: "100%",
+            height: "100%",
+            display: "grid",
+            gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+            overflow: "hidden",
+            boxSizing: "border-box",
+            border: "1px solid",
+            borderColor: "divider",
+            borderRadius: 999,
+            backgroundColor: "surface.containerHigh",
           }}
         >
           <IconButton
@@ -121,15 +167,12 @@ export function AbInspectControls({
               onScaleChange(Math.max(VIEWER_MIN_PRESET_SCALE, Math.floor(abScale - 0.001)))
             }
             sx={{
-              width: compactIconButtonSize,
-              height: compactIconButtonSize,
-              border: "1px solid",
-              borderColor: "divider",
-              borderRadius: 999,
+              width: "100%",
+              height: "100%",
+              borderRadius: 0,
               "&.Mui-disabled": {
                 color: "text.disabled",
-                borderColor: viewerTokens.control.disabledBorder,
-                backgroundColor: viewerTokens.control.disabledSurface,
+                backgroundColor: "transparent",
               },
             }}
           >
@@ -137,18 +180,18 @@ export function AbInspectControls({
           </IconButton>
           <Box
             sx={{
-              flex: 1,
-              height: compactControlHeight,
-              minHeight: compactControlHeight,
-              px: 1.1,
+              width: "100%",
+              height: "100%",
+              minWidth: 0,
+              minHeight: 0,
+              px: 0.25,
               display: "grid",
               placeItems: "center",
               fontSize: "0.9rem",
               fontWeight: 550,
-              borderRadius: 999,
+              fontVariantNumeric: "tabular-nums",
               whiteSpace: "nowrap",
-              border: "1px solid",
-              borderColor: "divider",
+              overflow: "hidden",
             }}
           >
             {formatZoomPercentage(abScale)}
@@ -161,21 +204,18 @@ export function AbInspectControls({
               onScaleChange(Math.min(VIEWER_MAX_PRESET_SCALE, Math.ceil(abScale + 0.001)))
             }
             sx={{
-              width: compactIconButtonSize,
-              height: compactIconButtonSize,
-              border: "1px solid",
-              borderColor: "divider",
-              borderRadius: 999,
+              width: "100%",
+              height: "100%",
+              borderRadius: 0,
               "&.Mui-disabled": {
                 color: "text.disabled",
-                borderColor: viewerTokens.control.disabledBorder,
-                backgroundColor: viewerTokens.control.disabledSurface,
+                backgroundColor: "transparent",
               },
             }}
           >
             <Add sx={{ fontSize: 16 }} />
           </IconButton>
-        </Stack>
+        </Box>
       </Box>
     </Stack>
   );

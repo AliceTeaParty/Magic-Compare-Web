@@ -9,15 +9,13 @@ export const viewerTokens = {
     disabledSurface: "var(--mui-palette-action-disabledBackground, rgba(255,255,255,0.02))",
   },
   filmstrip: {
-    activeCardSurface:
-      "color-mix(in srgb, var(--mui-palette-secondary-main, rgb(232 198 246)) 16%, transparent)",
-    activeCardInset: "inset 0 0 0 1px var(--mc-primary, rgba(232, 198, 246, 0.18))",
+    activeCardSurface: "var(--mui-palette-primary-light, rgba(232, 198, 246, 0.18))",
+    activeCardInset: "none",
     inactiveCardSurface: "var(--mui-palette-surface-container, rgba(255, 255, 255, 0.018))",
     shellSurface: "var(--mui-palette-surface-containerLow, rgba(255,255,255,0.014))",
     thumbnailSurface: "var(--mui-palette-surface-containerHighest, rgba(255,255,255,0.035))",
     scrollbarTrack: "var(--mui-palette-divider, rgba(255,255,255,0.08))",
-    scrollbarThumb:
-      "linear-gradient(90deg, rgba(232, 198, 246, 0.42) 0%, rgba(242, 235, 201, 0.5) 100%)",
+    scrollbarThumb: "var(--mui-palette-primary-main, rgba(232, 198, 246, 0.72))",
     scrollbarThumbRing: "0 0 0 1px var(--mui-palette-divider, rgba(255,255,255,0.08))",
   },
   heatmapNotice: {

@@ -1,30 +1,28 @@
 "use client";
 
-import { ArrowBack } from "@mui/icons-material";
-import { Box, Button, Stack, Typography } from "@mui/material";
+import { Box, Stack, Typography } from "@mui/material";
 import type { ViewerMode } from "@magic-compare/content-schema";
 import type { ViewerAsset } from "@magic-compare/compare-core/viewer-data";
-import Link from "next/link";
-import { ViewerToolbar } from "./viewer-toolbar";
+import { ViewerToolbar, ViewerUtilityControls } from "./viewer-toolbar";
 
 interface ViewerHeaderProps {
   abScale: number;
   abSide: "before" | "after";
-  afterAsset: ViewerAsset | undefined;
   beforeAsset: ViewerAsset | undefined;
   canUseHeatmap: boolean;
   caseTitle: string;
-  caseSlug: string;
   comparisonAssetKey: string | undefined;
   comparisonAssets: ViewerAsset[];
   guideOpen: boolean;
   groupTitle: string;
   hideStageScrollControl: boolean;
   mode: ViewerMode;
+  overlayOpacity: number;
   onAbSideChange: (side: "before" | "after") => void;
   onComparisonAssetChange: (assetKey: string) => void;
   onOpenGuide: () => void;
   onModeChange: (mode: ViewerMode) => void;
+  onOverlayOpacityChange: (value: number) => void;
   onScaleChange: (nextScale: number) => void;
   onScrollStageIntoView: () => void;
   onToggleSidebar: () => void;
@@ -39,21 +37,21 @@ interface ViewerHeaderProps {
 export function ViewerHeader({
   abScale,
   abSide,
-  afterAsset,
   beforeAsset,
   canUseHeatmap,
   caseTitle,
-  caseSlug,
   comparisonAssetKey,
   comparisonAssets,
   guideOpen,
   groupTitle,
   hideStageScrollControl,
   mode,
+  overlayOpacity,
   onAbSideChange,
   onComparisonAssetChange,
   onOpenGuide,
   onModeChange,
+  onOverlayOpacityChange,
   onScaleChange,
   onScrollStageIntoView,
   onToggleSidebar,
@@ -70,8 +68,12 @@ export function ViewerHeader({
         flexDirection: { xs: "column", sm: "row" },
         alignItems: { xs: "stretch", sm: "center" },
         justifyContent: "space-between",
-        gap: 1.5,
-        p: { xs: 1.75, md: 3 },
+        gap: { xs: 1, md: 2 },
+        minHeight: variant === "internal" ? { md: 112 } : undefined,
+        px: { xs: 1.5, md: 3 },
+        // The desktop header shares the catalog/workspace divider coordinate. Two compact toolbar
+        // rows fit inside this height; mobile uses explicit responsive rows below this breakpoint.
+        py: variant === "internal" ? { xs: 1.75, md: 1.5 } : { xs: 1.75, md: 3 },
         borderBottom: "1px solid",
         borderColor: "divider",
         backgroundColor:
@@ -82,19 +84,31 @@ export function ViewerHeader({
             : undefined,
       }}
     >
-      <Stack direction="row" sx={{ minWidth: 0, alignItems: "center", gap: 1 }}>
-        {variant === "internal" ? (
-          <Button
-            component={Link}
-            href={`/cases/${caseSlug}`}
-            variant="text"
-            startIcon={<ArrowBack />}
-            sx={{ flex: "0 0 auto", color: "text.secondary" }}
-          >
-            工作区
-          </Button>
-        ) : null}
-        <Stack spacing={0.2} sx={{ minWidth: 0, pr: { sm: 2 } }}>
+      <Stack
+        direction="row"
+        sx={{
+          // A zero flex basis makes the identity column consume only the toolbar's remaining
+          // width. Long titles then ellipsize instead of expanding the desktop header track.
+          width: { xs: "100%", sm: 0 },
+          minWidth: 0,
+          flex: "1 1 0%",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 0.75,
+        }}
+      >
+        {/* The persistent app rail owns Case-level navigation, leaving this header to identify the
+            active Group without duplicating a back action or shifting the title baseline. */}
+        <Stack
+          spacing={0.2}
+          sx={{
+            width: "100%",
+            minWidth: 0,
+            flex: "1 1 auto",
+            overflow: "hidden",
+            pr: { sm: 2 },
+          }}
+        >
           <Typography
             variant={variant === "internal" ? "h5" : "h4"}
             noWrap
@@ -103,6 +117,11 @@ export function ViewerHeader({
               // padding-bottom gives descenders (p, g, y...) room before overflow:hidden
               // clips them; noWrap relies on overflow:hidden for ellipsis truncation.
               paddingBottom: "0.18em",
+              display: "block",
+              maxWidth: "100%",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
             }}
           >
             {groupTitle}
@@ -114,17 +133,35 @@ export function ViewerHeader({
               color: "text.secondary",
               mt: "0.25em",
               pl: "0.08em",
+              display: "block",
+              maxWidth: "100%",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
             }}
           >
             {caseTitle}
           </Typography>
         </Stack>
+        <Box sx={{ display: { xs: "block", sm: "none" }, flex: "0 0 auto" }}>
+          {/* Mobile keeps only the two persistent utilities beside the ellipsized page identity;
+              the stage shortcut remains available in the desktop three-button group. */}
+          <ViewerUtilityControls
+            compact
+            guideOpen={guideOpen}
+            hideStageScrollControl
+            onOpenGuide={onOpenGuide}
+            onScrollStageIntoView={onScrollStageIntoView}
+            onToggleSidebar={onToggleSidebar}
+            sidebarOpen={sidebarOpen}
+            variant={variant}
+          />
+        </Box>
       </Stack>
 
       <ViewerToolbar
         abScale={abScale}
         abSide={abSide}
-        afterAsset={afterAsset}
         beforeAsset={beforeAsset}
         canUseHeatmap={canUseHeatmap}
         comparisonAssetKey={comparisonAssetKey}
@@ -132,10 +169,12 @@ export function ViewerHeader({
         guideOpen={guideOpen}
         hideStageScrollControl={hideStageScrollControl}
         mode={mode}
+        overlayOpacity={overlayOpacity}
         onAbSideChange={onAbSideChange}
         onComparisonAssetChange={onComparisonAssetChange}
         onOpenGuide={onOpenGuide}
         onModeChange={onModeChange}
+        onOverlayOpacityChange={onOverlayOpacityChange}
         onScaleChange={onScaleChange}
         onScrollStageIntoView={onScrollStageIntoView}
         onToggleSidebar={onToggleSidebar}

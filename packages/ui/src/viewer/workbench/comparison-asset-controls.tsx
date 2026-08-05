@@ -9,7 +9,6 @@ interface ComparisonAssetControlsProps {
   baselineAsset: ViewerAsset;
   comparisonAssetKey: string;
   comparisonAssets: ViewerAsset[];
-  disabled: boolean;
   onComparisonAssetChange: (assetKey: string) => void;
 }
 
@@ -21,7 +20,6 @@ export function ComparisonAssetControls({
   baselineAsset,
   comparisonAssetKey,
   comparisonAssets,
-  disabled,
   onComparisonAssetChange,
 }: ComparisonAssetControlsProps) {
   /** MUI exclusive groups can emit null when re-clicking the active segment; retain a valid target. */
@@ -37,6 +35,10 @@ export function ComparisonAssetControls({
       spacing={0.75}
       sx={{
         alignItems: "center",
+        // The contextual row is right-aligned in every mode. Taking the full mobile width made
+        // Swipe's compact Src ↔ target cluster appear left-aligned while A/B and Heatmap stayed right.
+        width: "fit-content",
+        ml: "auto",
         minWidth: 0,
         maxWidth: "100%",
         overflowX: "auto",
@@ -52,11 +54,17 @@ export function ComparisonAssetControls({
             flex: "0 0 auto",
             height: { xs: 42, md: 40 },
             maxWidth: 144,
-            borderRadius: 2,
+            borderRadius: 999,
+            borderColor: "divider",
+            backgroundColor: "surface.containerHigh",
             "& .MuiChip-label": {
+              fontWeight: 550,
               overflow: "hidden",
               textOverflow: "ellipsis",
               whiteSpace: "nowrap",
+            },
+            "& .MuiChip-icon": {
+              color: "text.secondary",
             },
           }}
         />
@@ -72,12 +80,17 @@ export function ComparisonAssetControls({
           exclusive
           size="small"
           value={comparisonAssetKey}
-          disabled={disabled}
           aria-label="选择对比变量"
           onChange={handleComparisonAssetChange}
           sx={{
             height: { xs: 42, md: 40 },
+            overflow: "hidden",
+            border: "1px solid",
+            borderColor: "divider",
+            borderRadius: 999,
+            backgroundColor: "surface.containerHigh",
             "& .MuiToggleButtonGroup-grouped": {
+              // One outer pill and flat equal segments match the Viewer mode control.
               minWidth: 72,
               maxWidth: 144,
               height: "100%",
@@ -87,6 +100,24 @@ export function ComparisonAssetControls({
               whiteSpace: "nowrap",
               fontSize: "0.86rem",
               fontWeight: 600,
+              margin: "0 !important",
+              border: "0 !important",
+              borderRadius: "0 !important",
+              backgroundColor: "transparent",
+            },
+            "& .MuiToggleButtonGroup-grouped:not(:first-of-type)": {
+              borderLeft: "1px solid !important",
+              borderLeftColor: "var(--mui-palette-divider) !important",
+            },
+            // Viewer segmented controls use the same theme-seed container pair as the active rail
+            // destination instead of falling back to the old dark secondary fill.
+            "& .MuiToggleButton-root.Mui-selected": {
+              color: "primary.onContainer",
+              backgroundColor: "primary.light",
+            },
+            "& .MuiToggleButton-root.Mui-selected:hover": {
+              backgroundColor:
+                "color-mix(in srgb, currentColor 8%, var(--mui-palette-primary-light))",
             },
           }}
         >

@@ -1,28 +1,73 @@
 "use client";
 
-import { ArrowBack, OpenInNew } from "@mui/icons-material";
+import { CheckCircleOutlineRounded, CheckRounded, CollectionsOutlined } from "@mui/icons-material";
 import {
   Box,
-  Button,
-  Chip,
   Divider,
   Drawer,
-  IconButton,
   Link as MuiLink,
+  List,
+  ListItemButton,
+  ListItemIcon,
+  ListItemText,
   Stack,
-  Tooltip,
   Typography,
 } from "@mui/material";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
-import { formatUtcDate } from "@magic-compare/shared-utils";
+import { findAsset, getComparisonTargetAssets } from "@magic-compare/compare-core/viewer-data";
+import { useEffect, useState } from "react";
 import type {
   ViewerAsset,
   ViewerDataset,
   ViewerFrame,
   ViewerGroup,
 } from "@magic-compare/compare-core/viewer-data";
+import { useRootScrollLock } from "../../overlays/use-root-scroll-lock";
+
+const internalStatusLabels = {
+  archived: "已归档",
+  draft: "草稿",
+  internal: "内部",
+  published: "公开",
+} as const;
+
+/** Formats server timestamps only after hydration so the browser's locale and time zone win. */
+function useLocalizedPublishDate(value: string | null | undefined) {
+  const [localizedDate, setLocalizedDate] = useState<{ source: string; label: string } | null>(
+    null,
+  );
+
+  useEffect(() => {
+    if (!value) return;
+
+    const date = new Date(value);
+    const label = Number.isNaN(date.getTime())
+      ? "时间不可用"
+      : new Intl.DateTimeFormat(undefined, {
+          year: "numeric",
+          month: "2-digit",
+          day: "2-digit",
+          hour: "2-digit",
+          minute: "2-digit",
+          timeZoneName: "short",
+        }).format(date);
+
+    setLocalizedDate({ source: value, label });
+  }, [value]);
+
+  if (!value) return "尚未发布";
+  return localizedDate?.source === value ? localizedDate.label : null;
+}
+
+/** Lists the baseline and every selectable comparison target shown by the Viewer toolbar. */
+function getAvailableVariableLabels(frame: ViewerFrame | undefined): string[] {
+  if (!frame) return [];
+  return [findAsset(frame, "before"), ...getComparisonTargetAssets(frame)]
+    .filter((asset): asset is ViewerAsset => Boolean(asset))
+    .map((asset) => asset.label);
+}
 
 /**
  * Uses the sibling-group list from the dataset so navigation order stays aligned with workspace
@@ -49,36 +94,108 @@ function GroupLinks({
   }
 
   return (
-    <Stack spacing={1}>
+    <List
+      disablePadding
+      sx={{
+        display: "grid",
+        gap: 0.25,
+        p: 0.5,
+        borderRadius: 2,
+        // The list owns one supporting surface so unselected groups still read as navigation.
+        backgroundColor: "surface.container",
+      }}
+    >
       {groups.map((group) => (
-        <MuiLink
+        <ListItemButton
           key={group.id}
           component={Link}
           href={group.href}
-          underline="none"
+          selected={group.isCurrent}
+          aria-current={group.isCurrent ? "page" : undefined}
           onFocus={() => handleGroupIntent(group)}
           onMouseEnter={() => handleGroupIntent(group)}
           onTouchStart={() => handleGroupIntent(group)}
           sx={{
-            color: group.isCurrent ? "primary.main" : "text.secondary",
-            fontWeight: group.isCurrent ? 700 : 500,
+            minHeight: 44,
+            px: 1.25,
+            py: 0.6,
+            borderRadius: 999,
+            color: "text.secondary",
+            // Group navigation is a selectable list, so the current destination uses the same
+            // container pair as the rail instead of relying on bold text alone.
+            "&.Mui-selected": {
+              color: "primary.onContainer",
+              backgroundColor:
+                "color-mix(in srgb, var(--mui-palette-primary-light) 72%, var(--mui-palette-surface-container))",
+            },
+            "&.Mui-selected:hover": {
+              backgroundColor:
+                "color-mix(in srgb, var(--mui-palette-primary-light) 80%, var(--mui-palette-surface-container))",
+            },
+            "&:hover": {
+              backgroundColor: "color-mix(in srgb, currentColor 8%, transparent)",
+            },
           }}
         >
-          {group.title}
-          {group.isCurrent ? " · current" : ""}
-        </MuiLink>
+          <ListItemIcon sx={{ minWidth: 32, color: "inherit" }}>
+            <Box
+              component={motion.span}
+              initial={false}
+              animate={
+                group.isCurrent
+                  ? { scale: [1, 0.84, 1.08, 1], rotate: [0, -7, 0] }
+                  : { scale: 1, rotate: 0 }
+              }
+              transition={{ duration: 0.3, ease: [0.2, 0, 0, 1] }}
+              sx={{ display: "grid", placeItems: "center", transformOrigin: "center" }}
+            >
+              <CollectionsOutlined sx={{ fontSize: 19 }} />
+            </Box>
+          </ListItemIcon>
+          <ListItemText
+            primary={group.title}
+            slotProps={{
+              primary: {
+                sx: {
+                  display: "-webkit-box",
+                  overflow: "hidden",
+                  WebkitBoxOrient: "vertical",
+                  WebkitLineClamp: 2,
+                  fontSize: "0.88rem",
+                  fontWeight: group.isCurrent ? 600 : 500,
+                  lineHeight: 1.35,
+                },
+              },
+            }}
+          />
+          {group.isCurrent ? (
+            <CheckRounded aria-hidden="true" sx={{ ml: 1, fontSize: 18 }} />
+          ) : null}
+        </ListItemButton>
       ))}
       {groups.length === 0 ? (
-        <Typography
-          variant="body2"
+        <Stack
+          direction="row"
           sx={{
-            color: "text.secondary",
+            minHeight: 44,
+            px: 1.25,
+            py: 0.6,
+            alignItems: "center",
+            gap: 1,
+            borderRadius: 999,
+            color: "primary.onContainer",
+            backgroundColor:
+              "color-mix(in srgb, var(--mui-palette-primary-light) 72%, var(--mui-palette-surface-container))",
           }}
         >
-          {currentGroup.title}
-        </Typography>
+          <CollectionsOutlined sx={{ fontSize: 19 }} />
+          <Typography variant="body2" sx={{ flex: 1, fontWeight: 600 }}>
+            {currentGroup.title}
+          </Typography>
+          <CheckRounded aria-hidden="true" sx={{ fontSize: 18 }} />
+        </Stack>
       ) : null}
-    </Stack>
+    </List>
   );
 }
 
@@ -87,7 +204,6 @@ function GroupLinks({
  * sidebars render the same information surface.
  */
 function ViewerSidebarContent({
-  caseMeta,
   currentGroup,
   currentFrame,
   groups,
@@ -96,7 +212,6 @@ function ViewerSidebarContent({
   publishStatus,
   variant,
 }: {
-  caseMeta: ViewerDataset["caseMeta"];
   currentGroup: ViewerGroup;
   currentFrame: ViewerFrame | undefined;
   groups: ViewerDataset["siblingGroups"];
@@ -105,8 +220,8 @@ function ViewerSidebarContent({
   publishStatus: ViewerDataset["publishStatus"];
   variant: "public" | "internal";
 }) {
-  const compactButtonHeight = { xs: 42, md: 40 };
-  const compactIconButtonSize = { xs: 42, md: 40 };
+  const isInternal = variant === "internal";
+  const localizedPublishDate = useLocalizedPublishDate(publishStatus?.publishedAt);
 
   return (
     <Stack spacing={2} sx={{ p: 2.25 }}>
@@ -120,22 +235,8 @@ function ViewerSidebarContent({
                 fontWeight: 500,
               }}
             >
-              Group navigator
+              Group
             </Typography>
-            <Button
-              component={Link}
-              href={`/cases/${caseMeta.slug}`}
-              variant="outlined"
-              size="small"
-              startIcon={<ArrowBack fontSize="small" />}
-              sx={{
-                alignSelf: "flex-start",
-                minHeight: compactButtonHeight,
-                px: 1.35,
-              }}
-            >
-              Back to workspace
-            </Button>
             <GroupLinks currentGroup={currentGroup} groups={groups} onGroupIntent={onGroupIntent} />
           </Stack>
           <Divider />
@@ -150,7 +251,7 @@ function ViewerSidebarContent({
             fontWeight: 500,
           }}
         >
-          Frame details
+          {isInternal ? "画面信息" : "Frame details"}
         </Typography>
         <Typography variant="subtitle1">{currentFrame?.title}</Typography>
         <Typography
@@ -159,7 +260,8 @@ function ViewerSidebarContent({
             color: "text.secondary",
           }}
         >
-          {currentFrame?.caption || "No frame note."}
+          {currentFrame?.caption.replace(/\bepisode\b/gi, "clip") ||
+            (isInternal ? "暂无备注。" : "No frame note.")}
         </Typography>
       </Stack>
 
@@ -173,17 +275,23 @@ function ViewerSidebarContent({
             fontWeight: 500,
           }}
         >
-          Asset metadata
+          {isInternal ? "素材信息" : "Asset metadata"}
         </Typography>
         <Typography variant="body2">
-          Primary assets:{" "}
-          {(currentFrame?.assets ?? [])
-            .filter((asset) => asset.isPrimaryDisplay)
-            .map((asset) => asset.label)
-            .join(", ") || "None"}
+          {/* Use the same asset resolver as the toolbar so extra columns such as Flt do not
+              disappear from the metadata summary after a three-way upload. */}
+          {isInternal ? "可用变量：" : "Available variables: "}
+          {getAvailableVariableLabels(currentFrame).join(", ") || (isInternal ? "无" : "None")}
         </Typography>
         <Typography variant="body2">
-          Heatmap: {heatmapAsset ? "Available" : "Unavailable"}
+          {isInternal ? "热图：" : "Heatmap: "}
+          {heatmapAsset
+            ? isInternal
+              ? "可用"
+              : "Available"
+            : isInternal
+              ? "不可用"
+              : "Unavailable"}
         </Typography>
       </Stack>
 
@@ -197,59 +305,60 @@ function ViewerSidebarContent({
                 color: "text.secondary",
               }}
             >
-              Publish status
+              发布状态
             </Typography>
-            <Chip
-              label={publishStatus.status}
-              color={publishStatus.status === "published" ? "primary" : "default"}
-              size="small"
-              sx={{ alignSelf: "flex-start" }}
-            />
             <Stack
               direction="row"
-              spacing={0.6}
-              useFlexGap
               sx={{
+                alignSelf: "flex-start",
+                minHeight: 32,
+                px: 1.25,
                 alignItems: "center",
+                gap: 0.65,
+                borderRadius: 999,
+                color: "text.secondary",
+                backgroundColor: "surface.containerHigh",
               }}
             >
-              <Typography variant="body2">
-                Public slug: {publishStatus.publicSlug ?? "Pending first publish"}
-              </Typography>
-              {publishStatus.publicUrl ? (
-                <Tooltip title="Open published page in a new tab">
-                  <IconButton
-                    component="a"
-                    href={publishStatus.publicUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    aria-label="Open published page in a new tab"
-                    size="small"
-                    sx={{
-                      // Keep the public-link affordance on the same touch-target baseline as the
-                      // rest of the viewer chrome instead of shrinking it into a special-case pill.
-                      width: compactIconButtonSize,
-                      height: compactIconButtonSize,
-                      px: 0.9,
-                      borderRadius: 999,
-                      border: "1px solid",
-                      borderColor: "divider",
-                      backgroundColor:
-                        variant === "internal" ? "surface.containerHigh" : "var(--mc-bg-raised)",
-                    }}
-                  >
-                    <OpenInNew sx={{ fontSize: 16 }} />
-                  </IconButton>
-                </Tooltip>
+              {publishStatus.status === "published" ? (
+                <CheckCircleOutlineRounded
+                  aria-hidden="true"
+                  sx={{ color: "success.main", fontSize: 18 }}
+                />
               ) : null}
+              <Typography variant="caption" sx={{ fontWeight: 650 }}>
+                {internalStatusLabels[publishStatus.status]}
+              </Typography>
             </Stack>
+            {publishStatus.publicUrl && publishStatus.publicSlug ? (
+              <MuiLink
+                href={publishStatus.publicUrl}
+                target="_blank"
+                rel="noreferrer"
+                aria-label={`打开公开 Slug ${publishStatus.publicSlug}`}
+                underline="hover"
+                variant="body2"
+                sx={{ alignSelf: "flex-start", fontWeight: 550, overflowWrap: "anywhere" }}
+              >
+                公开 Slug：{publishStatus.publicSlug}
+              </MuiLink>
+            ) : (
+              <Typography variant="body2" sx={{ color: "text.secondary" }}>
+                公开 Slug：首次发布后生成
+              </Typography>
+            )}
             <Typography
+              component="time"
+              dateTime={publishStatus.publishedAt ?? undefined}
               variant="body2"
               sx={{
+                minHeight: "1.5em",
                 color: "text.secondary",
               }}
             >
-              {formatUtcDate(publishStatus.publishedAt ?? null)}
+              {/* A non-breaking space keeps the metadata stack stable during hydration without
+                  briefly presenting the server's UTC value as the user's local time. */}
+              {localizedPublishDate ?? "\u00a0"}
             </Typography>
           </Stack>
         </>
@@ -259,7 +368,6 @@ function ViewerSidebarContent({
 }
 
 interface ViewerSidebarProps {
-  caseMeta: ViewerDataset["caseMeta"];
   currentFrame: ViewerFrame | undefined;
   currentGroup: ViewerGroup;
   groups: ViewerDataset["siblingGroups"];
@@ -277,7 +385,6 @@ interface ViewerSidebarProps {
  * viewer state independent from the current responsive layout.
  */
 export function ViewerSidebar({
-  caseMeta,
   currentFrame,
   currentGroup,
   groups,
@@ -290,7 +397,6 @@ export function ViewerSidebar({
   variant,
 }: ViewerSidebarProps) {
   const contentProps = {
-    caseMeta,
     currentFrame,
     currentGroup,
     groups,
@@ -299,6 +405,8 @@ export function ViewerSidebar({
     publishStatus,
     variant,
   };
+  const mobileDrawerOpen = sidebarOpen && !showDesktopSidebar;
+  useRootScrollLock(mobileDrawerOpen);
 
   return (
     <>
@@ -324,17 +432,20 @@ export function ViewerSidebar({
 
       <Drawer
         anchor="right"
-        open={sidebarOpen && !showDesktopSidebar}
+        open={mobileDrawerOpen}
         onClose={closeSidebar}
-        ModalProps={{ keepMounted: true }}
+        // Viewer owns the root scroll lock so Modal must not add body padding and squeeze the sheet.
+        ModalProps={{ keepMounted: true, disableScrollLock: true }}
         slotProps={{
           paper: {
             sx: {
               width: "min(88vw, 360px)",
               borderLeft: "1px solid",
               borderColor: "divider",
+              // Match the inline supporting pane so the Group list keeps its container contrast
+              // when the same content moves into a modal Drawer on narrower viewports.
               backgroundColor:
-                variant === "internal" ? "surface.container" : "rgba(20, 33, 70, 0.98)",
+                variant === "internal" ? "surface.containerLow" : "rgba(20, 33, 70, 0.98)",
               backgroundImage: "none",
             },
           },

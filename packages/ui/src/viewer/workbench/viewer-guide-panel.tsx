@@ -12,6 +12,7 @@ import {
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import { Close } from "@mui/icons-material";
+import { useRootScrollLock } from "../../overlays/use-root-scroll-lock";
 import { viewerTokens } from "./viewer-tokens";
 
 interface ViewerGuidePanelProps {
@@ -56,6 +57,7 @@ export function ViewerGuidePanel({ open, onClose, onComplete }: ViewerGuidePanel
   const useBottomDrawer = useMediaQuery(theme.breakpoints.down("sm"), {
     noSsr: true,
   });
+  useRootScrollLock(open);
 
   return (
     <Drawer
@@ -64,7 +66,8 @@ export function ViewerGuidePanel({ open, onClose, onComplete }: ViewerGuidePanel
       anchor={useBottomDrawer ? "bottom" : "right"}
       open={open}
       onClose={onClose}
-      ModalProps={{ keepMounted: true }}
+      // Viewer owns the root scroll lock so Modal must not add body padding and squeeze the sheet.
+      ModalProps={{ keepMounted: true, disableScrollLock: true }}
       slotProps={{
         paper: {
           sx: {

@@ -25,16 +25,10 @@ export function useViewerMediaPreferences() {
   const hideStageScrollControl = useMediaQuery(theme.breakpoints.down("sm"), {
     noSsr: true,
   });
-  const rotateStage = useMediaQuery(
-    "(max-width: 760px) and (orientation: portrait)",
-    {
-      noSsr: true,
-    },
-  );
-  const prefersReducedMotion = useMediaQuery(
-    "(prefers-reduced-motion: reduce)",
-    { noSsr: true },
-  );
+  const rotateStage = useMediaQuery("(max-width: 760px) and (orientation: portrait)", {
+    noSsr: true,
+  });
+  const prefersReducedMotion = useMediaQuery("(prefers-reduced-motion: reduce)", { noSsr: true });
   const [mediaPreferencesReady, setMediaPreferencesReady] = useState(false);
 
   useEffect(() => {
@@ -42,16 +36,11 @@ export function useViewerMediaPreferences() {
   }, []);
 
   return {
-    resolvedHideStageScrollControl: mediaPreferencesReady
-      ? hideStageScrollControl
-      : false,
-    resolvedPrefersReducedMotion: mediaPreferencesReady
-      ? prefersReducedMotion
-      : false,
+    mediaPreferencesReady,
+    resolvedHideStageScrollControl: mediaPreferencesReady ? hideStageScrollControl : false,
+    resolvedPrefersReducedMotion: mediaPreferencesReady ? prefersReducedMotion : false,
     resolvedRotateStage: mediaPreferencesReady ? rotateStage : false,
-    resolvedShowDesktopSidebar: mediaPreferencesReady
-      ? showDesktopSidebar
-      : false,
+    resolvedShowDesktopSidebar: mediaPreferencesReady ? showDesktopSidebar : false,
   };
 }
 
@@ -212,11 +201,7 @@ export function useViewerKeyboardShortcuts(params: {
         setMode("heatmap");
       }
 
-      if (
-        event.key === "Escape" &&
-        modeRef.current === "a-b" &&
-        abStageActiveRef.current
-      ) {
+      if (event.key === "Escape" && modeRef.current === "a-b" && abStageActiveRef.current) {
         event.preventDefault();
         setAbStageActive(false);
       }
@@ -247,15 +232,7 @@ export function useViewerKeyboardShortcuts(params: {
 
     window.addEventListener("keydown", handleKeydown);
     return () => window.removeEventListener("keydown", handleKeydown);
-  }, [
-    onResetView,
-    onToggleGuide,
-    setAbSide,
-    setAbStageActive,
-    setMode,
-    stepFrame,
-    toggleSidebar,
-  ]);
+  }, [onResetView, onToggleGuide, setAbSide, setAbStageActive, setMode, stepFrame, toggleSidebar]);
 }
 
 /**
@@ -277,11 +254,7 @@ export function useAbStageOutsideDismiss(params: {
     function handleOutsidePointerDown(event: PointerEvent) {
       const stageNode = stageRef.current;
 
-      if (
-        !stageNode ||
-        !(event.target instanceof Node) ||
-        stageNode.contains(event.target)
-      ) {
+      if (!stageNode || !(event.target instanceof Node) || stageNode.contains(event.target)) {
         return;
       }
 
@@ -289,11 +262,6 @@ export function useAbStageOutsideDismiss(params: {
     }
 
     document.addEventListener("pointerdown", handleOutsidePointerDown, true);
-    return () =>
-      document.removeEventListener(
-        "pointerdown",
-        handleOutsidePointerDown,
-        true,
-      );
+    return () => document.removeEventListener("pointerdown", handleOutsidePointerDown, true);
   }, [abStageActive, mode, setAbStageActive, stageRef]);
 }

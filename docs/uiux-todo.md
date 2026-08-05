@@ -42,10 +42,26 @@
 - Slug、发布状态等不可编辑信息不应放进 disabled TextField。禁用输入框会暗示“当前不可编辑”，并引入多余的 label、outline 和低对比文字；带图标的只读 metadata row 更符合实际语义。
 - Case 设置在宽屏作为 sticky supporting pane，在窄屏作为右侧 Drawer；两种容器复用同一份表单内容和草稿状态，避免响应式切换时重建表单、丢失输入或产生 hydration 分支。
 - Navigation rail 的品牌标记按 rail 全宽居中，不能沿用 extended rail 的左内边距；同一内容进入 modal drawer 时则需要恢复标准 leading inset，避免贴住屏幕边缘。
-- 同一个全局动作只保留一个入口。上传已经是 navigation rail destination，目录、工作区和空状态不再重复放上传按钮；依赖当前 Case 数据的部署动作由工作区注册状态和回调，导航只负责展示，避免复制请求逻辑。
+- 同一个全局动作只保留一个入口。上传已经是 navigation rail destination，目录、工作区和空状态不再重复放上传按钮；公开站点部署由应用外壳统一发起，不读取当前路由的 Case 或 Group 状态。
+- 全局导航在所有桌面断点保持 `80px` rail，不因窗口变宽扩展为带横向标签的侧栏。移动端使用 modal drawer，并以整行 container 表示当前目的地；两种形态复用同一导航顺序和动作状态。
+- 部署入口始终占用固定导航位置并使用主题主色。它执行不带 `caseId` 的全站部署，仅在请求进行中临时禁用，空 Group 页面和非 Case 路由不会改变可用性。
+- 当前 Case 工作区入口同样始终占用固定导航位置。没有 Case 上下文时显示禁用态，进入 Case 及其 Viewer 子路由后原位启用和选中，避免全局目的地顺序变化。
 - 异步保存、部署等短期状态使用固定定位的 Snackbar / Alert，不进入列表文档流。否则“正在保存”出现和消失会推动全部 Group，造成内容位置变化。
 - 删除确认框必须让动作名称成为主标题，删除范围和后果作为较小、较轻的 supporting text；Case 和 Group 复用同一组件，避免两套字号和字重再次分叉。
 - Inline editor 的新长度上限不能在进入编辑态时裁切旧数据。完整展示超限值、显示计数并禁用保存，只有用户主动修正后才写回，避免“打开再保存”静默破坏元数据。
+- Viewer 的模式专属控件必须占用固定 contextual slot。A/B 缩放和热图透明度在同一位置替换，首次提示悬浮在主图上方；不能用隐藏整行或在主图下方插入控件来维持稳定，否则会浪费空间或推动胶片条。
+- Viewer 的可用变量、当前变量和默认主显示素材是三种不同语义。工具栏和详情面板必须复用 `getComparisonTargetAssets` 等数据解析入口，不能用 `isPrimaryDisplay` 推断完整变量集合，否则三列上传会把 `Flt` 等可选变量写丢。
+- 窄屏 Viewer 工具栏按模式、工具、变量、模式上下文分行，每一行都限制在容器宽度内。桌面打开过的 supporting pane 偏好不能在移动端恢复成首屏遮挡 Drawer；移动端关闭后仍允许用户主动打开。
+- Viewer 桌面端按“视图工具、模式”排列两个三联组；移动端只保留帮助和详情两联组，并把它放进标题行右侧。标题与描述始终单行省略，不能为了容纳工具造成换行或 header 高度跳变。
+- Viewer 标题列使用零 flex 基准并限制为可用剩余宽度，宽屏和窄屏都由 CSS 单行省略。页面已经设置 `scrollbar-gutter: stable` 时，帮助和移动详情 Drawer 应关闭 MUI 的额外 scroll lock 补偿，避免重复增加 body 右内边距。
+- 同一 Case 内切换 Group 属于 Viewer 数据更新，不是整页层级跳转。路由过渡容器应按 Case Viewer scope 复用 React subtree，不渲染重复的 outgoing 页面；这样详情栏、模式和检查状态不会因 Group slug 改变而重置。
+- 路由加载只能有一个全局反馈源。根级 `loading.tsx` 不得再把页面替换成带内边距的嵌套骨架；顶边进度条延迟短暂显示，让已预取的快速切换直接完成，慢请求仍及时反馈。
+- Popover、Menu、Select 这类锚定面板不应锁定文档滚动；短暂选择不值得让整页横向位移。Drawer、Dialog 这类阻断式面板使用共享的根节点滚动锁，并以引用计数支持嵌套；宽度补偿只加到主内容，不能让 MUI 默认给 `body` 增加约 17px 内边距并挤压固定侧栏。
+- 同一 supporting pane 在宽屏 `aside` 和窄屏 Drawer 中必须复用内容结构与 surface 层级。Drawer 可以因触控和模态语义使用更宽面板、全高滚动、遮罩与滑入动效，但外层 surface 不能与内部 tonal list 使用同一角色，否则列表底色会消失。
+- 移动端 Viewer 详情与帮助使用模态 Drawer 时由共享根节点锁阻止背景滚动，不能保留一条挤压内容宽度的页面滚动条。发布状态使用足量内边距的低强调状态容器，公开 Slug 直接承担文字链接语义。
+- Viewer 胶片条是高频扫描工具，缩略图密度应高于普通内容卡片。选中态使用主题 container / on-container，图片 `alt` 留空并由按钮提供唯一名称，避免读屏名称重复；hover 只改变 state layer，不抬升卡片。
+- Internal Viewer 不单独提供返回按钮。全局侧栏在 Case 路由下增加当前“工作区”目的地，桌面 rail 与移动 drawer 复用同一导航模型，避免同一层级出现两套返回方式。
+- 服务端时间戳进入浏览器后再用 `Intl.DateTimeFormat` 按用户 locale 与 time zone 格式化；hydration 期间保留固定高度，不展示可能错误的 UTC 值。
 
 ## P1
 
@@ -55,11 +71,11 @@
 - [x] Catalog 增加 `search + status filter + updated sort`
       目录使用客户端搜索、状态筛选和更新时间排序，直接复用服务端首屏返回的完整 Case 列表。
 
-- [x] Viewer header 增加常驻的 `Back to workspace`
-      Internal viewer header 提供固定的工作区返回入口，details drawer 保留 Group 导航。
+- [x] 全局侧栏增加当前 Case 的工作区入口
+      Case 工作区和 Viewer 共用侧栏目的地，Viewer header 只保留 Group 标识；details drawer 保留 Group 导航。
 
 - [x] 重构 viewer 工具栏的信息层级
-      模式切换使用 connected control，主图、引导和详情操作使用固定图标槽，A/B 控件占用固定次级行。
+      模式切换使用 connected control，主图、引导和详情操作使用固定图标槽；A/B 和热图控件共用固定 contextual slot，移动端分行避免边缘裁切。
 
 - [x] 重新梳理 workspace 中 group 行的操作优先级
       可见性作为 container 色状态控件，打开作为行主动作，编辑和删除改为带 tooltip 的次级图标动作；身份区与操作底栏分层，编辑前后动作坐标保持不变。
@@ -98,3 +114,10 @@
 - 复核环境：本地 `internal-site` 开发服务器 + in-app browser + Chrome DevTools
 - 复核页面：`/`、`/cases/ikoku-nikki`、`/cases/uploadtest2`
 - 已验证状态：浅色、深色、Group 编辑、取消编辑、Group/Case 删除确认框、`390x844` 移动抽屉、目录与工作区 header 坐标、生产构建
+
+## 对比图复核
+
+- 复核日期：`2026-08-05`
+- 复核环境：本地 `internal-site` 开发服务器 + in-app browser
+- 复核页面：`/cases/ikoku-nikki/groups/tv`、`/cases/ultraman-tiga/groups/tv`、`/cases/ultraman-tiga/groups/movie`
+- 已验证状态：浅色、深色、`Src / Rip / Flt` 三变量切换、滑动、A/B、热图、详情侧栏、当前 Case 工作区导航、浏览器本地时间、桌面 `112px` header、Group 路由连续切换、单一顶边加载反馈、窄屏无横向溢出、宽窄侧栏 surface 层级、颜色面板和嵌套 Drawer 无滚动条位移、模式切换不推动主图与胶片条

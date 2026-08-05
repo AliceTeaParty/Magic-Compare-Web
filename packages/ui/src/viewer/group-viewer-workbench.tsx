@@ -1,11 +1,9 @@
 "use client";
 
-import { Tune } from "@mui/icons-material";
-import { Box, Paper, Slider, Stack, Typography } from "@mui/material";
+import { Box, Paper, Stack } from "@mui/material";
 import { cycleAbSide, getComparisonAssetKey } from "@magic-compare/compare-core";
 import { useViewerController } from "@magic-compare/compare-core/use-viewer-controller";
 import type { ViewerDataset } from "@magic-compare/compare-core/viewer-data";
-import { clampNumber } from "@magic-compare/shared-utils";
 import { useCallback, useEffect, useState } from "react";
 import { ViewerFilmstrip } from "./workbench/viewer-filmstrip";
 import { ViewerHeader } from "./workbench/viewer-header";
@@ -83,6 +81,7 @@ export function GroupViewerWorkbench({ dataset, variant }: GroupViewerWorkbenchP
     stageActive: abStageActive,
   } = abInspect;
   const {
+    mediaPreferencesReady,
     resolvedHideStageScrollControl,
     resolvedPrefersReducedMotion,
     resolvedRotateStage,
@@ -114,6 +113,14 @@ export function GroupViewerWorkbench({ dataset, variant }: GroupViewerWorkbenchP
     setSidebarOpen,
     sidebarOpen,
   });
+
+  useEffect(() => {
+    if (mediaPreferencesReady && !resolvedShowDesktopSidebar) {
+      // A persisted desktop supporting pane must not become a blocking drawer on mobile entry.
+      // This runs only when the responsive mode changes, so users can still open the drawer.
+      closeSidebar();
+    }
+  }, [closeSidebar, mediaPreferencesReady, resolvedShowDesktopSidebar]);
 
   // Pan/swipe state belongs to a single frame; carrying it over to another frame feels broken.
   useEffect(() => {
@@ -228,21 +235,21 @@ export function GroupViewerWorkbench({ dataset, variant }: GroupViewerWorkbenchP
         <ViewerHeader
           abScale={abDisplayedScale}
           abSide={abSide}
-          afterAsset={activeAfterAsset}
           beforeAsset={beforeAsset}
           canUseHeatmap={availableModes.includes("heatmap")}
           caseTitle={dataset.caseMeta.title}
-          caseSlug={dataset.caseMeta.slug}
           comparisonAssetKey={activeComparisonAssetKey}
           comparisonAssets={comparisonAssets}
           guideOpen={guideOpen}
           groupTitle={dataset.group.title}
           hideStageScrollControl={resolvedHideStageScrollControl}
           mode={mode}
+          overlayOpacity={overlayOpacity}
           onAbSideChange={setAbSide}
           onComparisonAssetChange={setComparisonAssetKey}
           onOpenGuide={openViewerGuide}
           onModeChange={setMode}
+          onOverlayOpacityChange={setOverlayOpacity}
           onScaleChange={setAbScale}
           onScrollStageIntoView={stageShell.scrollStageIntoView}
           onToggleSidebar={toggleSidebar}
@@ -268,13 +275,6 @@ export function GroupViewerWorkbench({ dataset, variant }: GroupViewerWorkbenchP
               }}
             >
               {mode === "heatmap" && !heatmapAsset ? <HeatmapNotice /> : null}
-              {showGuideNudge ? (
-                <ViewerOnboardingNudge
-                  onDismiss={dismissViewerGuideNudge}
-                  onOpenGuide={openViewerGuide}
-                />
-              ) : null}
-
               <Box
                 ref={stageShell.stageSlotRef}
                 sx={{
@@ -306,40 +306,24 @@ export function GroupViewerWorkbench({ dataset, variant }: GroupViewerWorkbenchP
                   stageRef={stageShell.stageRef}
                   swipePosition={swipePosition}
                 />
-              </Box>
-
-              {mode === "heatmap" && heatmapAsset ? (
-                <Stack
-                  direction={{ xs: "column", md: "row" }}
-                  spacing={2}
-                  sx={{
-                    alignItems: "center",
-                  }}
-                >
-                  <Stack
-                    direction="row"
-                    spacing={1}
+                {showGuideNudge ? (
+                  <Box
                     sx={{
-                      alignItems: "center",
+                      position: "absolute",
+                      zIndex: 2,
+                      top: { xs: 8, md: 12 },
+                      right: { xs: 8, md: 12 },
                     }}
                   >
-                    <Tune fontSize="small" />
-                    <Typography variant="body2">Opacity</Typography>
-                  </Stack>
-                  <Slider
-                    min={20}
-                    max={95}
-                    value={overlayOpacity}
-                    onChange={(_, value) =>
-                      setOverlayOpacity(
-                        clampNumber(Array.isArray(value) ? value[0] : value, 20, 95),
-                      )
-                    }
-                    valueLabelDisplay="auto"
-                    sx={{ maxWidth: 320 }}
-                  />
-                </Stack>
-              ) : null}
+                    {/* First-run guidance floats above the stage so appearing once cannot move the
+                        image or filmstrip that operators use for repeated frame inspection. */}
+                    <ViewerOnboardingNudge
+                      onDismiss={dismissViewerGuideNudge}
+                      onOpenGuide={openViewerGuide}
+                    />
+                  </Box>
+                ) : null}
+              </Box>
             </Stack>
           </Box>
 
@@ -353,7 +337,6 @@ export function GroupViewerWorkbench({ dataset, variant }: GroupViewerWorkbenchP
         </Box>
 
         <ViewerSidebar
-          caseMeta={dataset.caseMeta}
           currentFrame={currentFrame}
           currentGroup={dataset.group}
           groups={dataset.siblingGroups}

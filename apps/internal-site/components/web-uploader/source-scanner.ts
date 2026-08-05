@@ -64,10 +64,7 @@ const FALLBACK_FILENAME_RE = /^(?<frame>\d+)(?<variant>[A-Za-z][A-Za-z0-9]*)$/;
 const STRUCTURED_SOURCE_FILENAME_RE =
   /^(?:(?<fps>\d{2})_)?(?<title>.+)_(?<episode>\d+)(?:\.(?<sourceMarker>[^-]+))?-(?<frame>\d+)-(?<variant>[^_\-.]+)$/i;
 const GROUP_SUFFIX_NOISE_RE = /(?:[_\-. ]+\d{4,5}[_\-. ]+(?:gen[_\-. ]+vpy|m2ts|mkv|mp4|ts))$/i;
-const MATCH_KEY_SUFFIX_RE = new RegExp(
-  `(?:[_\\-. ]+(?:${MATCH_KEY_VARIANTS.join("|")}))+$`,
-  "i",
-);
+const MATCH_KEY_SUFFIX_RE = new RegExp(`(?:[_\\-. ]+(?:${MATCH_KEY_VARIANTS.join("|")}))+$`, "i");
 const NON_ALNUM_RE = /[^0-9a-z]+/g;
 const VOLUME_HINT_RE = /(?:^|[^a-zA-Z0-9])(VOL|BOX)[ _-]*(\d+)(?=$|[^a-zA-Z0-9])/i;
 const MAX_AFTER_ASSETS = 4;
@@ -152,7 +149,7 @@ function volumeSortKey(input: string): VolumeSortKey | null {
 function compareVolumeHints(left: string, right: string) {
   const leftKey = volumeSortKey(left);
   const rightKey = volumeSortKey(right);
-  const kindRank = (key: VolumeSortKey | null) => key ? (key.kind === "VOL" ? 0 : 1) : 2;
+  const kindRank = (key: VolumeSortKey | null) => (key ? (key.kind === "VOL" ? 0 : 1) : 2);
 
   return (
     kindRank(leftKey) - kindRank(rightKey) ||
@@ -161,11 +158,7 @@ function compareVolumeHints(left: string, right: string) {
 }
 
 function rootHintWithoutVolume(input: string) {
-  return input
-    .replace(VOLUME_HINT_RE, " ")
-    .toLowerCase()
-    .replace(NON_ALNUM_RE, " ")
-    .trim();
+  return input.replace(VOLUME_HINT_RE, " ").toLowerCase().replace(NON_ALNUM_RE, " ").trim();
 }
 
 function compareRootHints(left: string, right: string) {
@@ -231,7 +224,11 @@ function ignoreReason(entry: BrowserUploadFile) {
   if (normalizedName.startsWith(".")) {
     return "hidden-file";
   }
-  if (normalizedName.endsWith("~") || normalizedName.endsWith(".swp") || normalizedName.endsWith(".tmp")) {
+  if (
+    normalizedName.endsWith("~") ||
+    normalizedName.endsWith(".swp") ||
+    normalizedName.endsWith(".tmp")
+  ) {
     return "editor-temp";
   }
   if (normalizedName.startsWith("thumb-")) {
@@ -247,13 +244,7 @@ function ignoreReason(entry: BrowserUploadFile) {
 }
 
 function directoryTokens(name: string) {
-  return new Set(
-    name
-      .toLowerCase()
-      .replace(NON_ALNUM_RE, " ")
-      .split(/\s+/)
-      .filter(Boolean),
-  );
+  return new Set(name.toLowerCase().replace(NON_ALNUM_RE, " ").split(/\s+/).filter(Boolean));
 }
 
 function pathMatchesHints(path: string, hints: Set<string>) {
@@ -262,7 +253,13 @@ function pathMatchesHints(path: string, hints: Set<string>) {
 
 function matchKeyForName(name: string) {
   const normalized = name.toLowerCase().replace(MATCH_KEY_SUFFIX_RE, "");
-  return normalized.replace(NON_ALNUM_RE, "-").replace(/^-+|-+$/g, "") || name.toLowerCase().replace(NON_ALNUM_RE, "-").replace(/^-+|-+$/g, "");
+  return (
+    normalized.replace(NON_ALNUM_RE, "-").replace(/^-+|-+$/g, "") ||
+    name
+      .toLowerCase()
+      .replace(NON_ALNUM_RE, "-")
+      .replace(/^-+|-+$/g, "")
+  );
 }
 
 function topLevelDirectory(relativePath: string) {
@@ -297,22 +294,41 @@ function stripSharedTopLevelDirectory(entries: BrowserUploadFile[]) {
 }
 
 function suggestNonFlatLayout(entries: BrowserUploadFile[]): NonFlatLayout {
-  const directories = [...new Set(entries.map((entry) => topLevelDirectory(entry.relativePath)).filter(Boolean))].sort();
+  const directories = [
+    ...new Set(entries.map((entry) => topLevelDirectory(entry.relativePath)).filter(Boolean)),
+  ].sort();
   const beforeDir = directories.find((path) => pathMatchesHints(path, BEFORE_DIR_HINTS)) ?? null;
-  const afterDirs = directories.filter((path) => path !== beforeDir && pathMatchesHints(path, AFTER_DIR_HINTS));
-  const heatmapDirs = directories.filter((path) => path !== beforeDir && !afterDirs.includes(path) && pathMatchesHints(path, HEATMAP_VARIANTS));
-  const miscDirs = directories.filter((path) => path !== beforeDir && !afterDirs.includes(path) && !heatmapDirs.includes(path) && pathMatchesHints(path, MISC_DIR_HINTS));
+  const afterDirs = directories.filter(
+    (path) => path !== beforeDir && pathMatchesHints(path, AFTER_DIR_HINTS),
+  );
+  const heatmapDirs = directories.filter(
+    (path) =>
+      path !== beforeDir && !afterDirs.includes(path) && pathMatchesHints(path, HEATMAP_VARIANTS),
+  );
+  const miscDirs = directories.filter(
+    (path) =>
+      path !== beforeDir &&
+      !afterDirs.includes(path) &&
+      !heatmapDirs.includes(path) &&
+      pathMatchesHints(path, MISC_DIR_HINTS),
+  );
 
   return { beforeDir, afterDirs, heatmapDirs, miscDirs };
 }
 
 // Filename suffixes describe the actual comparison variable; directory names only fill in names
 // that omit a suffix, such as `after/001.png`.
-function resolveCandidateVariant(explicitVariant: string | null | undefined, directoryHint?: string) {
+function resolveCandidateVariant(
+  explicitVariant: string | null | undefined,
+  directoryHint?: string,
+) {
   return (explicitVariant ?? directoryHint ?? "output").trim().toLowerCase();
 }
 
-function parseCandidate(entry: BrowserUploadFile, variantOverride?: string): SourceCandidate | null {
+function parseCandidate(
+  entry: BrowserUploadFile,
+  variantOverride?: string,
+): SourceCandidate | null {
   const pathStem = stem(entry.relativePath);
   const structured = structuredFrameInfo(pathStem);
   if (structured) {
@@ -348,7 +364,7 @@ function parseCandidate(entry: BrowserUploadFile, variantOverride?: string): Sou
       episode,
       frameNumber,
       title,
-      caption: `fps ${fps} / episode ${episode} / frame ${frameNumber}`,
+      caption: `fps ${fps} / clip ${episode} / frame ${frameNumber}`,
       rootHint: prefix,
       frameKey: `name:${matchKeyForName(pathStem)}`,
       isFallback: false,
@@ -422,7 +438,10 @@ function alternatePriority(candidate: SourceCandidate) {
       ? 0
       : candidate.variant === "rip"
         ? 1
-        : candidate.variant === "deband" || candidate.variant === "nodeband" || candidate.variant === "noband" || candidate.variant === "nobanding"
+        : candidate.variant === "deband" ||
+            candidate.variant === "nodeband" ||
+            candidate.variant === "noband" ||
+            candidate.variant === "nobanding"
           ? 2
           : candidate.variant === "degrain" || candidate.variant === "degrained"
             ? 3
@@ -432,7 +451,10 @@ function alternatePriority(candidate: SourceCandidate) {
   return `${priority}:${candidate.variant}:${candidate.originalName.toLowerCase()}`;
 }
 
-function assetPlan(kind: WebUploadAssetPlan["kind"], candidate: SourceCandidate): WebUploadAssetPlan {
+function assetPlan(
+  kind: WebUploadAssetPlan["kind"],
+  candidate: SourceCandidate,
+): WebUploadAssetPlan {
   // Asset kind already records the baseline role. Preserve src/source/ori suffixes in the visible
   // column label so automatic inference reflects the operator's actual comparison variables.
   const label =
@@ -465,10 +487,7 @@ function formatCandidateFrameTitle(
   if (candidate.isStructured) {
     // VSEditor embeds the work title in every filename. Keep the row title to episode-frame so the
     // preview table stays scannable; the long title remains in caption and file tooltips.
-    const episode = String(Number(candidate.episode) || 0).padStart(
-      structuredEpisodeWidth,
-      "0",
-    );
+    const episode = String(Number(candidate.episode) || 0).padStart(structuredEpisodeWidth, "0");
     return `${episode}-${candidate.frameNumber}`;
   }
 
@@ -501,7 +520,9 @@ function buildFrameFromCandidates(
     };
   }
 
-  const heatmapCandidates = candidates.filter((candidate) => HEATMAP_VARIANTS.has(candidate.variant));
+  const heatmapCandidates = candidates.filter((candidate) =>
+    HEATMAP_VARIANTS.has(candidate.variant),
+  );
   if (heatmapCandidates.length > 1) {
     return {
       code: "heatmap-count",
@@ -511,7 +532,10 @@ function buildFrameFromCandidates(
     };
   }
 
-  const outputCandidates = candidates.filter((candidate) => !SOURCE_VARIANTS.has(candidate.variant) && !HEATMAP_VARIANTS.has(candidate.variant));
+  const outputCandidates = candidates.filter(
+    (candidate) =>
+      !SOURCE_VARIANTS.has(candidate.variant) && !HEATMAP_VARIANTS.has(candidate.variant),
+  );
   if (outputCandidates.length === 0) {
     return {
       code: "after-missing",
@@ -522,7 +546,9 @@ function buildFrameFromCandidates(
   }
 
   const before = beforeCandidates[0];
-  const after = [...outputCandidates].sort((left, right) => afterPriority(left).localeCompare(afterPriority(right)))[0];
+  const after = [...outputCandidates].sort((left, right) =>
+    afterPriority(left).localeCompare(afterPriority(right)),
+  )[0];
   const misc = outputCandidates
     .filter((candidate) => candidate !== after)
     .sort((left, right) => alternatePriority(left).localeCompare(alternatePriority(right)));
@@ -563,10 +589,18 @@ function groupByMatchKey(candidates: SourceCandidate[]) {
   return grouped;
 }
 
-function assignCandidatesToBeforeKeys(candidates: SourceCandidate[], beforeByKey: Map<string, SourceCandidate[]>) {
+function assignCandidatesToBeforeKeys(
+  candidates: SourceCandidate[],
+  beforeByKey: Map<string, SourceCandidate[]>,
+) {
   const grouped = new Map<string, SourceCandidate[]>();
   const unmatched: SourceCandidate[] = [];
-  const beforeTokens = new Map([...beforeByKey.entries()].map(([key, items]) => [key, matchTokensForName(stem(items[0].entry.relativePath))]));
+  const beforeTokens = new Map(
+    [...beforeByKey.entries()].map(([key, items]) => [
+      key,
+      matchTokensForName(stem(items[0].entry.relativePath)),
+    ]),
+  );
 
   for (const candidate of candidates) {
     const directKey = matchKeyForName(stem(candidate.entry.relativePath));
@@ -608,10 +642,15 @@ function deriveGroupIdentity(sourceRootName: string, candidates: SourceCandidate
     }
     commonPrefix = commonPrefix.slice(0, index);
   }
-  commonPrefix = commonPrefix.replace(GROUP_SUFFIX_NOISE_RE, "").replace(/^[ _\-.]+|[ _\-.]+$/g, "") || sourceRootName;
+  commonPrefix =
+    commonPrefix.replace(GROUP_SUFFIX_NOISE_RE, "").replace(/^[ _\-.]+|[ _\-.]+$/g, "") ||
+    sourceRootName;
   const slug = cjkKebabCase(commonPrefix, "");
   if (slug.length < 3) {
-    return { slug: cjkKebabCase(sourceRootName, "uploaded-group"), title: titleCase(sourceRootName) || "Uploaded Group" };
+    return {
+      slug: cjkKebabCase(sourceRootName, "uploaded-group"),
+      title: titleCase(sourceRootName) || "Uploaded Group",
+    };
   }
   return { slug, title: titleCase(commonPrefix) || titleCase(sourceRootName) || "Uploaded Group" };
 }
@@ -682,7 +721,11 @@ function parseEntries(entries: BrowserUploadFile[], variantOverride?: string) {
   return { candidates, ignored };
 }
 
-function buildFlatPlan(sourceRootName: string, entries: BrowserUploadFile[], ignoredFiles: IgnoredUploadFile[]): WebUploadPlan {
+function buildFlatPlan(
+  sourceRootName: string,
+  entries: BrowserUploadFile[],
+  ignoredFiles: IgnoredUploadFile[],
+): WebUploadPlan {
   const parsed = parseEntries(entries);
   const grouped = new Map<string, SourceCandidate[]>();
   for (const candidate of parsed.candidates) {
@@ -701,7 +744,8 @@ function buildFlatPlan(sourceRootName: string, entries: BrowserUploadFile[], ign
   });
   const fallbackWidth = Math.max(
     4,
-    String(Math.max(0, ...orderedGroups.map(([, candidates]) => candidates[0]?.frameNumber ?? 0))).length,
+    String(Math.max(0, ...orderedGroups.map(([, candidates]) => candidates[0]?.frameNumber ?? 0)))
+      .length,
   );
   const episodeWidth = structuredEpisodeWidth(parsed.candidates);
   const frames: WebUploadFramePlan[] = [];
@@ -727,20 +771,26 @@ function buildFlatPlan(sourceRootName: string, entries: BrowserUploadFile[], ign
   };
 }
 
-function buildNestedPlan(sourceRootName: string, entries: BrowserUploadFile[], ignoredFiles: IgnoredUploadFile[], layout: NonFlatLayout): WebUploadPlan {
+function buildNestedPlan(
+  sourceRootName: string,
+  entries: BrowserUploadFile[],
+  ignoredFiles: IgnoredUploadFile[],
+  layout: NonFlatLayout,
+): WebUploadPlan {
   const scopedEntries = (directory: string | null) =>
     directory ? entries.filter((entry) => topLevelDirectory(entry.relativePath) === directory) : [];
   const beforeVariant = layout.beforeDir ? basename(layout.beforeDir).toLowerCase() : "source";
   const beforeParsed = parseEntries(scopedEntries(layout.beforeDir), beforeVariant);
   const afterParsedResults = layout.afterDirs.map((directory) => {
     const directoryVariant = basename(directory).toLowerCase();
-    return parseEntries(
-      scopedEntries(directory),
-      directoryVariant,
-    );
+    return parseEntries(scopedEntries(directory), directoryVariant);
   });
-  const heatmapParsedResults = layout.heatmapDirs.map((directory) => parseEntries(scopedEntries(directory), "heatmap"));
-  const miscParsedResults = layout.miscDirs.map((directory) => parseEntries(scopedEntries(directory), basename(directory).toLowerCase() || "misc"));
+  const heatmapParsedResults = layout.heatmapDirs.map((directory) =>
+    parseEntries(scopedEntries(directory), "heatmap"),
+  );
+  const miscParsedResults = layout.miscDirs.map((directory) =>
+    parseEntries(scopedEntries(directory), basename(directory).toLowerCase() || "misc"),
+  );
   const afterParsed = afterParsedResults.flatMap((result) => result.candidates);
   const heatmapParsed = heatmapParsedResults.flatMap((result) => result.candidates);
   const miscParsed = miscParsedResults.flatMap((result) => result.candidates);
@@ -777,7 +827,10 @@ function buildNestedPlan(sourceRootName: string, entries: BrowserUploadFile[], i
         compareRootHints(left[1].rootHint, right[1].rootHint) ||
         left[0].localeCompare(right[0]),
     );
-  const fallbackWidth = Math.max(4, String(Math.max(0, ...allBefore.map(([, candidate]) => candidate.frameNumber))).length);
+  const fallbackWidth = Math.max(
+    4,
+    String(Math.max(0, ...allBefore.map(([, candidate]) => candidate.frameNumber))).length,
+  );
   const episodeWidth = structuredEpisodeWidth(beforeParsed.candidates);
   const frames: WebUploadFramePlan[] = [];
 
@@ -793,7 +846,9 @@ function buildNestedPlan(sourceRootName: string, entries: BrowserUploadFile[], i
       continue;
     }
 
-    const primaryAfter = [...matchedAfter].sort((left, right) => afterPriority(left).localeCompare(afterPriority(right)))[0];
+    const primaryAfter = [...matchedAfter].sort((left, right) =>
+      afterPriority(left).localeCompare(afterPriority(right)),
+    )[0];
     const extraAfter = matchedAfter
       .filter((candidate) => candidate !== primaryAfter)
       .sort((left, right) => alternatePriority(left).localeCompare(alternatePriority(right)));
@@ -804,7 +859,9 @@ function buildNestedPlan(sourceRootName: string, entries: BrowserUploadFile[], i
       caption: before.isFallback ? `file ${stem(before.entry.relativePath)}` : before.caption,
       before: assetPlan("before", before),
       after: assetPlan("after", primaryAfter),
-      heatmap: heatmapAssignments.grouped.get(matchKey)?.[0] ? assetPlan("heatmap", heatmapAssignments.grouped.get(matchKey)![0]) : null,
+      heatmap: heatmapAssignments.grouped.get(matchKey)?.[0]
+        ? assetPlan("heatmap", heatmapAssignments.grouped.get(matchKey)![0])
+        : null,
       misc: [
         ...extraAfter.slice(0, MAX_AFTER_ASSETS - 1),
         ...(miscAssignments.grouped.get(matchKey) ?? []),
@@ -812,7 +869,11 @@ function buildNestedPlan(sourceRootName: string, entries: BrowserUploadFile[], i
     });
   }
 
-  for (const candidate of [...afterAssignments.unmatched, ...heatmapAssignments.unmatched, ...miscAssignments.unmatched]) {
+  for (const candidate of [
+    ...afterAssignments.unmatched,
+    ...heatmapAssignments.unmatched,
+    ...miscAssignments.unmatched,
+  ]) {
     ignored.push({ path: candidate.entry.relativePath, reason: "unmatched-file" });
   }
 
@@ -832,7 +893,10 @@ function buildNestedPlan(sourceRootName: string, entries: BrowserUploadFile[], i
  * Scans browser-selected files into the same frame-first model expected by the upload API while
  * keeping raw File objects outside React state in the caller.
  */
-export function scanBrowserUploadFiles(entries: BrowserUploadFile[], sourceRootName = "uploaded-group"): WebUploadPlan {
+export function scanBrowserUploadFiles(
+  entries: BrowserUploadFile[],
+  sourceRootName = "uploaded-group",
+): WebUploadPlan {
   const importableEntries: BrowserUploadFile[] = [];
   const ignoredFiles: IgnoredUploadFile[] = [];
   for (const entry of entries) {

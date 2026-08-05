@@ -123,7 +123,9 @@ function StagePresentationShell({
         aspectRatio: hasMeasuredStageSize ? undefined : stageAspectRatio,
         minHeight: hasMeasuredStageSize ? 0 : { xs: 80 },
         marginInline: "auto",
-        borderRadius: 2.5,
+        // The image is the work surface, not a decorative card; a medium corner keeps it related
+        // to the surrounding M3 shell without softening the inspection boundary.
+        borderRadius: 1.5,
         overflow: "hidden",
         border: "1px solid",
         borderColor: inspectActive

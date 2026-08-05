@@ -1,16 +1,39 @@
 "use client";
 
-import { FitScreen, HelpOutlined, ViewSidebar } from "@mui/icons-material";
-import { Box, IconButton, Stack, ToggleButton, ToggleButtonGroup, Tooltip } from "@mui/material";
+import { FitScreen, HelpOutlined, Opacity, ViewSidebar } from "@mui/icons-material";
+import {
+  Box,
+  IconButton,
+  Slider,
+  Stack,
+  ToggleButton,
+  ToggleButtonGroup,
+  Tooltip,
+  Typography,
+} from "@mui/material";
 import type { ViewerMode } from "@magic-compare/content-schema";
 import type { ViewerAsset } from "@magic-compare/compare-core/viewer-data";
+import { clampNumber } from "@magic-compare/shared-utils";
 import { AbInspectControls } from "./ab-inspect-controls";
 import { ComparisonAssetControls } from "./comparison-asset-controls";
+
+const compactControlHeight = { xs: 42, md: 40 } as const;
+const tripleControlWidth = 144;
+
+interface ViewerUtilityControlsProps {
+  compact?: boolean;
+  guideOpen: boolean;
+  hideStageScrollControl: boolean;
+  onOpenGuide: () => void;
+  onScrollStageIntoView: () => void;
+  onToggleSidebar: () => void;
+  sidebarOpen: boolean;
+  variant: "public" | "internal";
+}
 
 interface ViewerToolbarProps {
   abScale: number;
   abSide: "before" | "after";
-  afterAsset: ViewerAsset | undefined;
   beforeAsset: ViewerAsset | undefined;
   canUseHeatmap: boolean;
   comparisonAssetKey: string | undefined;
@@ -18,15 +41,175 @@ interface ViewerToolbarProps {
   guideOpen: boolean;
   hideStageScrollControl: boolean;
   mode: ViewerMode;
+  overlayOpacity: number;
   onAbSideChange: (side: "before" | "after") => void;
   onComparisonAssetChange: (assetKey: string) => void;
   onOpenGuide: () => void;
   onModeChange: (mode: ViewerMode) => void;
+  onOverlayOpacityChange: (value: number) => void;
   onScaleChange: (nextScale: number) => void;
   onScrollStageIntoView: () => void;
   onToggleSidebar: () => void;
   sidebarOpen: boolean;
   variant: "public" | "internal";
+}
+
+/** Keeps Heatmap intensity inside the stable toolbar slot instead of moving the filmstrip. */
+function HeatmapOpacityControls({
+  onChange,
+  value,
+  variant,
+}: {
+  onChange: (value: number) => void;
+  value: number;
+  variant: "public" | "internal";
+}) {
+  return (
+    <Stack
+      direction="row"
+      sx={{
+        // Heatmap uses the same fixed-height tonal surface as the Viewer segmented controls, so
+        // switching modes changes content without introducing a visually unrelated bare slider.
+        width: "min(100%, 240px)",
+        height: compactControlHeight,
+        minHeight: compactControlHeight,
+        alignItems: "center",
+        gap: 0.75,
+        px: 1.25,
+        boxSizing: "border-box",
+        border: "1px solid",
+        borderColor: "divider",
+        borderRadius: 999,
+        backgroundColor: "surface.containerHigh",
+      }}
+    >
+      <Opacity aria-hidden="true" sx={{ color: "text.secondary", fontSize: 18 }} />
+      <Typography variant="body2" sx={{ whiteSpace: "nowrap" }}>
+        {variant === "internal" ? "透明度" : "Opacity"}
+      </Typography>
+      <Slider
+        aria-label={variant === "internal" ? "热图透明度" : "Heatmap opacity"}
+        min={20}
+        max={95}
+        size="small"
+        value={value}
+        onChange={(_, nextValue) =>
+          onChange(clampNumber(Array.isArray(nextValue) ? nextValue[0] : nextValue, 20, 95))
+        }
+        sx={{ flex: 1, minWidth: 64 }}
+      />
+      <Typography
+        variant="caption"
+        sx={{ width: 36, textAlign: "right", fontVariantNumeric: "tabular-nums" }}
+      >
+        {value}%
+      </Typography>
+    </Stack>
+  );
+}
+
+/** Renders one stable icon group that can move between the desktop toolbar and mobile title row. */
+export function ViewerUtilityControls({
+  compact = false,
+  guideOpen,
+  hideStageScrollControl,
+  onOpenGuide,
+  onScrollStageIntoView,
+  onToggleSidebar,
+  sidebarOpen,
+  variant,
+}: ViewerUtilityControlsProps) {
+  const stageControlHidden = compact || hideStageScrollControl;
+  const controlWidth = compact ? 80 : stageControlHidden ? 96 : tripleControlWidth;
+  const controlHeight = compact ? 40 : compactControlHeight;
+  const utilityIconButtonSx = {
+    width: "100%",
+    height: "100%",
+    border: 0,
+    borderRadius: 0,
+    backgroundColor: "transparent",
+    "&[aria-pressed='true']": {
+      color: "primary.onContainer",
+      backgroundColor: "primary.light",
+    },
+  } as const;
+
+  return (
+    <Stack
+      role="toolbar"
+      aria-label={variant === "internal" ? "视图工具" : "Viewer tools"}
+      direction="row"
+      useFlexGap
+      sx={{
+        alignItems: "center",
+        justifyContent: "flex-end",
+        gap: 0,
+        width: controlWidth,
+        height: controlHeight,
+        flex: "0 0 auto",
+        overflow: "hidden",
+        boxSizing: "border-box",
+        border: "1px solid",
+        borderColor: "divider",
+        borderRadius: 999,
+        backgroundColor: "surface.containerHigh",
+        // Mobile removes the stage shortcut and keeps two compact 40px cells beside the title.
+        display: "grid",
+        gridTemplateColumns: stageControlHidden
+          ? "repeat(2, minmax(0, 1fr))"
+          : "repeat(3, minmax(0, 1fr))",
+      }}
+    >
+      {!stageControlHidden ? (
+        <Box sx={{ width: "100%", height: "100%" }}>
+          <Tooltip title="滚动到对比主图">
+            <IconButton
+              size="small"
+              aria-label="滚动到对比主图"
+              onClick={onScrollStageIntoView}
+              sx={utilityIconButtonSx}
+            >
+              <FitScreen fontSize="small" />
+            </IconButton>
+          </Tooltip>
+        </Box>
+      ) : null}
+
+      <Tooltip title="查看引导 (?)">
+        <IconButton
+          size="small"
+          aria-label="查看引导"
+          aria-pressed={guideOpen}
+          onClick={onOpenGuide}
+          sx={{
+            ...utilityIconButtonSx,
+            borderLeft: stageControlHidden ? 0 : "1px solid",
+            borderLeftColor: "divider",
+            "& .MuiSvgIcon-root": { fontSize: 18 },
+          }}
+        >
+          <HelpOutlined />
+        </IconButton>
+      </Tooltip>
+
+      <Tooltip title={sidebarOpen ? "关闭详情 (I)" : "打开详情 (I)"}>
+        <IconButton
+          size="small"
+          aria-label={sidebarOpen ? "关闭详情" : "打开详情"}
+          aria-pressed={sidebarOpen}
+          onClick={onToggleSidebar}
+          sx={{
+            ...utilityIconButtonSx,
+            borderLeft: "1px solid",
+            borderLeftColor: "divider",
+            "& .MuiSvgIcon-root": { fontSize: 18 },
+          }}
+        >
+          <ViewSidebar />
+        </IconButton>
+      </Tooltip>
+    </Stack>
+  );
 }
 
 /**
@@ -36,7 +219,6 @@ interface ViewerToolbarProps {
 export function ViewerToolbar({
   abScale,
   abSide,
-  afterAsset,
   beforeAsset,
   canUseHeatmap,
   comparisonAssetKey,
@@ -44,19 +226,18 @@ export function ViewerToolbar({
   guideOpen,
   hideStageScrollControl,
   mode,
+  overlayOpacity,
   onAbSideChange,
   onComparisonAssetChange,
   onOpenGuide,
   onModeChange,
+  onOverlayOpacityChange,
   onScaleChange,
   onScrollStageIntoView,
   onToggleSidebar,
   sidebarOpen,
   variant,
 }: ViewerToolbarProps) {
-  const compactControlHeight = { xs: 42, md: 40 };
-  const compactIconButtonSize = { xs: 42, md: 40 };
-
   /**
    * Routes side selection through the parent controller so A/B state stays in sync with keyboard
    * shortcuts and stage tap cycling.
@@ -87,6 +268,8 @@ export function ViewerToolbar({
       spacing={0.75}
       sx={{
         alignItems: { xs: "stretch", sm: "flex-end" },
+        width: { xs: "100%", sm: 366 },
+        maxWidth: "100%",
         minWidth: 0,
       }}
     >
@@ -95,38 +278,70 @@ export function ViewerToolbar({
         useFlexGap
         sx={{
           alignItems: "center",
-          justifyContent: { xs: "flex-start", sm: "flex-end" },
-          flexWrap: "wrap",
+          justifyContent: "flex-end",
           gap: 0.75,
+          width: "100%",
+          minWidth: 0,
         }}
       >
+        <Box sx={{ display: { xs: "none", sm: "block" }, flex: "0 0 auto" }}>
+          <ViewerUtilityControls
+            guideOpen={guideOpen}
+            hideStageScrollControl={hideStageScrollControl}
+            onOpenGuide={onOpenGuide}
+            onScrollStageIntoView={onScrollStageIntoView}
+            onToggleSidebar={onToggleSidebar}
+            sidebarOpen={sidebarOpen}
+            variant={variant}
+          />
+        </Box>
+
         <ToggleButtonGroup
           exclusive
           size="small"
           value={mode}
           sx={{
             flexShrink: 0,
-            overflow: "visible",
+            width: { xs: "100%", sm: 216 },
+            height: compactControlHeight,
+            display: "grid",
+            gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+            gap: 0,
+            overflow: "hidden",
             alignItems: "stretch",
+            border: "1px solid",
+            borderColor: "divider",
+            borderRadius: 999,
+            backgroundColor: "surface.containerHigh",
             "& .MuiToggleButtonGroup-grouped": {
               // Fixed segment widths keep the utility controls stationary when the selected mode
-              // or translated label changes.
-              width: 72,
-              height: compactControlHeight,
-              minHeight: compactControlHeight,
+              // or translated label changes. Mobile segments share the available row so icon
+              // utilities never get clipped against the Viewer shell.
+              width: "auto",
+              minWidth: 0,
+              flex: "none",
+              height: "100%",
+              minHeight: 0,
               px: 1,
               fontSize: "0.86rem",
               fontWeight: 600,
               whiteSpace: "nowrap",
+              margin: "0 !important",
+              border: "0 !important",
+              borderRadius: "0 !important",
+              backgroundColor: "transparent",
             },
-            "& .MuiToggleButtonGroup-firstButton": {
-              borderRadius: "999px 4px 4px 999px",
+            "& .MuiToggleButtonGroup-grouped:not(:first-of-type)": {
+              borderLeft: "1px solid !important",
+              borderLeftColor: "var(--mui-palette-divider) !important",
             },
-            "& .MuiToggleButtonGroup-middleButton": {
-              borderRadius: 1,
+            "& .MuiToggleButton-root.Mui-selected": {
+              color: "primary.onContainer",
+              backgroundColor: "primary.light",
             },
-            "& .MuiToggleButtonGroup-lastButton": {
-              borderRadius: "4px 999px 999px 4px",
+            "& .MuiToggleButton-root.Mui-selected:hover": {
+              backgroundColor:
+                "color-mix(in srgb, currentColor 8%, var(--mui-palette-primary-light))",
             },
           }}
           onChange={handleModeChange}
@@ -139,112 +354,49 @@ export function ViewerToolbar({
             {variant === "internal" ? "热图" : "Heatmap"}
           </ToggleButton>
         </ToggleButtonGroup>
-
-        <Box
-          sx={{
-            width: compactIconButtonSize,
-            height: compactIconButtonSize,
-            flex: "0 0 auto",
-            // Preserve the slot when the shortcut is unnecessary so neighboring controls never
-            // move after scrolling or changing stage state.
-            visibility: hideStageScrollControl ? "hidden" : "visible",
-          }}
-        >
-          <Tooltip title="滚动到对比主图">
-            <IconButton
-              size="small"
-              aria-label="滚动到对比主图"
-              onClick={onScrollStageIntoView}
-              sx={{
-                width: "100%",
-                height: "100%",
-                border: "1px solid",
-                borderColor: "divider",
-                backgroundColor: "surface.containerHigh",
-              }}
-            >
-              <FitScreen fontSize="small" />
-            </IconButton>
-          </Tooltip>
-        </Box>
-
-        <Tooltip title="查看引导 (?)">
-          <IconButton
-            size="small"
-            aria-label="查看引导"
-            aria-pressed={guideOpen}
-            color={guideOpen ? "primary" : "default"}
-            onClick={onOpenGuide}
-            sx={{
-              width: compactIconButtonSize,
-              height: compactIconButtonSize,
-              "& .MuiSvgIcon-root": {
-                fontSize: 18,
-              },
-            }}
-          >
-            <HelpOutlined />
-          </IconButton>
-        </Tooltip>
-
-        <Tooltip title={sidebarOpen ? "关闭详情 (I)" : "打开详情 (I)"}>
-          <IconButton
-            size="small"
-            aria-label={sidebarOpen ? "关闭详情" : "打开详情"}
-            onClick={onToggleSidebar}
-            sx={{
-              width: compactIconButtonSize,
-              height: compactIconButtonSize,
-              "& .MuiSvgIcon-root": {
-                fontSize: 18,
-              },
-            }}
-          >
-            <ViewSidebar />
-          </IconButton>
-        </Tooltip>
       </Stack>
-
-      {beforeAsset && comparisonAssetKey && comparisonAssets.length > 1 ? (
-        <Box
-          sx={{
-            display: "flex",
-            justifyContent: { xs: "flex-start", sm: "flex-end" },
-            width: "100%",
-            minWidth: 0,
-          }}
-        >
-          {/* Extra uploaded variables used to disappear after import. Keep the entire target set
-              visible here so switching Rip/Flt never depends on opening the metadata drawer. */}
-          <ComparisonAssetControls
-            baselineAsset={beforeAsset}
-            comparisonAssetKey={comparisonAssetKey}
-            comparisonAssets={comparisonAssets}
-            disabled={mode === "heatmap"}
-            onComparisonAssetChange={onComparisonAssetChange}
-          />
-        </Box>
-      ) : null}
 
       <Box
         sx={{
-          display: "flex",
-          justifyContent: { xs: "flex-start", sm: "flex-end" },
           width: "100%",
+          minWidth: 0,
           minHeight: compactControlHeight,
-          // A reserved second row prevents the title and mode switch from jumping when A/B tools
-          // become available while keeping the inactive controls out of keyboard navigation.
-          visibility: mode === "a-b" ? "visible" : "hidden",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "flex-end",
+          // Only the active mode owns this row, preventing unrelated controls from scattering
+          // between the title and the right edge of the header.
         }}
       >
-        <AbInspectControls
-          abScale={abScale}
-          abSide={abSide}
-          afterLabel={afterAsset?.label ?? "After"}
-          beforeLabel={beforeAsset?.label ?? "Before"}
-          onAbSideChange={handleAbSideChange}
-          onScaleChange={handleScaleChange}
-        />
+        {mode === "before-after" ? (
+          beforeAsset && comparisonAssetKey && comparisonAssets.length > 0 ? (
+            <ComparisonAssetControls
+              baselineAsset={beforeAsset}
+              comparisonAssetKey={comparisonAssetKey}
+              comparisonAssets={comparisonAssets}
+              onComparisonAssetChange={onComparisonAssetChange}
+            />
+          ) : null
+        ) : mode === "a-b" ? (
+          beforeAsset && comparisonAssetKey && comparisonAssets.length > 0 ? (
+            <AbInspectControls
+              abScale={abScale}
+              abSide={abSide}
+              baselineAsset={beforeAsset}
+              comparisonAssetKey={comparisonAssetKey}
+              comparisonAssets={comparisonAssets}
+              onAbSideChange={handleAbSideChange}
+              onComparisonAssetChange={onComparisonAssetChange}
+              onScaleChange={handleScaleChange}
+            />
+          ) : null
+        ) : (
+          <HeatmapOpacityControls
+            onChange={onOverlayOpacityChange}
+            value={overlayOpacity}
+            variant={variant}
+          />
+        )}
       </Box>
     </Stack>
   );

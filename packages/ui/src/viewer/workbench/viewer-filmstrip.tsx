@@ -38,6 +38,8 @@ function ThumbnailButton({
   return (
     <Button
       data-frame-id={frame.id}
+      aria-label={frame.title}
+      aria-pressed={isActive}
       onClick={onClick}
       onFocus={onIntent}
       onMouseEnter={onIntent}
@@ -46,21 +48,22 @@ function ThumbnailButton({
         // This gives the browser permission to skip painting far-off thumbnails until they scroll
         // closer to view, which trims initial work without changing the drag model.
         contentVisibility: "auto",
-        containIntrinsicSize: "152px 114px",
-        minWidth: 168,
-        maxWidth: 168,
+        containIntrinsicSize: "140px 104px",
+        minWidth: 148,
+        maxWidth: 148,
         display: "flex",
         flexDirection: "column",
         alignItems: "stretch",
-        gap: 0.9,
-        borderRadius: 2.25,
+        gap: 0.65,
+        borderRadius: 1.5,
         border: "1px solid",
         borderColor: isActive ? "primary.main" : "divider",
+        color: isActive ? "primary.onContainer" : "text.primary",
         backgroundColor: isActive
           ? viewerTokens.filmstrip.activeCardSurface
           : viewerTokens.filmstrip.inactiveCardSurface,
         boxShadow: isActive ? viewerTokens.filmstrip.activeCardInset : "none",
-        p: 1.1,
+        p: 0.75,
         // Hover feedback changes the M3 state layer only; moving thumbnails made the filmstrip feel
         // unstable and changed the pointer target while scanning adjacent frames.
         transition:
@@ -74,7 +77,7 @@ function ThumbnailButton({
     >
       <Box
         sx={{
-          borderRadius: 2,
+          borderRadius: 1,
           overflow: "hidden",
           backgroundColor: viewerTokens.filmstrip.thumbnailSurface,
           aspectRatio: "16 / 9",
@@ -84,7 +87,7 @@ function ThumbnailButton({
           <Box
             component="img"
             src={thumbAsset.thumbUrl || thumbAsset.imageUrl}
-            alt={frame.title}
+            alt=""
             draggable={false}
             loading={isNearActive ? "eager" : "lazy"}
             fetchPriority={isNearActive ? "high" : "auto"}
@@ -123,6 +126,7 @@ function ThumbnailButton({
           noWrap
           sx={{
             fontWeight: 600,
+            fontSize: "0.78rem",
             width: "100%",
             textAlign: "center",
           }}
@@ -181,14 +185,15 @@ export function ViewerFilmstrip({
     <Box
       sx={{
         minWidth: 0,
-        px: { xs: 1.5, md: 2.25 },
-        pt: { xs: 1.35, md: 2 },
-        pb: { xs: 2.1, md: 2.35 },
+        px: { xs: 1.25, md: 1.5 },
+        pt: { xs: 1.1, md: 1.25 },
+        // The custom scrollbar needs its own breathing room; a thin bottom inset made the filmstrip
+        // appear clipped against the viewport even though the thumb itself remained interactive.
+        pb: { xs: 1.5, md: 1.75 },
         borderTop: "1px solid",
         borderBottom: "1px solid",
         borderColor: "divider",
         backgroundColor: viewerTokens.filmstrip.shellSurface,
-        position: "relative",
       }}
     >
       <Box
@@ -223,11 +228,9 @@ export function ViewerFilmstrip({
           }
           sx={{
             display: "flex",
-            gap: 1.25,
+            gap: 1,
             width: "max-content",
             minWidth: "100%",
-            pt: 0.35,
-            pb: 0.75,
             pr: 0.25,
             transform: "translate3d(var(--filmstrip-edge-offset), 0, 0)",
             transition:
@@ -261,14 +264,14 @@ export function ViewerFilmstrip({
           aria-valuemax={Math.round(scrollbarMetrics.maxScrollLeft)}
           aria-valuenow={Math.round(scrollbarMetrics.scrollLeft)}
           sx={{
-            position: "absolute",
-            left: { xs: 12, md: 18 },
-            right: { xs: 12, md: 18 },
-            bottom: { xs: 4, md: 7 },
-            height: { xs: 18, md: 16 },
+            width: "100%",
+            height: 8,
+            mt: { xs: 0.65, md: 0.75 },
+            mb: 0.25,
             borderRadius: 999,
             display: "flex",
             alignItems: "center",
+            // Keep the rail in normal flow so every viewport retains space beneath it.
             cursor: "grab",
             touchAction: "none",
             "&:active": {
@@ -285,17 +288,18 @@ export function ViewerFilmstrip({
             aria-hidden
             sx={{
               width: "100%",
-              height: 6,
+              height: 2,
               borderRadius: 999,
               backgroundColor: viewerTokens.filmstrip.scrollbarTrack,
-              overflow: "hidden",
+              overflow: "visible",
               pointerEvents: "none",
             }}
           >
             <Box
               sx={{
                 width: `${scrollbarMetrics.thumbWidth}px`,
-                height: "100%",
+                height: 4,
+                mt: "-1px",
                 borderRadius: 999,
                 background: viewerTokens.filmstrip.scrollbarThumb,
                 transform: `translate3d(${scrollbarMetrics.thumbOffset}px, 0, 0)`,
