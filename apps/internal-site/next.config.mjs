@@ -7,6 +7,7 @@ const repoRoot = path.join(__dirname, "../..");
 
 /** @type {import("next").NextConfig} */
 const nextConfig = {
+  agentRules: false,
   env: resolveMagicCompareBuildEnv(repoRoot),
   outputFileTracingRoot: repoRoot,
   transpilePackages: [
