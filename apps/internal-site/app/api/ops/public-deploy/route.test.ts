@@ -1,84 +1,79 @@
-import { describe, expect, it, vi } from "vitest";
-import { POST } from "./route";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { GET, POST } from "./route";
 
-const { deployPublicSite, getPublicSiteOperationErrorStatus } = vi.hoisted(
+const { getPublicDeployJob, getPublicSiteOperationErrorStatus, startPublicDeployJob } = vi.hoisted(
   () => ({
-    deployPublicSite: vi.fn(),
+    getPublicDeployJob: vi.fn(),
     getPublicSiteOperationErrorStatus: vi.fn(),
+    startPublicDeployJob: vi.fn(),
   }),
 );
 
 vi.mock("@/lib/server/public-site/runtime", () => ({
-  deployPublicSite,
+  getPublicDeployJob,
   getPublicSiteOperationErrorStatus,
+  startPublicDeployJob,
 }));
 
-describe("POST /api/ops/public-deploy", () => {
-  it("deploys the public site", async () => {
-    deployPublicSite.mockResolvedValue({
-      stdout: "Deploy complete",
-      stderr: "",
-      buildOutputDir: "/out/build",
-      exportDir: "/out/export",
-      projectName: "magic-compare-public",
-      branch: "main",
-    });
+const runningJob = {
+  id: "job-1",
+  caseId: null,
+  status: "running",
+  stage: "checking",
+  stageSequence: ["checking", "building", "preparing", "uploading"],
+  completedStageCount: 0,
+  startedAt: "2026-08-05T08:00:00.000Z",
+  updatedAt: "2026-08-05T08:00:00.000Z",
+  completedAt: null,
+  elapsedMs: null,
+  stageDurationsMs: {},
+  uploadProgress: null,
+  projectName: "magic-compare-public",
+  branch: "main",
+  publicSiteUrl: "https://magic-compare-public.pages.dev",
+  skipped: false,
+  error: null,
+};
+
+beforeEach(() => {
+  vi.clearAllMocks();
+});
+
+describe("/api/ops/public-deploy", () => {
+  it("starts a background deployment job", async () => {
+    startPublicDeployJob.mockResolvedValue({ job: runningJob, reused: false });
 
     const response = await POST(
       new Request("http://localhost:3000/api/ops/public-deploy", {
         method: "POST",
         body: JSON.stringify({}),
-        headers: {
-          "content-type": "application/json",
-        },
+        headers: { "content-type": "application/json" },
       }),
     );
 
-    expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({
-      stdout: "Deploy complete",
-      stderr: "",
-      buildOutputDir: "/out/build",
-      exportDir: "/out/export",
-      projectName: "magic-compare-public",
-      branch: "main",
-    });
-    expect(deployPublicSite).toHaveBeenCalledWith(undefined);
+    expect(response.status).toBe(202);
+    expect(await response.json()).toEqual({ job: runningJob, reused: false });
+    expect(startPublicDeployJob).toHaveBeenCalledWith(undefined);
   });
 
-  it("passes optional caseId for pre-deploy publish", async () => {
-    deployPublicSite.mockResolvedValue({
-      stdout: "",
-      stderr: "",
-      buildOutputDir: "/out/build",
-      exportDir: "/out/export",
-      projectName: "magic-compare-public",
-      branch: null,
+  it("passes optional caseId when creating the job", async () => {
+    startPublicDeployJob.mockResolvedValue({
+      job: { ...runningJob, caseId: "case-1" },
+      reused: false,
     });
 
-    const response = await POST(
+    await POST(
       new Request("http://localhost:3000/api/ops/public-deploy", {
         method: "POST",
         body: JSON.stringify({ caseId: "case-1" }),
-        headers: {
-          "content-type": "application/json",
-        },
       }),
     );
 
-    expect(response.status).toBe(200);
-    expect(deployPublicSite).toHaveBeenCalledWith("case-1");
+    expect(startPublicDeployJob).toHaveBeenCalledWith("case-1");
   });
 
-  it("accepts empty body gracefully", async () => {
-    deployPublicSite.mockResolvedValue({
-      stdout: "",
-      stderr: "",
-      buildOutputDir: "/out/build",
-      exportDir: "/out/export",
-      projectName: "p",
-      branch: null,
-    });
+  it("accepts an empty body", async () => {
+    startPublicDeployJob.mockResolvedValue({ job: runningJob, reused: false });
 
     const response = await POST(
       new Request("http://localhost:3000/api/ops/public-deploy", {
@@ -86,47 +81,17 @@ describe("POST /api/ops/public-deploy", () => {
       }),
     );
 
-    expect(response.status).toBe(200);
-    expect(deployPublicSite).toHaveBeenCalledWith(undefined);
+    expect(response.status).toBe(202);
+    expect(startPublicDeployJob).toHaveBeenCalledWith(undefined);
   });
 
-  it("returns 409 when another operation is already running", async () => {
-    const conflictError = new Error(
-      "Public site deploy is already running. Please wait for it to finish.",
-    );
-    deployPublicSite.mockRejectedValue(conflictError);
-    getPublicSiteOperationErrorStatus.mockReturnValue(409);
-
-    const response = await POST(
-      new Request("http://localhost:3000/api/ops/public-deploy", {
-        method: "POST",
-        body: JSON.stringify({}),
-        headers: {
-          "content-type": "application/json",
-        },
-      }),
-    );
-
-    expect(response.status).toBe(409);
-    expect(await response.json()).toEqual({
-      error:
-        "Public site deploy is already running. Please wait for it to finish.",
-    });
-  });
-
-  it("returns classifyError status for config errors", async () => {
-    deployPublicSite.mockRejectedValue(
-      new Error("Cloudflare Pages deploy is not configured."),
-    );
+  it("uses the operation error classifier for rejected starts", async () => {
+    startPublicDeployJob.mockRejectedValue(new Error("Cloudflare Pages deploy is not configured."));
     getPublicSiteOperationErrorStatus.mockReturnValue(400);
 
     const response = await POST(
       new Request("http://localhost:3000/api/ops/public-deploy", {
         method: "POST",
-        body: JSON.stringify({}),
-        headers: {
-          "content-type": "application/json",
-        },
       }),
     );
 
@@ -134,5 +99,28 @@ describe("POST /api/ops/public-deploy", () => {
     expect(await response.json()).toEqual({
       error: "Cloudflare Pages deploy is not configured.",
     });
+  });
+
+  it("returns the requested deployment job", async () => {
+    getPublicDeployJob.mockResolvedValue(runningJob);
+
+    const response = await GET(
+      new Request("http://localhost:3000/api/ops/public-deploy?jobId=job-1"),
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ job: runningJob });
+    expect(getPublicDeployJob).toHaveBeenCalledWith("job-1");
+  });
+
+  it("returns 404 for an unknown job", async () => {
+    getPublicDeployJob.mockResolvedValue(null);
+
+    const response = await GET(
+      new Request("http://localhost:3000/api/ops/public-deploy?jobId=missing"),
+    );
+
+    expect(response.status).toBe(404);
+    expect(await response.json()).toEqual({ error: "没有找到部署任务。" });
   });
 });

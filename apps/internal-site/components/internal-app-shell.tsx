@@ -33,11 +33,8 @@ import {
 import { InternalNavigationItem } from "./internal-navigation-item";
 import { InternalRouteTransition } from "./internal-route-transition";
 import { AppNotificationsProvider } from "./notifications/app-notifications-provider";
-import { useAppNotifications } from "./notifications/use-app-notifications";
-import {
-  notifyBrowserDeploySuccess,
-  requestBrowserDeployNotificationPermission,
-} from "./case-workspace/browser-deploy-notifications";
+import { PublicDeployTaskPanel } from "./public-deploy/public-deploy-task-panel";
+import { usePublicDeployJob } from "./public-deploy/use-public-deploy-job";
 
 const destinations = [
   { href: "/", label: "Case", icon: <FolderCopyOutlined />, iconFeedback: "case" },
@@ -196,10 +193,9 @@ function NavigationContent({
           ];
         })}
         <CaseCreateButton navigation />
-        {/* Deployment is a site-wide operation, so current-route Group data must not affect its
-            position or availability. Only an active request temporarily disables repeat input. */}
+        {/* Deployment keeps a stable global slot. While running, repeat input reopens the task
+            surface instead of changing navigation geometry or starting a second build. */}
         <InternalNavigationItem
-          disabled={isDeployingPublicSite}
           emphasized={!isDeployingPublicSite}
           icon={
             isDeployingPublicSite ? (
@@ -213,7 +209,7 @@ function NavigationContent({
             onDeployPublicSite();
             onNavigate?.();
           }}
-          title={isDeployingPublicSite ? "正在部署 Pages" : "部署 Pages"}
+          title={isDeployingPublicSite ? "查看部署进度" : "部署 Pages"}
         />
       </List>
 
@@ -244,8 +240,7 @@ function InternalAppShellScaffold({
   const pathname = usePathname();
   const railVisible = useMediaQuery(`(min-width:${NAV_RAIL_MIN_WIDTH}px)`);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [isDeployingPublicSite, setIsDeployingPublicSite] = useState(false);
-  const { dismissNotification, pushNotification } = useAppNotifications();
+  const publicDeploy = usePublicDeployJob();
   const mobileDrawerOpen = mobileOpen && !railVisible;
   useRootScrollLock(mobileDrawerOpen);
 
@@ -253,37 +248,6 @@ function InternalAppShellScaffold({
     // Crossing the content-driven rail breakpoint must not leave the modal drawer over the page.
     if (railVisible) setMobileOpen(false);
   }, [railVisible]);
-
-  /** Deploys the full published site without coupling availability to whichever route is open. */
-  async function deployPublicSite() {
-    if (isDeployingPublicSite) return;
-
-    requestBrowserDeployNotificationPermission();
-    setIsDeployingPublicSite(true);
-    pushNotification("正在部署公开站点…", "info", {
-      key: "public-site-deploying",
-      sticky: true,
-    });
-
-    try {
-      // Omitting caseId preserves every published Case and avoids treating the current route as
-      // the deployment source of truth.
-      const response = await fetch("/api/ops/public-deploy", { method: "POST" });
-      const result = await response.json().catch(() => null);
-      if (!response.ok) {
-        throw new Error(result?.error || "部署公开站点失败。");
-      }
-
-      const projectName = result?.projectName || "Cloudflare Pages";
-      pushNotification(`已部署到 ${projectName}。`, "success");
-      notifyBrowserDeploySuccess(projectName);
-    } catch (error) {
-      pushNotification(error instanceof Error ? error.message : "部署公开站点失败。", "error");
-    } finally {
-      dismissNotification("public-site-deploying");
-      setIsDeployingPublicSite(false);
-    }
-  }
 
   return (
     <>
@@ -315,8 +279,8 @@ function InternalAppShellScaffold({
           <NavigationContent
             appVersion={appVersion}
             commitHash={commitHash}
-            isDeployingPublicSite={isDeployingPublicSite}
-            onDeployPublicSite={() => void deployPublicSite()}
+            isDeployingPublicSite={publicDeploy.isDeploying}
+            onDeployPublicSite={() => void publicDeploy.startDeploy()}
             pathname={pathname}
           />
         </Box>
@@ -341,8 +305,8 @@ function InternalAppShellScaffold({
           <NavigationContent
             appVersion={appVersion}
             commitHash={commitHash}
-            isDeployingPublicSite={isDeployingPublicSite}
-            onDeployPublicSite={() => void deployPublicSite()}
+            isDeployingPublicSite={publicDeploy.isDeploying}
+            onDeployPublicSite={() => void publicDeploy.startDeploy()}
             pathname={pathname}
             onNavigate={() => setMobileOpen(false)}
           />
@@ -380,6 +344,12 @@ function InternalAppShellScaffold({
           <InternalRouteTransition>{children}</InternalRouteTransition>
         </Box>
       </Box>
+      <PublicDeployTaskPanel
+        job={publicDeploy.job}
+        open={publicDeploy.panelOpen}
+        onClose={publicDeploy.closePanel}
+        onRetry={() => void publicDeploy.startDeploy()}
+      />
     </>
   );
 }

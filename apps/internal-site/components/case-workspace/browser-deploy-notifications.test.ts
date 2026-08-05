@@ -1,8 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import {
-  notifyBrowserDeploySuccess,
-  requestBrowserDeployNotificationPermission,
-} from "./browser-deploy-notifications";
+import { notifyBrowserDeploySuccess } from "./browser-deploy-notifications";
 
 function installNotificationApi(
   permission: NotificationPermission,
@@ -30,22 +27,6 @@ afterEach(() => {
 });
 
 describe("browser deploy notifications", () => {
-  it("requests permission from the deploy click when the decision is pending", () => {
-    const { requestPermission } = installNotificationApi("default");
-
-    requestBrowserDeployNotificationPermission();
-
-    expect(requestPermission).toHaveBeenCalledTimes(1);
-  });
-
-  it("does not request permission again after the browser has a decision", () => {
-    const { requestPermission } = installNotificationApi("denied");
-
-    requestBrowserDeployNotificationPermission();
-
-    expect(requestPermission).not.toHaveBeenCalled();
-  });
-
   it("shows a completion notification when the workspace is in the background", () => {
     const { showNotification } = installNotificationApi("granted", "hidden");
 

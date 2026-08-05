@@ -1,4 +1,5 @@
 import { cp, mkdir, readdir, rm } from "node:fs/promises";
+import type { PublicDeployStage } from "../../../public-deploy-job";
 import {
   CF_PAGES_BRANCH_ENV_NAME,
   CF_PAGES_PROJECT_NAME_ENV_NAME,
@@ -12,16 +13,17 @@ import {
   runCommand,
 } from "./commands";
 import {
+  computePublicDeploymentFingerprint,
+  recordSuccessfulPublicDeployment,
+  wasPublicDeploymentSuccessful,
+} from "./deployment-fingerprint";
+import {
   getWorkspaceRoot,
   publicBuildOutputDirectory,
-  publicSiteDirectory,
   publishedGroupsDirectory,
   resolvePublicExportDirectory,
 } from "./paths";
-import {
-  PublicSiteOperationConflictError,
-  withPublicSiteOperationLock,
-} from "./operation-lock";
+import { PublicSiteOperationConflictError, withPublicSiteOperationLock } from "./operation-lock";
 
 export interface PublicExportResult extends CommandResult {
   buildOutputDir: string;
@@ -31,16 +33,24 @@ export interface PublicExportResult extends CommandResult {
 export interface PublicDeployResult extends PublicExportResult {
   projectName: string;
   branch: string | null;
+  fingerprint: string;
+  skipped: boolean;
+}
+
+export interface PublicDeployObserver {
+  onStage?: (stage: PublicDeployStage) => void;
+  onOutput?: (event: {
+    source: "build" | "wrangler";
+    stream: "stdout" | "stderr";
+    text: string;
+  }) => void;
 }
 
 /**
  * Mirrors the Next.js export into the configured publish directory so local exports and deploys can
  * target an arbitrary output root without teaching Next.js about that environment-specific path.
  */
-async function mirrorExportDirectory(
-  sourceDir: string,
-  targetDir: string,
-): Promise<void> {
+async function mirrorExportDirectory(sourceDir: string, targetDir: string): Promise<void> {
   if (sourceDir === targetDir) {
     return;
   }
@@ -83,19 +93,21 @@ async function ensurePublishedGroupsExist(): Promise<void> {
  * Builds the public app against the current published bundle and copies the static output into the
  * runtime export directory expected by local preview or deploy flows.
  */
-async function performPublicExport(): Promise<PublicExportResult> {
+async function performPublicExport(observer?: PublicDeployObserver): Promise<PublicExportResult> {
   const buildOutputDir = publicBuildOutputDirectory();
   const exportDir = resolvePublicExportDirectory();
 
   await ensurePublishedGroupsExist();
-  await rm(`${publicSiteDirectory()}/.next`, { recursive: true, force: true });
   await rm(buildOutputDir, { recursive: true, force: true });
 
-  const commandResult = await runCommand(
-    "pnpm",
-    getPublicSiteBuildArgs(),
-    getWorkspaceRoot(),
-  );
+  observer?.onStage?.("building");
+  const commandResult = await runCommand("pnpm", getPublicSiteBuildArgs(), getWorkspaceRoot(), {
+    // Deploys started by `next dev` inherit NODE_ENV=development. A nested `next build` rejects
+    // that mixed environment and can fail while prerendering Next's own metadata boundaries.
+    env: { NODE_ENV: "production" },
+    onOutput: (event) => observer?.onOutput?.({ source: "build", ...event }),
+  });
+  observer?.onStage?.("preparing");
   await mirrorExportDirectory(buildOutputDir, exportDir);
 
   return {
@@ -121,44 +133,76 @@ export async function exportPublicSite(): Promise<PublicExportResult> {
   return withPublicSiteOperationLock("export", performPublicExport);
 }
 
+/** Validates configuration before a background job is accepted by the API. */
+export function ensurePublicDeployConfigured(): void {
+  if (!isCloudflarePagesDeployConfigured()) {
+    throw new Error(
+      `Cloudflare Pages deploy is not configured. Missing ${CF_PAGES_PROJECT_NAME_ENV_NAME} or CLOUDFLARE credentials.`,
+    );
+  }
+}
+
 /**
  * Optionally republishes one case before exporting so the deploy path can produce a fresh public
  * site in one operator action without requiring a separate manual publish step.
  */
 export async function deployPublicSite(
   caseId?: string,
+  observer?: PublicDeployObserver,
 ): Promise<PublicDeployResult> {
-  if (!isCloudflarePagesDeployConfigured()) {
-    throw new Error(
-      `Cloudflare Pages deploy is not configured. Missing ${CF_PAGES_PROJECT_NAME_ENV_NAME} or CLOUDFLARE credentials.`,
-    );
-  }
+  ensurePublicDeployConfigured();
 
   return withPublicSiteOperationLock("deploy", async () => {
+    observer?.onStage?.("checking");
     if (caseId) {
+      observer?.onStage?.("publishing");
       await publishCase(caseId);
     }
 
-    const exportResult = await performPublicExport();
-    const projectName =
-      process.env[CF_PAGES_PROJECT_NAME_ENV_NAME]?.trim() || "";
+    await ensurePublishedGroupsExist();
+    const projectName = process.env[CF_PAGES_PROJECT_NAME_ENV_NAME]?.trim() || "";
     const branch = process.env[CF_PAGES_BRANCH_ENV_NAME]?.trim() || null;
+    const fingerprint = await computePublicDeploymentFingerprint();
+
+    if (await wasPublicDeploymentSuccessful(fingerprint)) {
+      return {
+        stdout: "Public site is already up to date.",
+        stderr: "",
+        buildOutputDir: publicBuildOutputDirectory(),
+        exportDir: resolvePublicExportDirectory(),
+        projectName,
+        branch,
+        fingerprint,
+        skipped: true,
+      };
+    }
+
+    const exportResult = await performPublicExport(observer);
+    observer?.onStage?.("uploading");
     const deployResult = await runCommand(
       "pnpm",
       getWranglerPagesDeployArgs(exportResult.exportDir),
       getWorkspaceRoot(),
+      {
+        onOutput: (event) => observer?.onOutput?.({ source: "wrangler", ...event }),
+      },
     );
+    try {
+      await recordSuccessfulPublicDeployment(fingerprint);
+    } catch (error) {
+      // Cloudflare has already accepted the deploy. Losing the local skip marker should make the
+      // next run slower, not falsely report this successful deployment as failed.
+      console.error("[public-deploy] Failed to record the successful fingerprint:", error);
+    }
 
     return {
       ...exportResult,
-      stdout: [exportResult.stdout.trim(), deployResult.stdout.trim()]
-        .filter(Boolean)
-        .join("\n"),
-      stderr: [exportResult.stderr.trim(), deployResult.stderr.trim()]
-        .filter(Boolean)
-        .join("\n"),
+      stdout: [exportResult.stdout.trim(), deployResult.stdout.trim()].filter(Boolean).join("\n"),
+      stderr: [exportResult.stderr.trim(), deployResult.stderr.trim()].filter(Boolean).join("\n"),
       projectName,
       branch,
+      fingerprint,
+      skipped: false,
     };
   });
 }

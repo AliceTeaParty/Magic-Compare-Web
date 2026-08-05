@@ -4,7 +4,6 @@
 
 它不是产品需求文档，而是一份“如何不把现有链路做坏”的工程说明。
 
-
 ## 先看结论
 
 - `internal-site` 是带服务端能力的 Next.js 站点，不是纯前端。
@@ -232,6 +231,21 @@ pnpm --filter @magic-compare/internal-site start
 - SQLite
 - published bundle
 - public export 目录
+- public deploy 任务状态与上次成功指纹
+
+public-site 的 Next.js 构建缓存使用独立挂载点：
+
+- 容器路径：`/app/apps/public-site/.next`
+- 默认 Docker named volume：`public-build-cache`
+- 可选宿主机路径：`MAGIC_COMPARE_PUBLIC_BUILD_CACHE_MOUNT`
+
+其他会重复写入的构建目录也使用 named volume：
+
+- `public-build-output`：Next 静态导出暂存目录
+- `public-build-published`：构建前同步的 published 静态资源
+- `public-deploy-cache`：Wrangler 本地缓存
+
+这些目录不能放在容器 writable diff layer。构建仍由部署动作按需启动，完成后进程退出；持久化的只有磁盘文件，不长期占用 CPU 或内存。
 
 ### Docker 中最容易踩的坑
 
@@ -385,11 +399,35 @@ Web 上传链路是：
 
 当前 internal-site workspace 入口：
 
-- 顶部只保留 `Deploy Pages`
-- 这个按钮会携带当前 `caseId` 调用 `POST /api/ops/public-deploy`
-- 因此它会先 republish 当前 case，再导出并部署
-- 点击部署时会按需申请浏览器通知权限；部署成功且 workspace 已切到后台时发送系统通知，
-  前台仍使用站内通知。
+- 全局导航固定保留“部署”入口
+- 全局入口调用不带 `caseId` 的 `POST /api/ops/public-deploy`，只部署已经发布的 bundle
+- `POST` 返回 `202` 和任务 id；`GET /api/ops/public-deploy?jobId=...` 返回可恢复的阶段状态
+- Case publish 仍由显式 publish 操作负责，不会因为打开某个工作区而隐式改变全站部署内容
+- 浏览器已经授予通知权限且页面在后台时才发送完成通知，部署点击本身不会弹权限请求
+
+### 部署缓存与性能记录
+
+public deploy 会为以下输入计算指纹：
+
+- published bundle 文件树
+- public-site 与相关共享包源码
+- lockfile、公开站配置、Pages 项目和 branch
+
+指纹与上次成功部署一致时直接返回“公开站点已是最新版本”。失败、中断和 Cloudflare 未接受的任务不会更新成功指纹。
+
+部署任务记录这些真实阶段：
+
+- 检查发布内容
+- 可选生成 Case 发布内容
+- 同步并构建公开页面
+- 整理部署文件
+- 上传到 Cloudflare Pages
+
+Wrangler 输出真实文件计数时，任务接口返回上传 `completed / total`；构建阶段没有真实总量，只返回阶段状态和已用时间。每次任务完成后，服务端输出一条 `[public-deploy]` 结构化日志，并把总耗时和阶段耗时写入 `/app/data/deploy-state/latest-job.json`。
+
+internal-site 即使运行在开发模式，也会让 public-site 子构建显式使用 `NODE_ENV=production`，避免 Next.js 生产构建继承 `development` 或自定义值。界面中的失败摘要最多显示 180 个字符；完整命令输出仍保留在任务记录和服务端日志中，供排查使用。
+
+性能验收以 Homelab 生产容器为准：镜像升级后的第一次运行记录冷构建，随后在相同代码和内容下分别记录热构建与无变化跳过。本地开发机只用于确认缓存命中和行为正确，不作为发布耗时结论。
 
 ## public-site 的真实路由约束
 

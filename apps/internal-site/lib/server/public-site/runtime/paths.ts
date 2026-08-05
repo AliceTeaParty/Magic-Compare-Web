@@ -28,3 +28,8 @@ export function publishedGroupsDirectory(): string {
 export function resolvePublicExportDirectory(): string {
   return getPublicExportDir();
 }
+
+/** Keeps deploy history beside the persistent export instead of in the container writable layer. */
+export function publicDeployStateDirectory(): string {
+  return path.join(path.dirname(resolvePublicExportDirectory()), "deploy-state");
+}

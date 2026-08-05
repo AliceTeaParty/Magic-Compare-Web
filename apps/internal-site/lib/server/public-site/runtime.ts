@@ -1,11 +1,15 @@
 export {
   exportPublicSite,
   deployPublicSite,
+  ensurePublicDeployConfigured,
   getPublicSiteOperationErrorStatus,
+  type PublicDeployObserver,
   type PublicDeployResult,
   type PublicExportResult,
 } from "./runtime/runtime-service";
 export {
-  getPublicSiteBuildArgs,
-  getWranglerPagesDeployArgs,
-} from "./runtime/commands";
+  getPublicDeployJob,
+  parseWranglerUploadProgress,
+  startPublicDeployJob,
+} from "./runtime/public-deploy-job-service";
+export { getPublicSiteBuildArgs, getWranglerPagesDeployArgs } from "./runtime/commands";

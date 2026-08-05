@@ -16,6 +16,9 @@ WORKDIR /app
 
 FROM base AS builder
 
+ARG MAGIC_COMPARE_COMMIT_SHA
+ENV MAGIC_COMPARE_COMMIT_SHA=$MAGIC_COMPARE_COMMIT_SHA
+
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
 RUN pnpm fetch --frozen-lockfile
 
@@ -25,8 +28,10 @@ RUN pnpm --filter @magic-compare/internal-site build
 
 FROM base AS runner
 
+ARG MAGIC_COMPARE_COMMIT_SHA
 WORKDIR /app
 ENV NODE_ENV=production
+ENV MAGIC_COMPARE_COMMIT_SHA=$MAGIC_COMPARE_COMMIT_SHA
 
 COPY --from=builder /app /app
 

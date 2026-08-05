@@ -58,6 +58,13 @@ services:
         condition: service_completed_successfully
     ports:
       - "${MAGIC_COMPARE_INTERNAL_SITE_HOST_PORT:-3000}:3000"
+    volumes:
+      - ${MAGIC_COMPARE_INTERNAL_DATA_MOUNT:-internal-data}:/app/data
+      # Public build cache must stay outside Docker's writable layer to reduce repeated overlay IO.
+      - ${MAGIC_COMPARE_PUBLIC_BUILD_CACHE_MOUNT:-public-build-cache}:/app/apps/public-site/.next
+      - public-build-output:/app/apps/public-site/out
+      - public-build-published:/app/apps/public-site/public/published
+      - public-deploy-cache:/app/node_modules/.cache/wrangler
     healthcheck:
       test:
         [
@@ -73,3 +80,7 @@ services:
 
 volumes:
   internal-data:
+  public-build-cache:
+  public-build-output:
+  public-build-published:
+  public-deploy-cache:

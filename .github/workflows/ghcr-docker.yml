@@ -73,6 +73,8 @@ jobs:
           # Docker's local image store cannot retain attestations; the publish build emits them.
           provenance: false
           tags: magic-compare/internal-site:ci
+          build-args: |
+            MAGIC_COMPARE_COMMIT_SHA=${{ github.sha }}
           cache-from: type=gha,scope=ghcr-docker-amd64
           cache-to: type=gha,mode=max,scope=ghcr-docker-amd64
 
@@ -212,6 +214,8 @@ jobs:
           push: true
           pull: true
           platforms: linux/amd64
+          build-args: |
+            MAGIC_COMPARE_COMMIT_SHA=${{ github.sha }}
           cache-from: type=gha,scope=ghcr-docker-amd64
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}

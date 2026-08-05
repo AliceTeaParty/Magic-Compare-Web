@@ -1,12 +1,19 @@
 import { spawn } from "node:child_process";
-import {
-  getCfPagesBranch,
-  getCfPagesProjectName,
-} from "../../runtime-config";
+import { getCfPagesBranch, getCfPagesProjectName } from "../../runtime-config";
 
 export interface CommandResult {
   stdout: string;
   stderr: string;
+}
+
+export interface CommandOutputEvent {
+  stream: "stdout" | "stderr";
+  text: string;
+}
+
+export interface RunCommandOptions {
+  env?: NodeJS.ProcessEnv;
+  onOutput?: (event: CommandOutputEvent) => void;
 }
 
 /**
@@ -32,15 +39,7 @@ export function getPublicSiteBuildArgs(): string[] {
 export function getWranglerPagesDeployArgs(exportDir: string): string[] {
   const projectName = getCfPagesProjectName() ?? "";
   const branch = getCfPagesBranch();
-  const args = [
-    "exec",
-    "wrangler",
-    "pages",
-    "deploy",
-    exportDir,
-    "--project-name",
-    projectName,
-  ];
+  const args = ["exec", "wrangler", "pages", "deploy", exportDir, "--project-name", projectName];
 
   if (branch) {
     args.push("--branch", branch);
@@ -57,11 +56,12 @@ export async function runCommand(
   command: string,
   args: string[],
   cwd: string,
+  options?: RunCommandOptions,
 ): Promise<CommandResult> {
   return new Promise((resolve, reject) => {
     const child = spawn(commandName(command), args, {
       cwd,
-      env: process.env,
+      env: { ...process.env, ...options?.env },
       stdio: ["ignore", "pipe", "pipe"],
     });
 
@@ -69,11 +69,15 @@ export async function runCommand(
     let stderr = "";
 
     child.stdout.on("data", (chunk) => {
-      stdout += chunk.toString();
+      const text = chunk.toString();
+      stdout += text;
+      options?.onOutput?.({ stream: "stdout", text });
     });
 
     child.stderr.on("data", (chunk) => {
-      stderr += chunk.toString();
+      const text = chunk.toString();
+      stderr += text;
+      options?.onOutput?.({ stream: "stderr", text });
     });
 
     child.on("error", reject);
@@ -85,11 +89,7 @@ export async function runCommand(
 
       reject(
         new Error(
-          [
-            `Command failed: ${command} ${args.join(" ")}`,
-            stderr.trim(),
-            stdout.trim(),
-          ]
+          [`Command failed: ${command} ${args.join(" ")}`, stderr.trim(), stdout.trim()]
             .filter(Boolean)
             .join("\n"),
         ),

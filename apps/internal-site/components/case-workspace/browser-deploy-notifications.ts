@@ -6,17 +6,6 @@ function browserNotificationApi() {
   return window.Notification;
 }
 
-/** Requests permission during the deploy click while browser user activation is still available. */
-export function requestBrowserDeployNotificationPermission() {
-  const NotificationApi = browserNotificationApi();
-  if (!NotificationApi || NotificationApi.permission !== "default") {
-    return;
-  }
-
-  // Notification support must stay optional; a rejected browser prompt cannot affect deployment.
-  void NotificationApi.requestPermission().catch(() => undefined);
-}
-
 /** Shows a system notification only when the operator has left the active workspace tab. */
 export function notifyBrowserDeploySuccess(projectName: string) {
   const NotificationApi = browserNotificationApi();
