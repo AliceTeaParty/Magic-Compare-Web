@@ -30,7 +30,6 @@ import {
 import {
   Alert,
   Box,
-  Chip,
   Collapse,
   FormControl,
   IconButton,
@@ -455,7 +454,7 @@ function SortablePairingRow({
           display: "grid",
           gridTemplateColumns: {
             // Drag and expand controls keep a 40px acquisition target even in the dense mobile row.
-            xs: "40px 44px minmax(0, 1fr) 40px",
+            xs: "40px 42px minmax(0, 1fr) 24px 40px",
             md: desktopGridColumns,
           },
           gap: { xs: 0.75, md: 1 },
@@ -520,7 +519,7 @@ function SortablePairingRow({
             </Box>
           );
         })}
-        <Box sx={{ display: { xs: "none", md: "block" } }}>
+        <Box sx={{ display: "block" }}>
           <IssueStatus row={row} />
         </Box>
         <KeyboardArrowDown
@@ -618,8 +617,8 @@ export function PairingPreviewPanel({
     <Paper
       elevation={0}
       sx={{
-        minHeight: { xs: 280, lg: "calc(100vh - 224px)" },
-        maxHeight: { lg: "calc(100vh - 160px)" },
+        minHeight: { xs: 320, lg: "calc(100vh - 252px)" },
+        maxHeight: { lg: "calc(100vh - 224px)" },
         display: "flex",
         flexDirection: "column",
         overflow: "hidden",
@@ -630,7 +629,7 @@ export function PairingPreviewPanel({
       <Box
         sx={{
           display: "grid",
-          gridTemplateColumns: { xs: "1fr", md: "auto minmax(0, 1fr)" },
+          gridTemplateColumns: { xs: "1fr", md: "minmax(0, auto) minmax(0, 1fr)" },
           alignItems: "center",
           gap: 1,
           px: { xs: 1.7, md: 2 },
@@ -639,7 +638,16 @@ export function PairingPreviewPanel({
           borderColor: "divider",
         }}
       >
-        <Typography variant="h4">配对预览</Typography>
+        <Stack direction="row" spacing={1} sx={{ alignItems: "baseline", minWidth: 0 }}>
+          <Typography component="h2" variant="h4">
+            配对
+          </Typography>
+          {planView ? (
+            <Typography variant="body2" color="text.secondary" noWrap>
+              {planView.frames.length} Frame
+            </Typography>
+          ) : null}
+        </Stack>
         {planView ? (
           <Box
             sx={{
@@ -722,14 +730,27 @@ export function PairingPreviewPanel({
                 ))}
               </Select>
             </FormControl>
-            <Chip
-              icon={hasBlockingIssues ? <WarningAmber /> : <CheckCircle />}
-              label={
-                planView ? `${planView.healthyPairCount} / ${planView.frames.length}` : "0 / 0"
-              }
-              color={planView ? (hasBlockingIssues ? "warning" : "primary") : "default"}
-              sx={{ minWidth: 78, height: webUploadSizes.compactControlHeight }}
-            />
+            <Box
+              sx={{
+                minHeight: webUploadSizes.compactControlHeight,
+                display: "flex",
+                alignItems: "center",
+                gap: 0.6,
+                px: 0.5,
+                color: hasBlockingIssues ? "warning.main" : "success.main",
+              }}
+            >
+              {hasBlockingIssues ? (
+                <WarningAmber aria-hidden="true" sx={{ fontSize: 19 }} />
+              ) : (
+                <CheckCircle aria-hidden="true" sx={{ fontSize: 19 }} />
+              )}
+              <Typography variant="body2" sx={{ color: "text.secondary", whiteSpace: "nowrap" }}>
+                {hasBlockingIssues
+                  ? `${planView.errorCount} 问题`
+                  : `${planView.healthyPairCount} 可用`}
+              </Typography>
+            </Box>
           </Box>
         ) : null}
       </Box>
@@ -748,7 +769,7 @@ export function PairingPreviewPanel({
                 sx={{
                   display: "grid",
                   gridTemplateColumns: {
-                    xs: "40px 44px minmax(0, 1fr) 40px",
+                    xs: "40px 42px minmax(0, 1fr) 24px 40px",
                     md: desktopGridColumns,
                   },
                   gap: { xs: 0.75, md: 1 },
@@ -792,7 +813,7 @@ export function PairingPreviewPanel({
                     />
                   </Box>
                 ))}
-                <Box component="span" sx={{ display: { xs: "none", md: "block" } }}>
+                <Box component="span" sx={{ display: "block" }}>
                   状态
                 </Box>
                 <span />
@@ -813,6 +834,21 @@ export function PairingPreviewPanel({
               ))}
             </SortableContext>
           </DndContext>
+        ) : planView ? (
+          <Stack
+            sx={{
+              alignItems: "center",
+              justifyContent: "center",
+              minHeight: 240,
+              px: 2,
+              py: 4,
+              textAlign: "center",
+            }}
+            spacing={1}
+          >
+            <ErrorOutlined color="warning" sx={{ fontSize: 42 }} />
+            <Typography variant="h4">没有可用 Frame</Typography>
+          </Stack>
         ) : (
           <Stack
             sx={{
@@ -827,9 +863,6 @@ export function PairingPreviewPanel({
           >
             <FluentFolderEmoji size={64} />
             <Typography variant="h4">等待素材目录</Typography>
-            <Typography variant="body2" color="text.secondary">
-              选择文件夹后会显示 Frame、变量列和配对状态。
-            </Typography>
           </Stack>
         )}
       </Box>

@@ -13,7 +13,9 @@ export const webUploadMotion = {
 
 export const webUploadSizes = {
   compactControlHeight: 40,
+  controlHeight: 44,
   dragHandleButton: 40,
+  flowMarker: 36,
   progressHeight: 6,
   statusMarker: 32,
   tinyThumbnailWidth: 26,
@@ -23,6 +25,8 @@ export const webUploadSizes = {
 
 export const webUploadSurfaces = {
   panel: "var(--mui-palette-surface-containerLow)",
+  flow: "var(--mui-palette-surface-container)",
+  intake: "var(--mui-palette-surface-containerLowest)",
   row: "var(--mui-palette-surface-container)",
   rowHover: "var(--mui-palette-surface-containerHigh)",
   rowSelected:

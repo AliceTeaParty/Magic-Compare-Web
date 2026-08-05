@@ -12,6 +12,8 @@
 
 ## 当前能力
 
+- 页面使用 `素材 -> 配对 -> 生成 -> 上传` 四阶段任务带，状态与实际扫描、资源生成和上传任务同步。
+- 未选择目录时只显示目标 Case 和素材入口；扫描完成后切换为 Group 配置侧栏与配对检查区；生成或上传时再显示进度详情。
 - 选择本地目录，推荐 Chrome / Edge 使用 `showDirectoryPicker()`。
 - 浏览器不支持目录选择 API 时，退回 `<input webkitdirectory>`。
 - 扫描平铺或常见 before / after 目录结构。
@@ -21,6 +23,7 @@
 - VSEditor 文件名允许带 `.gen.vpy` / `.m2ts` 等 source marker，也允许省略 marker。
 - VSEditor 文件名默认显示为 `<episode>-<frame>`；配对预览可以切换到 `<文件名前缀> - <frame>`，并把选择写入最终上传标题。
 - 右侧 `配对预览` 可展开单行预览，并在上传前拖拽调整 frame 顺序。
+- 上传前可以选择 Group 默认打开的 Viewer 模式：滑动、A/B 或热图。
 - Heatmap 参考是全局设置，只显示每个 frame 都存在的列，避免部分行静默 fallback。
 - 生成缩略图和缺失 heatmap 后，走 `group-upload-start -> prepare -> presigned PUT -> commit -> complete`。
 - 上传中可以暂停；放弃上传会取消浏览器请求、取消 active job，并清理未提交的 pending 对象前缀。

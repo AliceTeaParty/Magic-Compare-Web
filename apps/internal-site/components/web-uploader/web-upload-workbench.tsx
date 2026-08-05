@@ -7,7 +7,6 @@ import {
   DeleteOutlined,
   FolderOpen,
   HourglassTop,
-  InfoOutlined,
   MoreVert,
   OpenInNew,
   Pause,
@@ -15,41 +14,38 @@ import {
   WarningAmber,
 } from "@mui/icons-material";
 import {
-  Alert,
   Box,
   Button,
-  Chip,
-  FormControl,
   IconButton,
-  InputLabel,
   LinearProgress,
   ListItemIcon,
   Menu,
   MenuItem,
   Paper,
-  Select,
   Stack,
-  TextField,
   Typography,
 } from "@mui/material";
-import type { ViewerMode } from "@magic-compare/content-schema";
 import { cjkKebabCase } from "@magic-compare/shared-utils";
 import { useRouter } from "next/navigation";
 import type { CaseCatalogItem } from "@/lib/server/repositories/content-repository";
-import { CaseCreateButton } from "../case-create-button";
 import { InternalPageHeader } from "../internal-page-shell";
 import { useAppNotifications } from "../notifications/use-app-notifications";
 import type { GenerationProgress } from "./asset-generator";
 import { scanBrowserUploadFiles } from "./source-scanner";
 import { WebUploadRunner } from "./upload-runner";
 import {
-  webUploadFieldSx,
   webUploadPanelSx,
   webUploadRadii,
   webUploadSizes,
   webUploadSurfaces,
 } from "./web-upload-design";
 import { PairingPreviewPanel } from "./web-upload-pairing-preview";
+import {
+  UploadConfigurationPanel,
+  UploadFlowStrip,
+  UploadIntakePanel,
+  type UploadGroupMeta,
+} from "./web-upload-workspace-sections";
 import type {
   BrowserUploadFile,
   GeneratedUploadFrame,
@@ -173,22 +169,6 @@ function removeUploadResumeHint(groupSlug: string) {
   }
 }
 
-function stageLabel(stage: UploadRunnerSnapshot["stage"]) {
-  if (stage === "generating") {
-    return "生成中";
-  }
-  if (stage === "uploading") {
-    return "上传中";
-  }
-  if (stage === "completed") {
-    return "完成";
-  }
-  if (stage === "failed") {
-    return "失败";
-  }
-  return "待上传";
-}
-
 function UploadStageIcon({ marker }: { marker: string }) {
   if (marker === "!") return <WarningAmber fontSize="small" />;
   if (marker === "✓") return <CheckCircleOutlined fontSize="small" />;
@@ -301,6 +281,18 @@ function uploadStageCopy({
         snapshot.totalFrames > 0
           ? `${snapshot.completedFrames}/${snapshot.totalFrames} frames · ${Math.round(overallProgress)}%`
           : "等待文件队列",
+      progress: overallProgress,
+    };
+  }
+
+  if (snapshot.stage === "paused") {
+    return {
+      marker: "◐",
+      title: "已暂停",
+      detail:
+        snapshot.totalFrames > 0
+          ? `${snapshot.completedFrames}/${snapshot.totalFrames} frames · ${Math.round(overallProgress)}%`
+          : "等待继续",
       progress: overallProgress,
     };
   }
@@ -502,21 +494,23 @@ export function WebUploadWorkbench({ cases, initialCaseSlug }: WebUploadWorkbenc
     return cases[0]?.slug ?? "";
   });
   const [actionMenuAnchor, setActionMenuAnchor] = useState<HTMLElement | null>(null);
-  const [groupMeta, setGroupMeta] = useState({
+  const [groupMeta, setGroupMeta] = useState<UploadGroupMeta>({
     slug: "uploaded-group",
     title: "Uploaded Group",
     description: "",
-    defaultMode: "before-after" as ViewerMode,
+    defaultMode: "before-after",
   });
   const [planView, setPlanView] = useState<PlanView | null>(null);
   const [frameTitleMode, setFrameTitleMode] = useState<FrameTitleMode>("inferred");
   const [generationProgress, setGenerationProgress] = useState<GenerationProgress | null>(null);
   const [expandedFrameId, setExpandedFrameId] = useState<string | null>(null);
+  const [isScanning, setIsScanning] = useState(false);
   const [snapshot, setSnapshot] = useState<UploadRunnerSnapshot>(() => buildInitialSnapshot());
 
   // Failed uploads can be resumed against the existing server job. Keep metadata locked there too
   // so visible inputs cannot drift away from the payload already owned by the runner.
   const isLocked =
+    isScanning ||
     snapshot.stage === "generating" ||
     snapshot.stage === "uploading" ||
     snapshot.stage === "paused" ||
@@ -531,6 +525,8 @@ export function WebUploadWorkbench({ cases, initialCaseSlug }: WebUploadWorkbenc
   const canStart = Boolean(selectedCaseExists && planView && planRef.current && !hasBlockingIssues);
   const canAbandon =
     Boolean(planRef.current) && snapshot.stage !== "idle" && snapshot.stage !== "completed";
+  const sourceRootName = planRef.current?.sourceRootName ?? null;
+  const showProgressPanel = snapshot.stage !== "idle" && snapshot.stage !== "scanned";
   const overallProgress =
     snapshot.totalFiles > 0 ? (snapshot.completedFiles / snapshot.totalFiles) * 100 : 0;
 
@@ -600,6 +596,7 @@ export function WebUploadWorkbench({ cases, initialCaseSlug }: WebUploadWorkbenc
 
     try {
       const handle = await picker.showDirectoryPicker();
+      setIsScanning(true);
       const entries = await readDirectoryHandle(handle);
       applyScannedFiles(entries, handle.name);
     } catch (error) {
@@ -609,6 +606,8 @@ export function WebUploadWorkbench({ cases, initialCaseSlug }: WebUploadWorkbenc
       pushNotification(error instanceof Error ? error.message : "读取目录失败。", "error", {
         key: "web-upload-directory-error",
       });
+    } finally {
+      setIsScanning(false);
     }
   }
 
@@ -618,10 +617,19 @@ export function WebUploadWorkbench({ cases, initialCaseSlug }: WebUploadWorkbenc
       return;
     }
 
-    const entries = filesFromInput(files);
-    const sourceRootName =
-      entries[0]?.relativePath.split("/").filter(Boolean)[0] ?? "uploaded-group";
-    applyScannedFiles(entries, sourceRootName);
+    setIsScanning(true);
+    try {
+      const entries = filesFromInput(files);
+      const sourceRootName =
+        entries[0]?.relativePath.split("/").filter(Boolean)[0] ?? "uploaded-group";
+      applyScannedFiles(entries, sourceRootName);
+    } catch (error) {
+      pushNotification(error instanceof Error ? error.message : "读取目录失败。", "error", {
+        key: "web-upload-directory-error",
+      });
+    } finally {
+      setIsScanning(false);
+    }
     event.target.value = "";
   }
 
@@ -828,15 +836,20 @@ export function WebUploadWorkbench({ cases, initialCaseSlug }: WebUploadWorkbenc
 
   return (
     <>
-      <Stack spacing={2.5}>
+      <Stack spacing={{ xs: 1.5, md: 2 }}>
         <InternalPageHeader
           backHref={returnHref}
-          eyebrow="上传工作台"
           title="上传对比"
-          subtitle="选择 Case 与素材目录，确认配对结果后上传。"
+          subtitle={
+            sourceRootName && planView
+              ? `${sourceRootName} · ${planView.frames.length} Frame`
+              : "未选择素材"
+          }
           actions={
             <>
-              {snapshot.stage === "completed" ? (
+              {!planView ? (
+                <Box aria-hidden="true" sx={{ width: 140, height: 40 }} />
+              ) : snapshot.stage === "completed" ? (
                 <Button
                   variant="contained"
                   endIcon={<OpenInNew />}
@@ -867,7 +880,7 @@ export function WebUploadWorkbench({ cases, initialCaseSlug }: WebUploadWorkbenc
                     ? "正在准备"
                     : snapshot.stage === "paused" || snapshot.stage === "failed"
                       ? "继续上传"
-                  : "开始上传"}
+                      : "开始上传"}
                 </Button>
               )}
               <Box
@@ -913,149 +926,94 @@ export function WebUploadWorkbench({ cases, initialCaseSlug }: WebUploadWorkbenc
           }
         />
 
+        <input
+          ref={inputRef}
+          type="file"
+          multiple
+          hidden
+          onChange={handleFallbackInput}
+          {...({ webkitdirectory: "", directory: "" } as Record<string, string>)}
+        />
 
-        <Box
-          sx={{
-            display: "grid",
-            gridTemplateColumns: { xs: "1fr", lg: "minmax(320px, 0.72fr) minmax(0, 1.7fr)" },
-            gap: { xs: 1.4, md: 1.6 },
-            alignItems: "start",
-          }}
-        >
-          <Stack spacing={1.4}>
-            <Paper elevation={0} sx={webUploadPanelSx}>
-              <Stack spacing={1.45} sx={webUploadFieldSx}>
-                <Stack direction="row" sx={{ alignItems: "center", gap: 1 }}>
-                  <InfoOutlined color="primary" fontSize="small" />
-                  <Typography variant="h4">对比信息</Typography>
-                </Stack>
+        <UploadFlowStrip
+          generationProgress={generationProgress}
+          overallProgress={overallProgress}
+          planView={planView}
+          snapshot={snapshot}
+          sourceRootName={sourceRootName}
+        />
 
-                <Button
-                  variant="outlined"
-                  startIcon={<FolderOpen />}
-                  disabled={isLocked}
-                  onClick={chooseDirectory}
-                >
-                  选择文件夹
-                </Button>
-                <input
-                  ref={inputRef}
-                  type="file"
-                  multiple
-                  hidden
-                  onChange={handleFallbackInput}
-                  {...({ webkitdirectory: "", directory: "" } as Record<string, string>)}
-                />
-
-                {cases.length === 0 ? (
-                  <Stack spacing={1}>
-                    <Alert severity="warning">上传前需要先创建一个 Case。</Alert>
-                    <CaseCreateButton />
-                  </Stack>
-                ) : null}
-
-                <FormControl fullWidth size="small" disabled={cases.length === 0 || isLocked}>
-                  <InputLabel id="web-upload-case-label">目标 Case</InputLabel>
-                  <Select
-                    labelId="web-upload-case-label"
-                    label="目标 Case"
-                    value={selectedCaseSlug}
-                    onChange={(event) => setSelectedCaseSlug(event.target.value)}
-                  >
-                    {cases.map((item) => (
-                      <MenuItem key={item.slug} value={item.slug}>
-                        {item.title}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-
-                <TextField
-                  label="Slug"
-                  size="small"
-                  value={groupMeta.slug}
-                  disabled={isLocked}
-                  onChange={(event) =>
-                    setGroupMeta((current) => ({
-                      ...current,
-                      slug: normalizeSlug(event.target.value),
-                    }))
-                  }
-                />
-                <TextField
-                  label="标题"
-                  size="small"
-                  value={groupMeta.title}
-                  disabled={isLocked}
-                  onChange={(event) =>
-                    setGroupMeta((current) => ({ ...current, title: event.target.value }))
-                  }
-                />
-                <TextField
-                  label="描述"
-                  size="small"
-                  multiline
-                  minRows={2}
-                  value={groupMeta.description}
-                  disabled={isLocked}
-                  onChange={(event) =>
-                    setGroupMeta((current) => ({
-                      ...current,
-                      description: event.target.value,
-                    }))
-                  }
-                />
-              </Stack>
-            </Paper>
-
-            <Paper elevation={0} sx={webUploadPanelSx}>
-              <Stack spacing={1.35}>
-                <Stack
-                  direction="row"
-                  spacing={1}
-                  sx={{
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                  }}
-                >
-                  <Typography variant="h4">上传详情</Typography>
-                  <Chip
-                    label={stageLabel(snapshot.stage)}
-                    color={
-                      snapshot.stage === "completed"
-                        ? "primary"
-                        : snapshot.stage === "failed"
-                          ? "warning"
-                          : "default"
-                    }
-                    sx={{ height: webUploadSizes.compactControlHeight }}
-                  />
-                </Stack>
-
-                <UploadDetails
-                  generationProgress={generationProgress}
-                  overallProgress={overallProgress}
-                  planView={planView}
-                  snapshot={snapshot}
-                />
-              </Stack>
-            </Paper>
-          </Stack>
-
-          <PairingPreviewPanel
-            plan={planRef.current}
-            planView={planView}
-            canReorder={snapshot.stage === "scanned"}
-            expandedFrameId={expandedFrameId}
-            frameTitleMode={frameTitleMode}
-            hasBlockingIssues={hasBlockingIssues}
-            onExpandedFrameChange={setExpandedFrameId}
-            onFrameTitleModeChange={changeFrameTitleMode}
-            onHeatmapReferenceChange={changeHeatmapReference}
-            onRenameColumn={renamePairingColumn}
-            onReorder={reorderPairingRows}
+        {!planView ? (
+          <UploadIntakePanel
+            cases={cases}
+            isScanning={isScanning}
+            selectedCaseSlug={selectedCaseSlug}
+            onCaseChange={setSelectedCaseSlug}
+            onChooseDirectory={() => void chooseDirectory()}
           />
-        </Box>
+        ) : (
+          <Box
+            sx={{
+              display: "grid",
+              gridTemplateColumns: { xs: "minmax(0, 1fr)", lg: "304px minmax(0, 1fr)" },
+              gap: { xs: 1.5, md: 2 },
+              alignItems: "start",
+              minWidth: 0,
+            }}
+          >
+            <Stack
+              spacing={1.5}
+              sx={{
+                minWidth: 0,
+                position: { lg: "sticky" },
+                top: { lg: 16 },
+              }}
+            >
+              {showProgressPanel ? (
+                <Paper elevation={0} sx={webUploadPanelSx}>
+                  <Stack spacing={1.35}>
+                    <Typography component="h2" variant="h4">
+                      进度
+                    </Typography>
+                    <UploadDetails
+                      generationProgress={generationProgress}
+                      overallProgress={overallProgress}
+                      planView={planView}
+                      snapshot={snapshot}
+                    />
+                  </Stack>
+                </Paper>
+              ) : null}
+
+              <UploadConfigurationPanel
+                cases={cases}
+                groupMeta={groupMeta}
+                isLocked={isLocked}
+                selectedCaseSlug={selectedCaseSlug}
+                sourceRootName={sourceRootName ?? groupMeta.title}
+                onCaseChange={setSelectedCaseSlug}
+                onChooseDirectory={() => void chooseDirectory()}
+                onGroupMetaChange={(nextMeta) =>
+                  setGroupMeta({ ...nextMeta, slug: normalizeSlug(nextMeta.slug) })
+                }
+              />
+            </Stack>
+
+            <PairingPreviewPanel
+              plan={planRef.current}
+              planView={planView}
+              canReorder={snapshot.stage === "scanned"}
+              expandedFrameId={expandedFrameId}
+              frameTitleMode={frameTitleMode}
+              hasBlockingIssues={hasBlockingIssues}
+              onExpandedFrameChange={setExpandedFrameId}
+              onFrameTitleModeChange={changeFrameTitleMode}
+              onHeatmapReferenceChange={changeHeatmapReference}
+              onRenameColumn={renamePairingColumn}
+              onReorder={reorderPairingRows}
+            />
+          </Box>
+        )}
       </Stack>
     </>
   );
