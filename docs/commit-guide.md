@@ -13,7 +13,9 @@
 ```bash
 git switch -c codex/<topic>
 git add -A
+git diff --cached --check
 git commit -m "refactor: improve web upload frame processing"
+git show --stat --format=fuller HEAD
 ```
 
 说明：
@@ -58,18 +60,49 @@ refactor: improve web upload frame processing
 
 常用 `type`：
 
-* `feat`：新功能
-* `fix`：修复
-* `refactor`：重构
-* `style`：样式与结构整理
-* `docs`：文档
-* `chore`：配置、脚本、依赖调整
-* `test`：测试
+- `feat`：新功能
+- `fix`：修复
+- `refactor`：重构
+- `style`：样式与结构整理
+- `docs`：文档
+- `chore`：配置、脚本、依赖调整
+- `test`：测试
+
+### 多行提交说明
+
+复杂变更使用真实换行写正文。推荐用 heredoc，提交消息在 shell 和 Git 中都保持原样：
+
+```bash
+git commit -F - <<'EOF'
+refactor: improve web upload frame processing
+
+- remove the legacy CLI upload path
+- add group-upload start/prepare/commit/complete API flow
+- move Docker/runtime defaults to external R2-style S3 storage
+EOF
+```
+
+也可以用多个 `-m` 参数，每个参数表示一个段落：
+
+```bash
+git commit \
+  -m "refactor: improve web upload frame processing" \
+  -m "remove the legacy CLI upload path" \
+  -m "add the group-upload API flow"
+```
+
+不要在 `-m` 的引号内写 `\n` 或 `\\n` 代替换行；zsh 和 bash 会把它们作为普通字符传给 Git，最终提交正文会出现字面量 `\n`。提交后用下面的命令检查实际正文：
+
+```bash
+git show -s --format='%B' HEAD
+```
+
+如果当前提交尚未推送，可以用同样的 `git commit --amend -F - <<'EOF'` 方式修正正文；已有多个本地提交时，逐个 reword 后再推送。
 
 ## 禁止事项
 
-* 不要最后一次性提交所有改动。
-* 不要使用模糊提交信息，或是只用一行简要概括。
-* 不要写成“update”“fix stuff”“wip”这类无法审阅的提交信息。
-* 不要跳过已完成步骤的提交，导致历史无法回溯。
-* 不要继续把日常开发直接提交到 `main`。
+- 不要最后一次性提交所有改动。
+- 不要使用模糊提交信息，或是只用一行简要概括。
+- 不要写成“update”“fix stuff”“wip”这类无法审阅的提交信息。
+- 不要跳过已完成步骤的提交，导致历史无法回溯。
+- 不要继续把日常开发直接提交到 `main`。
