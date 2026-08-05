@@ -1,0 +1,55 @@
+{
+  "schemaVersion": 1,
+  "publicSlug": "e2e-sample--viewer",
+  "generatedAt": "2026-08-05T00:00:00.000Z",
+  "assetBasePath": "data:image/svg+xml",
+  "case": {
+    "slug": "e2e-sample",
+    "title": "E2E Sample",
+    "subtitle": "",
+    "summary": "Deterministic browser smoke fixture.",
+    "tags": ["e2e"],
+    "publishedAt": "2026-08-05T00:00:00.000Z"
+  },
+  "group": {
+    "id": "e2e-group",
+    "slug": "viewer",
+    "publicSlug": "e2e-sample--viewer",
+    "title": "E2E Viewer",
+    "description": "Static comparison fixture",
+    "defaultMode": "before-after",
+    "tags": ["smoke"]
+  },
+  "frames": [
+    {
+      "id": "e2e-frame",
+      "title": "Frame 1",
+      "caption": "Inline SVG assets",
+      "order": 0,
+      "assets": [
+        {
+          "id": "e2e-before",
+          "kind": "before",
+          "label": "Before",
+          "imageUrl": "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22640%22%20height%3D%22360%22%3E%3Crect%20width%3D%22640%22%20height%3D%22360%22%20fill%3D%22%23202b38%22%2F%3E%3C%2Fsvg%3E",
+          "thumbUrl": "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22640%22%20height%3D%22360%22%3E%3Crect%20width%3D%22640%22%20height%3D%22360%22%20fill%3D%22%23202b38%22%2F%3E%3C%2Fsvg%3E",
+          "width": 640,
+          "height": 360,
+          "note": "Before fixture",
+          "isPrimaryDisplay": true
+        },
+        {
+          "id": "e2e-after",
+          "kind": "after",
+          "label": "After",
+          "imageUrl": "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22640%22%20height%3D%22360%22%3E%3Crect%20width%3D%22640%22%20height%3D%22360%22%20fill%3D%22%23c7d8eb%22%2F%3E%3C%2Fsvg%3E",
+          "thumbUrl": "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22640%22%20height%3D%22360%22%3E%3Crect%20width%3D%22640%22%20height%3D%22360%22%20fill%3D%22%23c7d8eb%22%2F%3E%3C%2Fsvg%3E",
+          "width": 640,
+          "height": 360,
+          "note": "After fixture",
+          "isPrimaryDisplay": true
+        }
+      ]
+    }
+  ]
+}
