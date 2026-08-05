@@ -12,7 +12,7 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
-    "pinyin-pro": "^3.28.1",
+    "pinyin-pro": "^3.28.2",
     "wanakana": "^5.3.1"
   }
 }

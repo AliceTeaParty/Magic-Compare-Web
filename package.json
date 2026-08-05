@@ -36,18 +36,18 @@
     "postinstall": "pnpm db:generate"
   },
   "devDependencies": {
-    "@playwright/test": "^1.58.2",
-    "@types/node": "^24.0.0",
+    "@playwright/test": "^1.62.1",
+    "@types/node": "^24.13.3",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
-    "eslint": "^10.1.0",
-    "eslint-plugin-react-hooks": "^7.0.1",
-    "playwright": "^1.58.2",
-    "prettier": "^3.8.1",
-    "tsx": "^4.20.5",
+    "eslint": "^10.8.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "playwright": "^1.62.1",
+    "prettier": "^3.9.6",
+    "tsx": "^4.23.6",
     "typescript": "^5.8.3",
     "typescript-eslint": "^8.57.2",
     "vitest": "^3.2.4",
-    "wrangler": "^4.110.0"
+    "wrangler": "^4.118.0"
   }
 }
