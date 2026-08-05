@@ -1,31 +1,20 @@
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { Box } from "@mui/material";
 import InitColorSchemeScript from "@mui/material/InitColorSchemeScript";
-import { IBM_Plex_Sans, Noto_Serif_JP, Noto_Serif_SC } from "next/font/google";
+import "@fontsource-variable/ibm-plex-sans/wght.css";
+import "@fontsource-variable/noto-serif-jp/wght.css";
+import "@fontsource-variable/noto-serif-sc/wght.css";
 import { resolveFooterConfig } from "@magic-compare/shared-utils";
 import { MagicSiteFooter } from "./magic-site-footer";
 import { MagicThemeProvider } from "../theme/magic-theme-provider";
 import type { MagicThemeProfile } from "../theme/magic-theme-provider";
 
-const displayFontSc = Noto_Serif_SC({
-  preload: false,
-  variable: "--font-display-sc",
-  weight: ["400", "500", "600", "700"],
-});
-
-const displayFontJp = Noto_Serif_JP({
-  subsets: ["latin"],
-  variable: "--font-display-jp",
-  weight: ["400", "500", "600", "700"],
-});
-
-const bodyFont = IBM_Plex_Sans({
-  subsets: ["latin"],
-  variable: "--font-body",
-  weight: ["400", "500", "600", "700"],
-});
-
-const rootClassName = `${displayFontSc.variable} ${displayFontJp.variable} ${bodyFont.variable}`;
+// Local Fontsource assets keep container and CI builds independent of Google Fonts availability.
+const rootFontVariables = {
+  "--font-display-sc": '"Noto Serif SC Variable"',
+  "--font-display-jp": '"Noto Serif JP Variable"',
+  "--font-body": '"IBM Plex Sans Variable"',
+} as CSSProperties;
 
 interface MagicRootLayoutShellProps {
   children: ReactNode;
@@ -50,7 +39,7 @@ export function MagicRootLayoutShell({
   });
 
   return (
-    <html lang={lang} className={rootClassName} suppressHydrationWarning>
+    <html lang={lang} style={rootFontVariables} suppressHydrationWarning>
       <body>
         {profile === "internal" ? (
           <InitColorSchemeScript

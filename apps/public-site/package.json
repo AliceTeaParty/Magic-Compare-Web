@@ -3,11 +3,11 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "tsx --tsconfig ../../tsconfig.base.json ../../scripts/sync-published.ts && next dev",
+    "dev": "next dev --port 3001",
     "build": "tsx --tsconfig ../../tsconfig.base.json ../../scripts/sync-published.ts && next build && tsx --tsconfig ../../tsconfig.base.json ../../scripts/write-public-route-aliases.ts",
     "start": "serve out --listen 3001",
-    "typecheck": "next build",
-    "lint": "eslint .",
+    "typecheck": "next typegen && tsc -p tsconfig.json --noEmit",
+    "lint": "eslint . --config ../../eslint.config.mjs",
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {

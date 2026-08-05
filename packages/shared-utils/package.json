@@ -8,6 +8,7 @@
     "./workspace-env": "./src/workspace-env.ts"
   },
   "scripts": {
+    "lint": "eslint . --config ../../eslint.config.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run --passWithNoTests"
   },
