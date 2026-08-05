@@ -4,7 +4,10 @@ export interface ViewerPreloadQueueItem {
   url: string;
   priority: number;
   order: number;
+  scope?: string;
 }
+
+export type ViewerPreloadQueueEntry = Pick<ViewerPreloadQueueItem, "url" | "priority">;
 
 export interface ViewerPreloadImageHandle {
   src: string;
@@ -17,10 +20,12 @@ export interface ViewerPreloadQueueOptions {
   connectionLimit: () => number;
   createImage: () => ViewerPreloadImageHandle;
   maxCacheEntries?: number;
+  maxQueuedEntries?: number;
   onLoad?: (url: string) => void;
 }
 
 const DEFAULT_MAX_CACHE_ENTRIES = 96;
+const DEFAULT_MAX_QUEUED_ENTRIES = 8;
 type ViewerPreloadResultStatus = Extract<ViewerPreloadStatus, "loaded" | "error">;
 
 function sortQueue(left: ViewerPreloadQueueItem, right: ViewerPreloadQueueItem): number {
@@ -40,6 +45,7 @@ export class ViewerImagePreloadQueue {
   private readonly createImage: () => ViewerPreloadImageHandle;
   private readonly loadingUrls = new Set<string>();
   private readonly maxCacheEntries: number;
+  private readonly maxQueuedEntries: number;
   private readonly onLoad?: (url: string) => void;
   private readonly queue: ViewerPreloadQueueItem[] = [];
   private readonly queuedUrls = new Set<string>();
@@ -51,6 +57,7 @@ export class ViewerImagePreloadQueue {
     this.connectionLimit = options.connectionLimit;
     this.createImage = options.createImage;
     this.maxCacheEntries = options.maxCacheEntries ?? DEFAULT_MAX_CACHE_ENTRIES;
+    this.maxQueuedEntries = options.maxQueuedEntries ?? DEFAULT_MAX_QUEUED_ENTRIES;
     this.onLoad = options.onLoad;
   }
 
@@ -80,14 +87,14 @@ export class ViewerImagePreloadQueue {
     return statuses;
   }
 
-  enqueue(url: string | undefined | null, priority: number): void {
+  enqueue(url: string | undefined | null, priority: number, scope?: string): void {
     if (!url) {
       return;
     }
 
     const status = this.getStatus(url);
     if (status === "queued") {
-      this.raiseQueuedPriority(url, priority);
+      this.raiseQueuedPriority(url, priority, scope);
       return;
     }
 
@@ -101,18 +108,53 @@ export class ViewerImagePreloadQueue {
       url,
       priority,
       order: this.order,
+      scope,
     });
     this.order += 1;
+    this.trimQueue();
     this.pump();
   }
 
-  private raiseQueuedPriority(url: string, priority: number): void {
+  /** Replaces stale speculative work while leaving active image requests and explicit intent alone. */
+  replaceScope(scope: string, entries: ViewerPreloadQueueEntry[]): void {
+    for (let index = this.queue.length - 1; index >= 0; index -= 1) {
+      const item = this.queue[index];
+      if (item?.scope !== scope) {
+        continue;
+      }
+
+      this.queue.splice(index, 1);
+      this.queuedUrls.delete(item.url);
+    }
+
+    for (const entry of entries) {
+      this.enqueue(entry.url, entry.priority, scope);
+    }
+  }
+
+  private raiseQueuedPriority(url: string, priority: number, scope?: string): void {
     const item = this.queue.find((candidate) => candidate.url === url);
     if (!item) {
       return;
     }
 
     item.priority = Math.max(item.priority, priority);
+    // Direct focus/pointer intent must survive later replacement of the speculative frame window.
+    if (scope === undefined) {
+      item.scope = undefined;
+    } else if (item.scope !== undefined) {
+      item.scope = scope;
+    }
+  }
+
+  private trimQueue(): void {
+    this.queue.sort(sortQueue);
+    while (this.queue.length > this.maxQueuedEntries) {
+      const removed = this.queue.pop();
+      if (removed) {
+        this.queuedUrls.delete(removed.url);
+      }
+    }
   }
 
   private pump(): void {
@@ -177,9 +219,7 @@ export class ViewerImagePreloadQueue {
 
   private trimCache(): void {
     while (this.resultCache.size > this.maxCacheEntries) {
-      const oldestKey = this.resultCache.keys().next().value as
-        | string
-        | undefined;
+      const oldestKey = this.resultCache.keys().next().value as string | undefined;
       if (!oldestKey) {
         return;
       }

@@ -3,8 +3,13 @@
 import { PhotoLibrary } from "@mui/icons-material";
 import { Box, Button, Stack, Typography } from "@mui/material";
 import type { ViewerFrame } from "@magic-compare/compare-core/viewer-data";
-import type { CSSProperties, DragEvent as ReactDragEvent } from "react";
+import { useEffect, useRef, type CSSProperties, type DragEvent as ReactDragEvent } from "react";
 import { useFilmstripDrag } from "./use-filmstrip-drag";
+import {
+  FILMSTRIP_CARD_WIDTH,
+  FILMSTRIP_ITEM_STRIDE,
+  getFilmstripRenderWindow,
+} from "./filmstrip-window";
 import { viewerTokens } from "./viewer-tokens";
 
 /** Chooses a stable representative thumbnail for each frame without affecting main-stage loading. */
@@ -34,6 +39,30 @@ function ThumbnailButton({
   onIntent: () => void;
 }) {
   const thumbAsset = resolveThumbnailAsset(frame);
+  const hoverIntentTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  /** Cancels speculative hover work when the pointer only crosses a thumbnail while scrolling. */
+  function cancelHoverIntent() {
+    if (hoverIntentTimerRef.current) {
+      clearTimeout(hoverIntentTimerRef.current);
+      hoverIntentTimerRef.current = null;
+    }
+  }
+
+  function handleImmediateIntent() {
+    cancelHoverIntent();
+    onIntent();
+  }
+
+  function handleMouseEnter() {
+    cancelHoverIntent();
+    hoverIntentTimerRef.current = setTimeout(() => {
+      hoverIntentTimerRef.current = null;
+      onIntent();
+    }, 150);
+  }
+
+  useEffect(() => cancelHoverIntent, []);
 
   return (
     <Button
@@ -41,9 +70,10 @@ function ThumbnailButton({
       aria-label={frame.title}
       aria-pressed={isActive}
       onClick={onClick}
-      onFocus={onIntent}
-      onMouseEnter={onIntent}
-      onPointerDown={onIntent}
+      onFocus={handleImmediateIntent}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={cancelHoverIntent}
+      onPointerDown={handleImmediateIntent}
       sx={{
         // This gives the browser permission to skip painting far-off thumbnails until they scroll
         // closer to view, which trims initial work without changing the drag model.
@@ -157,7 +187,9 @@ export function ViewerFilmstrip({
   onFrameIntent,
   onSelectFrame,
 }: ViewerFilmstripProps) {
+  const activeIndex = frames.findIndex((frame) => frame.id === currentFrameId);
   const {
+    filmstripScrollState,
     isDragging,
     scrollbarHandlers,
     scrollbarMetrics,
@@ -170,6 +202,31 @@ export function ViewerFilmstrip({
     onSelectFrame,
     prefersReducedMotion,
   });
+  const renderWindow = getFilmstripRenderWindow({
+    activeIndex,
+    clientWidth: filmstripScrollState.clientWidth,
+    frameCount: frames.length,
+    scrollLeft: filmstripScrollState.scrollLeft,
+  });
+  const visibleFrames = frames.slice(renderWindow.start, renderWindow.end);
+
+  useEffect(() => {
+    const viewport = viewportRef.current;
+    if (!viewport || activeIndex < 0 || filmstripScrollState.clientWidth <= 0) {
+      return;
+    }
+
+    const cardLeft = activeIndex * FILMSTRIP_ITEM_STRIDE;
+    const cardRight = cardLeft + FILMSTRIP_CARD_WIDTH;
+    const viewportRight = viewport.scrollLeft + viewport.clientWidth;
+    if (cardLeft >= viewport.scrollLeft && cardRight <= viewportRight) {
+      return;
+    }
+
+    // Selection can come from keyboard or restored state, so synchronize native scroll after the
+    // active card has entered the virtual window instead of leaving an empty viewport segment.
+    viewport.scrollLeft = Math.max(0, cardLeft - (viewport.clientWidth - FILMSTRIP_CARD_WIDTH) / 2);
+  }, [activeIndex, filmstripScrollState.clientWidth, viewportRef]);
 
   /**
    * Prevents the browser's native drag image from hijacking horizontal scrolling when users start a
@@ -178,8 +235,6 @@ export function ViewerFilmstrip({
   function handleViewportDragStart(event: ReactDragEvent<HTMLDivElement>) {
     event.preventDefault();
   }
-
-  const activeIndex = frames.findIndex((frame) => frame.id === currentFrameId);
 
   return (
     <Box
@@ -239,16 +294,37 @@ export function ViewerFilmstrip({
                 : "transform 220ms cubic-bezier(0.2, 0, 0, 1)",
           }}
         >
-          {frames.map((frame, index) => (
-            <ThumbnailButton
-              key={frame.id}
-              frame={frame}
-              isActive={frame.id === currentFrameId}
-              isNearActive={activeIndex === -1 || Math.abs(index - activeIndex) <= 8}
-              onClick={() => handleFrameSelection(frame.id)}
-              onIntent={() => onFrameIntent(frame)}
+          {renderWindow.leadingSpacerWidth > 0 ? (
+            <Box
+              aria-hidden
+              sx={{
+                flex: `0 0 ${renderWindow.leadingSpacerWidth}px`,
+                width: renderWindow.leadingSpacerWidth,
+              }}
             />
-          ))}
+          ) : null}
+          {visibleFrames.map((frame, windowIndex) => {
+            const index = renderWindow.start + windowIndex;
+            return (
+              <ThumbnailButton
+                key={frame.id}
+                frame={frame}
+                isActive={frame.id === currentFrameId}
+                isNearActive={activeIndex === -1 || Math.abs(index - activeIndex) <= 8}
+                onClick={() => handleFrameSelection(frame.id)}
+                onIntent={() => onFrameIntent(frame)}
+              />
+            );
+          })}
+          {renderWindow.trailingSpacerWidth > 0 ? (
+            <Box
+              aria-hidden
+              sx={{
+                flex: `0 0 ${renderWindow.trailingSpacerWidth}px`,
+                width: renderWindow.trailingSpacerWidth,
+              }}
+            />
+          ) : null}
         </Box>
       </Box>
 

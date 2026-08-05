@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  getComparisonAssetKey,
   getComparisonTargetAssets,
   type ViewerAsset,
   type ViewerAssetPreloadHint,
@@ -14,26 +15,33 @@ import {
 } from "./viewer-image-preloader-core";
 import { markViewerStageImageLoaded } from "./stage-image-load-cache";
 
-const FRAME_PRELOAD_RADIUS = 2;
+const FRAME_PRELOAD_SCOPE = "active-frame-window";
+
+export interface ViewerConnectionInfo {
+  effectiveType?: string;
+  saveData?: boolean;
+}
 
 export interface ViewerImagePreloader {
   preloadFrame: (frame: ViewerFrame | undefined) => void;
   preloadGroupHint: (assets: ViewerAssetPreloadHint[] | undefined) => void;
 }
 
-function getConnectionInfo() {
+function getConnectionInfo(): ViewerConnectionInfo | null {
   if (typeof navigator === "undefined") {
     return null;
   }
 
   return (
-    navigator as Navigator & {
-      connection?: {
-        effectiveType?: string;
-        saveData?: boolean;
-      };
-    }
-  ).connection;
+    (
+      navigator as Navigator & {
+        connection?: {
+          effectiveType?: string;
+          saveData?: boolean;
+        };
+      }
+    ).connection ?? null
+  );
 }
 
 function getConnectionLimit(): number {
@@ -42,7 +50,8 @@ function getConnectionLimit(): number {
   if (
     connection?.saveData ||
     connection?.effectiveType === "slow-2g" ||
-    connection?.effectiveType === "2g"
+    connection?.effectiveType === "2g" ||
+    connection?.effectiveType === "3g"
   ) {
     return 1;
   }
@@ -50,21 +59,19 @@ function getConnectionLimit(): number {
   return 2;
 }
 
-function getFramePreloadRadius(): number {
-  const connection = getConnectionInfo();
-
-  if (connection?.saveData) {
+export function getFramePreloadRadiusForConnection(
+  connection: ViewerConnectionInfo | null,
+): number {
+  if (
+    connection?.saveData ||
+    connection?.effectiveType === "slow-2g" ||
+    connection?.effectiveType === "2g" ||
+    connection?.effectiveType === "3g"
+  ) {
     return 0;
   }
 
-  if (
-    connection?.effectiveType === "slow-2g" ||
-    connection?.effectiveType === "2g"
-  ) {
-    return 1;
-  }
-
-  return FRAME_PRELOAD_RADIUS;
+  return 1;
 }
 
 function createBrowserImage(): ViewerPreloadImageHandle {
@@ -102,6 +109,7 @@ function createBrowserImage(): ViewerPreloadImageHandle {
 function getPreloadAssetsForFrame(
   frame: ViewerFrame | undefined,
   mode: ViewerMode,
+  comparisonAssetKey: string | undefined,
 ): ViewerAsset[] {
   if (!frame) {
     return [];
@@ -109,28 +117,30 @@ function getPreloadAssetsForFrame(
 
   const beforeAsset = frame.assets.find((asset) => asset.kind === "before");
   const heatmapAsset = frame.assets.find((asset) => asset.kind === "heatmap");
+  const comparisonAssets = getComparisonTargetAssets(frame);
+  const comparisonAsset =
+    comparisonAssets.find((asset) => getComparisonAssetKey(asset) === comparisonAssetKey) ??
+    comparisonAssets[0];
 
   if (mode === "heatmap") {
-    return [...getComparisonTargetAssets(frame), heatmapAsset].filter(
-      (asset): asset is ViewerAsset => Boolean(asset),
-    );
+    return [comparisonAsset, heatmapAsset].filter((asset): asset is ViewerAsset => Boolean(asset));
   }
 
-  // Preload every uploaded output for the bounded current/neighbor frame window so switching from
-  // Rip to Flt updates the inspection stage immediately instead of revealing an unloaded column.
-  return [beforeAsset, ...getComparisonTargetAssets(frame)].filter(
-    (asset): asset is ViewerAsset => Boolean(asset),
-  );
+  // Only the selected comparison pair can enter the stage. Other variables are fetched after the
+  // corresponding selector receives explicit intent, avoiding hidden full-resolution downloads.
+  return [beforeAsset, comparisonAsset].filter((asset): asset is ViewerAsset => Boolean(asset));
 }
 
 /**
  * Preloads likely next full-size viewer assets without tying image request churn to React renders.
  */
 export function useViewerImagePreloader({
+  comparisonAssetKey,
   currentFrameIndex,
   frames,
   mode,
 }: {
+  comparisonAssetKey: string | undefined;
   currentFrameIndex: number;
   frames: ViewerFrame[];
   mode: ViewerMode;
@@ -145,25 +155,22 @@ export function useViewerImagePreloader({
     });
   }
 
-  const enqueueUrl = useCallback(
-    (url: string | undefined | null, priority: number) => {
-      queueRef.current?.enqueue(url, priority);
-    },
-    [],
-  );
+  const enqueueUrl = useCallback((url: string | undefined | null, priority: number) => {
+    queueRef.current?.enqueue(url, priority);
+  }, []);
 
   const preloadFrame = useCallback(
     (frame: ViewerFrame | undefined) => {
-      for (const asset of getPreloadAssetsForFrame(frame, mode)) {
+      for (const asset of getPreloadAssetsForFrame(frame, mode, comparisonAssetKey)) {
         enqueueUrl(asset.imageUrl, 90);
       }
     },
-    [enqueueUrl, mode],
+    [comparisonAssetKey, enqueueUrl, mode],
   );
 
   const preloadGroupHint = useCallback(
     (assets: ViewerAssetPreloadHint[] | undefined) => {
-      for (const asset of assets ?? []) {
+      for (const asset of (assets ?? []).slice(0, 2)) {
         enqueueUrl(asset.imageUrl, 80);
       }
     },
@@ -175,25 +182,28 @@ export function useViewerImagePreloader({
       return;
     }
 
-    const radius = getFramePreloadRadius();
+    const radius = getFramePreloadRadiusForConnection(getConnectionInfo());
+    const entries: Array<{ url: string; priority: number }> = [];
     const currentFrame = frames[currentFrameIndex];
-    for (const asset of getPreloadAssetsForFrame(currentFrame, mode)) {
-      enqueueUrl(asset.imageUrl, 120);
+    for (const asset of getPreloadAssetsForFrame(currentFrame, mode, comparisonAssetKey)) {
+      entries.push({ url: asset.imageUrl, priority: 120 });
     }
 
     for (let offset = 1; offset <= radius; offset += 1) {
       const nextFrame = frames[currentFrameIndex + offset];
       const previousFrame = frames[currentFrameIndex - offset];
 
-      for (const asset of getPreloadAssetsForFrame(nextFrame, mode)) {
-        enqueueUrl(asset.imageUrl, 70 - offset);
+      for (const asset of getPreloadAssetsForFrame(nextFrame, mode, comparisonAssetKey)) {
+        entries.push({ url: asset.imageUrl, priority: 70 - offset });
       }
 
-      for (const asset of getPreloadAssetsForFrame(previousFrame, mode)) {
-        enqueueUrl(asset.imageUrl, 70 - offset);
+      for (const asset of getPreloadAssetsForFrame(previousFrame, mode, comparisonAssetKey)) {
+        entries.push({ url: asset.imageUrl, priority: 70 - offset });
       }
     }
-  }, [currentFrameIndex, enqueueUrl, frames, mode]);
+
+    queueRef.current?.replaceScope(FRAME_PRELOAD_SCOPE, entries);
+  }, [comparisonAssetKey, currentFrameIndex, frames, mode]);
 
   return useMemo(
     () => ({

@@ -111,6 +111,7 @@ export function GroupViewerWorkbench({
     viewportSize,
   });
   const imagePreloader = useViewerImagePreloader({
+    comparisonAssetKey: activeComparisonAssetKey,
     currentFrameIndex,
     frames,
     mode,

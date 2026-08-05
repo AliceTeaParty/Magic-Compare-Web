@@ -70,6 +70,9 @@
 - 同一 supporting pane 在宽屏 `aside` 和窄屏 Drawer 中必须复用内容结构与 surface 层级。Drawer 可以因触控和模态语义使用更宽面板、全高滚动、遮罩与滑入动效，但外层 surface 不能与内部 tonal list 使用同一角色，否则列表底色会消失。
 - 移动端 Viewer 详情与帮助使用模态 Drawer 时由共享根节点锁阻止背景滚动，不能保留一条挤压内容宽度的页面滚动条。发布状态使用足量内边距的低强调状态容器，公开 Slug 直接承担文字链接语义。
 - Viewer 胶片条是高频扫描工具，缩略图密度应高于普通内容卡片。选中态使用主题 container / on-container，图片 `alt` 留空并由按钮提供唯一名称，避免读屏名称重复；hover 只改变 state layer，不抬升卡片。
+- Viewer 胶片条按固定卡片宽度窗口化，可视区前后各保留 4 项；用等宽 spacer 保持原生滚动范围和拖动手感，不能为了减少 DOM 改成分页或让选中帧跳位。
+- Viewer 全图预取只处理当前模式实际显示的两个资源。省流量、2G、3G 不预测邻帧，4G 或未知网络只预测相邻一帧；hover 等待约 150ms，focus 和 pointerdown 立即响应。
+- MUI App Router 页面由官方 cache provider 统一 Emotion 注入顺序。不要同时开启 CSS layer；现有主题优先级依赖当前无 layer 模型。
 - Internal Viewer 不单独提供返回按钮。全局侧栏在 Case 路由下增加当前“工作区”目的地，桌面 rail 与移动 drawer 复用同一导航模型，避免同一层级出现两套返回方式。
 - 服务端时间戳进入浏览器后再用 `Intl.DateTimeFormat` 按用户 locale 与 time zone 格式化；hydration 期间保留固定高度，不展示可能错误的 UTC 值。
 
@@ -134,6 +137,8 @@
 
 ## 上传工作台：需要大改
 
+- [ ] 重构时加入 1 / 2 / 3 Worker 手动选择
+      不读取 `deviceMemory` 或 `hardwareConcurrency` 自动猜测；默认 1 Worker，选择在预检开始后锁定，并让预检与逐帧生成共用同一并发值。
 - 复核日期：`2026-08-05`
 - 复核环境：本地 `internal-site` 开发服务器 + in-app browser
 - 复核页面：`/upload`

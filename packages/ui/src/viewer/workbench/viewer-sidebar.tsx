@@ -18,7 +18,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
 import { findAsset, getComparisonTargetAssets } from "@magic-compare/compare-core/viewer-data";
-import { useEffect, useState, type MouseEvent as ReactMouseEvent } from "react";
+import { useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
 import type {
   ViewerAsset,
   ViewerDataset,
@@ -90,10 +90,18 @@ function GroupLinks({
   pendingGroupHref?: string | null;
 }) {
   const router = useRouter();
+  const hoverIntentTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function cancelHoverIntent() {
+    if (hoverIntentTimerRef.current) {
+      clearTimeout(hoverIntentTimerRef.current);
+      hoverIntentTimerRef.current = null;
+    }
+  }
 
   /**
-   * Uses hover/focus/touch as explicit navigation intent: route data can be prefetched immediately
-   * while only the target group's small first-frame hint is handed to the image preloader.
+   * Prefetches immediately for focus and touch, while hover waits briefly so crossing a compact
+   * navigation list does not start route and image requests for every row.
    */
   function handleGroupIntent(group: ViewerDataset["siblingGroups"][number]) {
     if (onGroupPrefetch) {
@@ -103,6 +111,21 @@ function GroupLinks({
     }
     onGroupIntent(group.preloadAssets);
   }
+
+  function handleGroupHover(group: ViewerDataset["siblingGroups"][number]) {
+    cancelHoverIntent();
+    hoverIntentTimerRef.current = setTimeout(() => {
+      hoverIntentTimerRef.current = null;
+      handleGroupIntent(group);
+    }, 150);
+  }
+
+  function handleImmediateGroupIntent(group: ViewerDataset["siblingGroups"][number]) {
+    cancelHoverIntent();
+    handleGroupIntent(group);
+  }
+
+  useEffect(() => cancelHoverIntent, []);
 
   /** Intercepts only an ordinary primary click; browser-native new-tab and modifier behavior stays. */
   function handleGroupClick(
@@ -149,9 +172,10 @@ function GroupLinks({
           aria-busy={pendingGroupHref === group.href || undefined}
           data-viewer-group-link={onGroupNavigate ? "" : undefined}
           onClick={(event) => handleGroupClick(event, group)}
-          onFocus={() => handleGroupIntent(group)}
-          onMouseEnter={() => handleGroupIntent(group)}
-          onTouchStart={() => handleGroupIntent(group)}
+          onFocus={() => handleImmediateGroupIntent(group)}
+          onMouseEnter={() => handleGroupHover(group)}
+          onMouseLeave={cancelHoverIntent}
+          onTouchStart={() => handleImmediateGroupIntent(group)}
           sx={{
             minHeight: 44,
             px: 1.25,

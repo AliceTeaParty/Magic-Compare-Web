@@ -37,13 +37,12 @@ export function useFilmstripDrag({
     frameCount,
     viewportRef,
   });
-  const { isDragging, handleFrameSelection, viewportHandlers } =
-    useFilmstripGestureSession({
-      frameCount,
-      onSelectFrame,
-      prefersReducedMotion,
-      stripRef,
-    });
+  const { isDragging, handleFrameSelection, viewportHandlers } = useFilmstripGestureSession({
+    frameCount,
+    onSelectFrame,
+    prefersReducedMotion,
+    stripRef,
+  });
 
   const scrollbarMetrics = useMemo(
     () =>
@@ -100,16 +99,13 @@ export function useFilmstripDrag({
     const trackWidth = event.currentTarget.clientWidth;
     const maxThumbOffset = Math.max(1, trackWidth - scrollbarMetrics.thumbWidth);
     const scrollDelta =
-      ((event.clientX - dragState.startClientX) / maxThumbOffset) *
-      scrollbarMetrics.maxScrollLeft;
+      ((event.clientX - dragState.startClientX) / maxThumbOffset) * scrollbarMetrics.maxScrollLeft;
 
     scrollTo(dragState.startScrollLeft + scrollDelta);
     event.preventDefault();
   }
 
-  function finishScrollbarPointerDrag(
-    event: ReactPointerEvent<HTMLDivElement>,
-  ) {
+  function finishScrollbarPointerDrag(event: ReactPointerEvent<HTMLDivElement>) {
     if (scrollbarDragRef.current?.pointerId !== event.pointerId) {
       return;
     }
@@ -159,6 +155,7 @@ export function useFilmstripDrag({
   }
 
   return {
+    filmstripScrollState,
     isDragging,
     scrollbarMetrics,
     scrollbarHandlers: {

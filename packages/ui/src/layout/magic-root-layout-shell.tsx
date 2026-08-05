@@ -1,6 +1,7 @@
 import type { CSSProperties, ReactNode } from "react";
 import { Box } from "@mui/material";
 import InitColorSchemeScript from "@mui/material/InitColorSchemeScript";
+import { AppRouterCacheProvider } from "@mui/material-nextjs/v16-appRouter";
 import "@fontsource-variable/ibm-plex-sans/wght.css";
 import "@fontsource-variable/noto-serif-jp/wght.css";
 import "@fontsource-variable/noto-serif-sc/wght.css";
@@ -41,22 +42,26 @@ export function MagicRootLayoutShell({
   return (
     <html lang={lang} style={rootFontVariables} suppressHydrationWarning>
       <body>
-        {profile === "internal" ? (
-          <InitColorSchemeScript
-            attribute="data"
-            defaultMode="system"
-            modeStorageKey="mc-internal-mode"
-            colorSchemeStorageKey="mc-internal-color-scheme"
-          />
-        ) : null}
-        <MagicThemeProvider profile={profile} initialThemeSeed={initialThemeSeed}>
-          <Box sx={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
-            <Box component="main" sx={{ flex: 1, minWidth: 0 }}>
-              {children}
+        {/* The App Router cache owns Emotion insertion order across server streaming and hydration,
+            preventing duplicate style tags without changing the incumbent CSS priority model. */}
+        <AppRouterCacheProvider>
+          {profile === "internal" ? (
+            <InitColorSchemeScript
+              attribute="data"
+              defaultMode="system"
+              modeStorageKey="mc-internal-mode"
+              colorSchemeStorageKey="mc-internal-color-scheme"
+            />
+          ) : null}
+          <MagicThemeProvider profile={profile} initialThemeSeed={initialThemeSeed}>
+            <Box sx={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
+              <Box component="main" sx={{ flex: 1, minWidth: 0 }}>
+                {children}
+              </Box>
+              {profile === "public" ? <MagicSiteFooter {...footerConfig} /> : null}
             </Box>
-            {profile === "public" ? <MagicSiteFooter {...footerConfig} /> : null}
-          </Box>
-        </MagicThemeProvider>
+          </MagicThemeProvider>
+        </AppRouterCacheProvider>
       </body>
     </html>
   );

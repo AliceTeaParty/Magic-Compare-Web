@@ -71,6 +71,47 @@ describe("ViewerImagePreloadQueue", () => {
     expect(handles[0]?.src).toBe("/candidate.png");
   });
 
+  it("keeps at most eight pending speculative requests", () => {
+    const handles: ViewerPreloadImageHandle[] = [];
+    const queue = new ViewerImagePreloadQueue({
+      connectionLimit: () => 0,
+      createImage: () => {
+        const handle: ViewerPreloadImageHandle = {
+          src: "",
+          onload: null,
+          onerror: null,
+        };
+        handles.push(handle);
+        return handle;
+      },
+    });
+
+    for (let index = 0; index < 20; index += 1) {
+      queue.enqueue(`/frame-${index}.png`, 20 - index, "frame-window");
+    }
+
+    expect(queue.queuedRequestCount).toBe(8);
+    expect(handles).toHaveLength(0);
+    expect(queue.statusByUrl.has("/frame-0.png")).toBe(true);
+    expect(queue.statusByUrl.has("/frame-19.png")).toBe(false);
+  });
+
+  it("replaces stale frame-window work without dropping direct intent", () => {
+    const { queue } = createControllableQueue(() => 0);
+
+    queue.replaceScope("frame-window", [
+      { url: "/old-a.png", priority: 20 },
+      { url: "/old-b.png", priority: 20 },
+    ]);
+    queue.enqueue("/focused.png", 100);
+    queue.replaceScope("frame-window", [{ url: "/new.png", priority: 20 }]);
+
+    expect(queue.statusByUrl.has("/old-a.png")).toBe(false);
+    expect(queue.statusByUrl.has("/old-b.png")).toBe(false);
+    expect(queue.statusByUrl.get("/focused.png")).toBe("queued");
+    expect(queue.statusByUrl.get("/new.png")).toBe("queued");
+  });
+
   it("respects the active request limit and continues after load", () => {
     const { handles, queue } = createControllableQueue(() => 2);
 
@@ -84,11 +125,7 @@ describe("ViewerImagePreloadQueue", () => {
 
     handles[0]?.onload?.();
 
-    expect(handles.map((handle) => handle.src)).toEqual([
-      "/a.png",
-      "/b.png",
-      "/c.png",
-    ]);
+    expect(handles.map((handle) => handle.src)).toEqual(["/a.png", "/b.png", "/c.png"]);
     expect(queue.activeRequestCount).toBe(2);
     expect(queue.queuedRequestCount).toBe(0);
   });
