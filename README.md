@@ -2,554 +2,82 @@
 
 [English](./README.md) | [简体中文](./README.zh-CN.md)
 
-<p align="center">
-  <strong>Compare image changes with three focused review modes</strong>
-</p>
-<p align="center">
-  Built for encoding-group review workflows with a fast path from local imports to published static compare pages.
-</p>
-<p align="center">
-  <a href="#quick-start">Quick Start</a> ·
-  <a href="#workflow-overview">View Workflow</a> ·
-  <a href="./docs/web-uploader.zh-CN.md">Web Upload Docs</a>
-</p>
+Magic Compare Web is a monorepo for reviewing and publishing image comparisons. It is built for focused before/after inspection and does not provide video processing or an in-site discussion workflow.
 
-<table>
-  <tr>
-    <td width="33%" align="center">
-      <img src="./apps/internal-site/prisma/demo-assets/001-before.svg" alt="Slider mode before preview" width="49%" />
-      <img src="./apps/internal-site/prisma/demo-assets/001-after.svg" alt="Slider mode after preview" width="49%" />
-      <br />
-      <strong>Slider</strong>
-      <br />
-      <sub>Drag across before and after frames to inspect cleanup, texture recovery, and edge handling.</sub>
-    </td>
-    <td width="33%" align="center">
-      <img src="./apps/internal-site/prisma/demo-assets/002-before.svg" alt="A/B mode before preview" width="49%" />
-      <img src="./apps/internal-site/prisma/demo-assets/002-after.svg" alt="A/B mode after preview" width="49%" />
-      <br />
-      <strong>A/B</strong>
-      <br />
-      <sub>Flip between two versions to check decisions frame by frame without leaving the viewer.</sub>
-    </td>
-    <td width="33%" align="center">
-      <img src="./apps/internal-site/prisma/demo-assets/001-heatmap.svg" alt="Heatmap mode preview" width="100%" />
-      <br />
-      <strong>Heatmap</strong>
-      <br />
-      <sub>Highlight difference regions and change intensity when a direct visual diff needs more emphasis.</sub>
-    </td>
-  </tr>
-</table>
+## Scope
 
-Magic Compare Web is a monorepo for an image compare platform aimed at encoding groups.
+- `internal-site`: server-backed catalog, case workspace, viewer, Web uploader, publishing, export, and deployment actions.
+- `public-site`: static read-only pages generated from published manifests.
+- `packages/`: shared viewer logic, content schemas, UI, and utilities.
 
-The project has two deployment targets:
-
-- `internal-site`: a server-backed Next.js app for the internal catalog, case workspace, compare viewer, reorder operations, publish operations, public export, and Pages deploy.
-- `public-site`: a static export target that consumes published artifacts from `content/published`.
-
-This repository is deliberately not a video previewer, not an online VapourSynth runner, and not an in-site review/comment system. The current scope is "look" and "publish".
-
-## ✨ Highlights
-
-- `Slider` for before/after inspection on the same frame.
-- `A/B` for direct version toggling during image review.
-- `Heatmap` for difference emphasis when visual deltas need extra contrast.
-- A Web upload-to-publish workflow that turns local image sets into reviewable cases.
-- A static public delivery target that reads published bundles from `content/published`.
-- S3-compatible internal asset storage with presigned direct uploads.
-- Explicit public export and Cloudflare Pages deploy actions from the internal workspace.
-
-<a id="quick-start"></a>
-
-## 🚀 Quick Start
+## Quick Start
 
 ```bash
 cp .env.example .env
-# Fill in MAGIC_COMPARE_S3_* in .env with your S3-compatible storage (Cloudflare R2 or self-hosted minio etc.)
+# Fill in the required MAGIC_COMPARE_S3_* values.
 pnpm install
 pnpm dev
 ```
-
-Local tooling uses Node `24.13.x` and pnpm `10.32.1`. `pnpm dev` checks the environment, synchronizes the SQLite schema, and starts the internal site without uploading or repairing demo data. Use `pnpm dev:bootstrap` when the demo needs repair, or `pnpm dev:all` for two-site development.
 
 Local entry points:
 
-- internal site: `http://localhost:3000`
-- public site: `http://localhost:3001`
-- demo public page: `http://localhost:3001/g/demo-grain-study--banding-check`
+- Internal site: <http://localhost:3000>
+- Public site: <http://localhost:3001>
+- Demo page: <http://localhost:3001/g/demo-grain-study--banding-check>
 
-Demo content:
+Use `pnpm dev:bootstrap` when demo data needs repair, or `pnpm dev:all` to run both sites.
 
-- internal case slug: `demo-grain-study`
-- internal group slug: `banding-check`
-- public group slug: `demo-grain-study--banding-check`
+## Workflows
 
-💡 Note:
+### Upload
 
-- `pnpm db:push` currently runs `apps/internal-site/prisma/init-db.ts` because `prisma db push` fails in the current local environment.
+Open `/upload`, review the pairing plan, then preflight and upload the selected image set. The Web uploader guide is the source for current browser behavior and upload protocol details.
 
-## 🐳 Docker and Storage
+### Publish
 
-- `docker/internal-site.Dockerfile` builds a full-workspace internal-site image that can also trigger public export and Pages deploy.
-- `docker-compose.yml` wires together:
-  - `internal-site`
-  - `internal-site-init`, a one-off initializer that runs `db:push` and (when external storage is configured) `db:seed` before the app starts
-- server-side Docker deployment now only needs:
-  - `docker-compose.yml`
-  - `.env`
-  - the published runtime image
-- the base Compose file now defaults to the GHCR runtime image via `MAGIC_COMPARE_INTERNAL_SITE_IMAGE`, so servers can `docker compose up` without a local build step
-- the base Compose file now uses Docker named volumes, so a server can run it without depending on repository-relative `docker-data` paths
-- if you want a local image build plus inspectable bind mounts during development, add `-f docker/dev.compose.override.yml`
-- for local development, prefer the root scripts: `pnpm docker:dev:up`, `pnpm docker:dev:down`, `pnpm docker:dev:logs`
-- internal assets live in external S3-compatible storage configured by `MAGIC_COMPARE_S3_*` (Cloudflare R2 or any S3-compatible service)
-- published bundles still live under `MAGIC_COMPARE_PUBLISHED_ROOT`
-- static public exports are mirrored into `MAGIC_COMPARE_PUBLIC_EXPORT_DIR`
-- the resident Next process runs directly under Node with a 512MiB default old-space limit; public build and Wrangler have separate, overrideable limits that apply only to their transient child processes
-- Compose leaves container burst memory to the host, uses `/api/healthz`, limits allocator arena retention, and persists public build/output caches on disk
+Publish a case from the internal site, then explicitly export or deploy the public site when needed. Publishing, export, and deployment are separate actions.
 
-<a id="workflow-overview"></a>
-
-## 🔄 Workflow Overview
-
-### 📥 Upload Workflow
-
-1. Open the internal Web uploader at `/upload`, or `/upload?case=<caseSlug>` from a case workspace.
-2. Select a local directory and review the pairing preview before uploading.
-3. Complete source decode, dimensions, SHA-256, and heatmap-plan validation before the first network write.
-4. Stream each generated frame through `group-upload-start -> frame prepare -> presigned PUT -> frame commit -> group-upload-complete`.
-5. Let the internal site update case/group metadata and switch each committed frame to the new object-storage revision.
-
-Result:
-
-- imported review data is available in the internal site workspace
-- internal assets live in S3-compatible storage; the database keeps logical `/groups/...` paths while browser-facing URLs resolve from `MAGIC_COMPARE_S3_PUBLIC_BASE_URL`
-- current Web upload usage lives in `docs/web-uploader.zh-CN.md`
-- a Chinese note about the difference between built-in demo content and real case/group flows lives in `docs/reference/demo-vs-real.zh-CN.md`
-
-### 📦 Publish Workflow
-
-1. Trigger `POST /api/ops/case-publish` from the internal site.
-2. Filter `group.isPublic`, `frame.isPublic`, and `asset.isPublic` for the selected case.
-3. Derive or reuse a stable `publicSlug` for each public group.
-4. Write a `manifest.json` with `schemaVersion` and absolute public S3 image URLs for each published group.
-5. Trigger `pnpm public:export` or `POST /api/ops/public-export` when you want a fresh static public bundle.
-6. Trigger `pnpm public:deploy` or `POST /api/ops/public-deploy` when you want a direct Cloudflare Pages upload.
-
-Result:
-
-- published artifacts live under `content/published`
-- `apps/public-site` consumes those artifacts as static content
-- the public deployment target stays read-only
-
-## ✅ What Works Now
-
-The repository is fully bootstrapped and verified:
-
-- `pnpm install` works.
-- `pnpm db:push` initializes the SQLite schema.
-- `pnpm db:seed` seeds a demo case into the internal database and uploads demo internal assets to S3-compatible storage.
-- `pnpm public:export` builds the static public bundle into `dist/public-site` by default.
-- `pnpm build` succeeds for both Next.js apps.
-- `pnpm test` succeeds for shared schema and viewer logic tests.
-
-The seeded demo case is:
-
-- Internal site case slug: `demo-grain-study`
-- Internal group slug: `banding-check`
-- Public group slug: `demo-grain-study--banding-check`
-
-## 🧱 Monorepo Layout
+## Repository Layout
 
 ```text
-apps/
-  internal-site/
-  public-site/
-
-packages/
-  compare-core/
-  content-schema/
-  shared-utils/
-  ui/
-
-content/
-  published/
+apps/internal-site/   Server-backed internal workspace
+apps/public-site/     Static public viewer
+packages/              Shared schemas, viewer logic, UI, and utilities
+content/published/     Published manifest and demo content
+docs/                  Workflow, API, deployment, and UI notes
 ```
 
-## 🧠 Technical Details
-
-<details>
-<summary><strong>🏗️ Architecture Notes</strong></summary>
-
-### apps/internal-site
-
-Internal site responsibilities:
-
-- show the case catalog
-- show a case workspace
-- show the internal group viewer
-- provide the Web upload workbench and frame-level upload APIs
-- reorder groups within a case
-- reorder frames within a group
-- publish public artifacts into `content/published`
-- export and deploy the public static site on demand
-
-Key implementation areas:
-
-- `app/`: Next.js App Router routes
-- `components/`: internal-only UI such as the case directory and workspace list
-- `lib/server/repositories/`: read/write data access backed by Prisma client
-- `lib/server/publish/`: publish pipeline that filters public content and writes manifests
-- `lib/server/storage/`: S3-backed internal asset helpers and published artifact writers
-- `lib/server/public-site/`: runtime public export and Pages deploy helpers
-- `prisma/schema.prisma`: Prisma data model
-- `prisma/init-db.ts`: SQLite schema bootstrap script used by `pnpm db:push`
-
-### apps/public-site
-
-Public site responsibilities:
-
-- statically export published group pages
-- read only from `content/published/groups/*/manifest.json`
-- expose no catalog, no upload UI, and no write APIs
-
-Key implementation areas:
-
-- `app/g/[publicSlug]/page.tsx`: SSG/static-export group viewer entry
-- `lib/content.ts`: published manifest reader
-
-### packages/content-schema
-
-Shared Zod schemas and TypeScript types for:
-
-- case
-- group
-- frame
-- asset
-- frame-level upload payload
-- publish manifest
-- enums such as `CaseStatus`, `ViewerMode`, and `AssetKind`
-
-Important current rule:
-
-- internal `slug` values use kebab-case with single hyphens
-- public `publicSlug` values allow double hyphen separators such as `case--group`
-
-### packages/compare-core
-
-Shared viewer logic:
-
-- viewer dataset shape
-- asset lookup helpers
-- available mode calculation
-- heatmap fallback resolution
-- client-side viewer controller state
-
-### packages/ui
-
-Shared viewer workbench and theme:
-
-- dark modern MUI theme
-- group viewer shell
-- top toolbar
-- main stage
-- filmstrip rail
-- right sidebar
-
-</details>
-
-<details>
-<summary><strong>🗂️ Data Model</strong></summary>
-
-The current implementation uses four content entities.
-
-### Case
-
-Case is the top-level container.
-
-Fields:
-
-- `id`
-- `slug`
-- `title`
-- `subtitle`
-- `summary`
-- `tags[]`
-- `status`
-- `coverAssetId`
-- `publishedAt`
-- `updatedAt`
-
-### Group
-
-Group is the smallest public sharing unit.
-
-Fields:
-
-- `id`
-- `caseId`
-- `slug`
-- `publicSlug`
-- `title`
-- `description`
-- `order`
-- `defaultMode`
-- `isPublic`
-- `tags[]`
-
-### Frame
-
-Frame is one position in the filmstrip. A group can contain multiple frames.
-
-Fields:
-
-- `id`
-- `groupId`
-- `title`
-- `caption`
-- `order`
-- `isPublic`
-
-### Asset
-
-Asset is one concrete image variant attached to a frame.
-
-Fields:
-
-- `id`
-- `frameId`
-- `kind`
-- `label`
-- `imageUrl`
-- `thumbUrl`
-- `width`
-- `height`
-- `note`
-- `isPublic`
-- `isPrimaryDisplay`
-
-Current semantic rules:
-
-- `before` and `after` are required for every frame
-- `before` and `after` are the default primary display assets
-- `heatmap` is optional
-- `crop` and `misc` are optional
-
-</details>
-
-<details>
-<summary><strong>🛣️ Routing</strong></summary>
-
-### Internal site
-
-- `/`
-- `/upload`
-- `/cases/[caseSlug]`
-- `/cases/[caseSlug]/groups/[groupSlug]`
-- `POST /api/ops/group-upload-start`
-- `POST /api/ops/group-upload-frame-prepare`
-- `POST /api/ops/group-upload-frame-commit`
-- `POST /api/ops/group-upload-complete`
-- `POST /api/ops/group-upload-cancel`
-- `POST /api/ops/group-reorder`
-- `POST /api/ops/frame-reorder`
-- `POST /api/ops/case-publish`
-
-### Public site
-
-- `/g/[publicSlug]`
-
-The public site intentionally has no index page.
-
-</details>
-
-<details>
-<summary><strong>🖼️ Viewer Behavior</strong></summary>
-
-The shared viewer layout follows the agreed workbench structure:
-
-- top lightweight toolbar
-- central main stage
-- bottom filmstrip rail
-- collapsible right sidebar
-
-Supported v1 viewer modes:
-
-- `before-after`
-- `a-b`
-- `heatmap`
-
-Current heatmap degradation rules:
-
-- if a frame has no heatmap asset, the public site hides the heatmap entry
-- on the internal site, heatmap is shown as unavailable through state and sidebar information
-- if the current frame does not support heatmap, viewer mode falls back to `group.defaultMode`
-- if `group.defaultMode` also depends on heatmap, the final fallback is `before-after`
-
-Keyboard support currently includes:
-
-- left and right arrow for frame navigation
-- `1` for before/after
-- `2` for A/B
-- `3` for heatmap
-- `i` for sidebar toggle
-
-</details>
-
-<details>
-<summary><strong>📥 Detailed Upload Flow</strong></summary>
-
-The current recommended upload flow is browser scanning + worker generation + presigned object upload.
-
-1. `/upload` scans a local directory in the browser and builds a pairing plan.
-2. The pairing preview can rename alternate columns, reorder frames, and choose a global heatmap reference.
-3. A worker generates thumbnails and missing heatmaps without blocking the UI.
-4. `group-upload-start` creates or resumes a group upload job.
-5. Each frame runs `prepare -> presigned PUT upload -> commit`.
-6. `group-upload-complete` finalizes the group after every frame is committed.
-7. `group-upload-cancel` abandons an active job and deletes uncommitted pending prefixes.
-
-</details>
-
-<details>
-<summary><strong>📦 Detailed Publish Flow</strong></summary>
-
-The current publish flow is explicit and case-scoped.
-
-1. Internal site calls `POST /api/ops/case-publish`.
-2. The publish pipeline loads the full case and filters `group.isPublic`, `frame.isPublic`, and `asset.isPublic`.
-3. Each public group gets a stable `publicSlug`. If it does not exist yet, it is derived from `caseSlug--groupSlug`. Collisions add a short suffix.
-4. A `manifest.json` with `schemaVersion` and absolute public S3 image URLs is written for each published group.
-5. `pnpm public:export` builds a fresh static public bundle and mirrors it into `MAGIC_COMPARE_PUBLIC_EXPORT_DIR`.
-6. `pnpm public:deploy` optionally uploads that bundle to Cloudflare Pages through Wrangler.
-
-Important current rule:
-
-- a public frame without both `before` and `after` causes publish to fail
-
-</details>
-
-<details>
-<summary><strong>🛠️ Local Development Details</strong></summary>
-
-### 1. Install dependencies
-
-```bash
-pnpm install
-```
-
-### 2. Start the internal site
-
-```bash
-pnpm dev
-```
-
-Note:
-
-- startup runs `dev:doctor` and calls `apps/internal-site/prisma/init-db.ts` directly
-- Prisma remains the runtime ORM
-- development output uses `.next-dev`; builds and type checks use `.next`, so they can run concurrently
-- Playwright uses `.next-e2e`, so browser smoke tests do not stop or overwrite a running development server
-
-### 3. Repair demo content when needed
-
-```bash
-# Ensure MAGIC_COMPARE_S3_* is configured in .env before seeding
-pnpm dev:bootstrap
-```
-
-### 4. Develop the internal and public sites together
-
-Start both sites with one command:
-
-```bash
-pnpm dev:all
-```
-
-Suggested local URLs:
-
-- internal site: `http://localhost:3000`
-- public site: `http://localhost:3001` or another port if you launch it separately
-
-</details>
-
-<details>
-<summary><strong>🧪 Build, Test, and Useful Commands</strong></summary>
-
-| Task                                    | Command               |
-| --------------------------------------- | --------------------- |
-| Build both apps                         | `pnpm build`          |
-| Run the complete pre-commit check       | `pnpm check`          |
-| Run all tests                           | `pnpm test`           |
-| Run local browser smoke tests           | `pnpm test:e2e`       |
-| Run workspace type checks               | `pnpm typecheck`      |
-| Start the internal site quickly         | `pnpm dev`            |
-| Repair demo and start the internal site | `pnpm dev:bootstrap`  |
-| Check the development environment       | `pnpm dev:doctor all` |
-| Start both sites                        | `pnpm dev:all`        |
-| Start internal site                     | `pnpm dev:internal`   |
-| Start public site                       | `pnpm dev:public`     |
-| Initialize SQLite                       | `pnpm db:push`        |
-| Seed demo content                       | `pnpm db:seed`        |
-| Export public static site               | `pnpm public:export`  |
-| Deploy public static site               | `pnpm public:deploy`  |
-
-Build everything:
-
-```bash
-pnpm build
-```
-
-Run all tests:
-
-```bash
-pnpm test
-```
-
-Run workspace type checks:
-
-```bash
-pnpm typecheck
-```
-
-</details>
-
-## 🧾 Demo Assets and Published Bundle
-
-The repository includes a checked-in published demo bundle:
-
-- `content/published/groups/demo-grain-study--banding-check/manifest.json`
-- corresponding SVG assets in the same directory
-
-This is used for:
-
-- public-site static generation
-- local verification of the publish artifact shape
-- seed/bootstrap reference content
-
-## ⚠️ Current Limitations
-
-- Prisma migrations are not yet wired; SQLite bootstrap is currently implemented through a manual init script.
-- The public site still consumes published artifacts from the same repository checkout before export.
-- Cloudflare Pages deploy assumes an existing Pages project and Wrangler-compatible credentials.
-- The Web uploader is the primary upload path, but it is still browser-first and currently optimized for Chrome / Edge directory selection.
-- There is no in-site discussion, scoring, annotation, or review workflow.
-
-## 🔗 Related Docs
-
-- [Web uploader guide (Simplified Chinese)](./docs/web-uploader.zh-CN.md)
-- [Demo vs real case/group flow (Simplified Chinese)](./docs/reference/demo-vs-real.zh-CN.md)
-- [Chinese root README](./README.zh-CN.md)
-
-## 🛣️ Roadmap
-
-- add a proper migration workflow once the Prisma schema engine issue is resolved in this environment
-- move internal assets from app public storage to object storage or a dedicated managed path
-- add richer error reporting for reorder and publish failures in the UI
-- add end-to-end tests around internal reorder and publish flows
-
-## 📄 License
-
-Released under the [MIT License](./LICENSE).
+## Common Commands
+
+| Task                       | Command              |
+| -------------------------- | -------------------- |
+| Start internal site        | `pnpm dev`           |
+| Start both sites           | `pnpm dev:all`       |
+| Repair demo and start      | `pnpm dev:bootstrap` |
+| Build both apps            | `pnpm build`         |
+| Run checks and tests       | `pnpm check`         |
+| Run browser smoke tests    | `pnpm test:e2e`      |
+| Initialize SQLite          | `pnpm db:push`       |
+| Seed demo content          | `pnpm db:seed`       |
+| Export public site         | `pnpm public:export` |
+| Deploy public site         | `pnpm public:deploy` |
+| Start local Docker runtime | `pnpm docker:dev:up` |
+
+## Configuration
+
+Copy `.env.example` to `.env`. Internal assets use S3-compatible storage; local Docker development uses the Compose configuration and named volumes. See the workflow guide for runtime, storage, and deployment details.
+
+## Related Docs
+
+- [Workflow and deployment guide](./docs/workflow-guide.md)
+- [Web uploader guide](./docs/web-uploader.zh-CN.md)
+- [API endpoint reference](./docs/reference/api-endpoints.zh-CN.md)
+- [Database architecture](./docs/reference/database-architecture.zh-CN.md)
+- [Demo vs real case/group flow](./docs/reference/demo-vs-real.zh-CN.md)
+- [UI/UX notes](./docs/uiux-todo.md)
+- [Commit guide](./docs/commit-guide.md)
+- [Chinese README](./README.zh-CN.md)
+
+## License
+
+Released under the [GNU General Public License v3.0](./LICENSE).
