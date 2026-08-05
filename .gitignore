@@ -16,6 +16,8 @@
 **/.next/
 /.next-dev/
 **/.next-dev/
+/.next-e2e/
+**/.next-e2e/
 /.nuxt/
 **/.nuxt/
 /out/

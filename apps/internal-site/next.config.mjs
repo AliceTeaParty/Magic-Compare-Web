@@ -14,9 +14,11 @@ const repoRoot = path.join(__dirname, "../..");
  * @returns {import("next").NextConfig}
  */
 export default function createNextConfig(phase) {
+  const developmentDistDir = process.env.MAGIC_COMPARE_NEXT_DIST_DIR?.trim() || ".next-dev";
+
   return {
     agentRules: false,
-    distDir: phase === PHASE_DEVELOPMENT_SERVER ? ".next-dev" : ".next",
+    distDir: phase === PHASE_DEVELOPMENT_SERVER ? developmentDistDir : ".next",
     env: resolveMagicCompareBuildEnv(repoRoot),
     outputFileTracingRoot: repoRoot,
     transpilePackages: [

@@ -34,13 +34,15 @@ export default defineConfig({
   ],
   webServer: [
     {
-      command: "pnpm --filter @magic-compare/internal-site dev",
+      command:
+        "pnpm --filter @magic-compare/internal-site db:push && pnpm --filter @magic-compare/internal-site exec next dev --port 3100",
       url: "http://localhost:3100",
       timeout: 120_000,
       reuseExistingServer: false,
       env: {
         ...inheritedEnvironment,
         PORT: "3100",
+        MAGIC_COMPARE_NEXT_DIST_DIR: ".next-e2e",
         DATABASE_URL: `file:${e2eDatabasePath}`,
         MAGIC_COMPARE_HIDE_DEMO: "true",
         MAGIC_COMPARE_S3_BUCKET: "",
@@ -56,6 +58,7 @@ export default defineConfig({
       reuseExistingServer: false,
       env: {
         ...inheritedEnvironment,
+        MAGIC_COMPARE_NEXT_DIST_DIR: ".next-e2e",
         MAGIC_COMPARE_HIDE_DEMO: "true",
         MAGIC_COMPARE_PUBLISHED_ROOT: e2ePublishedRoot,
       },

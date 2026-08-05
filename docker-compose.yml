@@ -1,6 +1,12 @@
 x-internal-site-common: &internal-site-common
   image: ${MAGIC_COMPARE_INTERNAL_SITE_IMAGE:-ghcr.io/aliceteaparty/magic-compare-web:latest}
+  init: true
   environment: &internal-site-environment
+    MALLOC_ARENA_MAX: ${MALLOC_ARENA_MAX:-2}
+    NODE_OPTIONS: ${MAGIC_COMPARE_SERVER_NODE_OPTIONS:---max-old-space-size=512}
+    MAGIC_COMPARE_PUBLIC_BUILD_NODE_OPTIONS: ${MAGIC_COMPARE_PUBLIC_BUILD_NODE_OPTIONS:---max-old-space-size=1024}
+    MAGIC_COMPARE_PUBLIC_BUILD_CPUS: ${MAGIC_COMPARE_PUBLIC_BUILD_CPUS:-2}
+    MAGIC_COMPARE_WRANGLER_NODE_OPTIONS: ${MAGIC_COMPARE_WRANGLER_NODE_OPTIONS:---max-old-space-size=512}
     DATABASE_URL: ${MAGIC_COMPARE_DOCKER_DATABASE_URL:-file:/app/data/sqlite/internal-site.db}
     MAGIC_COMPARE_HIDE_DEMO: ${MAGIC_COMPARE_HIDE_DEMO:-true}
     MAGIC_COMPARE_PUBLISHED_ROOT: ${MAGIC_COMPARE_PUBLISHED_ROOT:-/app/data/published}
@@ -71,9 +77,9 @@ services:
           "CMD",
           "node",
           "-e",
-          "fetch('http://127.0.0.1:3000').then((response) => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))",
+          "fetch('http://127.0.0.1:3000/api/healthz', { cache: 'no-store' }).then((response) => process.exit(response.status === 204 ? 0 : 1)).catch(() => process.exit(1))",
         ]
-      interval: 45s
+      interval: 90s
       timeout: 10s
       retries: 5
       start_period: 90s

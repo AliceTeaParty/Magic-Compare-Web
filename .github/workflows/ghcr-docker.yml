@@ -78,6 +78,18 @@ jobs:
           cache-from: type=gha,scope=ghcr-docker-amd64
           cache-to: type=gha,mode=max,scope=ghcr-docker-amd64
 
+      - name: Record runtime image size
+        run: |
+          image_size_bytes="$(docker image inspect magic-compare/internal-site:ci --format '{{.Size}}')"
+          largest_layer="$(docker history magic-compare/internal-site:ci --no-trunc --format '{{.Size}}' | sort -hr | head -n 1)"
+          {
+            echo "## Runtime Image Size"
+            echo
+            echo "- Total bytes: `$image_size_bytes`"
+            echo "- Largest layer: `$largest_layer`"
+            echo "- Measurement only; releases are not blocked by a size threshold."
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Start compose stack
         run: docker compose $CI_COMPOSE_ARGS up -d --no-build internal-site rustfs
 
@@ -111,7 +123,7 @@ jobs:
               fi
             fi
 
-            if curl -fsS http://127.0.0.1:3000 >/dev/null; then
+            if curl -fsS http://127.0.0.1:3000/api/healthz >/dev/null; then
               exit 0
             fi
             sleep 2
@@ -151,7 +163,7 @@ jobs:
             echo "- Compose files: \`docker-compose.yml\` + \`docker/ci.compose.override.yml\`"
             echo "- Runtime image target: \`${IMAGE_NAME}\`"
             echo "- Object storage: rustfs (minio-compatible) CI sidecar on port 9000"
-            echo "- Readiness probe: \`http://127.0.0.1:3000\`"
+            echo "- Readiness probe: \`http://127.0.0.1:3000/api/healthz\`"
             echo "- Demo seed: enabled (\`MAGIC_COMPARE_HIDE_DEMO=false\` plus CI S3 env)"
           } >> "$GITHUB_STEP_SUMMARY"
 

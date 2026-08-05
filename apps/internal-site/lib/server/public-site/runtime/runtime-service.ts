@@ -1,4 +1,5 @@
 import { cp, mkdir, readdir, rm } from "node:fs/promises";
+import { dirname } from "node:path";
 import type { PublicDeployStage } from "../../../public-deploy-job";
 import {
   CF_PAGES_BRANCH_ENV_NAME,
@@ -50,7 +51,7 @@ export interface PublicDeployObserver {
  * Mirrors the Next.js export into the configured publish directory so local exports and deploys can
  * target an arbitrary output root without teaching Next.js about that environment-specific path.
  */
-async function mirrorExportDirectory(sourceDir: string, targetDir: string): Promise<void> {
+export async function mirrorExportDirectory(sourceDir: string, targetDir: string): Promise<void> {
   if (sourceDir === targetDir) {
     return;
   }
@@ -58,13 +59,7 @@ async function mirrorExportDirectory(sourceDir: string, targetDir: string): Prom
   await rm(targetDir, { recursive: true, force: true });
   // Create the parent explicitly because deploy targets may point outside the app tree and `cp`
   // will not materialize missing ancestors for us.
-  await mkdir(new URL(`file://${targetDir}`).pathname.replace(/\/[^/]*$/, ""), {
-    recursive: true,
-  }).catch(async () =>
-    mkdir(targetDir.substring(0, targetDir.lastIndexOf("/")), {
-      recursive: true,
-    }),
-  );
+  await mkdir(dirname(targetDir), { recursive: true });
   await cp(sourceDir, targetDir, { recursive: true });
 }
 
@@ -104,7 +99,12 @@ async function performPublicExport(observer?: PublicDeployObserver): Promise<Pub
   const commandResult = await runCommand("pnpm", getPublicSiteBuildArgs(), getWorkspaceRoot(), {
     // Deploys started by `next dev` inherit NODE_ENV=development. A nested `next build` rejects
     // that mixed environment and can fail while prerendering Next's own metadata boundaries.
-    env: { NODE_ENV: "production" },
+    env: {
+      NODE_ENV: "production",
+      // The public build is transient and may use more heap than the idle internal-site server.
+      NODE_OPTIONS:
+        process.env.MAGIC_COMPARE_PUBLIC_BUILD_NODE_OPTIONS ?? "--max-old-space-size=1024",
+    },
     onOutput: (event) => observer?.onOutput?.({ source: "build", ...event }),
   });
   observer?.onStage?.("preparing");
@@ -184,6 +184,11 @@ export async function deployPublicSite(
       getWranglerPagesDeployArgs(exportResult.exportDir),
       getWorkspaceRoot(),
       {
+        env: {
+          NODE_ENV: "production",
+          NODE_OPTIONS:
+            process.env.MAGIC_COMPARE_WRANGLER_NODE_OPTIONS ?? "--max-old-space-size=512",
+        },
         onOutput: (event) => observer?.onOutput?.({ source: "wrangler", ...event }),
       },
     );

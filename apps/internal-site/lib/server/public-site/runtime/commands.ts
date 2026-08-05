@@ -16,6 +16,38 @@ export interface RunCommandOptions {
   onOutput?: (event: CommandOutputEvent) => void;
 }
 
+const OUTPUT_CAPTURE_LIMIT_BYTES = 64 * 1024;
+
+/** Retains a byte-bounded diagnostic tail so verbose builds cannot grow the server heap forever. */
+export function appendCommandOutputTail(
+  current: Buffer<ArrayBufferLike>,
+  chunk: Buffer<ArrayBufferLike> | string,
+): Buffer<ArrayBufferLike> {
+  const next = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+  if (next.byteLength >= OUTPUT_CAPTURE_LIMIT_BYTES) {
+    return next.subarray(next.byteLength - OUTPUT_CAPTURE_LIMIT_BYTES);
+  }
+
+  const combined = Buffer.concat([current, next]);
+  return combined.byteLength > OUTPUT_CAPTURE_LIMIT_BYTES
+    ? combined.subarray(combined.byteLength - OUTPUT_CAPTURE_LIMIT_BYTES)
+    : combined;
+}
+
+/** Signals the entire detached command group so pnpm cannot leave build workers behind. */
+function signalCommandTree(child: ReturnType<typeof spawn>, signal: NodeJS.Signals): void {
+  if (process.platform !== "win32" && child.pid) {
+    try {
+      process.kill(-child.pid, signal);
+      return;
+    } catch {
+      // The process may have exited between the signal and group lookup; fall back to the child.
+    }
+  }
+
+  child.kill(signal);
+}
+
 /**
  * Normalizes command names for Windows shells so runtime helpers can keep a single invocation path
  * for `pnpm` regardless of the host OS.
@@ -49,8 +81,8 @@ export function getWranglerPagesDeployArgs(exportDir: string): string[] {
 }
 
 /**
- * Captures stdout/stderr so deploy failures surface enough context in API responses instead of
- * forcing operators to rerun the command manually to see the real error.
+ * Captures bounded stdout/stderr tails for diagnostics and forwards container shutdown to every
+ * process in the transient build/deploy command group.
  */
 export async function runCommand(
   command: string,
@@ -61,35 +93,74 @@ export async function runCommand(
   return new Promise((resolve, reject) => {
     const child = spawn(commandName(command), args, {
       cwd,
+      detached: process.platform !== "win32",
       env: { ...process.env, ...options?.env },
       stdio: ["ignore", "pipe", "pipe"],
     });
 
-    let stdout = "";
-    let stderr = "";
+    let stdout: Buffer<ArrayBufferLike> = Buffer.alloc(0);
+    let stderr: Buffer<ArrayBufferLike> = Buffer.alloc(0);
+    let parentSignal: NodeJS.Signals | null = null;
+    let forceKillTimer: NodeJS.Timeout | null = null;
+
+    /** A parent signal is replayed after the child group exits so Next itself also shuts down. */
+    function forwardParentSignal(signal: NodeJS.Signals) {
+      if (parentSignal) {
+        return;
+      }
+
+      parentSignal = signal;
+      signalCommandTree(child, signal);
+      forceKillTimer = setTimeout(() => signalCommandTree(child, "SIGKILL"), 5_000);
+      forceKillTimer.unref();
+    }
+
+    const handleSigterm = () => forwardParentSignal("SIGTERM");
+    const handleSigint = () => forwardParentSignal("SIGINT");
+    process.once("SIGTERM", handleSigterm);
+    process.once("SIGINT", handleSigint);
+
+    function cleanup() {
+      process.removeListener("SIGTERM", handleSigterm);
+      process.removeListener("SIGINT", handleSigint);
+      if (forceKillTimer) {
+        clearTimeout(forceKillTimer);
+      }
+    }
 
     child.stdout.on("data", (chunk) => {
       const text = chunk.toString();
-      stdout += text;
+      stdout = appendCommandOutputTail(stdout, chunk);
       options?.onOutput?.({ stream: "stdout", text });
     });
 
     child.stderr.on("data", (chunk) => {
       const text = chunk.toString();
-      stderr += text;
+      stderr = appendCommandOutputTail(stderr, chunk);
       options?.onOutput?.({ stream: "stderr", text });
     });
 
-    child.on("error", reject);
+    child.on("error", (error) => {
+      cleanup();
+      reject(error);
+    });
     child.on("close", (code) => {
+      cleanup();
+      if (parentSignal) {
+        process.kill(process.pid, parentSignal);
+        return;
+      }
+
+      const stdoutText = stdout.toString("utf8");
+      const stderrText = stderr.toString("utf8");
       if (code === 0) {
-        resolve({ stdout, stderr });
+        resolve({ stdout: stdoutText, stderr: stderrText });
         return;
       }
 
       reject(
         new Error(
-          [`Command failed: ${command} ${args.join(" ")}`, stderr.trim(), stdout.trim()]
+          [`Command failed: ${command} ${args.join(" ")}`, stderrText.trim(), stdoutText.trim()]
             .filter(Boolean)
             .join("\n"),
         ),

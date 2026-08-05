@@ -222,8 +222,8 @@ compose 当前会做这些事：
 node apps/internal-site/node_modules/next/dist/bin/next start apps/internal-site --hostname 0.0.0.0
 ```
 
-- 默认 old-space 上限为 384MiB，容器内存和 swap 上限同为 1536MiB，`MALLOC_ARENA_MAX=2`
-- public-site 构建和 Wrangler 只在部署时启动，分别使用 1024MiB 和 384MiB old-space 上限
+- 常驻服务默认使用 512MiB old-space 和 `MALLOC_ARENA_MAX=2`；Compose 不设置容器级内存或 swap 硬上限，短时构建峰值可使用宿主机余量
+- public-site 构建固定使用 Next 16 的 Webpack builder，默认 2 个 worker、1024MiB old-space；Wrangler 使用 512MiB。两者均为按需子进程，任务结束后退出，相关参数可通过 `.env` 独立调整
 - `/api/healthz` 返回无缓存 `204`，健康检查每 90 秒调用一次，不查询 SQLite 或渲染页面
 
 ### 当前 Docker 里的持久化目录
