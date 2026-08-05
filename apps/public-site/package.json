@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "dev": "next dev --port 3001",
-    "build": "tsx --tsconfig ../../tsconfig.base.json ../../scripts/sync-published.ts && next build && tsx --tsconfig ../../tsconfig.base.json ../../scripts/write-public-route-aliases.ts",
+    "build": "tsx --tsconfig ../../tsconfig.base.json ../../scripts/sync-published.ts && next build --webpack && tsx --tsconfig ../../tsconfig.base.json ../../scripts/write-public-route-aliases.ts",
     "start": "serve out --listen 3001",
     "typecheck": "next typegen && tsc -p tsconfig.json --noEmit",
     "lint": "eslint . --config ../../eslint.config.mjs",

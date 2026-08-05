@@ -61,18 +61,20 @@
       "yaml@>=1.0.0 <1.10.3": "1.10.3"
     }
   },
-  "devDependencies": {
-    "@playwright/test": "^1.62.1",
+  "dependencies": {
     "@types/node": "^24.13.3",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",
+    "tsx": "^4.23.6",
+    "typescript": "^6.0.3",
+    "wrangler": "^4.118.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.62.1",
     "eslint": "^10.8.0",
     "eslint-plugin-react-hooks": "^7.1.1",
     "prettier": "^3.9.6",
-    "tsx": "^4.23.6",
-    "typescript": "^6.0.3",
     "typescript-eslint": "^8.66.0",
-    "vitest": "^4.1.10",
-    "wrangler": "^4.118.0"
+    "vitest": "^4.1.10"
   }
 }
