@@ -69,16 +69,10 @@ Magic Compare Web 是一个面向压制组图片对比展示场景的 monorepo�
 cp .env.example .env
 # 在 .env 中填写 S3-compatible 存储配置（Cloudflare R2 或自建 minio 等）
 pnpm install
-pnpm db:push
-pnpm db:seed
-pnpm public:export
-
-# terminal 1
-pnpm dev:internal
-
-# terminal 2
-pnpm dev:public
+pnpm dev
 ```
+
+本地工具链使用 Node `24.13.x` 和 pnpm `10.32.1`。`pnpm dev` 会检查环境、同步 SQLite schema 并启动 internal-site，不会上传或修复 demo。需要 demo 时运行 `pnpm dev:bootstrap`；需要同时联调公开站时运行 `pnpm dev:all`。
 
 根目录 `.env.example` 只服务于网站 / 运行时。Python uploader 使用自己独立的 `tools/uploader/.env.example`。
 
@@ -142,8 +136,8 @@ pnpm dev:public
 2. 按 `group.isPublic`、`frame.isPublic`、`asset.isPublic` 过滤 case 中可公开内容。
 3. 为每个公开 group 复用或生成稳定的 `publicSlug`。
 4. 为每个公开 group 写出带 `schemaVersion` 和公网 S3 图片绝对地址的 `manifest.json`。
-6. 在需要时触发 `pnpm public:export` 或 `POST /api/ops/public-export`，生成新的静态公开站点。
-7. 在需要时触发 `pnpm public:deploy` 或 `POST /api/ops/public-deploy`，直传到 Cloudflare Pages。
+5. 在需要时触发 `pnpm public:export` 或 `POST /api/ops/public-export`，生成新的静态公开站点。
+6. 在需要时触发 `pnpm public:deploy` 或 `POST /api/ops/public-deploy`，直传到 Cloudflare Pages。
 
 结果：
 
@@ -449,8 +443,8 @@ Asset 是挂在某个 frame 下的一个具体图片变体。
 2. 发布流程加载完整 case，并过滤 `group.isPublic`、`frame.isPublic` 与 `asset.isPublic`。
 3. 每个公开 group 都会获得稳定的 `publicSlug`。若此前不存在，则由 `caseSlug--groupSlug` 推导；若冲突则追加短后缀。
 4. 系统会为每个公开 group 写出带 `schemaVersion` 和公网 S3 图片绝对地址的 `manifest.json`。
-6. `pnpm public:export` 会生成新的公开静态站点，并镜像到 `MAGIC_COMPARE_PUBLIC_EXPORT_DIR`。
-7. `pnpm public:deploy` 会通过 Wrangler 把这份静态站点直传到 Cloudflare Pages。
+5. `pnpm public:export` 会生成新的公开静态站点，并镜像到 `MAGIC_COMPARE_PUBLIC_EXPORT_DIR`。
+6. `pnpm public:deploy` 会通过 Wrangler 把这份静态站点直传到 Cloudflare Pages。
 
 当前重要规则：
 
@@ -467,33 +461,31 @@ Asset 是挂在某个 frame 下的一个具体图片变体。
 pnpm install
 ```
 
-### 2. 初始化 SQLite
+### 2. 启动 internal-site
 
 ```bash
-pnpm db:push
+pnpm dev
 ```
 
 说明：
 
-- `pnpm db:push` 当前实际执行的是 `apps/internal-site/prisma/init-db.ts`
+- 启动前会运行 `dev:doctor` 并直接调用 `apps/internal-site/prisma/init-db.ts`
 - Prisma 仍然是运行时 ORM
-- 这样做是因为当前本地环境里 `prisma db push` 自身会失败，因此先用这个方式完成 SQLite 初始化
+- 开发缓存写到 `.next-dev`，`pnpm build` 和 `pnpm typecheck` 使用 `.next`，两者可以同时运行
 
-### 3. 写入 demo 数据
+### 3. 需要时修复 demo 数据
 
 ```bash
 # 确保 .env 中的 MAGIC_COMPARE_S3_* 已配置好对象存储
-pnpm db:seed
-pnpm public:export
+pnpm dev:bootstrap
 ```
 
-### 4. 启动 internal-site 和 public-site
+### 4. 联调 internal-site 和 public-site
 
-分别在两个终端中执行：
+一个命令同时启动两个站点：
 
 ```bash
-pnpm dev:internal
-pnpm dev:public
+pnpm dev:all
 ```
 
 建议本地访问地址：
@@ -506,17 +498,23 @@ pnpm dev:public
 <details>
 <summary><strong>🧪 构建、测试与常用命令</strong></summary>
 
-| 任务 | 命令 |
-| --- | --- |
-| 构建两个应用 | `pnpm build` |
-| 运行全部测试 | `pnpm test` |
-| 运行工作区类型检查 | `pnpm typecheck` |
-| 启动 internal-site | `pnpm dev:internal` |
-| 启动 public-site | `pnpm dev:public` |
-| 初始化 SQLite | `pnpm db:push` |
-| 写入 demo 数据 | `pnpm db:seed` |
-| 导出公开静态站 | `pnpm public:export` |
-| 部署到 Cloudflare Pages | `pnpm public:deploy` |
+| 任务                           | 命令                  |
+| ------------------------------ | --------------------- |
+| 构建两个应用                   | `pnpm build`          |
+| 运行提交前完整检查             | `pnpm check`          |
+| 运行全部测试                   | `pnpm test`           |
+| 运行本地浏览器冒烟             | `pnpm test:e2e`       |
+| 运行工作区类型检查             | `pnpm typecheck`      |
+| 快速启动 internal-site         | `pnpm dev`            |
+| 修复 demo 后启动 internal-site | `pnpm dev:bootstrap`  |
+| 检查开发环境                   | `pnpm dev:doctor all` |
+| 同时启动两个站点               | `pnpm dev:all`        |
+| 启动 internal-site             | `pnpm dev:internal`   |
+| 启动 public-site               | `pnpm dev:public`     |
+| 初始化 SQLite                  | `pnpm db:push`        |
+| 写入 demo 数据                 | `pnpm db:seed`        |
+| 导出公开静态站                 | `pnpm public:export`  |
+| 部署到 Cloudflare Pages        | `pnpm public:deploy`  |
 
 构建整个工作区：
 

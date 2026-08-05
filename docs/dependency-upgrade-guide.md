@@ -19,7 +19,9 @@
 | Wrangler / Motion              | `4.118.0` / `12.43.0`          |
 | AWS S3 client / presigner      | `3.1103.0`                     |
 
-`@types/node` 保持 Node 24 版本线。TypeScript 7、Prisma 7 和 pnpm 11 属于后续独立迁移，不进入常规补丁更新。
+本地、CI 与 Docker 统一使用 Node `24.13.x`，pnpm 固定为 `10.32.1`，`@types/node` 保持 Node 24 版本线。TypeScript 7、Prisma 7 和 pnpm 11 属于后续独立迁移，不进入常规补丁更新。
+
+Next 开发缓存固定为 `.next-dev`，生产构建缓存为 `.next`。应用类型检查使用 `next typegen + tsc`；依赖升级验证时不需要为了类型检查停止开发服务器。
 
 ## 拆分顺序
 

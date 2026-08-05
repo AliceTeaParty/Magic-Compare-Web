@@ -69,16 +69,10 @@ This repository is deliberately not a video previewer, not an online VapourSynth
 cp .env.example .env
 # Fill in MAGIC_COMPARE_S3_* in .env with your S3-compatible storage (Cloudflare R2 or self-hosted minio etc.)
 pnpm install
-pnpm db:push
-pnpm db:seed
-pnpm public:export
-
-# terminal 1
-pnpm dev:internal
-
-# terminal 2
-pnpm dev:public
+pnpm dev
 ```
+
+Local tooling uses Node `24.13.x` and pnpm `10.32.1`. `pnpm dev` checks the environment, synchronizes the SQLite schema, and starts the internal site without uploading or repairing demo data. Use `pnpm dev:bootstrap` when the demo needs repair, or `pnpm dev:all` for two-site development.
 
 The root `.env.example` is only for the website/runtime side. The Python uploader keeps its own template at `tools/uploader/.env.example`.
 
@@ -142,8 +136,8 @@ Result:
 2. Filter `group.isPublic`, `frame.isPublic`, and `asset.isPublic` for the selected case.
 3. Derive or reuse a stable `publicSlug` for each public group.
 4. Write a `manifest.json` with `schemaVersion` and absolute public S3 image URLs for each published group.
-6. Trigger `pnpm public:export` or `POST /api/ops/public-export` when you want a fresh static public bundle.
-7. Trigger `pnpm public:deploy` or `POST /api/ops/public-deploy` when you want a direct Cloudflare Pages upload.
+5. Trigger `pnpm public:export` or `POST /api/ops/public-export` when you want a fresh static public bundle.
+6. Trigger `pnpm public:deploy` or `POST /api/ops/public-deploy` when you want a direct Cloudflare Pages upload.
 
 Result:
 
@@ -443,8 +437,8 @@ The current publish flow is explicit and case-scoped.
 2. The publish pipeline loads the full case and filters `group.isPublic`, `frame.isPublic`, and `asset.isPublic`.
 3. Each public group gets a stable `publicSlug`. If it does not exist yet, it is derived from `caseSlug--groupSlug`. Collisions add a short suffix.
 4. A `manifest.json` with `schemaVersion` and absolute public S3 image URLs is written for each published group.
-6. `pnpm public:export` builds a fresh static public bundle and mirrors it into `MAGIC_COMPARE_PUBLIC_EXPORT_DIR`.
-7. `pnpm public:deploy` optionally uploads that bundle to Cloudflare Pages through Wrangler.
+5. `pnpm public:export` builds a fresh static public bundle and mirrors it into `MAGIC_COMPARE_PUBLIC_EXPORT_DIR`.
+6. `pnpm public:deploy` optionally uploads that bundle to Cloudflare Pages through Wrangler.
 
 Important current rule:
 
@@ -461,33 +455,31 @@ Important current rule:
 pnpm install
 ```
 
-### 2. Initialize SQLite
+### 2. Start the internal site
 
 ```bash
-pnpm db:push
+pnpm dev
 ```
 
 Note:
 
-- `pnpm db:push` currently runs `apps/internal-site/prisma/init-db.ts`
+- startup runs `dev:doctor` and calls `apps/internal-site/prisma/init-db.ts` directly
 - Prisma remains the runtime ORM
-- this workaround exists because `prisma db push` itself fails in the current local environment
+- development output uses `.next-dev`; builds and type checks use `.next`, so they can run concurrently
 
-### 3. Seed demo content
+### 3. Repair demo content when needed
 
 ```bash
 # Ensure MAGIC_COMPARE_S3_* is configured in .env before seeding
-pnpm db:seed
-pnpm public:export
+pnpm dev:bootstrap
 ```
 
-### 4. Start internal and public sites
+### 4. Develop the internal and public sites together
 
-In separate terminals:
+Start both sites with one command:
 
 ```bash
-pnpm dev:internal
-pnpm dev:public
+pnpm dev:all
 ```
 
 Suggested local URLs:
@@ -500,17 +492,23 @@ Suggested local URLs:
 <details>
 <summary><strong>🧪 Build, Test, and Useful Commands</strong></summary>
 
-| Task | Command |
-| --- | --- |
-| Build both apps | `pnpm build` |
-| Run all tests | `pnpm test` |
-| Run workspace type checks | `pnpm typecheck` |
-| Start internal site | `pnpm dev:internal` |
-| Start public site | `pnpm dev:public` |
-| Initialize SQLite | `pnpm db:push` |
-| Seed demo content | `pnpm db:seed` |
-| Export public static site | `pnpm public:export` |
-| Deploy public static site | `pnpm public:deploy` |
+| Task                                    | Command               |
+| --------------------------------------- | --------------------- |
+| Build both apps                         | `pnpm build`          |
+| Run the complete pre-commit check       | `pnpm check`          |
+| Run all tests                           | `pnpm test`           |
+| Run local browser smoke tests           | `pnpm test:e2e`       |
+| Run workspace type checks               | `pnpm typecheck`      |
+| Start the internal site quickly         | `pnpm dev`            |
+| Repair demo and start the internal site | `pnpm dev:bootstrap`  |
+| Check the development environment       | `pnpm dev:doctor all` |
+| Start both sites                        | `pnpm dev:all`        |
+| Start internal site                     | `pnpm dev:internal`   |
+| Start public site                       | `pnpm dev:public`     |
+| Initialize SQLite                       | `pnpm db:push`        |
+| Seed demo content                       | `pnpm db:seed`        |
+| Export public static site               | `pnpm public:export`  |
+| Deploy public static site               | `pnpm public:deploy`  |
 
 Build everything:
 

@@ -15,6 +15,10 @@
 多数命令是普通 pnpm workspace 习惯，只列容易误解或本仓库特有的入口：
 
 ```bash
+pnpm dev                   # 快速启动 internal-site，不自动 seed
+pnpm dev:bootstrap         # 修复 demo 数据与素材后启动 internal-site
+pnpm dev:doctor all        # 检查 Node/pnpm、端口、SQLite、S3 与公开内容
+pnpm dev:all               # 同时启动 internal-site 3000 与 public-site 3001
 pnpm dev:internal          # internal-site，本地 http://localhost:3000
 pnpm dev:public            # public-site，本地 http://localhost:3001
 pnpm db:push               # 不是 prisma db push；实际运行 internal-site/prisma/init-db.ts
@@ -23,6 +27,8 @@ pnpm public:export         # 显式导出 public-site 到静态目录
 pnpm public:deploy         # 显式导出并上传 Cloudflare Pages
 pnpm mcp:doctor            # 检查 mcp-vector-search 本地环境
 pnpm mcp:search -- "<query>"
+pnpm check                 # format、lint、typecheck、Vitest
+pnpm test:e2e              # 本地 Chromium 冒烟，不属于默认 CI
 ```
 
 验证按影响范围选择：
@@ -36,6 +42,10 @@ pnpm lint
 pnpm test
 pnpm typecheck
 ```
+
+`pnpm format:check` 只检查当前变更；需要查看全仓库既有格式欠账时使用 `pnpm format:check:all`。
+
+Next 开发服务器使用各应用的 `.next-dev`，生产构建、Docker 与公开部署使用 `.next`。不要为了运行 `pnpm build` 或 `pnpm typecheck` 停止开发服务器。
 
 ## 架构边界
 

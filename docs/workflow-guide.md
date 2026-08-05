@@ -171,16 +171,21 @@ pnpm db:seed
 ```bash
 cp .env.example .env
 pnpm install
-pnpm db:push
-pnpm dev:internal
+pnpm dev
 ```
 
 当前行为：
 
-- `pnpm dev:internal` 总会先执行 `db:push`
-- 只有当 demo 未隐藏且外部 S3/R2 配置齐全时，才会继续 `db:seed`
+- `pnpm dev` 先检查 Node/pnpm、端口、SQLite 与 S3 配置，再直接执行幂等 schema sync
+- 默认启动不会 seed，也不会向远端对象存储重复上传 demo 素材
+- 需要创建或修复 demo 时使用 `pnpm dev:bootstrap`
+- `pnpm dev:all` 同时启动 internal-site 3000 和 public-site 3001；单站仍可使用 `dev:internal`、`dev:public`
 
-如果没有配置外部对象存储，internal-site 仍可启动，但不会自动补 demo 图片数据。
+如果没有配置外部对象存储，doctor 会警告，internal-site 仍可用于 Case 管理；上传、素材检查和发布需要完整 S3/R2 配置。
+
+两个应用的 Next 开发产物写入 `.next-dev`。`pnpm build`、`pnpm typecheck`、Docker 构建和公开部署继续使用 `.next`，因此生产构建不再删除运行中开发服务器的缓存。类型检查使用 `next typegen + tsc`，不会执行页面数据收集和静态导出。
+
+提交前使用 `pnpm check` 统一执行格式检查、lint、类型检查和 Vitest。本地 Chromium 冒烟测试使用 `pnpm test:e2e`；它使用隔离 SQLite 与固定公开 manifest，不进入默认 CI。
 
 ## Docker 生产运行的真实路径
 
@@ -572,7 +577,7 @@ pnpm docker:build:internal
 等价于：
 
 ```bash
-docker build -f docker/internal-site.Dockerfile -t magic-compare/internal-site .
+docker build --platform linux/amd64 -f docker/internal-site.Dockerfile -t magic-compare/internal-site .
 ```
 
 `ghcr-docker.yml` 当前建议分成两段：
