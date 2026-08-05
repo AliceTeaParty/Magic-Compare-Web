@@ -23,6 +23,7 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
+import { useRootScrollLock } from "@magic-compare/ui";
 import { useRouter } from "next/navigation";
 import type { CaseWorkspaceData } from "@/lib/server/repositories/content-repository";
 import type { AppNotificationTone } from "../notifications/use-app-notifications";
@@ -86,6 +87,7 @@ export function CaseSettingsPane({
   const [tagsText, setTagsText] = useState(data.tags.join(", "));
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [isPending, startTransition] = useTransition();
+  useRootScrollLock(open);
   const tags = tagsText
     .split(",")
     .map((tag) => tag.trim())
@@ -294,6 +296,8 @@ export function CaseSettingsPane({
         anchor="right"
         open={open}
         onClose={closeSettings}
+        // The shared root lock keeps the workspace stable and supports the nested delete dialog.
+        ModalProps={{ disableScrollLock: true }}
         sx={{ display: { lg: "none" } }}
         slotProps={{
           paper: {

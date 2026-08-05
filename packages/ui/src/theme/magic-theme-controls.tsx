@@ -83,6 +83,8 @@ export function MagicThemeControls({ compact = false }: { compact?: boolean }) {
         open={Boolean(anchor)}
         anchorEl={anchor}
         onClose={() => setAnchor(null)}
+        // The theme keeps anchored overlays scroll-neutral; this documents the palette's contract.
+        disableScrollLock
         anchorOrigin={{
           vertical: compact ? "top" : "bottom",
           horizontal: compact ? "right" : "right",

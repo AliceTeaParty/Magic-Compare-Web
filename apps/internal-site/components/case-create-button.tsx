@@ -13,6 +13,7 @@ import {
   TextField,
 } from "@mui/material";
 import { cjkKebabCase } from "@magic-compare/shared-utils";
+import { useRootScrollLock } from "@magic-compare/ui";
 import { useRouter } from "next/navigation";
 import { AppNotifications } from "./notifications/app-notifications";
 import { useAppNotifications } from "./notifications/use-app-notifications";
@@ -40,6 +41,7 @@ export function CaseCreateButton({ navigation = false }: { navigation?: boolean 
   const normalizedSlug = normalizeSlug(slug);
   const hasSummaryError = summary.length > CASE_SUMMARY_MAX_LENGTH;
   const canSubmit = Boolean(normalizedTitle && normalizedSlug && !hasSummaryError);
+  useRootScrollLock(open);
 
   function resetDraft() {
     // Blank drafts prevent a fast double click from creating a generic, hard-to-identify Case.
@@ -105,6 +107,8 @@ export function CaseCreateButton({ navigation = false }: { navigation?: boolean 
       <Dialog
         open={open}
         onClose={closeDialog}
+        // The shared root lock keeps the catalog width fixed while this modal blocks background scroll.
+        disableScrollLock
         fullWidth
         maxWidth="sm"
         slotProps={{

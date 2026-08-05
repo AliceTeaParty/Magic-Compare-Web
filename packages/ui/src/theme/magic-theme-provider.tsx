@@ -264,6 +264,10 @@ function LegacyMagicThemeProvider({ children }: PropsWithChildren) {
             },
           },
         },
+        MuiPopover: {
+          // Public viewer selectors are anchored overlays and must leave page scrolling unchanged.
+          defaultProps: { disableScrollLock: true },
+        },
         MuiMenu: {
           styleOverrides: {
             paper: {
@@ -598,6 +602,10 @@ function buildInternalTheme(seedValue: string) {
         styleOverrides: {
           paper: { borderRadius: 16, backgroundColor: "var(--mui-palette-surface-containerHigh)" },
         },
+      },
+      MuiPopover: {
+        // Anchored menus and pickers must not alter the page scrollbar or shift the app shell.
+        defaultProps: { disableScrollLock: true },
       },
       MuiMenu: {
         styleOverrides: {

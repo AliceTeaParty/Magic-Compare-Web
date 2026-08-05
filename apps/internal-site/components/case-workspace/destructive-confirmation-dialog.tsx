@@ -9,6 +9,7 @@ import {
   DialogContentText,
   DialogTitle,
 } from "@mui/material";
+import { useRootScrollLock } from "@magic-compare/ui";
 
 /** Keeps Case and Group deletion on the same explicit M3 hierarchy and pending behavior. */
 export function DestructiveConfirmationDialog({
@@ -26,12 +27,16 @@ export function DestructiveConfirmationDialog({
   open: boolean;
   title: string;
 }) {
+  useRootScrollLock(open);
+
   return (
     <Dialog
       open={open}
       onClose={() => {
         if (!loading) onCancel();
       }}
+      // The shared root lock prevents nested deletion dialogs from adding another body offset.
+      disableScrollLock
       maxWidth="xs"
       fullWidth
     >
