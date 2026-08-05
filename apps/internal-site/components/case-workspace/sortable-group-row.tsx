@@ -30,7 +30,7 @@ import type { CaseWorkspaceData } from "@/lib/server/repositories/content-reposi
 import { inlineEditTextSx } from "./inline-edit-text-sx";
 
 type GroupItem = CaseWorkspaceData["groups"][number];
-const GROUP_TITLE_MAX_LENGTH = 16;
+const GROUP_TITLE_MAX_LENGTH = 20;
 const GROUP_DESCRIPTION_MAX_LENGTH = 40;
 const metadataChipSx = {
   height: 30,
