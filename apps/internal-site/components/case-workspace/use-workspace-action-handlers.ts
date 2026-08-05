@@ -3,7 +3,6 @@ import type { TransitionStartFunction } from "react";
 import type { CaseWorkspaceData } from "@/lib/server/repositories/content-repository";
 import {
   deleteWorkspaceGroup,
-  deployWorkspacePublicSite,
   type NotificationApi,
   reorderWorkspaceGroups,
   toggleWorkspaceGroupVisibility,
@@ -24,23 +23,19 @@ export function useWorkspaceActionHandlers({
   caseSummary,
   data,
   groups,
-  isDeployingPublicSite,
   notifications,
   refresh,
   setCaseSummary,
   setGroups,
-  setIsDeployingPublicSite,
   startTransition,
 }: {
   caseSummary: string;
   data: CaseWorkspaceData;
   groups: GroupItem[];
-  isDeployingPublicSite: boolean;
   notifications: NotificationApi;
   refresh: () => void;
   setCaseSummary: (nextSummary: string) => void;
   setGroups: (updater: GroupItem[] | ((current: GroupItem[]) => GroupItem[])) => void;
-  setIsDeployingPublicSite: (nextState: boolean) => void;
   startTransition: TransitionStartFunction;
 }) {
   const groupsRef = useRef(groups);
@@ -79,18 +74,6 @@ export function useWorkspaceActionHandlers({
   }
 
   /**
-   * Keeps deploy single-flight on the client as well as the server lock so repeated taps do not
-   * spam Cloudflare deploys before the first request has even left the browser.
-   */
-  function deployPublicSite() {
-    deployWorkspacePublicSite({
-      ...mutationContext,
-      isDeployingPublicSite,
-      setIsDeployingPublicSite,
-    });
-  }
-
-  /**
    * Mirrors drag-and-drop order optimistically and rolls back on failure so the workspace stays
    * responsive while still preserving the server as the source of truth.
    */
@@ -116,7 +99,6 @@ export function useWorkspaceActionHandlers({
   return {
     publicGroupCount,
     toggleGroupVisibility,
-    deployPublicSite,
     reorderCaseGroups,
     updateCaseSummary,
     updateGroupMetadata,

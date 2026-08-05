@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import {
   CloudSyncOutlined,
   CloudUploadOutlined,
+  DashboardOutlined,
   FolderCopyOutlined,
   Menu,
 } from "@mui/icons-material";
@@ -18,17 +19,24 @@ import {
   Stack,
   Toolbar,
   Typography,
+  useMediaQuery,
 } from "@mui/material";
-import { MagicThemeControls } from "@magic-compare/ui";
+import { MagicThemeControls, useRootScrollLock } from "@magic-compare/ui";
 import { usePathname } from "next/navigation";
 import { CaseCreateButton } from "./case-create-button";
-import { NAV_EXTENDED_WIDTH, NAV_RAIL_WIDTH } from "./internal-layout-constants";
+import {
+  NAV_RAIL_MEDIA_QUERY,
+  NAV_RAIL_MIN_WIDTH,
+  NAV_RAIL_WIDTH,
+} from "./internal-layout-constants";
 import { InternalNavigationItem } from "./internal-navigation-item";
 import { InternalRouteTransition } from "./internal-route-transition";
+import { AppNotifications } from "./notifications/app-notifications";
+import { useAppNotifications } from "./notifications/use-app-notifications";
 import {
-  CaseDeployNavigationActionContext,
-  type CaseDeployNavigationAction,
-} from "./internal-shell-actions";
+  notifyBrowserDeploySuccess,
+  requestBrowserDeployNotificationPermission,
+} from "./case-workspace/browser-deploy-notifications";
 
 const destinations = [
   { href: "/", label: "Case", icon: <FolderCopyOutlined /> },
@@ -36,20 +44,30 @@ const destinations = [
 ] as const;
 
 function isDestinationActive(pathname: string, href: string) {
-  if (href === "/") return pathname === "/" || pathname.startsWith("/cases/");
+  if (href === "/") return pathname === "/";
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
-/** Uses one navigation model for the modal drawer, rail, and extended rail. */
+/** Returns the current Case workspace path while preserving the route's encoded slug. */
+function getCurrentCaseWorkspaceHref(pathname: string) {
+  const caseSlug = pathname.match(/^\/cases\/([^/]+)/)?.[1];
+  return caseSlug ? `/cases/${caseSlug}` : null;
+}
+
+/** Uses one navigation model for the modal drawer and compact desktop rail. */
 function NavigationContent({
-  caseDeployAction,
+  isDeployingPublicSite,
+  onDeployPublicSite,
   pathname,
   onNavigate,
 }: {
-  caseDeployAction: CaseDeployNavigationAction | null;
+  isDeployingPublicSite: boolean;
+  onDeployPublicSite: () => void;
   pathname: string;
   onNavigate?: () => void;
 }) {
+  const currentCaseWorkspaceHref = getCurrentCaseWorkspaceHref(pathname);
+
   return (
     <Stack sx={{ height: "100%", minHeight: 0 }}>
       <Box
@@ -58,9 +76,10 @@ function NavigationContent({
           alignItems: "center",
           // The compact rail has no wordmark, so its logo must be centered in the full 80px
           // column. The modal drawer gets a real leading inset instead of touching the viewport.
-          justifyContent: { xs: "flex-start", sm: "center", md: "flex-start" },
+          justifyContent: "flex-start",
           height: 72,
-          px: { xs: 2, sm: 0, md: 2 },
+          px: 2,
+          [NAV_RAIL_MEDIA_QUERY]: { justifyContent: "center", px: 0 },
         }}
       >
         <Box
@@ -80,16 +99,21 @@ function NavigationContent({
         </Box>
         <Typography
           variant="subtitle1"
-          sx={{ ml: 1.25, display: { xs: "block", sm: "none", md: "block" }, whiteSpace: "nowrap" }}
+          sx={{
+            ml: 1.25,
+            display: "block",
+            whiteSpace: "nowrap",
+            [NAV_RAIL_MEDIA_QUERY]: { display: "none" },
+          }}
         >
           Magic Compare
         </Typography>
       </Box>
 
-      <List sx={{ px: { xs: 1, sm: 0.75, md: 1 }, py: 1 }}>
-        {destinations.map((destination) => {
+      <List sx={{ px: 1, py: 1, [NAV_RAIL_MEDIA_QUERY]: { px: 0.75 } }}>
+        {destinations.flatMap((destination) => {
           const selected = isDestinationActive(pathname, destination.href);
-          return (
+          const destinationItem = (
             <InternalNavigationItem
               key={destination.href}
               href={destination.href}
@@ -99,41 +123,57 @@ function NavigationContent({
               onClick={onNavigate}
             />
           );
+
+          if (destination.href !== "/") return [destinationItem];
+
+          // Workspace keeps a stable slot just like deployment. Without a current Case it remains
+          // visible but unavailable; Case descendants enable the same destination in place.
+          return [
+            destinationItem,
+            <InternalNavigationItem
+              key="current-case-workspace"
+              disabled={!currentCaseWorkspaceHref}
+              href={currentCaseWorkspaceHref ?? undefined}
+              icon={<DashboardOutlined />}
+              label="工作区"
+              selected={
+                Boolean(currentCaseWorkspaceHref) &&
+                (pathname === currentCaseWorkspaceHref ||
+                  pathname.startsWith(`${currentCaseWorkspaceHref}/`))
+              }
+              onClick={onNavigate}
+              title={currentCaseWorkspaceHref ? "当前 Case 工作区" : "进入 Case 后可打开工作区"}
+            />,
+          ];
         })}
         <CaseCreateButton navigation />
-        {caseDeployAction ? (
-          <InternalNavigationItem
-            disabled={caseDeployAction.disabled}
-            icon={
-              caseDeployAction.loading ? (
-                <CircularProgress color="inherit" size={20} thickness={5} />
-              ) : (
-                <CloudSyncOutlined />
-              )
-            }
-            label="部署"
-            onClick={() => {
-              caseDeployAction.onClick();
-              onNavigate?.();
-            }}
-            title={caseDeployAction.disabledReason || "部署 Pages"}
-          />
-        ) : null}
+        {/* Deployment is a site-wide operation, so current-route Group data must not affect its
+            position or availability. Only an active request temporarily disables repeat input. */}
+        <InternalNavigationItem
+          disabled={isDeployingPublicSite}
+          emphasized={!isDeployingPublicSite}
+          icon={
+            isDeployingPublicSite ? (
+              <CircularProgress color="inherit" size={20} thickness={5} />
+            ) : (
+              <CloudSyncOutlined />
+            )
+          }
+          label="部署"
+          onClick={() => {
+            onDeployPublicSite();
+            onNavigate?.();
+          }}
+          title={isDeployingPublicSite ? "正在部署 Pages" : "部署 Pages"}
+        />
       </List>
 
-      <Stack spacing={1.25} sx={{ mt: "auto", p: { xs: 1.5, sm: 1, md: 1.5 } }}>
+      <Stack spacing={1} sx={{ mt: "auto", p: 1.5, [NAV_RAIL_MEDIA_QUERY]: { p: 1 } }}>
         <Divider />
-        <Typography
-          variant="caption"
-          color="text.secondary"
-          sx={{ display: { xs: "block", sm: "none", md: "block" }, px: 0.5 }}
-        >
-          外观
-        </Typography>
-        <Box sx={{ display: { xs: "block", sm: "none", md: "block" } }}>
+        <Box sx={{ display: "block", [NAV_RAIL_MEDIA_QUERY]: { display: "none" } }}>
           <MagicThemeControls />
         </Box>
-        <Box sx={{ display: { xs: "none", sm: "block", md: "none" } }}>
+        <Box sx={{ display: "none", [NAV_RAIL_MEDIA_QUERY]: { display: "block" } }}>
           <MagicThemeControls compact />
         </Box>
       </Stack>
@@ -144,26 +184,65 @@ function NavigationContent({
 /** Provides one adaptive scaffold so route changes replace content without moving global chrome. */
 export function InternalAppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+  const railVisible = useMediaQuery(`(min-width:${NAV_RAIL_MIN_WIDTH}px)`);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [caseDeployAction, setCaseDeployAction] = useState<CaseDeployNavigationAction | null>(null);
+  const [isDeployingPublicSite, setIsDeployingPublicSite] = useState(false);
+  const { dismissNotification, notifications, pushNotification } = useAppNotifications();
+  const mobileDrawerOpen = mobileOpen && !railVisible;
+  useRootScrollLock(mobileDrawerOpen);
+
+  useEffect(() => {
+    // Crossing the content-driven rail breakpoint must not leave the modal drawer over the page.
+    if (railVisible) setMobileOpen(false);
+  }, [railVisible]);
+
+  /** Deploys the full published site without coupling availability to whichever route is open. */
+  async function deployPublicSite() {
+    if (isDeployingPublicSite) return;
+
+    requestBrowserDeployNotificationPermission();
+    setIsDeployingPublicSite(true);
+    pushNotification("正在部署公开站点…", "info", {
+      key: "public-site-deploying",
+      sticky: true,
+    });
+
+    try {
+      // Omitting caseId preserves every published Case and avoids treating the current route as
+      // the deployment source of truth.
+      const response = await fetch("/api/ops/public-deploy", { method: "POST" });
+      const result = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(result?.error || "部署公开站点失败。");
+      }
+
+      const projectName = result?.projectName || "Cloudflare Pages";
+      pushNotification(`已部署到 ${projectName}。`, "success");
+      notifyBrowserDeploySuccess(projectName);
+    } catch (error) {
+      pushNotification(error instanceof Error ? error.message : "部署公开站点失败。", "error");
+    } finally {
+      dismissNotification("public-site-deploying");
+      setIsDeployingPublicSite(false);
+    }
+  }
 
   return (
-    <CaseDeployNavigationActionContext.Provider value={setCaseDeployAction}>
+    <>
       <Box
         sx={{
           minHeight: "100vh",
           display: "grid",
-          gridTemplateColumns: {
-            xs: "minmax(0, 1fr)",
-            sm: `${NAV_RAIL_WIDTH}px minmax(0, 1fr)`,
-            md: `${NAV_EXTENDED_WIDTH}px minmax(0, 1fr)`,
+          gridTemplateColumns: "minmax(0, 1fr)",
+          [NAV_RAIL_MEDIA_QUERY]: {
+            gridTemplateColumns: `${NAV_RAIL_WIDTH}px minmax(0, 1fr)`,
           },
         }}
       >
         <Box
           component="nav"
           sx={{
-            display: { xs: "none", sm: "block" },
+            display: "none",
             position: "sticky",
             top: 0,
             height: "100vh",
@@ -172,25 +251,36 @@ export function InternalAppShell({ children }: { children: ReactNode }) {
             borderColor: "divider",
             backgroundColor: "var(--mui-palette-surface-containerLow)",
             transition: "background-color 250ms cubic-bezier(0.2, 0, 0, 1)",
+            [NAV_RAIL_MEDIA_QUERY]: { display: "block" },
           }}
         >
-          <NavigationContent caseDeployAction={caseDeployAction} pathname={pathname} />
+          <NavigationContent
+            isDeployingPublicSite={isDeployingPublicSite}
+            onDeployPublicSite={() => void deployPublicSite()}
+            pathname={pathname}
+          />
         </Box>
 
         <Drawer
-          open={mobileOpen}
+          open={mobileDrawerOpen}
           onClose={() => setMobileOpen(false)}
+          // The shared root lock avoids MUI's body padding while preserving modal scroll blocking.
+          ModalProps={{ keepMounted: true, disableScrollLock: true }}
           slotProps={{
             paper: {
               sx: {
                 width: "min(84vw, 304px)",
+                overflowX: "hidden",
+                borderTopRightRadius: "16px",
+                borderBottomRightRadius: "16px",
                 backgroundColor: "var(--mui-palette-surface-containerLow)",
               },
             },
           }}
         >
           <NavigationContent
-            caseDeployAction={caseDeployAction}
+            isDeployingPublicSite={isDeployingPublicSite}
+            onDeployPublicSite={() => void deployPublicSite()}
             pathname={pathname}
             onNavigate={() => setMobileOpen(false)}
           />
@@ -202,20 +292,21 @@ export function InternalAppShell({ children }: { children: ReactNode }) {
             elevation={0}
             color="transparent"
             sx={{
-              display: { xs: "block", sm: "none" },
+              display: "block",
               height: 56,
               borderBottom: "1px solid",
               borderColor: "divider",
               // A fully opaque app bar prevents scrolling content from bleeding into text and icons at
               // the viewport edge, which was especially visible in the narrow workbench layout.
               backgroundColor: "var(--mui-palette-surface-container)",
+              [NAV_RAIL_MEDIA_QUERY]: { display: "none" },
             }}
           >
             <Toolbar disableGutters sx={{ minHeight: "56px !important", px: 1.5 }}>
               <IconButton
                 aria-label="打开导航"
                 onClick={() => setMobileOpen(true)}
-                sx={{ display: { xs: "inline-flex", sm: "none" }, mr: 0.75 }}
+                sx={{ mr: 0.75 }}
               >
                 <Menu />
               </IconButton>
@@ -227,6 +318,7 @@ export function InternalAppShell({ children }: { children: ReactNode }) {
           <InternalRouteTransition>{children}</InternalRouteTransition>
         </Box>
       </Box>
-    </CaseDeployNavigationActionContext.Provider>
+      <AppNotifications notifications={notifications} onDismiss={dismissNotification} />
+    </>
   );
 }

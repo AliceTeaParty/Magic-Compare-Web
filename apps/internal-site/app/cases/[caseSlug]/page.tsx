@@ -2,7 +2,6 @@ import { notFound } from "next/navigation";
 import { CaseWorkspaceBoard } from "@/components/case-workspace-board";
 import { InternalPageShell } from "@/components/internal-page-shell";
 import { getCaseWorkspace } from "@/lib/server/repositories/content-repository";
-import { isCloudflarePagesDeployConfigured } from "@/lib/server/runtime-config";
 
 export const dynamic = "force-dynamic";
 
@@ -20,7 +19,7 @@ export default async function CaseWorkspacePage({
 
   return (
     <InternalPageShell>
-      <CaseWorkspaceBoard data={data} canDeployPublicSite={isCloudflarePagesDeployConfigured()} />
+      <CaseWorkspaceBoard data={data} />
     </InternalPageShell>
   );
 }

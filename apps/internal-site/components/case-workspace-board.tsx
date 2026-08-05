@@ -14,18 +14,11 @@ import { WorkspaceNotifications } from "./case-workspace/notifications";
 import { SortableGroupRow } from "./case-workspace/sortable-group-row";
 import { useCaseWorkspaceActions } from "./case-workspace/use-case-workspace-actions";
 import { useWorkspaceNotifications } from "./case-workspace/use-workspace-notifications";
-import { useCaseDeployNavigationAction } from "./internal-shell-actions";
 
 type GroupItem = CaseWorkspaceData["groups"][number];
 
 /** Organizes Group review and Case settings as an M3 primary/supporting pane layout. */
-export function CaseWorkspaceBoard({
-  data,
-  canDeployPublicSite,
-}: {
-  data: CaseWorkspaceData;
-  canDeployPublicSite: boolean;
-}) {
+export function CaseWorkspaceBoard({ data }: { data: CaseWorkspaceData }) {
   const router = useRouter();
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
   const [groups, setGroups] = useState(data.groups);
@@ -39,9 +32,7 @@ export function CaseWorkspaceBoard({
   const { dismissNotification, notifications, pushNotification } = workspaceNotifications;
   const {
     publicGroupCount,
-    isDeployingPublicSite,
     toggleGroupVisibility,
-    deployPublicSite,
     reorderCaseGroups,
     updateGroupMetadata,
     deleteGroup,
@@ -63,21 +54,6 @@ export function CaseWorkspaceBoard({
     setCaseSummary(data.summary);
     setCaseTags(data.tags);
   }, [data.summary, data.tags, data.title]);
-
-  const deployUnavailableReason = !canDeployPublicSite
-    ? "配置 Cloudflare Pages 环境后才能部署。"
-    : publicGroupCount === 0
-      ? "至少公开一个 Group 后才能部署。"
-      : "";
-
-  // Deployment belongs to the persistent navigation; the workspace only owns its live state and
-  // mutation handler so route-specific server data does not leak into the app shell.
-  useCaseDeployNavigationAction({
-    disabled: isPending || isDeployingPublicSite || !canDeployPublicSite || publicGroupCount === 0,
-    disabledReason: deployUnavailableReason,
-    loading: isDeployingPublicSite,
-    onClick: deployPublicSite,
-  });
 
   function handleGroupDragEnd(activeId: string, overId: string | null) {
     reorderCaseGroups(activeId, overId);

@@ -1,10 +1,6 @@
 import type { MutableRefObject, TransitionStartFunction } from "react";
 import { arrayMove } from "@dnd-kit/sortable";
 import type { CaseWorkspaceData } from "@/lib/server/repositories/content-repository";
-import {
-  notifyBrowserDeploySuccess,
-  requestBrowserDeployNotificationPermission,
-} from "./browser-deploy-notifications";
 import type { WorkspaceNotificationTone } from "./use-workspace-notifications";
 
 type GroupItem = CaseWorkspaceData["groups"][number];
@@ -128,39 +124,6 @@ function runOptimisticGroupMutation<T>({
       pushWorkspaceError(context.notifications, error, fallbackErrorMessage);
     } finally {
       context.notifications.dismissWorkspaceSavingNotification();
-    }
-  });
-}
-
-/**
- * Publishing and deploy actions do not need optimistic state, but they still share the same
- * transition-wrapped request and notification pattern.
- */
-function runWorkspaceMutation<T>({
-  onError,
-  onFinally,
-  onSuccess,
-  request,
-  startTransition,
-}: {
-  onError?: (error: unknown) => void;
-  onFinally?: () => void;
-  onSuccess?: (result: T) => void;
-  request: () => Promise<T>;
-  startTransition: TransitionStartFunction;
-}) {
-  runWorkspaceTransition(startTransition, async () => {
-    try {
-      const result = await request();
-      onSuccess?.(result);
-    } catch (error) {
-      onError?.(error);
-      if (!onError) {
-        throw error;
-      }
-      return;
-    } finally {
-      onFinally?.();
     }
   });
 }
@@ -368,53 +331,6 @@ export function deleteWorkspaceGroup(
         groupSlug: targetGroup.slug,
       }),
     context,
-  });
-}
-
-/**
- * Deploy remains single-flight on the client as well as the server lock so repeated taps cannot
- * queue duplicate Cloudflare deploys before the first request leaves the browser.
- */
-export function deployWorkspacePublicSite({
-  data,
-  isDeployingPublicSite,
-  notifications,
-  setIsDeployingPublicSite,
-  startTransition,
-}: WorkspaceMutationContext & {
-  isDeployingPublicSite: boolean;
-  setIsDeployingPublicSite: (nextState: boolean) => void;
-}) {
-  if (isDeployingPublicSite) {
-    return;
-  }
-
-  requestBrowserDeployNotificationPermission();
-  setIsDeployingPublicSite(true);
-  notifications.pushNotification(
-    "Republishing this case and deploying a fresh public export to Cloudflare Pages...",
-    "info",
-    {
-      key: "workspace-deploying-public-site",
-      sticky: true,
-    },
-  );
-
-  runWorkspaceMutation({
-    onError: (error) => pushWorkspaceError(notifications, error, "Failed to deploy public site."),
-    onFinally: () => {
-      notifications.dismissNotification("workspace-deploying-public-site");
-      setIsDeployingPublicSite(false);
-    },
-    onSuccess: (result: { projectName: string }) => {
-      notifications.pushNotification(
-        `Deployed fresh static export to Cloudflare Pages project ${result.projectName}.`,
-        "success",
-      );
-      notifyBrowserDeploySuccess(result.projectName);
-    },
-    request: async () => postJson("/api/ops/public-deploy", { caseId: data.id }),
-    startTransition,
   });
 }
 
