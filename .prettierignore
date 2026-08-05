@@ -4,8 +4,7 @@
 .next-e2e/
 out/
 dist/
-playwright-report/
-test-results/
+output/
 build/
 
 # Dependencies

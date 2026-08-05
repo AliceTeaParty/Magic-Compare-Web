@@ -8,14 +8,19 @@ const inheritedEnvironment = Object.fromEntries(
       entry[1] !== undefined && entry[0] !== "FORCE_COLOR" && entry[0] !== "NO_COLOR",
   ),
 );
-const e2eDatabasePath = path.join(workspaceRoot, "tmp", "e2e", `internal-site-${process.pid}.db`);
+const playwrightOutputRoot = path.join(workspaceRoot, "output", "playwright");
+const e2eDatabasePath = path.join(playwrightOutputRoot, "e2e", `internal-site-${process.pid}.db`);
 const e2ePublishedRoot = path.join(workspaceRoot, "tests", "e2e", "fixtures", "published");
 
 export default defineConfig({
   testDir: "./tests/e2e",
   fullyParallel: false,
   workers: 1,
-  reporter: [["list"], ["html", { open: "never" }]],
+  outputDir: path.join(playwrightOutputRoot, "test-results"),
+  reporter: [
+    ["list"],
+    ["html", { open: "never", outputFolder: path.join(playwrightOutputRoot, "playwright-report") }],
+  ],
   use: {
     trace: "retain-on-failure",
     screenshot: "only-on-failure",

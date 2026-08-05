@@ -183,7 +183,7 @@ pnpm dev
 
 两个应用的 Next 开发产物写入 `.next-dev`。`pnpm build`、`pnpm typecheck`、Docker 构建和公开部署继续使用 `.next`，因此生产构建不再删除运行中开发服务器的缓存。类型检查使用 `next typegen + tsc`，不会执行页面数据收集和静态导出。
 
-提交前使用 `pnpm check` 统一执行格式检查、lint、类型检查和 Vitest。本地 Chromium 冒烟测试使用 `pnpm test:e2e`；它使用隔离 SQLite、固定公开 manifest 和 `.next-e2e`，可以在日常 `.next-dev` 服务器运行时执行，不进入默认 CI。
+提交前使用 `pnpm check` 统一执行格式检查、lint、类型检查和 Vitest。本地 Chromium 冒烟测试使用 `pnpm test:e2e`；它使用 `output/playwright/e2e` 下的隔离 SQLite、固定公开 manifest 和 `.next-e2e`，报告与附件写入 `output/playwright/`，可以在日常 `.next-dev` 服务器运行时执行，不进入默认 CI。
 
 ## Docker 生产运行的真实路径
 
