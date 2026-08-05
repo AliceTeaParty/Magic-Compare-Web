@@ -170,7 +170,7 @@ Code quality refresh focused on refactoring, API robustness, and comprehensive t
 - Added comprehensive API endpoint tests for `case-publish`, `public-export`, `public-deploy`, `frame-reorder`, `group-reorder`, and `group-upload-frame-commit` routes (78+ new test cases).
 - Added `withApiRoute()` wrapper to centralize error handling, authentication, validation, and response formatting across all 15 `/api/ops/*` routes.
 - Added package-level READMEs for `@magic-compare/compare-core`, `@magic-compare/content-schema`, `@magic-compare/shared-utils`, and `@magic-compare/ui`.
-- Added [docs/optimize.md](docs/optimize.md) to document code quality audit results, refactoring priorities, and resolved technical debt.
+- Added [docs/archive/optimize-2026-03-31.md](docs/archive/optimize-2026-03-31.md) to document code quality audit results, refactoring priorities, and resolved technical debt.
 
 ### Changed
 
@@ -443,7 +443,7 @@ First stable release of Magic Compare Web with a production-ready internal/publi
 - Configurable global footer with env-driven author, year range, and optional `Join us` link.
 - Persistent `Open details` state across internal and public viewer shells.
 - Bottom-right workspace notification center for publish, deploy, reorder, and visibility feedback.
-- UI improvement records under `docs/ui-improvements/` to preserve viewer and workspace interaction lessons.
+- UI improvement records under `docs/archive/` preserve viewer and workspace interaction lessons.
 
 ### Changed
 

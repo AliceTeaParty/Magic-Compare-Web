@@ -28,6 +28,7 @@
 | `POST /api/ops/case-update`                | 修改 case summary                              |
 | `POST /api/ops/case-delete`                | 删除空 case                                    |
 | `POST /api/ops/case-publish`               | 重新发布一个 case 下当前可公开的 group         |
+| `POST /api/ops/group-viewer`               | 返回单个 group 的 viewer dataset               |
 | `POST /api/ops/group-update`               | 修改 group 标题和描述                          |
 | `POST /api/ops/group-visibility`           | 切换 group 的 `isPublic` 状态                  |
 | `POST /api/ops/group-delete`               | 删除一个 group 及其桶内图像前缀、已发布 bundle |
@@ -290,6 +291,56 @@
 - 这个接口会把 case 的 `status` 设为 `published`，并写入 `publishedAt`。
 
 ## Group / Frame 工作区端点
+
+### `POST /api/ops/group-viewer`
+
+实现：`apps/internal-site/app/api/ops/group-viewer/route.ts`
+
+请求体：
+
+```json
+{
+  "caseSlug": "2026",
+  "groupSlug": "test-group"
+}
+```
+
+成功响应：
+
+```json
+{
+  "dataset": {
+    "caseMeta": {
+      "slug": "2026",
+      "title": "2026",
+      "summary": "",
+      "tags": [],
+      "status": "internal",
+      "publishedAt": null
+    },
+    "group": {
+      "id": "group-1",
+      "slug": "test-group",
+      "title": "Test Group",
+      "description": "",
+      "defaultMode": "before-after",
+      "tags": [],
+      "isPublic": false,
+      "frames": []
+    },
+    "siblingGroups": [],
+    "publishStatus": {
+      "status": "internal"
+    }
+  }
+}
+```
+
+说明：
+
+- 这是只读接口，供 internal-site 的 Group viewer 导航加载另一组 dataset，不修改数据库或发布状态。
+- `caseSlug` 和 `groupSlug` 必须为非空字符串；校验失败返回 `400`。
+- 找不到对应 group 时返回 `404` 和 `{ "error": "Group not found." }`。
 
 ### `POST /api/ops/group-update`
 

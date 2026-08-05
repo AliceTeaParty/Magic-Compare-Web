@@ -15,7 +15,7 @@
 | 提交/分支规范                            | [commit-guide.md](commit-guide.md)                                                   |
 | MCP 工具使用优先级                       | [mcp-usage-guide.md](mcp-usage-guide.md)                                             |
 | 跟踪当前 Web 站点 UI/UX 待办             | [uiux-todo.md](uiux-todo.md)                                                         |
-| 代码质量体检报告与重构追踪               | [optimize.md](optimize.md)                                                           |
+| 内部工作台 UI 设计基线                   | [internal-ui-design-system.md](internal-ui-design-system.md)                         |
 
 ## 文档分层
 
@@ -28,7 +28,7 @@
 - [commit-guide.md](commit-guide.md) — 提交粒度、分支规则、message 格式
 - [mcp-usage-guide.md](mcp-usage-guide.md) — MCP 工具分工与使用原则
 - [uiux-todo.md](uiux-todo.md) — 当前 Web 站点 UI/UX 审计后的可勾选待办清单
-- [optimize.md](optimize.md) — 代码质量体检报告，按风险/收益排序的重构任务追踪
+- [internal-ui-design-system.md](internal-ui-design-system.md) — 内部工作台的 Material Design 3 / MUI 设计基线
 
 ### 时效性参考（需随代码同步更新）
 
@@ -46,6 +46,7 @@
 - [archive/2026-03-26-r2-frame-upload-rewrite-notes.zh-CN.md](archive/2026-03-26-r2-frame-upload-rewrite-notes.zh-CN.md)
 - [archive/2026-03-28-maintainability-cleanup-notes.zh-CN.md](archive/2026-03-28-maintainability-cleanup-notes.zh-CN.md)
 - [archive/2026-03-28-uploader-progress-and-throughput-notes.zh-CN.md](archive/2026-03-28-uploader-progress-and-throughput-notes.zh-CN.md)
+- [archive/optimize-2026-03-31.md](archive/optimize-2026-03-31.md)
 - [archive/uploader-frontend-roadmap-2026-03-21.zh-CN.md](archive/uploader-frontend-roadmap-2026-03-21.zh-CN.md)
 - [archive/ci-ghcr-lessons.zh-CN.md](archive/ci-ghcr-lessons.zh-CN.md)
 - [archive/browser-smoke-and-ci-prep.zh-CN.md](archive/browser-smoke-and-ci-prep.zh-CN.md)

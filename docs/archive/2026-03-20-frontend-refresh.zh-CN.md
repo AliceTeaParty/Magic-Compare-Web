@@ -2,19 +2,19 @@
 
 这份文档记录本轮整站色系、布局、viewer 交互与移动端优化开始前的已知状态，作为后续实现和回归检查的依据。
 
-## 当前 docs 列表
+## 相关文档（当前路径）
 
-- `docs/uploader/vseditor-workflow.zh-CN.md`
-- `docs/demo-vs-real-case-flow.zh-CN.md`
+- `docs/web-uploader.zh-CN.md`
+- `docs/reference/demo-vs-real.zh-CN.md`
 - `docs/mcp-usage-guide.md`
-- `docs/project-overview-guide.md`
-- `docs/ui-improvements/2026-03-20-viewer-stage-and-filmstrip-notes.zh-CN.md`
+- `docs/workflow-guide.md`
+- `docs/archive/2026-03-20-viewer-stage-and-filmstrip-notes.zh-CN.md`
 
 ## 本轮已读取并作为约束的文档
 
-- `docs/project-overview-guide.md`
-- `docs/ui-improvements/2026-03-20-viewer-stage-and-filmstrip-notes.zh-CN.md`
-- `docs/demo-vs-real-case-flow.zh-CN.md`
+- `docs/workflow-guide.md`
+- `docs/archive/2026-03-20-viewer-stage-and-filmstrip-notes.zh-CN.md`
+- `docs/reference/demo-vs-real.zh-CN.md`
 
 ## 当前前端状态
 

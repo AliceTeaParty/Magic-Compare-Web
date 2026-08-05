@@ -3,7 +3,7 @@
 本文档约束本仓库开发时的 MCP 使用顺序与查询策略。
 目标是先证据后实现，减少凭记忆编码和重复造轮子。
 
-> 最近核对：2026-06-27，`mcp-vector-search version 4.1.14 (build 401)`。
+> 最近核对：2026-06-27
 
 ## 目标
 
@@ -25,25 +25,6 @@
 - `pnpm mcp:search -- "<query>"`：走语义搜索，适合先找现有实现。当前 CLI 默认使用 hybrid search、query expansion、MMR 和 rerank；如结果过散，可加 `-- --files "*.ts"`、`-- --language typescript`、`-- --no-rerank` 或 `-- --search-mode bm25` 做收窄。
 - `pnpm mcp:complexity`：快速看当前热点文件/函数。复杂度评级只是重构候选线索，不是 P 级优先级或验收标准。
 - `pnpm mcp:dead-code`：做一轮死代码候选排查。删除前必须用 `rg`、类型检查、测试和实际调用链复核。
-
-## mcp-vector-search 当前可用重点
-
-`mcp-vector-search` 更新较快；参数以本机 `--help` 为准。当前 4.1.14 版本中，常用入口包括：
-
-```bash
-mcp-vector-search setup
-mcp-vector-search search "error handling"
-mcp-vector-search search --files "*.tsx" --language typescript "viewer stage image loading"
-mcp-vector-search search --similar "packages/ui/src/viewer/workbench/viewer-stage.tsx" --json --limit 5
-mcp-vector-search analyze complexity --top 20
-mcp-vector-search analyze complexity --changed-only --top 20
-mcp-vector-search analyze complexity --json > analysis.json
-mcp-vector-search analyze dead-code
-mcp-vector-search index kg
-mcp-vector-search kg calls "<function_name>"
-mcp-vector-search visualize
-mcp-vector-search wiki
-```
 
 ## 使用原则
 

@@ -1,7 +1,7 @@
 # 2026-03-28 上传体验与吞吐优化记录
 
 这份记录保存本轮 uploader 体验优化时确认过的取舍和经验。  
-它是临时设计记忆，不代替 `docs/workflow-guide.md` 或 `docs/uploader/README.md` 里的当前规范。
+它是临时设计记忆，不代替 `docs/workflow-guide.md` 或 `docs/web-uploader.zh-CN.md` 里的当前规范。
 
 ## 为什么只给 wizard 做复杂进度
 
