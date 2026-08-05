@@ -1,4 +1,8 @@
 import type {
+  UploadStreamFrameDescriptor,
+  UploadStreamSourceAssetDescriptor,
+} from "@/lib/server/uploads/contracts";
+import type {
   GeneratedUploadAsset,
   GeneratedUploadFile,
   GeneratedUploadFrame,
@@ -14,6 +18,16 @@ interface WorkerUploadFile {
   blob: Blob;
 }
 
+interface WorkerPreflightResult {
+  assetKey: string;
+  width: number;
+  height: number;
+  extension: string;
+  contentType: string;
+  sha256: string;
+  size: number;
+}
+
 interface WorkerAssetResult {
   assetKey: string;
   width: number;
@@ -24,6 +38,7 @@ interface WorkerAssetResult {
 }
 
 type WorkerResponse =
+  | { type: "preflight-complete"; requestId: string; result: WorkerPreflightResult }
   | { type: "asset-complete"; requestId: string; result: WorkerAssetResult }
   | { type: "asset-error"; requestId: string; assetKey: string; error: string };
 
@@ -33,11 +48,31 @@ export interface GenerationProgress {
   label: string;
 }
 
-export interface GenerateUploadFrameOptions {
-  generateMissingHeatmap?: boolean;
-  heatmapReferenceLabel?: string;
+export interface PreflightedUploadFrame {
+  plan: WebUploadFramePlan;
+  descriptor: UploadStreamFrameDescriptor;
+  sources: Map<
+    string,
+    {
+      asset: WebUploadAssetPlan;
+      preflight: WorkerPreflightResult;
+    }
+  >;
+}
+
+export interface PreflightUploadOptions {
+  heatmapReferenceLabel: string;
   signal?: AbortSignal;
 }
+
+export interface GenerateUploadFrameOptions {
+  signal?: AbortSignal;
+  onProgress?: (progress: GenerationProgress) => void;
+}
+
+// Upload stays serial until the upload workspace redesign can expose an explicit 1/2/3 Worker
+// choice without adding another temporary control to the current page.
+export const WEB_UPLOAD_WORKER_CONCURRENCY = 1;
 
 function workerUploadFileToGenerated(file: WorkerUploadFile): GeneratedUploadFile {
   return {
@@ -55,17 +90,15 @@ function createWorker() {
   });
 }
 
-/**
- * Serializes asset generation through one worker so large heatmap/canvas jobs do not saturate
- * memory or compete with React rendering on slower operator machines.
- */
+/** Owns one worker and rejects pending work when upload pause/dispose terminates it. */
 class WebUploadAssetWorkerClient {
   private readonly worker = createWorker();
   private readonly pending = new Map<
     string,
     {
-      resolve: (result: WorkerAssetResult) => void;
+      resolve: (result: WorkerAssetResult | WorkerPreflightResult) => void;
       reject: (error: Error) => void;
+      cleanup: () => void;
     }
   >();
   private requestCounter = 0;
@@ -74,48 +107,219 @@ class WebUploadAssetWorkerClient {
     this.worker.addEventListener("message", (event: MessageEvent<WorkerResponse>) => {
       const payload = event.data;
       const request = this.pending.get(payload.requestId);
-      if (!request) {
-        return;
-      }
+      if (!request) return;
 
       this.pending.delete(payload.requestId);
-      if (payload.type === "asset-complete") {
-        request.resolve(payload.result);
-      } else {
+      request.cleanup();
+      if (payload.type === "asset-error") {
         request.reject(new Error(payload.error));
+      } else {
+        request.resolve(payload.result);
       }
     });
   }
 
-  dispose() {
+  dispose(error = new DOMException("Upload generation was abandoned.", "AbortError")) {
     this.worker.terminate();
+    for (const request of this.pending.values()) {
+      request.cleanup();
+      request.reject(error);
+    }
     this.pending.clear();
+  }
+
+  private request<T extends WorkerAssetResult | WorkerPreflightResult>(
+    payload: Record<string, unknown>,
+    signal?: AbortSignal,
+  ): Promise<T> {
+    if (signal?.aborted) {
+      return Promise.reject(new DOMException("Upload generation was abandoned.", "AbortError"));
+    }
+    const requestId = `asset-${this.requestCounter}`;
+    this.requestCounter += 1;
+    return new Promise<T>((resolve, reject) => {
+      const abort = () => {
+        const request = this.pending.get(requestId);
+        if (!request) return;
+        this.pending.delete(requestId);
+        request.cleanup();
+        reject(new DOMException("Upload generation was abandoned.", "AbortError"));
+      };
+      const cleanup = () => signal?.removeEventListener("abort", abort);
+      signal?.addEventListener("abort", abort, { once: true });
+      this.pending.set(requestId, {
+        resolve: (result) => resolve(result as T),
+        reject,
+        cleanup,
+      });
+      this.worker.postMessage({ ...payload, requestId });
+    });
+  }
+
+  preflightAsset(assetKey: string, original: File, signal?: AbortSignal) {
+    return this.request<WorkerPreflightResult>(
+      { type: "preflight-asset", assetKey, original },
+      signal,
+    );
   }
 
   generateAsset(params: {
     assetKey: string;
     original: File;
+    preflight: WorkerPreflightResult;
     heatmapBefore?: File;
     heatmapAfter?: File;
+    signal?: AbortSignal;
   }) {
-    const requestId = `${params.assetKey}-${this.requestCounter}`;
-    this.requestCounter += 1;
-    return new Promise<WorkerAssetResult>((resolve, reject) => {
-      this.pending.set(requestId, { resolve, reject });
-      this.worker.postMessage({
+    return this.request<WorkerAssetResult>(
+      {
         type: "generate-asset",
-        requestId,
         assetKey: params.assetKey,
         original: params.original,
+        preflight: params.preflight,
         heatmapBefore: params.heatmapBefore,
         heatmapAfter: params.heatmapAfter,
-      });
-    });
+      },
+      params.signal,
+    );
   }
 }
 
+function plannedAssets(frame: WebUploadFramePlan) {
+  return [
+    { slot: "slot-001", asset: frame.before },
+    { slot: "slot-002", asset: frame.after },
+    ...(frame.heatmap ? [{ slot: "slot-003", asset: frame.heatmap }] : []),
+    ...frame.misc.map((asset, index) => ({
+      slot: `slot-${String(index + 4).padStart(3, "0")}`,
+      asset,
+    })),
+  ];
+}
+
+function selectedHeatmapSource(frame: WebUploadFramePlan, referenceLabel: string) {
+  const selected = plannedAssets(frame).find(
+    ({ asset }) =>
+      asset !== frame.before && asset.kind !== "heatmap" && asset.label === referenceLabel,
+  );
+  if (!selected) {
+    throw new Error(`${frame.title} 不存在 heatmap 参考列 ${referenceLabel}。`);
+  }
+  return selected;
+}
+
+function sourceDescriptor(
+  slot: string,
+  asset: WebUploadAssetPlan,
+  preflight: WorkerPreflightResult,
+): UploadStreamSourceAssetDescriptor {
+  return {
+    slot,
+    kind: asset.kind,
+    label: asset.label,
+    note: asset.note,
+    width: preflight.width,
+    height: preflight.height,
+    isPrimaryDisplay: asset.kind === "before" || asset.kind === "after",
+    original: {
+      extension: preflight.extension,
+      contentType: preflight.contentType,
+      sha256: preflight.sha256,
+      size: preflight.size,
+    },
+  };
+}
+
+/**
+ * Decodes, dimensions-checks, and hashes the complete source set before a server job can start.
+ * The result contains descriptors only, not derived thumbnail/heatmap blobs.
+ */
+export async function preflightUploadFrames(
+  frames: WebUploadFramePlan[],
+  onProgress: (progress: GenerationProgress) => void,
+  options: PreflightUploadOptions,
+): Promise<PreflightedUploadFrame[]> {
+  const tasks = frames.flatMap((frame) =>
+    plannedAssets(frame).map(({ slot, asset }) => ({ frame, slot, asset })),
+  );
+  const results = new Map<number, PreflightedUploadFrame["sources"]>();
+  const clients = Array.from(
+    { length: Math.min(WEB_UPLOAD_WORKER_CONCURRENCY, Math.max(1, tasks.length)) },
+    () => new WebUploadAssetWorkerClient(),
+  );
+  let cursor = 0;
+  let completed = 0;
+
+  try {
+    await Promise.all(
+      clients.map(async (client) => {
+        while (cursor < tasks.length) {
+          const task = tasks[cursor];
+          cursor += 1;
+          const preflight = await client.preflightAsset(
+            `${task.frame.order}:${task.slot}`,
+            task.asset.source.file,
+            options.signal,
+          );
+          const frameSources = results.get(task.frame.order) ?? new Map();
+          frameSources.set(task.slot, { asset: task.asset, preflight });
+          results.set(task.frame.order, frameSources);
+          completed += 1;
+          onProgress({ completed, total: tasks.length, label: task.asset.source.relativePath });
+        }
+      }),
+    );
+  } finally {
+    for (const client of clients) client.dispose();
+  }
+
+  return frames.map((frame) => {
+    const sources = results.get(frame.order);
+    if (!sources || sources.size !== plannedAssets(frame).length) {
+      throw new Error(`${frame.title} 的素材预检没有完整结束。`);
+    }
+    const before = sources.get("slot-001")!.preflight;
+    for (const { asset, preflight } of sources.values()) {
+      if (preflight.width !== before.width || preflight.height !== before.height) {
+        throw new Error(`${frame.title} 的 ${asset.label} 与 Before 尺寸不一致。`);
+      }
+    }
+
+    // Explicit heatmaps are already source assets and must not depend on a generated-heatmap
+    // reference column shared by unrelated frames.
+    const reference = frame.heatmap
+      ? null
+      : selectedHeatmapSource(frame, options.heatmapReferenceLabel);
+    if (
+      !frame.heatmap &&
+      (before.extension === ".svg" || sources.get(reference!.slot)!.preflight.extension === ".svg")
+    ) {
+      throw new Error(`${frame.title} 使用 SVG 时必须提供显式 heatmap。`);
+    }
+
+    return {
+      plan: frame,
+      sources,
+      descriptor: {
+        order: frame.order,
+        title: frame.title,
+        caption: frame.caption,
+        assets: plannedAssets(frame).map(({ slot, asset }) =>
+          sourceDescriptor(slot, asset, sources.get(slot)!.preflight),
+        ),
+        generatedHeatmap: frame.heatmap
+          ? null
+          : {
+              slot: "slot-003",
+              beforeSlot: "slot-001",
+              afterSlot: reference!.slot,
+            },
+      },
+    };
+  });
+}
+
 function generatedAsset(
-  frame: WebUploadFramePlan,
   asset: WebUploadAssetPlan,
   slot: string,
   result: WorkerAssetResult,
@@ -133,128 +337,66 @@ function generatedAsset(
   };
 }
 
-function generatedHeatmapAsset(
-  frame: WebUploadFramePlan,
-  heatmapAfter: WebUploadAssetPlan,
-  result: WorkerAssetResult,
-): GeneratedUploadAsset {
-  if (!result.heatmap) {
-    throw new Error(`${frame.title} 没有生成 heatmap。`);
-  }
-
-  return {
-    slot: "slot-003",
-    kind: "heatmap",
-    label: "Heatmap",
-    note: `Auto-generated from ${frame.before.source.relativePath} vs ${heatmapAfter.source.relativePath}`,
-    width: result.width,
-    height: result.height,
-    isPrimaryDisplay: false,
-    original: workerUploadFileToGenerated(result.heatmap),
-    thumbnail: workerUploadFileToGenerated(result.heatmap),
-  };
-}
-
-function heatmapAfterAsset(frame: WebUploadFramePlan, referenceLabel: string) {
-  const candidates = [frame.after, ...frame.misc];
-  const selected = candidates.find((asset) => asset.label === referenceLabel);
-  if (!selected) {
-    throw new Error(`${frame.title} 不存在 heatmap 参考列 ${referenceLabel}。`);
-  }
-  return selected;
-}
-
-/**
- * Produces the upload API frame payload while keeping Blob/File descriptors in a caller-owned
- * structure for direct presigned PUTs.
- */
-export async function generateUploadFrames(
-  frames: WebUploadFramePlan[],
-  onProgress: (progress: GenerationProgress) => void,
+/** Generates one preflighted frame in an isolated worker so pause can terminate CPU work. */
+export async function generateUploadFrame(
+  frame: PreflightedUploadFrame,
   options: GenerateUploadFrameOptions = {},
-) {
-  const generateMissingHeatmap = options.generateMissingHeatmap ?? true;
-  const heatmapReferenceLabel = options.heatmapReferenceLabel ?? "After";
+): Promise<GeneratedUploadFrame> {
   const worker = new WebUploadAssetWorkerClient();
-  const generatedFrames: GeneratedUploadFrame[] = [];
-  const total = frames.reduce(
-    (count, frame) =>
-      count + 2 + frame.misc.length + (frame.heatmap || generateMissingHeatmap ? 1 : 0),
-    0,
-  );
+  const planned = plannedAssets(frame.plan);
+  const total = planned.length + (frame.descriptor.generatedHeatmap ? 1 : 0);
   let completed = 0;
-
-  function tick(label: string) {
+  const tick = (label: string) => {
     completed += 1;
-    onProgress({ completed, total, label });
-  }
-
-  function throwIfAborted() {
-    if (options.signal?.aborted) {
-      throw new DOMException("Upload generation was abandoned.", "AbortError");
-    }
-  }
+    options.onProgress?.({ completed, total, label });
+  };
 
   try {
-    for (const frame of frames) {
-      throwIfAborted();
-      const beforeResult = await worker.generateAsset({
-        assetKey: `${frame.order}:before`,
-        original: frame.before.source.file,
+    const reference = frame.descriptor.generatedHeatmap
+      ? selectedHeatmapSource(
+          frame.plan,
+          frame.sources.get(frame.descriptor.generatedHeatmap.afterSlot)!.asset.label,
+        )
+      : null;
+    const assets: GeneratedUploadAsset[] = [];
+    for (const { slot, asset } of planned) {
+      const source = frame.sources.get(slot)!;
+      const shouldGenerateHeatmap = slot === "slot-002" && frame.descriptor.generatedHeatmap;
+      const result = await worker.generateAsset({
+        assetKey: `${frame.plan.order}:${slot}`,
+        original: asset.source.file,
+        preflight: source.preflight,
+        heatmapBefore: shouldGenerateHeatmap ? frame.plan.before.source.file : undefined,
+        heatmapAfter: shouldGenerateHeatmap ? reference!.asset.source.file : undefined,
+        signal: options.signal,
       });
-      throwIfAborted();
-      tick(`${frame.title} before`);
+      assets.push(generatedAsset(asset, slot, result));
+      tick(`${frame.plan.title} ${asset.label}`);
 
-      // The UI validates the global reference against every frame; this server-facing generation
-      // path still fails fast in case labels changed after the cached plan was built.
-      const selectedHeatmapAfter = heatmapAfterAsset(frame, heatmapReferenceLabel);
-      const afterResult = await worker.generateAsset({
-        assetKey: `${frame.order}:after`,
-        original: frame.after.source.file,
-        heatmapBefore: !frame.heatmap && generateMissingHeatmap ? frame.before.source.file : undefined,
-        heatmapAfter: !frame.heatmap && generateMissingHeatmap ? selectedHeatmapAfter.source.file : undefined,
-      });
-      throwIfAborted();
-      tick(`${frame.title} after`);
-
-      const assets: GeneratedUploadAsset[] = [
-        generatedAsset(frame, frame.before, "slot-001", beforeResult),
-        generatedAsset(frame, frame.after, "slot-002", afterResult),
-      ];
-
-      if (frame.heatmap) {
-        const heatmapResult = await worker.generateAsset({
-          assetKey: `${frame.order}:heatmap`,
-          original: frame.heatmap.source.file,
+      if (shouldGenerateHeatmap) {
+        if (!result.heatmap) throw new Error(`${frame.plan.title} 没有生成 heatmap。`);
+        assets.push({
+          slot: frame.descriptor.generatedHeatmap!.slot,
+          kind: "heatmap",
+          label: "Heatmap",
+          note: `Auto-generated from ${frame.plan.before.source.relativePath} vs ${reference!.asset.source.relativePath}`,
+          width: result.width,
+          height: result.height,
+          isPrimaryDisplay: false,
+          original: workerUploadFileToGenerated(result.heatmap),
+          thumbnail: workerUploadFileToGenerated(result.heatmap),
         });
-        throwIfAborted();
-        assets.push(generatedAsset(frame, frame.heatmap, "slot-003", heatmapResult));
-        tick(`${frame.title} heatmap`);
-      } else if (generateMissingHeatmap) {
-        assets.push(generatedHeatmapAsset(frame, selectedHeatmapAfter, afterResult));
-        tick(`${frame.title} heatmap`);
+        tick(`${frame.plan.title} Heatmap`);
       }
-
-      for (const [index, misc] of frame.misc.entries()) {
-        const miscResult = await worker.generateAsset({
-          assetKey: `${frame.order}:misc:${index}`,
-          original: misc.source.file,
-        });
-        throwIfAborted();
-        assets.push(generatedAsset(frame, misc, `slot-${String(index + 4).padStart(3, "0")}`, miscResult));
-        tick(`${frame.title} ${misc.label}`);
-      }
-
-      generatedFrames.push({
-        order: frame.order,
-        title: frame.title,
-        caption: frame.caption,
-        assets,
-      });
     }
+
+    return {
+      order: frame.plan.order,
+      title: frame.plan.title,
+      caption: frame.plan.caption,
+      assets: assets.sort((left, right) => left.slot.localeCompare(right.slot)),
+    };
   } finally {
     worker.dispose();
   }
-
-  return generatedFrames;
 }

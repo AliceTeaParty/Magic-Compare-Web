@@ -8,7 +8,9 @@ import {
   GroupUploadFramePrepareInputSchema,
   GroupUploadStartInputSchema,
   type UploadFrameDescriptor,
+  type UploadStreamFrameDescriptor,
   computeGroupUploadInputHash,
+  isStreamUploadInput,
 } from "./contracts";
 import {
   ACTIVE_JOB_STATUS,
@@ -90,20 +92,36 @@ export async function startGroupUpload(rawInput: unknown) {
  */
 export async function prepareGroupUploadFrame(rawInput: unknown) {
   const input = GroupUploadFramePrepareInputSchema.parse(rawInput);
-  const frameJob = await requireActiveFrameUploadJob(
-    input.groupUploadJobId,
-    input.frameOrder,
-  );
+  const frameJob = await requireActiveFrameUploadJob(input.groupUploadJobId, input.frameOrder);
   assertFrameCanPrepare(frameJob);
 
+  const rawJobSnapshot = parsePersistedJson<{ protocol?: unknown }>(
+    frameJob.groupUploadJob.snapshotJson,
+    "group upload snapshot",
+  );
+  const streamJobSnapshot =
+    rawJobSnapshot?.protocol === "stream-v2"
+      ? GroupUploadStartInputSchema.parse(rawJobSnapshot)
+      : null;
+  const streamInput =
+    streamJobSnapshot && isStreamUploadInput(streamJobSnapshot) ? streamJobSnapshot : null;
+  const streamSourceFrame = streamInput?.frames.find((frame) => frame.order === input.frameOrder);
+  if (streamInput && !streamSourceFrame) {
+    throw new Error("stream-v2 source frame was not found in the upload snapshot.");
+  }
+  const usesStreamingProtocol = Boolean(streamSourceFrame);
+  const frameSnapshot = streamSourceFrame
+    ? resolveStreamFrameSnapshot(streamSourceFrame, input.frame)
+    : parsePersistedJson<UploadFrameDescriptor>(
+        frameJob.frameSnapshotJson,
+        "frame upload snapshot",
+      );
+
+  // Validate the replacement descriptor before deleting retryable objects from the previous
+  // prepare. A malformed retry must not destroy the last internally consistent pending revision.
   if (frameJob.pendingPrefix) {
     await deleteInternalAssetPrefix(frameJob.pendingPrefix);
   }
-
-  const frameSnapshot = parsePersistedJson<UploadFrameDescriptor>(
-    frameJob.frameSnapshotJson,
-    "frame upload snapshot",
-  );
   const pendingPrefix = buildFramePendingPrefix(
     frameJob.groupUploadJob.group.storageRoot,
     frameSnapshot.order,
@@ -115,6 +133,7 @@ export async function prepareGroupUploadFrame(rawInput: unknown) {
     where: { id: frameJob.id },
     data: {
       pendingPrefix,
+      ...(usesStreamingProtocol ? { frameSnapshotJson: JSON.stringify(frameSnapshot) } : {}),
       preparedAssetsJson: JSON.stringify(preparedAssets),
       status: PREPARED_FRAME_STATUS,
     },
@@ -128,14 +147,113 @@ export async function prepareGroupUploadFrame(rawInput: unknown) {
   };
 }
 
+function sameFileDescriptor(
+  left: UploadFrameDescriptor["assets"][number]["original"],
+  right: UploadFrameDescriptor["assets"][number]["original"],
+): boolean {
+  return (
+    left.extension === right.extension &&
+    left.contentType === right.contentType &&
+    left.sha256.toLowerCase() === right.sha256.toLowerCase() &&
+    left.size === right.size
+  );
+}
+
+/**
+ * Stream start persists the fully validated source manifest before any PUT. Prepare accepts the
+ * generated thumbnail/heatmap descriptors later, but every original source and metadata field must
+ * still match that immutable preflight snapshot.
+ */
+function resolveStreamFrameSnapshot(
+  sourceFrame: UploadStreamFrameDescriptor,
+  generatedFrame: UploadFrameDescriptor | undefined,
+): UploadFrameDescriptor {
+  if (!generatedFrame) {
+    throw new Error("stream-v2 frame prepare requires a generated frame descriptor.");
+  }
+  if (
+    generatedFrame.order !== sourceFrame.order ||
+    generatedFrame.title !== sourceFrame.title ||
+    generatedFrame.caption !== sourceFrame.caption
+  ) {
+    throw new Error("Generated frame identity no longer matches the validated source manifest.");
+  }
+
+  const sourceBySlot = new Map(sourceFrame.assets.map((asset) => [asset.slot, asset]));
+  const generatedBySlot = new Map(generatedFrame.assets.map((asset) => [asset.slot, asset]));
+  if (
+    sourceBySlot.size !== sourceFrame.assets.length ||
+    generatedBySlot.size !== generatedFrame.assets.length
+  ) {
+    throw new Error("Generated frame contains duplicate asset slots.");
+  }
+  for (const sourceAsset of sourceFrame.assets) {
+    const generatedAsset = generatedBySlot.get(sourceAsset.slot);
+    if (
+      !generatedAsset ||
+      generatedAsset.kind !== sourceAsset.kind ||
+      generatedAsset.label !== sourceAsset.label ||
+      generatedAsset.note !== sourceAsset.note ||
+      generatedAsset.width !== sourceAsset.width ||
+      generatedAsset.height !== sourceAsset.height ||
+      generatedAsset.isPrimaryDisplay !== sourceAsset.isPrimaryDisplay ||
+      !sameFileDescriptor(generatedAsset.original, sourceAsset.original)
+    ) {
+      throw new Error(
+        `Generated asset ${sourceAsset.slot} no longer matches the preflight result.`,
+      );
+    }
+  }
+
+  const expectedSlots = new Set(sourceFrame.assets.map((asset) => asset.slot));
+  if (sourceFrame.generatedHeatmap) {
+    const heatmapPlan = sourceFrame.generatedHeatmap;
+    const beforeSource = sourceBySlot.get(heatmapPlan.beforeSlot);
+    const afterSource = sourceBySlot.get(heatmapPlan.afterSlot);
+    const heatmap = generatedBySlot.get(heatmapPlan.slot);
+    const before = generatedBySlot.get(heatmapPlan.beforeSlot);
+    const after = generatedBySlot.get(heatmapPlan.afterSlot);
+    if (
+      expectedSlots.has(heatmapPlan.slot) ||
+      heatmapPlan.beforeSlot === heatmapPlan.afterSlot ||
+      !beforeSource ||
+      beforeSource.kind !== "before" ||
+      !afterSource ||
+      (afterSource.kind !== "after" && afterSource.kind !== "misc") ||
+      !heatmap ||
+      !before ||
+      !after ||
+      heatmap.kind !== "heatmap" ||
+      heatmap.width !== before.width ||
+      heatmap.height !== before.height ||
+      heatmap.width !== after.width ||
+      heatmap.height !== after.height ||
+      heatmap.isPrimaryDisplay
+    ) {
+      throw new Error("Generated heatmap no longer matches the validated source manifest.");
+    }
+    expectedSlots.add(heatmapPlan.slot);
+  }
+  if (
+    generatedFrame.assets.length !== expectedSlots.size ||
+    generatedFrame.assets.some((asset) => !expectedSlots.has(asset.slot))
+  ) {
+    throw new Error("Generated frame contains an unexpected asset set.");
+  }
+
+  return generatedFrame;
+}
+
 /**
  * Commit only flips one frame at a time. That keeps retries local to the failed frame while the
  * rest of the group can continue making forward progress.
  */
 export async function commitGroupUploadFrame(rawInput: unknown) {
   const input = GroupUploadFrameCommitInputSchema.parse(rawInput);
-  const { frameJob, frameSnapshot, job, preparedAssets } =
-    await loadPreparedFrameCommit(input.groupUploadJobId, input.frameOrder);
+  const { frameJob, frameSnapshot, job, preparedAssets } = await loadPreparedFrameCommit(
+    input.groupUploadJobId,
+    input.frameOrder,
+  );
   await assertPreparedAssetsUploaded(preparedAssets);
   const existingFrames = await prisma.frame.findMany({
     where: {
@@ -432,17 +550,13 @@ function buildUploadJobCreateInput(params: {
     snapshotJson: JSON.stringify(params.input),
     status: ACTIVE_JOB_STATUS,
     expectedFrameCount: params.input.frames.length,
-    committedFrameCount: params.resumableCommittedFrames
-      ? params.input.frames.length
-      : 0,
+    committedFrameCount: params.resumableCommittedFrames ? params.input.frames.length : 0,
     expiresAt: new Date(Date.now() + JOB_TTL_MS),
     frameJobs: {
       create: params.input.frames.map((frame) => ({
         frameOrder: frame.order,
         frameSnapshotJson: JSON.stringify(frame),
-        status: params.resumableCommittedFrames
-          ? COMMITTED_FRAME_STATUS
-          : PENDING_FRAME_STATUS,
+        status: params.resumableCommittedFrames ? COMMITTED_FRAME_STATUS : PENDING_FRAME_STATUS,
       })),
     },
   };
@@ -458,6 +572,7 @@ function buildCommittedFrameCreateInput(
   pendingPrefix: string,
   preparedAssets: PreparedUploadAsset[],
 ) {
+  const storageValidatedAt = new Date();
   return {
     groupId,
     title: frameSnapshot.title,
@@ -476,6 +591,9 @@ function buildCommittedFrameCreateInput(
         note: asset.note,
         isPublic: true,
         isPrimaryDisplay: asset.isPrimaryDisplay,
+        // Commit only reaches this transaction after every prepared object passed the storage
+        // signature check, so later publishes can trust these immutable object paths.
+        storageValidatedAt,
       })),
     },
   };

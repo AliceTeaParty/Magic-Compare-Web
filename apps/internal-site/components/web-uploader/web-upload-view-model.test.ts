@@ -74,11 +74,7 @@ describe("web upload view model", () => {
 
     const reordered = reorderUploadPlan(originalPlan, activeId, overId);
     expect(reordered).not.toBeNull();
-    expect(reordered?.frames.map((item) => item.title)).toEqual([
-      "Frame 3",
-      "Frame 1",
-      "Frame 2",
-    ]);
+    expect(reordered?.frames.map((item) => item.title)).toEqual(["Frame 3", "Frame 1", "Frame 2"]);
     expect(buildPlanView(reordered!).frames.map((item) => item.title)).toEqual([
       "Frame 3",
       "Frame 1",
@@ -100,9 +96,15 @@ describe("web upload view model", () => {
   it("ignores unknown drag ids", () => {
     const originalPlan = plan();
 
-    expect(reorderUploadPlan(originalPlan, "missing", frameIdForFrame(originalPlan.frames[0]))).toBeNull();
-    expect(reorderUploadPlan(originalPlan, frameIdForFrame(originalPlan.frames[0]), "missing")).toBeNull();
-    expect(reorderUploadPlan(originalPlan, frameIdForFrame(originalPlan.frames[0]), null)).toBeNull();
+    expect(
+      reorderUploadPlan(originalPlan, "missing", frameIdForFrame(originalPlan.frames[0])),
+    ).toBeNull();
+    expect(
+      reorderUploadPlan(originalPlan, frameIdForFrame(originalPlan.frames[0]), "missing"),
+    ).toBeNull();
+    expect(
+      reorderUploadPlan(originalPlan, frameIdForFrame(originalPlan.frames[0]), null),
+    ).toBeNull();
   });
 
   it("exposes up to three alternate after columns for preview", () => {
@@ -160,11 +162,7 @@ describe("web upload view model", () => {
 
     const renamed = renameUploadPlanAssetLabel(originalPlan, { kind: "after" }, "Output");
 
-    expect(renamed?.frames.map((item) => item.after.label)).toEqual([
-      "Output",
-      "Output",
-      "Output",
-    ]);
+    expect(renamed?.frames.map((item) => item.after.label)).toEqual(["Output", "Output", "Output"]);
     expect(renamed?.heatmapReferenceLabel).toBe("Output");
     expect(getUploadPlanHeatmapReferenceOptions(renamed!)).toEqual(["Output"]);
   });
@@ -182,8 +180,12 @@ describe("web upload view model", () => {
     expect(renameUploadPlanAssetLabel(originalPlan, { kind: "before" }, "")).toBeNull();
     expect(renameUploadPlanAssetLabel(originalPlan, { kind: "before" }, "After")).toBeNull();
     expect(renameUploadPlanAssetLabel(originalPlan, { kind: "after" }, "Rip")).toBeNull();
-    expect(renameUploadPlanAssetLabel(originalPlan, { kind: "misc", label: "Rip" }, "Degrain")).toBeNull();
-    expect(renameUploadPlanAssetLabel(originalPlan, { kind: "misc", label: "Rip" }, "Heatmap")).toBeNull();
+    expect(
+      renameUploadPlanAssetLabel(originalPlan, { kind: "misc", label: "Rip" }, "Degrain"),
+    ).toBeNull();
+    expect(
+      renameUploadPlanAssetLabel(originalPlan, { kind: "misc", label: "Rip" }, "Heatmap"),
+    ).toBeNull();
   });
 
   it("only exposes global heatmap references available on every frame", () => {
@@ -212,16 +214,33 @@ describe("web upload view model", () => {
     expect(setUploadPlanHeatmapReference(nextPlan!, "Deband")).toBeNull();
   });
 
+  it("excludes explicit-heatmap frames from reference options", () => {
+    const originalPlan = plan();
+    originalPlan.frames[0] = {
+      ...originalPlan.frames[0],
+      after: { ...originalPlan.frames[0].after, label: "Output" },
+      heatmap: asset("heatmap", "heatmap/1.png"),
+    };
+    originalPlan.frames[1] = {
+      ...originalPlan.frames[1],
+      after: { ...originalPlan.frames[1].after, label: "Rip" },
+    };
+    originalPlan.frames[2] = {
+      ...originalPlan.frames[2],
+      after: { ...originalPlan.frames[2].after, label: "Rip" },
+    };
+
+    expect(getUploadPlanHeatmapReferenceOptions(originalPlan)).toEqual(["Rip"]);
+  });
+
   it("builds full frame titles from the shared filename parser", () => {
     expect(fullFrameTitleFromSourcePath("before/clip - 0001 - source.png")).toBe("clip - 0001");
     expect(fullFrameTitleFromSourcePath("before/clip-0002-source.png")).toBe("clip - 0002");
     expect(fullFrameTitleFromSourcePath("before/clip_0003_source.png")).toBe("clip - 0003");
     expect(fullFrameTitleFromSourcePath("before/clip.0004.source.png")).toBe("clip - 0004");
-    expect(
-      fullFrameTitleFromSourcePath(
-        "30_ULTRAMAN_DYNA_BD_BOX_7_00008-28973-src.png",
-      ),
-    ).toBe("30_ULTRAMAN_DYNA_BD_BOX_7_00008 - 28973");
+    expect(fullFrameTitleFromSourcePath("30_ULTRAMAN_DYNA_BD_BOX_7_00008-28973-src.png")).toBe(
+      "30_ULTRAMAN_DYNA_BD_BOX_7_00008 - 28973",
+    );
   });
 
   it("switches frame titles between inferred and filename modes", () => {
@@ -238,9 +257,7 @@ describe("web upload view model", () => {
     ];
 
     const filenamePlan = setUploadPlanFrameTitleMode(originalPlan, "filename");
-    expect(filenamePlan.frames[0].title).toBe(
-      "30_ULTRAMAN_DYNA_BD_BOX_7_00008 - 28973",
-    );
+    expect(filenamePlan.frames[0].title).toBe("30_ULTRAMAN_DYNA_BD_BOX_7_00008 - 28973");
 
     const inferredPlan = setUploadPlanFrameTitleMode(filenamePlan, "inferred");
     expect(inferredPlan.frames[0].title).toBe("8-28973");

@@ -1,4 +1,4 @@
-import type { GroupUploadStartInput } from "@/lib/server/uploads/contracts";
+import type { GroupUploadStartInput, UploadFrameDescriptor } from "@/lib/server/uploads/contracts";
 
 export interface UploadFrameState {
   frameOrder: number;
@@ -31,11 +31,8 @@ export interface GroupUploadPrepareResult {
 
 export interface GroupUploadCommitResult {
   groupUploadJobId: string;
-  inputHash: string;
-  expectedFrameCount: number;
-  committedFrameCount: number;
-  canComplete: boolean;
-  frameStates: UploadFrameState[];
+  frameOrder: number;
+  status: "committed";
 }
 
 export interface GroupUploadCompleteResult {
@@ -84,21 +81,13 @@ export function startGroupUpload(input: GroupUploadStartInput) {
 export function prepareGroupUploadFrame(params: {
   groupUploadJobId: string;
   frameOrder: number;
+  frame?: UploadFrameDescriptor;
 }) {
-  return postJson<GroupUploadPrepareResult>(
-    "/api/ops/group-upload-frame-prepare",
-    params,
-  );
+  return postJson<GroupUploadPrepareResult>("/api/ops/group-upload-frame-prepare", params);
 }
 
-export function commitGroupUploadFrame(params: {
-  groupUploadJobId: string;
-  frameOrder: number;
-}) {
-  return postJson<GroupUploadCommitResult>(
-    "/api/ops/group-upload-frame-commit",
-    params,
-  );
+export function commitGroupUploadFrame(params: { groupUploadJobId: string; frameOrder: number }) {
+  return postJson<GroupUploadCommitResult>("/api/ops/group-upload-frame-commit", params);
 }
 
 export function completeGroupUpload(params: { groupUploadJobId: string }) {

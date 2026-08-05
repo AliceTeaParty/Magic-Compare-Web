@@ -30,7 +30,7 @@ import { useRouter } from "next/navigation";
 import type { CaseCatalogItem } from "@/lib/server/repositories/content-repository";
 import { InternalPageHeader } from "../internal-page-shell";
 import { useAppNotifications } from "../notifications/use-app-notifications";
-import type { GenerationProgress } from "./asset-generator";
+import type { GenerationProgress, PreflightedUploadFrame } from "./asset-generator";
 import { scanBrowserUploadFiles } from "./source-scanner";
 import { WebUploadRunner } from "./upload-runner";
 import {
@@ -46,12 +46,7 @@ import {
   UploadIntakePanel,
   type UploadGroupMeta,
 } from "./web-upload-workspace-sections";
-import type {
-  BrowserUploadFile,
-  GeneratedUploadFrame,
-  UploadRunnerSnapshot,
-  WebUploadPlan,
-} from "./web-upload-types";
+import type { BrowserUploadFile, UploadRunnerSnapshot, WebUploadPlan } from "./web-upload-types";
 import {
   buildPlanView,
   renameUploadPlanAssetLabel,
@@ -262,10 +257,10 @@ function uploadStageCopy({
   if (snapshot.stage === "generating") {
     return {
       marker: "◐",
-      title: "正在准备资源",
+      title: "正在完整预检",
       detail: generationProgress
         ? `${generationProgress.completed}/${generationProgress.total} · ${generationProgress.label}`
-        : "生成缩略图与 heatmap",
+        : "解码图片、检查尺寸并计算摘要",
       progress:
         generationProgress && generationProgress.total > 0
           ? (generationProgress.completed / generationProgress.total) * 100
@@ -482,7 +477,7 @@ export function WebUploadWorkbench({ cases, initialCaseSlug }: WebUploadWorkbenc
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement | null>(null);
   const planRef = useRef<WebUploadPlan | null>(null);
-  const generatedFramesRef = useRef<GeneratedUploadFrame[] | null>(null);
+  const preflightFramesRef = useRef<PreflightedUploadFrame[] | null>(null);
   const runnerRef = useRef<WebUploadRunner | null>(null);
   const unsubscribeRunnerRef = useRef<(() => void) | null>(null);
   const generationAbortRef = useRef<AbortController | null>(null);
@@ -522,7 +517,13 @@ export function WebUploadWorkbench({ cases, initialCaseSlug }: WebUploadWorkbenc
     initialCaseSlug && cases.some((item) => item.slug === initialCaseSlug) ? initialCaseSlug : null;
   const returnHref = returnCaseSlug ? `/cases/${encodeURIComponent(returnCaseSlug)}` : "/";
   const hasBlockingIssues = Boolean(planView && planView.errorCount > 0);
-  const canStart = Boolean(selectedCaseExists && planView && planRef.current && !hasBlockingIssues);
+  const canStart = Boolean(
+    selectedCaseExists &&
+    planView &&
+    planView.frames.length > 0 &&
+    planRef.current &&
+    !hasBlockingIssues,
+  );
   const canAbandon =
     Boolean(planRef.current) && snapshot.stage !== "idle" && snapshot.stage !== "completed";
   const sourceRootName = planRef.current?.sourceRootName ?? null;
@@ -555,7 +556,7 @@ export function WebUploadWorkbench({ cases, initialCaseSlug }: WebUploadWorkbenc
   function applyScannedFiles(entries: BrowserUploadFile[], sourceRootName: string) {
     const plan = scanBrowserUploadFiles(entries, sourceRootName);
     planRef.current = plan;
-    generatedFramesRef.current = null;
+    preflightFramesRef.current = null;
     generationAbortRef.current?.abort();
     generationAbortRef.current = null;
     runnerRef.current?.dispose();
@@ -633,38 +634,46 @@ export function WebUploadWorkbench({ cases, initialCaseSlug }: WebUploadWorkbenc
     event.target.value = "";
   }
 
-  async function ensureGeneratedFrames() {
+  /** Completes source decode, dimensions, and hashing before creating the remote upload job. */
+  async function ensurePreflightedFrames() {
     const plan = planRef.current;
     if (!plan) {
       throw new Error("请先选择文件夹。");
     }
+    if (plan.frames.length === 0) {
+      throw new Error("所选目录中没有可上传的对比帧。");
+    }
 
-    if (generatedFramesRef.current) {
-      return generatedFramesRef.current;
+    if (preflightFramesRef.current) {
+      return preflightFramesRef.current;
     }
 
     const abortController = new AbortController();
     generationAbortRef.current = abortController;
-    setSnapshot({ ...buildInitialSnapshot(), stage: "generating", message: "正在生成资源。" });
-    const { generateUploadFrames } = await import("./asset-generator");
-    const frames = await generateUploadFrames(
-      plan.frames,
-      (progress) => {
-        setGenerationProgress(progress);
-      },
-      {
-        generateMissingHeatmap: true,
-        heatmapReferenceLabel: plan.heatmapReferenceLabel,
-        signal: abortController.signal,
-      },
-    );
-    if (abortController.signal.aborted) {
-      throw new DOMException("Upload generation was abandoned.", "AbortError");
+    setSnapshot({ ...buildInitialSnapshot(), stage: "generating", message: "正在完整预检素材。" });
+    const { preflightUploadFrames } = await import("./asset-generator");
+    try {
+      const frames = await preflightUploadFrames(
+        plan.frames,
+        (progress) => {
+          setGenerationProgress(progress);
+        },
+        {
+          heatmapReferenceLabel: plan.heatmapReferenceLabel,
+          signal: abortController.signal,
+        },
+      );
+      if (abortController.signal.aborted) {
+        throw new DOMException("Upload generation was abandoned.", "AbortError");
+      }
+      preflightFramesRef.current = frames;
+      setSnapshot({ ...buildInitialSnapshot(), stage: "ready", message: "完整预检已通过。" });
+      return frames;
+    } finally {
+      if (generationAbortRef.current === abortController) {
+        generationAbortRef.current = null;
+      }
     }
-    generationAbortRef.current = null;
-    generatedFramesRef.current = frames;
-    setSnapshot({ ...buildInitialSnapshot(), stage: "ready", message: "资源生成完成。" });
-    return frames;
   }
 
   async function startOrResumeUpload() {
@@ -673,7 +682,9 @@ export function WebUploadWorkbench({ cases, initialCaseSlug }: WebUploadWorkbenc
     }
 
     try {
-      const frames = await ensureGeneratedFrames();
+      const frames = await ensurePreflightedFrames();
+      const generation = await import("./asset-generator");
+      const framesByOrder = new Map(frames.map((frame) => [frame.descriptor.order, frame]));
       const caseInput = getCaseInput(cases, selectedCaseSlug);
       const runner =
         runnerRef.current ??
@@ -687,7 +698,18 @@ export function WebUploadWorkbench({ cases, initialCaseSlug }: WebUploadWorkbenc
             order: 0,
             tags: [],
           },
-          frames,
+          uploadConcurrency: generation.WEB_UPLOAD_WORKER_CONCURRENCY,
+          stream: {
+            frames: frames.map((frame) => frame.descriptor),
+            generateFrame: async (frameOrder, signal) => {
+              const frame = framesByOrder.get(frameOrder);
+              if (!frame) throw new Error(`找不到 Frame ${frameOrder + 1} 的预检结果。`);
+              return generation.generateUploadFrame(frame, {
+                signal,
+                onProgress: setGenerationProgress,
+              });
+            },
+          },
         });
 
       if (!runnerRef.current) {
@@ -731,7 +753,7 @@ export function WebUploadWorkbench({ cases, initialCaseSlug }: WebUploadWorkbenc
     runnerRef.current?.dispose();
     runnerRef.current = null;
     planRef.current = null;
-    generatedFramesRef.current = null;
+    preflightFramesRef.current = null;
     setPlanView(null);
     setGenerationProgress(null);
     setExpandedFrameId(null);
@@ -785,9 +807,9 @@ export function WebUploadWorkbench({ cases, initialCaseSlug }: WebUploadWorkbenc
     }
 
     planRef.current = reorderedPlan;
-    // Generated blobs embed frame order in upload descriptors, so any pre-upload reorder must
-    // invalidate cached generation output before the user starts the final upload.
-    generatedFramesRef.current = null;
+    // Preflight descriptors embed frame order in the signed source manifest, so any pre-upload
+    // reorder must invalidate them before the user starts the remote job.
+    preflightFramesRef.current = null;
     setPlanView(buildPlanView(reorderedPlan));
   }
 
@@ -797,9 +819,9 @@ export function WebUploadWorkbench({ cases, initialCaseSlug }: WebUploadWorkbenc
     }
 
     planRef.current = nextPlan;
-    // Generated blobs carry asset labels and heatmap descriptors, so any metadata-level plan edit
-    // before upload must invalidate the cached generation output.
-    generatedFramesRef.current = null;
+    // Labels and heatmap references enter the preflight manifest; invalidating here prevents the
+    // progress UI from claiming an older validation still covers the edited plan.
+    preflightFramesRef.current = null;
     setPlanView(buildPlanView(nextPlan));
   }
 

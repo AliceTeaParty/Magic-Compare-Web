@@ -15,16 +15,34 @@ interface WorkerAssetResult {
   heatmap?: WorkerUploadFile;
 }
 
+interface WorkerPreflightResult {
+  assetKey: string;
+  width: number;
+  height: number;
+  extension: string;
+  contentType: string;
+  sha256: string;
+  size: number;
+}
+
+interface PreflightAssetMessage {
+  type: "preflight-asset";
+  requestId: string;
+  assetKey: string;
+  original: File;
+}
+
 interface GenerateAssetMessage {
   type: "generate-asset";
   requestId: string;
   assetKey: string;
   original: File;
+  preflight: WorkerPreflightResult;
   heatmapBefore?: File;
   heatmapAfter?: File;
 }
 
-type WorkerRequestMessage = GenerateAssetMessage;
+type WorkerRequestMessage = GenerateAssetMessage | PreflightAssetMessage;
 
 const THUMBNAIL_MAX_WIDTH = 480;
 const THUMBNAIL_MAX_HEIGHT = 270;
@@ -41,12 +59,14 @@ function contentTypeForFile(file: File) {
 async function sha256Hex(blob: Blob) {
   const buffer = await blob.arrayBuffer();
   const digest = await crypto.subtle.digest("SHA-256", buffer);
-  return [...new Uint8Array(digest)]
-    .map((byte) => byte.toString(16).padStart(2, "0"))
-    .join("");
+  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
-async function uploadFileDescriptor(file: Blob, extension: string, contentType: string): Promise<WorkerUploadFile> {
+async function uploadFileDescriptor(
+  file: Blob,
+  extension: string,
+  contentType: string,
+): Promise<WorkerUploadFile> {
   return {
     extension,
     contentType,
@@ -97,9 +117,20 @@ async function canvasToBlob(canvas: OffscreenCanvas, contentType = "image/webp",
   return blob.size > 0 ? blob : await canvas.convertToBlob({ type: "image/png" });
 }
 
-async function buildThumbnail(file: File, width: number, height: number) {
+async function buildThumbnail(
+  file: File,
+  width: number,
+  height: number,
+  preflight: WorkerPreflightResult,
+) {
   if (extensionForFile(file) === ".svg") {
-    return uploadFileDescriptor(file, extensionForFile(file), contentTypeForFile(file));
+    return {
+      extension: preflight.extension,
+      contentType: preflight.contentType,
+      sha256: preflight.sha256,
+      size: preflight.size,
+      blob: file,
+    };
   }
 
   const bitmap = await createImageBitmap(file);
@@ -142,17 +173,27 @@ function heatmapColor(value: number) {
 
 function grayscaleDifference(beforeData: ImageData, afterData: ImageData) {
   const values = new Uint8ClampedArray(beforeData.width * beforeData.height);
-  for (let sourceIndex = 0, targetIndex = 0; sourceIndex < beforeData.data.length; sourceIndex += 4, targetIndex += 1) {
+  for (
+    let sourceIndex = 0, targetIndex = 0;
+    sourceIndex < beforeData.data.length;
+    sourceIndex += 4, targetIndex += 1
+  ) {
     const diff =
       Math.abs(beforeData.data[sourceIndex] - afterData.data[sourceIndex]) * 0.299 +
       Math.abs(beforeData.data[sourceIndex + 1] - afterData.data[sourceIndex + 1]) * 0.587 +
       Math.abs(beforeData.data[sourceIndex + 2] - afterData.data[sourceIndex + 2]) * 0.114;
-    values[targetIndex] = Math.round(((diff / 255) ** 0.72) * 255);
+    values[targetIndex] = Math.round((diff / 255) ** 0.72 * 255);
   }
   return values;
 }
 
-function blurredIntensity(values: Uint8ClampedArray, width: number, height: number, radius: number, scale = 1) {
+function blurredIntensity(
+  values: Uint8ClampedArray,
+  width: number,
+  height: number,
+  radius: number,
+  scale = 1,
+) {
   const output = new Uint8ClampedArray(values.length);
   const integerRadius = Math.max(1, Math.ceil(radius * 2));
   const sigma = Math.max(radius, 0.1);
@@ -192,7 +233,11 @@ function blurredIntensity(values: Uint8ClampedArray, width: number, height: numb
 
 function thermalImageData(intensity: Uint8ClampedArray, width: number, height: number) {
   const output = new ImageData(width, height);
-  for (let pixelIndex = 0, dataIndex = 0; pixelIndex < intensity.length; pixelIndex += 1, dataIndex += 4) {
+  for (
+    let pixelIndex = 0, dataIndex = 0;
+    pixelIndex < intensity.length;
+    pixelIndex += 1, dataIndex += 4
+  ) {
     const [red, green, blue] = heatmapColor(intensity[pixelIndex]);
     output.data[dataIndex] = red;
     output.data[dataIndex + 1] = green;
@@ -224,9 +269,15 @@ function blendImageData(left: ImageData, right: ImageData, rightWeight: number) 
   const output = new ImageData(left.width, left.height);
   const leftWeight = 1 - rightWeight;
   for (let index = 0; index < left.data.length; index += 4) {
-    output.data[index] = Math.round(left.data[index] * leftWeight + right.data[index] * rightWeight);
-    output.data[index + 1] = Math.round(left.data[index + 1] * leftWeight + right.data[index + 1] * rightWeight);
-    output.data[index + 2] = Math.round(left.data[index + 2] * leftWeight + right.data[index + 2] * rightWeight);
+    output.data[index] = Math.round(
+      left.data[index] * leftWeight + right.data[index] * rightWeight,
+    );
+    output.data[index + 1] = Math.round(
+      left.data[index + 1] * leftWeight + right.data[index + 1] * rightWeight,
+    );
+    output.data[index + 2] = Math.round(
+      left.data[index + 2] * leftWeight + right.data[index + 2] * rightWeight,
+    );
     output.data[index + 3] = 255;
   }
   return output;
@@ -280,13 +331,20 @@ async function buildHeatmap(before: File, after: File) {
 }
 
 async function handleGenerateAsset(message: GenerateAssetMessage): Promise<WorkerAssetResult> {
-  const dimensions = await imageDimensions(message.original);
-  const original = await uploadFileDescriptor(
+  const dimensions = { width: message.preflight.width, height: message.preflight.height };
+  const original: WorkerUploadFile = {
+    extension: message.preflight.extension,
+    contentType: message.preflight.contentType,
+    sha256: message.preflight.sha256,
+    size: message.preflight.size,
+    blob: message.original,
+  };
+  const thumbnail = await buildThumbnail(
     message.original,
-    extensionForFile(message.original),
-    contentTypeForFile(message.original),
+    dimensions.width,
+    dimensions.height,
+    message.preflight,
   );
-  const thumbnail = await buildThumbnail(message.original, dimensions.width, dimensions.height);
   const heatmap =
     message.heatmapBefore && message.heatmapAfter
       ? await buildHeatmap(message.heatmapBefore, message.heatmapAfter)
@@ -302,9 +360,36 @@ async function handleGenerateAsset(message: GenerateAssetMessage): Promise<Worke
   };
 }
 
+/** Decodes and hashes every selected source before the upload job or any PUT can begin. */
+async function handlePreflightAsset(
+  message: PreflightAssetMessage,
+): Promise<WorkerPreflightResult> {
+  const dimensions = await imageDimensions(message.original);
+  return {
+    assetKey: message.assetKey,
+    ...dimensions,
+    extension: extensionForFile(message.original),
+    contentType: contentTypeForFile(message.original),
+    sha256: await sha256Hex(message.original),
+    size: message.original.size,
+  };
+}
+
 self.addEventListener("message", (event: MessageEvent<WorkerRequestMessage>) => {
   const message = event.data;
-  if (message.type !== "generate-asset") {
+  if (message.type === "preflight-asset") {
+    void handlePreflightAsset(message)
+      .then((result) => {
+        self.postMessage({ type: "preflight-complete", requestId: message.requestId, result });
+      })
+      .catch((error: unknown) => {
+        self.postMessage({
+          type: "asset-error",
+          requestId: message.requestId,
+          assetKey: message.assetKey,
+          error: error instanceof Error ? error.message : "资源预检失败。",
+        });
+      });
     return;
   }
 

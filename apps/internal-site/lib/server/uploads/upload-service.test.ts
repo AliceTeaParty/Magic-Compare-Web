@@ -103,6 +103,125 @@ vi.mock("./upload-service-helpers", async () => {
   };
 });
 
+/** Builds a retry-shaped stream job so tests keep the immutable source and prepared output distinct. */
+function streamPrepareFixture(afterSlot = "slot-002") {
+  const original = {
+    extension: ".png",
+    contentType: "image/png",
+    sha256: "a".repeat(64),
+    size: 100,
+  };
+  const thumbnail = {
+    extension: ".webp",
+    contentType: "image/webp",
+    sha256: "b".repeat(64),
+    size: 20,
+  };
+  const sourceAssets = [
+    {
+      slot: "slot-001",
+      kind: "before" as const,
+      label: "Before",
+      note: "",
+      width: 1920,
+      height: 1080,
+      isPrimaryDisplay: true,
+      original,
+    },
+    {
+      slot: "slot-002",
+      kind: "after" as const,
+      label: "After",
+      note: "",
+      width: 1920,
+      height: 1080,
+      isPrimaryDisplay: true,
+      original,
+    },
+  ];
+  const sourceFrame = {
+    order: 0,
+    title: "Frame 1",
+    caption: "",
+    assets: sourceAssets,
+    generatedHeatmap: {
+      slot: "slot-003",
+      beforeSlot: "slot-001",
+      afterSlot,
+    },
+  };
+  const generatedFrame = {
+    order: sourceFrame.order,
+    title: sourceFrame.title,
+    caption: sourceFrame.caption,
+    assets: [
+      ...sourceAssets.map((asset) => ({ ...asset, thumbnail })),
+      {
+        slot: "slot-003",
+        kind: "heatmap" as const,
+        label: "Heatmap",
+        note: "generated",
+        width: 1920,
+        height: 1080,
+        isPrimaryDisplay: false,
+        original: { ...original, sha256: "d".repeat(64) },
+        thumbnail,
+      },
+    ],
+  };
+  const previousGeneratedFrame = {
+    ...generatedFrame,
+    assets: generatedFrame.assets.map((asset) =>
+      asset.slot === "slot-003"
+        ? { ...asset, original: { ...asset.original, sha256: "c".repeat(64) } }
+        : asset,
+    ),
+  };
+
+  return {
+    generatedFrame,
+    frameJob: {
+      id: "frame-job-1",
+      frameOrder: 0,
+      // A failed PUT leaves the previous generated output here; validation must use snapshotJson.
+      frameSnapshotJson: JSON.stringify(previousGeneratedFrame),
+      preparedAssetsJson: "",
+      pendingPrefix: null,
+      status: "prepared",
+      groupUploadJob: {
+        id: "job-1",
+        snapshotJson: JSON.stringify({
+          protocol: "stream-v2",
+          case: {
+            slug: "2026",
+            title: "2026",
+            summary: "",
+            tags: [],
+            coverAssetLabel: null,
+          },
+          group: {
+            slug: "test-group",
+            title: "Test Group",
+            description: "",
+            order: 0,
+            defaultMode: "before-after",
+            tags: [],
+          },
+          frames: [sourceFrame],
+          forceRestart: false,
+        }),
+        inputHash: "hash-1",
+        expectedFrameCount: 1,
+        committedFrameCount: 0,
+        status: "active",
+        expiresAt: null,
+        case: { id: "case-1", slug: "2026" },
+        group: { id: "group-1", slug: "test-group", storageRoot: "/groups/group-1" },
+      },
+    },
+  };
+}
+
 describe("upload-service", () => {
   beforeEach(() => {
     groupUploadJobCreate.mockReset();
@@ -214,9 +333,9 @@ describe("upload-service", () => {
     });
 
     expect(helperMocks.cancelExpiredActiveUploadJobs).toHaveBeenCalledWith("group-1");
-    expect(
-      helperMocks.cancelExpiredActiveUploadJobs.mock.invocationCallOrder[0],
-    ).toBeLessThan(helperMocks.findActiveUploadJobByGroup.mock.invocationCallOrder[0]);
+    expect(helperMocks.cancelExpiredActiveUploadJobs.mock.invocationCallOrder[0]).toBeLessThan(
+      helperMocks.findActiveUploadJobByGroup.mock.invocationCallOrder[0],
+    );
     expect(result).toEqual({ groupUploadJobId: "job-1" });
   });
 
@@ -235,6 +354,7 @@ describe("upload-service", () => {
       status: "pending",
       groupUploadJob: {
         id: "job-1",
+        snapshotJson: "{}",
         inputHash: "hash-1",
         expectedFrameCount: 1,
         committedFrameCount: 0,
@@ -286,6 +406,50 @@ describe("upload-service", () => {
         },
       ],
     });
+  });
+
+  it("validates stream retries against the immutable source snapshot", async () => {
+    const { frameJob, generatedFrame } = streamPrepareFixture();
+    helperMocks.requireActiveFrameUploadJob.mockResolvedValue(frameJob);
+    helperMocks.buildFramePendingPrefix.mockReturnValue("/groups/group-1/1/revision-1");
+    helperMocks.buildPreparedUploadAssets.mockReturnValue([]);
+    helperMocks.buildPresignedFiles.mockResolvedValue([]);
+
+    await prepareGroupUploadFrame({
+      groupUploadJobId: "job-1",
+      frameOrder: 0,
+      frame: generatedFrame,
+    });
+
+    expect(frameUploadJobUpdate).toHaveBeenCalledWith({
+      where: { id: "frame-job-1" },
+      data: expect.objectContaining({
+        frameSnapshotJson: JSON.stringify(generatedFrame),
+        status: "prepared",
+      }),
+    });
+  });
+
+  it("rejects a generated heatmap whose after slot is absent from the source snapshot", async () => {
+    const { frameJob, generatedFrame } = streamPrepareFixture("slot-999");
+    helperMocks.requireActiveFrameUploadJob.mockResolvedValue({
+      ...frameJob,
+      pendingPrefix: "/groups/group-1/1/previous-revision",
+    });
+    helperMocks.buildFramePendingPrefix.mockReturnValue("/groups/group-1/1/revision-1");
+    helperMocks.buildPreparedUploadAssets.mockReturnValue([]);
+    helperMocks.buildPresignedFiles.mockResolvedValue([]);
+
+    await expect(
+      prepareGroupUploadFrame({
+        groupUploadJobId: "job-1",
+        frameOrder: 0,
+        frame: generatedFrame,
+      }),
+    ).rejects.toThrow("Generated heatmap no longer matches the validated source manifest.");
+
+    expect(frameUploadJobUpdate).not.toHaveBeenCalled();
+    expect(deleteInternalAssetPrefix).not.toHaveBeenCalled();
   });
 
   it("commits one frame by loading only the targeted frame job", async () => {

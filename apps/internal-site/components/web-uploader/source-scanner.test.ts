@@ -92,11 +92,7 @@ describe("scanBrowserUploadFiles", () => {
 
   it("uses the first after label as the default heatmap reference for src/rip/flt sets", () => {
     const plan = scanBrowserUploadFiles(
-      [
-        image("case/src/001.png"),
-        image("case/rip/001.png"),
-        image("case/flt/001_crop.png"),
-      ],
+      [image("case/src/001.png"), image("case/rip/001.png"), image("case/flt/001_crop.png")],
       "case",
     );
 
@@ -163,13 +159,58 @@ describe("scanBrowserUploadFiles", () => {
     );
   });
 
-  it("preserves nested out and output directory variants for primary selection", () => {
+  it("does not require a shared reference when every frame supplies a heatmap", () => {
     const plan = scanBrowserUploadFiles(
       [
-        image("case/src/001.png"),
-        image("case/output/001.png"),
-        image("case/out/001.png"),
+        image("sample/frame-001_src.png"),
+        image("sample/frame-001_output.png"),
+        image("sample/frame-001_heatmap.png"),
+        image("sample/frame-002_src.png"),
+        image("sample/frame-002_rip.png"),
+        image("sample/frame-002_heatmap.png"),
       ],
+      "sample",
+    );
+
+    expect(plan.frames).toHaveLength(2);
+    expect(plan.frames.every((frame) => Boolean(frame.heatmap))).toBe(true);
+    expect(plan.issues).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ code: "heatmap-reference-missing" })]),
+    );
+  });
+
+  it("checks shared references only for frames that need a generated heatmap", () => {
+    const plan = scanBrowserUploadFiles(
+      [
+        image("sample/frame-001_src.png"),
+        image("sample/frame-001_output.png"),
+        image("sample/frame-001_heatmap.png"),
+        image("sample/frame-002_src.png"),
+        image("sample/frame-002_rip.png"),
+      ],
+      "sample",
+    );
+
+    expect(plan.heatmapReferenceLabel).toBe("Rip");
+    expect(plan.issues).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ code: "heatmap-reference-missing" })]),
+    );
+  });
+
+  it("reports an empty directory before upload preflight", () => {
+    const plan = scanBrowserUploadFiles([], "empty");
+
+    expect(plan.frames).toEqual([]);
+    expect(plan.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ severity: "error", code: "frame-missing" }),
+      ]),
+    );
+  });
+
+  it("preserves nested out and output directory variants for primary selection", () => {
+    const plan = scanBrowserUploadFiles(
+      [image("case/src/001.png"), image("case/output/001.png"), image("case/out/001.png")],
       "case",
     );
 
@@ -217,11 +258,7 @@ describe("scanBrowserUploadFiles", () => {
       "frame-001_rip.png",
       "frame-001_nodeband.png",
     ]);
-    expect(plan.frames[0].misc.map((asset) => asset.label)).toEqual([
-      "After",
-      "Rip",
-      "NoDeband",
-    ]);
+    expect(plan.frames[0].misc.map((asset) => asset.label)).toEqual(["After", "Rip", "NoDeband"]);
   });
 
   it("caps alternate after assets at three", () => {

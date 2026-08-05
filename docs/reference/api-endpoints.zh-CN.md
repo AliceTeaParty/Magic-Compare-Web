@@ -5,8 +5,8 @@
 
 ## 范围与约束
 
-- 当前仓库里，internal-site 的服务端 API 仅位于 `apps/internal-site/app/api/ops/*`。
-- 这些端点当前全部使用 `POST`，没有额外的 `GET` / `PUT` / `DELETE` 路由。
+- 业务操作 API 位于 `apps/internal-site/app/api/ops/*`；另有不读取业务状态的 `GET /api/healthz`。
+- ops 写操作使用 `POST`；部署任务查询使用 `GET /api/ops/public-deploy`。
 - 新上传链路里的二进制文件不会再发到 internal-site；`group-upload-frame-prepare` 返回的是对象存储 presigned PUT URL，客户端随后直传到 S3-compatible 存储。
 - 当前代码里没有单独的 route-level 鉴权中间件；远程调用通常由部署侧入口控制。
 
@@ -18,27 +18,28 @@
 
 ## 端点总览
 
-| 路径                                       | 作用                                              |
-| ------------------------------------------ | ------------------------------------------------- |
-| `POST /api/ops/case-list`                  | 列出当前全部 case                                 |
-| `POST /api/ops/case-groups`                | 列出某个 case 下当前全部 group                    |
+| 路径                                       | 作用                                           |
+| ------------------------------------------ | ---------------------------------------------- |
+| `GET /api/healthz`                         | 返回无缓存 204，供容器健康检查                 |
+| `POST /api/ops/case-list`                  | 列出当前全部 case                              |
+| `POST /api/ops/case-groups`                | 列出某个 case 下当前全部 group                 |
 | `POST /api/ops/case-search`                | 搜索 case，供内部站选择已有 case 使用          |
-| `POST /api/ops/case-create`                | 新建一个空的 internal case                        |
-| `POST /api/ops/case-update`                | 修改 case summary                                 |
-| `POST /api/ops/case-delete`                | 删除空 case                                       |
-| `POST /api/ops/case-publish`               | 重新发布一个 case 下当前可公开的 group            |
-| `POST /api/ops/group-update`               | 修改 group 标题和描述                             |
-| `POST /api/ops/group-visibility`           | 切换 group 的 `isPublic` 状态                     |
-| `POST /api/ops/group-delete`               | 删除一个 group 及其桶内图像前缀、已发布 bundle    |
-| `POST /api/ops/group-reorder`              | 调整一个 case 内 group 顺序                       |
-| `POST /api/ops/frame-reorder`              | 调整一个 group 内 frame 顺序                      |
-| `POST /api/ops/group-upload-start`         | 启动或恢复一个 group 上传作业                     |
-| `POST /api/ops/group-upload-frame-prepare` | 为单个 frame 申请 presigned PUT URL               |
-| `POST /api/ops/group-upload-frame-commit`  | 提交单个 frame，切换数据库到新 revision           |
-| `POST /api/ops/group-upload-complete`      | 在全部 frame 提交后完成整个 group 上传            |
-| `POST /api/ops/group-upload-cancel`        | 放弃 active 上传作业并清理未提交 pending 前缀     |
-| `POST /api/ops/public-export`              | 导出当前 public-site 静态产物                     |
-| `POST /api/ops/public-deploy`              | 可选先发布一个 case，再导出并部署 public-site     |
+| `POST /api/ops/case-create`                | 新建一个空的 internal case                     |
+| `POST /api/ops/case-update`                | 修改 case summary                              |
+| `POST /api/ops/case-delete`                | 删除空 case                                    |
+| `POST /api/ops/case-publish`               | 重新发布一个 case 下当前可公开的 group         |
+| `POST /api/ops/group-update`               | 修改 group 标题和描述                          |
+| `POST /api/ops/group-visibility`           | 切换 group 的 `isPublic` 状态                  |
+| `POST /api/ops/group-delete`               | 删除一个 group 及其桶内图像前缀、已发布 bundle |
+| `POST /api/ops/group-reorder`              | 调整一个 case 内 group 顺序                    |
+| `POST /api/ops/frame-reorder`              | 调整一个 group 内 frame 顺序                   |
+| `POST /api/ops/group-upload-start`         | 启动或恢复一个 group 上传作业                  |
+| `POST /api/ops/group-upload-frame-prepare` | 为单个 frame 申请 presigned PUT URL            |
+| `POST /api/ops/group-upload-frame-commit`  | 提交单个 frame，切换数据库到新 revision        |
+| `POST /api/ops/group-upload-complete`      | 在全部 frame 提交后完成整个 group 上传         |
+| `POST /api/ops/group-upload-cancel`        | 放弃 active 上传作业并清理未提交 pending 前缀  |
+| `POST /api/ops/public-export`              | 导出当前 public-site 静态产物                  |
+| `POST /api/ops/public-deploy`              | 可选先发布一个 case，再导出并部署 public-site  |
 
 ## Case 相关端点
 
@@ -531,6 +532,60 @@
 - `group.defaultMode` 默认值是 `before-after`。
 - `frames[].assets` 当前最少需要两个 asset。
 - `forceRestart` 可选，默认 `false`。
+- 不带 `protocol` 时使用完整 frame 快照，兼容既有调用方。
+- Web 工作台使用 `protocol: "stream-v2"`；start 中只提交已经完整预检的源文件描述，缩略图和自动 heatmap 在逐帧 prepare 时补齐。
+
+`stream-v2` 的 frame 形状：
+
+```json
+{
+  "protocol": "stream-v2",
+  "frames": [
+    {
+      "order": 0,
+      "title": "Frame 1",
+      "caption": "",
+      "assets": [
+        {
+          "slot": "slot-001",
+          "kind": "before",
+          "label": "Src",
+          "note": "",
+          "width": 1920,
+          "height": 1080,
+          "isPrimaryDisplay": true,
+          "original": {
+            "extension": ".png",
+            "contentType": "image/png",
+            "sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+            "size": 123456
+          }
+        },
+        {
+          "slot": "slot-002",
+          "kind": "after",
+          "label": "Rip",
+          "note": "",
+          "width": 1920,
+          "height": 1080,
+          "isPrimaryDisplay": true,
+          "original": {
+            "extension": ".png",
+            "contentType": "image/png",
+            "sha256": "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789",
+            "size": 123123
+          }
+        }
+      ],
+      "generatedHeatmap": {
+        "slot": "slot-003",
+        "beforeSlot": "slot-001",
+        "afterSlot": "slot-002"
+      }
+    }
+  ]
+}
+```
 
 成功响应：
 
@@ -606,6 +661,8 @@
 - 如果这个 frame 在当前 job 下已经存在旧的 pending revision，服务端会先删掉旧 pending 前缀，再签发新 URL。
 - 如果该 frame 已经是 `committed`，这个接口会返回 `400`，避免重复 prepare。
 - presign 组装和对象路径命名都在服务端完成，客户端不自行决定最终 bucket key。
+- `stream-v2` 必须在 prepare 请求中附带该 frame 的完整生成描述；服务端会与 start 的源摘要、尺寸、slot 和 heatmap 计划逐项核对。
+- prepare 的 presign 和 commit 前的对象签名读取都使用有界并发；SQLite commit 仍按 frame 串行。
 
 ### `POST /api/ops/group-upload-frame-commit`
 

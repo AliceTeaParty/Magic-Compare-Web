@@ -1,14 +1,7 @@
 import type { ViewerMode } from "@magic-compare/content-schema";
 
 export type WebUploadStage =
-  | "idle"
-  | "scanned"
-  | "generating"
-  | "ready"
-  | "uploading"
-  | "paused"
-  | "completed"
-  | "failed";
+  "idle" | "scanned" | "generating" | "ready" | "uploading" | "paused" | "completed" | "failed";
 
 export type WebUploadIssueSeverity = "warning" | "error";
 
@@ -98,6 +91,7 @@ export interface UploadRunnerFrameSnapshot {
   title: string;
   status:
     | "pending"
+    | "generating"
     | "preparing"
     | "prepared"
     | "uploading"

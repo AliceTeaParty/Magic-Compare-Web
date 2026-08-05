@@ -169,12 +169,15 @@ export function UploadFlowStrip({
           backgroundColor: webUploadSurfaces.progressTrack,
         }}
       >
+        {/* Progress updates stay on the compositor so frequent upload ticks do not relayout the flow. */}
         <Box
           sx={{
-            width: `${flow.progress}%`,
+            width: "100%",
             height: "100%",
             backgroundColor: "primary.main",
-            transition: "width 300ms cubic-bezier(0.2, 0, 0, 1)",
+            transform: `scaleX(${flow.progress / 100})`,
+            transformOrigin: "left center",
+            transition: "transform 300ms cubic-bezier(0.2, 0, 0, 1)",
             "@media (prefers-reduced-motion: reduce)": { transition: "none" },
           }}
         />

@@ -52,6 +52,7 @@ const uploadJobSummarySelect = {
 
 const uploadJobLifecycleSelect = {
   ...baseJobFields,
+  snapshotJson: true,
   case: { select: { id: true, slug: true } },
   group: { select: { id: true, slug: true, storageRoot: true } },
 } satisfies Prisma.GroupUploadJobSelect;
@@ -103,10 +104,7 @@ export function buildGroupStorageRoot(): string {
  * Uses one-based frame folders because object listings are easier to scan when they match the
  * operator-facing frame order instead of the zero-based internal index.
  */
-export function buildFramePendingPrefix(
-  storageRoot: string,
-  frameOrder: number,
-): string {
+export function buildFramePendingPrefix(storageRoot: string, frameOrder: number): string {
   return `${storageRoot}/${frameOrder + 1}/${randomUUID()}`;
 }
 
@@ -131,10 +129,7 @@ async function refreshCaseDerivedState(caseId: string): Promise<void> {
  * Upload job expiry is enforced at read time so stale local resumptions stop behaving like valid
  * active jobs even before a later start flow cancels them in the database.
  */
-function isExpiredUploadJob(
-  expiresAt: Date | null,
-  now: Date = new Date(),
-): boolean {
+function isExpiredUploadJob(expiresAt: Date | null, now: Date = new Date()): boolean {
   return Boolean(expiresAt && expiresAt <= now);
 }
 
@@ -143,12 +138,10 @@ function isExpiredUploadJob(
  * same stale/cancelled job shapes without each caller re-implementing expiry semantics.
  */
 function assertUploadJobIsActive(
-  job:
-    | {
-        status: string;
-        expiresAt: Date | null;
-      }
-    | null,
+  job: {
+    status: string;
+    expiresAt: Date | null;
+  } | null,
   now: Date = new Date(),
 ): asserts job is {
   status: string;
@@ -330,6 +323,17 @@ export function buildPreparedUploadAssets(
  * storage credentials or path-shaping logic locally.
  */
 export async function buildPresignedFiles(preparedAssets: PreparedUploadAsset[]) {
+  const descriptors: Array<{
+    slot: string;
+    variant: "original" | "thumbnail";
+    prepared: PreparedUploadAsset["original"] | PreparedUploadAsset["thumbnail"];
+  }> = [];
+  for (const asset of preparedAssets) {
+    for (const variant of ["original", "thumbnail"] as const) {
+      descriptors.push({ slot: asset.slot, variant, prepared: asset[variant] });
+    }
+  }
+
   const files: Array<{
     slot: string;
     variant: "original" | "thumbnail";
@@ -338,25 +342,33 @@ export async function buildPresignedFiles(preparedAssets: PreparedUploadAsset[])
     expiresInSeconds: number;
     contentType: string;
   }> = [];
+  let nextIndex = 0;
+  const workerCount = Math.min(6, descriptors.length);
+  await Promise.all(
+    Array.from({ length: workerCount }, async () => {
+      while (nextIndex < descriptors.length) {
+        const descriptor = descriptors[nextIndex];
+        nextIndex += 1;
+        const { prepared } = descriptor;
+        const signed = await createPresignedInternalAssetUpload({
+          logicalPath: prepared.logicalPath,
+        });
+        files.push({
+          slot: descriptor.slot,
+          variant: descriptor.variant,
+          logicalPath: prepared.logicalPath,
+          uploadUrl: signed.uploadUrl,
+          expiresInSeconds: signed.expiresInSeconds,
+          contentType: prepared.contentType,
+        });
+      }
+    }),
+  );
 
-  for (const asset of preparedAssets) {
-    for (const variant of ["original", "thumbnail"] as const) {
-      const prepared = asset[variant];
-      const signed = await createPresignedInternalAssetUpload({
-        logicalPath: prepared.logicalPath,
-      });
-      files.push({
-        slot: asset.slot,
-        variant,
-        logicalPath: prepared.logicalPath,
-        uploadUrl: signed.uploadUrl,
-        expiresInSeconds: signed.expiresInSeconds,
-        contentType: prepared.contentType,
-      });
-    }
-  }
-
-  return files;
+  return files.sort(
+    (left, right) =>
+      left.slot.localeCompare(right.slot) || left.variant.localeCompare(right.variant),
+  );
 }
 
 /**
@@ -375,9 +387,7 @@ export function summarizeUploadJob(job: {
     inputHash: job.inputHash,
     expectedFrameCount: job.expectedFrameCount,
     committedFrameCount: job.committedFrameCount,
-    canComplete:
-      job.expectedFrameCount > 0 &&
-      job.expectedFrameCount === job.committedFrameCount,
+    canComplete: job.expectedFrameCount > 0 && job.expectedFrameCount === job.committedFrameCount,
     frameStates: [...job.frameJobs].map((frameJob) => ({
       frameOrder: frameJob.frameOrder,
       status: frameJob.status,
@@ -619,11 +629,21 @@ export function assertFrameCanCommit(
 export async function assertPreparedAssetsUploaded(
   preparedAssets: PreparedUploadAsset[],
 ): Promise<void> {
-  for (const asset of preparedAssets) {
-    for (const variant of ["original", "thumbnail"] as const) {
-      await assertLikelyImageAssetUrl(asset[variant].logicalPath);
-    }
-  }
+  const logicalPaths = preparedAssets.flatMap((asset) => [
+    asset.original.logicalPath,
+    asset.thumbnail.logicalPath,
+  ]);
+  let nextIndex = 0;
+  const workerCount = Math.min(6, logicalPaths.length);
+  await Promise.all(
+    Array.from({ length: workerCount }, async () => {
+      while (nextIndex < logicalPaths.length) {
+        const logicalPath = logicalPaths[nextIndex];
+        nextIndex += 1;
+        await assertLikelyImageAssetUrl(logicalPath);
+      }
+    }),
+  );
 }
 
 /**

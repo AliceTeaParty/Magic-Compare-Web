@@ -1,6 +1,8 @@
 import type {
   GroupUploadStartInput,
   UploadAssetDescriptor,
+  UploadFrameDescriptor,
+  UploadStreamFrameDescriptor,
 } from "@/lib/server/uploads/contracts";
 import {
   cancelGroupUpload,
@@ -23,18 +25,34 @@ import type {
 
 const SNAPSHOT_THROTTLE_MS = 140;
 const DEFAULT_UPLOAD_CONCURRENCY = 2;
-const DEFAULT_FILE_UPLOAD_CONCURRENCY = 4;
+const DEFAULT_FILE_UPLOAD_CONCURRENCY = 3;
+const DEFAULT_GLOBAL_FILE_UPLOAD_CONCURRENCY = 6;
 
 type UploadFileVariant = "original" | "thumbnail";
 type RunnerListener = (snapshot: UploadRunnerSnapshot) => void;
 
-interface UploadRunnerOptions {
+interface CommonUploadRunnerOptions {
   caseInput: GroupUploadStartInput["case"];
   groupInput: WebUploadGroupMetadata;
-  frames: GeneratedUploadFrame[];
   uploadConcurrency?: number;
   fileUploadConcurrency?: number;
+  globalFileUploadConcurrency?: number;
 }
+
+interface LegacyUploadRunnerOptions extends CommonUploadRunnerOptions {
+  frames: GeneratedUploadFrame[];
+  stream?: never;
+}
+
+interface StreamUploadRunnerOptions extends CommonUploadRunnerOptions {
+  frames?: never;
+  stream: {
+    frames: UploadStreamFrameDescriptor[];
+    generateFrame: (frameOrder: number, signal: AbortSignal) => Promise<GeneratedUploadFrame>;
+  };
+}
+
+type UploadRunnerOptions = LegacyUploadRunnerOptions | StreamUploadRunnerOptions;
 
 interface UploadFileSource {
   blob: Blob;
@@ -79,11 +97,16 @@ function assetDescriptor(asset: GeneratedUploadAsset): UploadAssetDescriptor {
   };
 }
 
-function uploadFileKey(
-  frameOrder: number,
-  slot: string,
-  variant: UploadFileVariant,
-) {
+function frameDescriptor(frame: GeneratedUploadFrame): UploadFrameDescriptor {
+  return {
+    order: frame.order,
+    title: frame.title,
+    caption: frame.caption,
+    assets: frame.assets.map(assetDescriptor),
+  };
+}
+
+function uploadFileKey(frameOrder: number, slot: string, variant: UploadFileVariant) {
   return `${frameOrder}:${slot}:${variant}`;
 }
 
@@ -91,7 +114,7 @@ function uploadFileKey(
  * Builds the server upload payload and local Blob lookup together so the descriptor order and PUT
  * body map cannot drift while React still avoids holding large File/Blob objects in state.
  */
-function buildUploadPlan(options: UploadRunnerOptions) {
+function buildLegacyUploadPlan(options: LegacyUploadRunnerOptions) {
   const filesByKey = new Map<string, UploadFileSource>();
   const frames = options.frames.map((frame) => {
     for (const asset of frame.assets) {
@@ -131,6 +154,74 @@ function buildUploadPlan(options: UploadRunnerOptions) {
   };
 }
 
+function buildStreamUploadPlan(options: StreamUploadRunnerOptions) {
+  return {
+    payload: {
+      protocol: "stream-v2" as const,
+      case: options.caseInput,
+      group: {
+        slug: options.groupInput.slug,
+        title: options.groupInput.title,
+        description: options.groupInput.description,
+        order: options.groupInput.order,
+        defaultMode: options.groupInput.defaultMode,
+        tags: options.groupInput.tags,
+      },
+      frames: options.stream.frames,
+      forceRestart: false,
+    } satisfies GroupUploadStartInput,
+    filesByKey: new Map<string, UploadFileSource>(),
+  };
+}
+
+/** Caps PUTs across all active frames; per-frame pools alone would multiply concurrency. */
+class AsyncSemaphore {
+  private active = 0;
+  private readonly waiters: Array<{
+    resolve: (release: () => void) => void;
+    reject: (error: Error) => void;
+    signal?: AbortSignal;
+    abort?: () => void;
+  }> = [];
+
+  constructor(private readonly limit: number) {}
+
+  acquire(signal?: AbortSignal): Promise<() => void> {
+    if (signal?.aborted) {
+      return Promise.reject(new DOMException("Upload was paused.", "AbortError"));
+    }
+    if (this.active < this.limit) {
+      this.active += 1;
+      return Promise.resolve(this.releaseFactory());
+    }
+    return new Promise((resolve, reject) => {
+      const waiter = { resolve, reject, signal } as (typeof this.waiters)[number];
+      waiter.abort = () => {
+        const index = this.waiters.indexOf(waiter);
+        if (index >= 0) this.waiters.splice(index, 1);
+        reject(new DOMException("Upload was paused.", "AbortError"));
+      };
+      signal?.addEventListener("abort", waiter.abort, { once: true });
+      this.waiters.push(waiter);
+    });
+  }
+
+  private releaseFactory() {
+    let released = false;
+    return () => {
+      if (released) return;
+      released = true;
+      const waiter = this.waiters.shift();
+      if (waiter) {
+        if (waiter.abort) waiter.signal?.removeEventListener("abort", waiter.abort);
+        waiter.resolve(this.releaseFactory());
+      } else {
+        this.active -= 1;
+      }
+    };
+  }
+}
+
 /**
  * Owns the browser upload state machine so the page only subscribes to throttled summaries while
  * File/Blob objects, AbortControllers, and transient progress remain outside React state.
@@ -140,12 +231,18 @@ export class WebUploadRunner {
   private readonly filesByKey: Map<string, UploadFileSource>;
   private readonly uploadConcurrency: number;
   private readonly fileUploadConcurrency: number;
+  private readonly fileUploadSemaphore: AsyncSemaphore;
+  private readonly generatedFramesByOrder = new Map<number, GeneratedUploadFrame>();
+  private readonly generateFrame: StreamUploadRunnerOptions["stream"]["generateFrame"] | null;
   private readonly listeners = new Set<RunnerListener>();
   private readonly abortControllers = new Set<AbortController>();
+  private readonly generationControllers = new Set<AbortController>();
   private readonly frames = new Map<number, RunnerFrameState>();
   private snapshotTimer: ReturnType<typeof setTimeout> | null = null;
   private jobId: string | null = null;
   private inputHash: string | null = null;
+  private pendingStartRequest: ReturnType<typeof startGroupUpload> | null = null;
+  private serverCancellation: Promise<void> | null = null;
   private stage: WebUploadStage = "ready";
   private message = "准备上传。";
   private paused = false;
@@ -160,14 +257,28 @@ export class WebUploadRunner {
   private committedFrameOrders = new Set<number>();
 
   constructor(options: UploadRunnerOptions) {
-    const plan = buildUploadPlan(options);
+    const plan =
+      "stream" in options && options.stream
+        ? buildStreamUploadPlan(options)
+        : buildLegacyUploadPlan(options);
     this.payload = plan.payload;
     this.filesByKey = plan.filesByKey;
     this.uploadConcurrency = options.uploadConcurrency ?? DEFAULT_UPLOAD_CONCURRENCY;
     this.fileUploadConcurrency = options.fileUploadConcurrency ?? DEFAULT_FILE_UPLOAD_CONCURRENCY;
+    this.fileUploadSemaphore = new AsyncSemaphore(
+      options.globalFileUploadConcurrency ?? DEFAULT_GLOBAL_FILE_UPLOAD_CONCURRENCY,
+    );
+    this.generateFrame =
+      "stream" in options && options.stream ? options.stream.generateFrame : null;
 
-    for (const frame of options.frames) {
-      const totalFiles = frame.assets.length * 2;
+    const frames = "stream" in options && options.stream ? options.stream.frames : options.frames;
+    if (!("stream" in options) || !options.stream) {
+      for (const frame of options.frames) this.generatedFramesByOrder.set(frame.order, frame);
+    }
+
+    for (const frame of frames) {
+      const totalFiles =
+        (frame.assets.length + ("generatedHeatmap" in frame && frame.generatedHeatmap ? 1 : 0)) * 2;
       this.frames.set(frame.order, {
         order: frame.order,
         title: frame.title,
@@ -224,6 +335,20 @@ export class WebUploadRunner {
       controller.abort();
     }
     this.abortControllers.clear();
+    for (const controller of this.generationControllers) {
+      controller.abort();
+    }
+    this.generationControllers.clear();
+  }
+
+  private cancelServerJob() {
+    if (!this.jobId) {
+      return Promise.resolve();
+    }
+    this.serverCancellation ??= cancelGroupUpload({ groupUploadJobId: this.jobId }).then(
+      () => undefined,
+    );
+    return this.serverCancellation;
   }
 
   /**
@@ -254,9 +379,14 @@ export class WebUploadRunner {
     this.abortBrowserRequests();
     this.emitSoon();
 
-    if (this.jobId) {
-      await cancelGroupUpload({ groupUploadJobId: this.jobId });
+    if (!this.jobId && this.pendingStartRequest) {
+      try {
+        await this.pendingStartRequest;
+      } catch {
+        // A rejected start did not return a cancellable job identity.
+      }
     }
+    await this.cancelServerJob();
   }
 
   dispose() {
@@ -289,9 +419,16 @@ export class WebUploadRunner {
     this.emitSoon();
 
     try {
-      const startResult = await startGroupUpload(this.payload);
+      this.pendingStartRequest = startGroupUpload(this.payload);
+      const startResult = await this.pendingStartRequest;
       this.jobId = startResult.groupUploadJobId;
       this.inputHash = startResult.inputHash;
+      // Abandon can happen while the start request is in flight. Once the server returns the new
+      // identity, finish that deferred cancellation before any frame generation or PUT can begin.
+      if (this.cancelled) {
+        await this.cancelServerJob();
+        return;
+      }
       this.applyServerFrameStates(startResult.frameStates);
 
       const pendingFrames = [...this.frames.values()]
@@ -336,6 +473,7 @@ export class WebUploadRunner {
       }
       this.emitSoon();
     } finally {
+      this.pendingStartRequest = null;
       this.running = false;
     }
   }
@@ -363,9 +501,7 @@ export class WebUploadRunner {
 
   private applyServerFrameStates(states: UploadFrameState[]) {
     this.committedFrameOrders = new Set(
-      states
-        .filter((frame) => frame.status === "committed")
-        .map((frame) => frame.frameOrder),
+      states.filter((frame) => frame.status === "committed").map((frame) => frame.frameOrder),
     );
     this.committedCount = this.committedFrameOrders.size;
     this.uploadedFiles = 0;
@@ -408,15 +544,22 @@ export class WebUploadRunner {
   }
 
   private async processFrame(frame: RunnerFrameState) {
-    frame.status = "preparing";
+    let generatedFrame: GeneratedUploadFrame | null = null;
+    frame.status = this.generateFrame ? "generating" : "preparing";
     frame.error = undefined;
-    this.message = `正在准备 ${frame.title}。`;
+    this.message = this.generateFrame ? `正在生成 ${frame.title}。` : `正在准备 ${frame.title}。`;
     this.emitSoon();
 
     try {
+      generatedFrame = await this.resolveGeneratedFrame(frame);
+      this.registerFrameFiles(generatedFrame);
+      frame.status = "preparing";
+      this.message = `正在准备 ${frame.title}。`;
+      this.emitSoon();
       const prepared = await prepareGroupUploadFrame({
         groupUploadJobId: this.requireJobId(),
         frameOrder: frame.order,
+        ...(this.generateFrame ? { frame: frameDescriptor(generatedFrame) } : {}),
       });
 
       frame.status = "uploading";
@@ -438,6 +581,52 @@ export class WebUploadRunner {
       frame.progress = clampProgress(frame.uploadedFiles / frame.totalFiles);
       this.failedCount += 1;
       this.emitSoon();
+    } finally {
+      if (this.generateFrame && generatedFrame) {
+        this.releaseFrameFiles(generatedFrame);
+      }
+    }
+  }
+
+  /** Generates only pending frames and keeps their Blobs reachable until that frame commits. */
+  private async resolveGeneratedFrame(frame: RunnerFrameState) {
+    const existing = this.generatedFramesByOrder.get(frame.order);
+    if (existing) return existing;
+    if (!this.generateFrame) {
+      throw new Error(`找不到 ${frame.title} 的生成计划。`);
+    }
+
+    const controller = new AbortController();
+    this.generationControllers.add(controller);
+    try {
+      const generated = await this.generateFrame(frame.order, controller.signal);
+      if (generated.order !== frame.order) {
+        throw new Error(`${frame.title} 的生成结果顺序不一致。`);
+      }
+      return generated;
+    } finally {
+      this.generationControllers.delete(controller);
+    }
+  }
+
+  private registerFrameFiles(frame: GeneratedUploadFrame) {
+    for (const asset of frame.assets) {
+      for (const variant of ["original", "thumbnail"] as const) {
+        const file = asset[variant];
+        this.filesByKey.set(uploadFileKey(frame.order, asset.slot, variant), {
+          blob: file.blob,
+          contentType: file.contentType,
+          label: `${frame.title} ${asset.label} ${variant}`,
+        });
+      }
+    }
+  }
+
+  private releaseFrameFiles(frame: GeneratedUploadFrame) {
+    for (const asset of frame.assets) {
+      for (const variant of ["original", "thumbnail"] as const) {
+        this.filesByKey.delete(uploadFileKey(frame.order, asset.slot, variant));
+      }
     }
   }
 
@@ -456,7 +645,9 @@ export class WebUploadRunner {
     const controller = new AbortController();
     this.abortControllers.add(controller);
     batchControllers?.add(controller);
+    let release: (() => void) | null = null;
     try {
+      release = await this.fileUploadSemaphore.acquire(controller.signal);
       const response = await fetch(preparedFile.uploadUrl, {
         method: "PUT",
         headers: {
@@ -473,22 +664,17 @@ export class WebUploadRunner {
       this.uploadedFiles += 1;
       this.emitSoon();
     } finally {
+      release?.();
       this.abortControllers.delete(controller);
       batchControllers?.delete(controller);
     }
   }
 
-  private async uploadPreparedFiles(
-    frame: RunnerFrameState,
-    files: PreparedUploadFile[],
-  ) {
+  private async uploadPreparedFiles(frame: RunnerFrameState, files: PreparedUploadFile[]) {
     let cursor = 0;
     let firstError: unknown = null;
     const batchControllers = new Set<AbortController>();
-    const workerCount = Math.max(
-      1,
-      Math.min(this.fileUploadConcurrency, files.length),
-    );
+    const workerCount = Math.max(1, Math.min(this.fileUploadConcurrency, files.length));
     const workers = Array.from({ length: workerCount }, async () => {
       while (!this.paused && !firstError) {
         const file = files[cursor];
@@ -529,10 +715,9 @@ export class WebUploadRunner {
       () => undefined,
       () => undefined,
     );
-    const result = await task;
-    this.inputHash = result.inputHash;
+    await task;
     this.committedFrameOrders.add(frame.order);
-    this.committedCount = result.committedFrameCount;
+    this.committedCount = this.committedFrameOrders.size;
     this.uploadedFiles += Math.max(0, frame.totalFiles - frame.uploadedFiles);
     frame.status = "committed";
     frame.progress = 1;

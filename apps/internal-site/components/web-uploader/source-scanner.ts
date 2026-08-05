@@ -661,16 +661,21 @@ function orderedComparisonLabels(frame: WebUploadFramePlan) {
   );
 }
 
+function framesRequiringGeneratedHeatmap(frames: WebUploadFramePlan[]) {
+  return frames.filter((frame) => !frame.heatmap);
+}
+
 /**
  * Mirrors the preview selector rule so the generated default is safe for every frame instead of
  * only matching the first row's primary comparison column.
  */
 function commonHeatmapReferenceLabels(frames: WebUploadFramePlan[]) {
-  if (frames.length === 0) {
+  const generatedHeatmapFrames = framesRequiringGeneratedHeatmap(frames);
+  if (generatedHeatmapFrames.length === 0) {
     return [];
   }
 
-  const [firstFrame, ...remainingFrames] = frames;
+  const [firstFrame, ...remainingFrames] = generatedHeatmapFrames;
   const commonLabels = new Set(orderedComparisonLabels(firstFrame));
   for (const frame of remainingFrames) {
     const labels = new Set(orderedComparisonLabels(frame));
@@ -693,7 +698,11 @@ export function defaultHeatmapReferenceLabel(frames: WebUploadFramePlan[]) {
  * fail later on the first row missing the stored reference label.
  */
 function heatmapReferenceIssues(frames: WebUploadFramePlan[]): WebUploadIssue[] {
-  if (frames.length === 0 || commonHeatmapReferenceLabels(frames).length > 0) {
+  const generatedHeatmapFrames = framesRequiringGeneratedHeatmap(frames);
+  if (
+    generatedHeatmapFrames.length === 0 ||
+    commonHeatmapReferenceLabels(generatedHeatmapFrames).length > 0
+  ) {
     return [];
   }
 
@@ -701,8 +710,23 @@ function heatmapReferenceIssues(frames: WebUploadFramePlan[]): WebUploadIssue[] 
     {
       code: "heatmap-reference-missing",
       severity: "error",
-      path: frames[0].after.source.relativePath,
-      message: "没有所有帧都可用的 heatmap 参考列，请统一比较列后再上传。",
+      path: generatedHeatmapFrames[0].after.source.relativePath,
+      message: "需要自动生成 heatmap 的帧没有共同参考列，请统一比较列后再上传。",
+    },
+  ];
+}
+
+function emptyFrameIssues(frames: WebUploadFramePlan[]): WebUploadIssue[] {
+  if (frames.length > 0) {
+    return [];
+  }
+
+  return [
+    {
+      code: "frame-missing",
+      severity: "error",
+      path: "",
+      message: "所选目录中没有可上传的对比帧。",
     },
   ];
 }
@@ -767,7 +791,7 @@ function buildFlatPlan(
     frames,
     heatmapReferenceLabel: defaultHeatmapReferenceLabel(frames),
     ignoredFiles: [...ignoredFiles, ...parsed.ignored],
-    issues: [...issues, ...heatmapReferenceIssues(frames)],
+    issues: [...issues, ...emptyFrameIssues(frames), ...heatmapReferenceIssues(frames)],
   };
 }
 
@@ -885,7 +909,7 @@ function buildNestedPlan(
     frames,
     heatmapReferenceLabel: defaultHeatmapReferenceLabel(frames),
     ignoredFiles: ignored,
-    issues: [...issues, ...heatmapReferenceIssues(frames)],
+    issues: [...issues, ...emptyFrameIssues(frames), ...heatmapReferenceIssues(frames)],
   };
 }
 

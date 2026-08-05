@@ -1,9 +1,5 @@
 import { parseUploadFilenameStem } from "./filename-parser";
-import type {
-  WebUploadFramePlan,
-  WebUploadIssue,
-  WebUploadPlan,
-} from "./web-upload-types";
+import type { WebUploadFramePlan, WebUploadIssue, WebUploadPlan } from "./web-upload-types";
 
 export interface FramePreviewRow {
   frameId: string;
@@ -36,9 +32,7 @@ export interface PlanView {
 }
 
 export type UploadPlanImageColumn =
-  | { kind: "before" }
-  | { kind: "after" }
-  | { kind: "misc"; label: string };
+  { kind: "before" } | { kind: "after" } | { kind: "misc"; label: string };
 
 export type FrameTitleMode = "inferred" | "filename";
 
@@ -66,10 +60,7 @@ export function fullFrameTitleFromSourcePath(path: string) {
  * Keeps the scanner's compact title alongside the active title so operators can switch to a
  * filename-based fallback and return without rescanning the directory or losing other plan edits.
  */
-export function setUploadPlanFrameTitleMode(
-  plan: WebUploadPlan,
-  mode: FrameTitleMode,
-) {
+export function setUploadPlanFrameTitleMode(plan: WebUploadPlan, mode: FrameTitleMode) {
   return {
     ...plan,
     frames: plan.frames.map((frame) => {
@@ -127,11 +118,14 @@ function orderedComparisonLabels(frame: WebUploadFramePlan) {
 }
 
 export function getUploadPlanHeatmapReferenceOptions(plan: WebUploadPlan) {
-  if (plan.frames.length === 0) {
+  // A supplied heatmap has no generated reference. Excluding those rows keeps the table-level
+  // selector aligned with the subset that will actually consume it during preflight.
+  const generatedHeatmapFrames = plan.frames.filter((frame) => !frame.heatmap);
+  if (generatedHeatmapFrames.length === 0) {
     return [];
   }
 
-  const [firstFrame, ...remainingFrames] = plan.frames;
+  const [firstFrame, ...remainingFrames] = generatedHeatmapFrames;
   const commonLabels = new Set(orderedComparisonLabels(firstFrame));
   for (const frame of remainingFrames) {
     const labels = new Set(orderedComparisonLabels(frame));
@@ -217,19 +211,24 @@ export function renameUploadPlanAssetLabel(
   const currentLabelSet = new Set(currentColumnLabels.map((label) => label.toLowerCase()));
   const existingLabels = new Set(
     plan.frames
-      .flatMap((frame) => [frame.before.label, frame.after.label, ...frame.misc.map((asset) => asset.label)])
+      .flatMap((frame) => [
+        frame.before.label,
+        frame.after.label,
+        ...frame.misc.map((asset) => asset.label),
+      ])
       .filter((label) => !currentLabelSet.has(label.toLowerCase()))
       .map((label) => label.toLowerCase()),
   );
   // Column labels drive table headers and the global heatmap selector, so keep them unique. The
   // target role is explicit because older scans can contain a misc column also named "After".
-  if (normalizedLabel.toLowerCase() === "heatmap" || existingLabels.has(normalizedLabel.toLowerCase())) {
+  if (
+    normalizedLabel.toLowerCase() === "heatmap" ||
+    existingLabels.has(normalizedLabel.toLowerCase())
+  ) {
     return null;
   }
   const hasBuiltInColumnWithCurrentLabel = plan.frames.some(
-    (frame) =>
-      frame.before.label === currentLabel ||
-      frame.after.label === currentLabel,
+    (frame) => frame.before.label === currentLabel || frame.after.label === currentLabel,
   );
   const shouldRenameHeatmapReference =
     plan.heatmapReferenceLabel === currentLabel &&
@@ -237,20 +236,13 @@ export function renameUploadPlanAssetLabel(
 
   return {
     ...plan,
-    heatmapReferenceLabel:
-      shouldRenameHeatmapReference
-        ? normalizedLabel
-        : plan.heatmapReferenceLabel,
+    heatmapReferenceLabel: shouldRenameHeatmapReference
+      ? normalizedLabel
+      : plan.heatmapReferenceLabel,
     frames: plan.frames.map((frame) => ({
       ...frame,
-      before:
-        column.kind === "before"
-          ? { ...frame.before, label: normalizedLabel }
-          : frame.before,
-      after:
-        column.kind === "after"
-          ? { ...frame.after, label: normalizedLabel }
-          : frame.after,
+      before: column.kind === "before" ? { ...frame.before, label: normalizedLabel } : frame.before,
+      after: column.kind === "after" ? { ...frame.after, label: normalizedLabel } : frame.after,
       misc: frame.misc.map((asset) =>
         column.kind === "misc" && asset.label === column.label
           ? { ...asset, label: normalizedLabel }
@@ -260,10 +252,7 @@ export function renameUploadPlanAssetLabel(
   };
 }
 
-export function setUploadPlanHeatmapReference(
-  plan: WebUploadPlan,
-  nextLabel: string,
-) {
+export function setUploadPlanHeatmapReference(plan: WebUploadPlan, nextLabel: string) {
   if (
     plan.heatmapReferenceLabel === nextLabel ||
     !getUploadPlanHeatmapReferenceOptions(plan).includes(nextLabel)
