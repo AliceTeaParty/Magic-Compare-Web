@@ -1,14 +1,8 @@
-import {
-  existsSync,
-  mkdirSync,
-  readdirSync,
-  readFileSync,
-  rmSync,
-  writeFileSync,
-} from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import {
   loadWorkspaceEnvFromModule,
+  resolveDefaultPublishedRoot,
   resolveWorkspaceRoot,
 } from "../packages/shared-utils/src/workspace-env";
 
@@ -26,12 +20,12 @@ interface PublishedAlias {
 
 /**
  * Reads the published bundle root from env so the alias generator follows the same data source
- * as export/deploy, regardless of whether the repo is using the default local content path.
+ * as export/deploy, regardless of whether the repo is using the default user cache path.
  */
 function publishedGroupsDir(): string {
   const publishedRoot = process.env.MAGIC_COMPARE_PUBLISHED_ROOT?.trim()
     ? path.resolve(process.env.MAGIC_COMPARE_PUBLISHED_ROOT.trim())
-    : path.join(workspaceRoot, "content", "published");
+    : resolveDefaultPublishedRoot(workspaceRoot);
 
   return path.join(publishedRoot, "groups");
 }
@@ -132,12 +126,7 @@ function main(): void {
   });
 
   for (const alias of readAliases()) {
-    const aliasDir = path.join(
-      aliasRoot,
-      alias.caseSlug,
-      "groups",
-      alias.groupSlug,
-    );
+    const aliasDir = path.join(aliasRoot, alias.caseSlug, "groups", alias.groupSlug);
     mkdirSync(aliasDir, { recursive: true });
     writeFileSync(
       path.join(aliasDir, "index.html"),

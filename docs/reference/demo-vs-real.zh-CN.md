@@ -31,7 +31,7 @@ demo 的原始文件固定存放在：
 
 - `apps/internal-site/prisma/demo-assets/`
 
-这些文件是 seed 的稳定输入，不依赖上传工具，也不依赖当前 `content/published` 中是否已经有最新发布产物。
+这些文件是 seed 的稳定输入，不依赖上传工具，也不依赖当前 published root 中是否已经有最新发布产物。
 
 ### 2. seed 会把 demo 写入数据库与 S3
 
@@ -98,7 +98,7 @@ pnpm db:seed
 
 - group 排序
 - frame 浏览
-- 发布到 `content/published`
+- 发布到 published root
 - public export
 - public deploy
 - group 删除
@@ -136,8 +136,8 @@ pnpm db:seed
 
 如果直接把 demo 当作真实导入流程样板，会得出几个错误结论：
 
-- “图片是不是从 `content/published` 回流导入的？”
-  不是。真实内容不会从 `content/published` 回流。
+- “图片是不是从 published root 回流导入的？”
+  真实内容不会从 published root 回流。
 
 - “是不是所有 case 都会被 `db:seed` 改写？”
   不是。只有固定 demo 由 seed 维护。
@@ -225,5 +225,5 @@ http://localhost:3000/upload
 - demo seed：`apps/internal-site/prisma/seed.ts`
 - demo 原始素材：`apps/internal-site/prisma/demo-assets/`
 - 真实导入入口：`apps/internal-site/app/upload/page.tsx`
-- published bundle：`content/published/groups/`
+- published bundle：published root 下的 `groups/`
 - 公开站读取逻辑：`apps/public-site/lib/content.ts`

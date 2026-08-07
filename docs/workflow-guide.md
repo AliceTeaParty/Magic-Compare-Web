@@ -34,7 +34,7 @@
 
 `public-site` 负责：
 
-- 读取 `content/published/groups/*/manifest.json`
+- 读取 published root 下的 `groups/*/manifest.json`
 - 静态导出公开页面
 - 公开访问 `/g/[publicSlug]`
 
@@ -76,7 +76,9 @@
 
 如果 `MAGIC_COMPARE_PUBLISHED_ROOT` 留空：
 
-- 宿主机默认用仓库内的 `content/published`
+- 宿主机默认使用被忽略的 `output/published`
+
+旧工作区若仍有 `content/published`，需要在确认新目录不存在后将其移动到 `output/published`。运行时不会回读旧目录。
 
 Docker compose 会自动把它指向持久化卷路径：
 
@@ -352,7 +354,7 @@ Web 上传链路是：
 
 结果：
 
-- `content/published` 或 `MAGIC_COMPARE_PUBLISHED_ROOT` 更新
+- published root 或 `MAGIC_COMPARE_PUBLISHED_ROOT` 更新
 
 发布只查询公开 Group、Frame 和 manifest 所需字段。新上传或 manifest 导入在对象检查成功后写入 `Asset.storageValidatedAt`；旧素材首次发布以 8 路并发检查未记录的原图和缩略图，后续发布信任 UUID 不可变路径，不再重复读取 R2。日志记录查询、校验和总耗时以及信任/新增校验数量。
 
@@ -600,7 +602,7 @@ docker build --platform linux/amd64 -f docker/internal-site.Dockerfile -t magic-
 
 ### 不要在 CI 里假设这些目录永远存在
 
-- `content/published`
+- `output/published`（默认 published bundle）
 - `dist/public-site`
 - `apps/public-site/public/published`
 

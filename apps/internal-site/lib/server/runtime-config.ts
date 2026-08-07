@@ -6,6 +6,7 @@ import {
   parseEnvFlag,
   PUBLISHED_ROOT_ENV_NAME,
 } from "@magic-compare/shared-utils";
+import { resolveDefaultPublishedRoot } from "@magic-compare/shared-utils/workspace-env";
 import { loadWorkspaceEnv } from "./env/load-workspace-env";
 export const PUBLIC_EXPORT_DIR_ENV_NAME = "MAGIC_COMPARE_PUBLIC_EXPORT_DIR";
 export const S3_BUCKET_ENV_NAME = "MAGIC_COMPARE_S3_BUCKET";
@@ -84,26 +85,22 @@ export function isHiddenDemoCaseSlug(caseSlug: string): boolean {
 export function getPublishedRoot(): string {
   loadWorkspaceEnv();
   const configured = process.env[PUBLISHED_ROOT_ENV_NAME]?.trim();
-  return configured
-    ? path.resolve(configured)
-    : path.join(workspaceRoot(), "content", "published");
+  return configured ? path.resolve(configured) : resolveDefaultPublishedRoot(workspaceRoot());
 }
 
 export function getPublicExportDir(): string {
   loadWorkspaceEnv();
   const configured = process.env[PUBLIC_EXPORT_DIR_ENV_NAME]?.trim();
-  return configured
-    ? path.resolve(configured)
-    : path.join(workspaceRoot(), "dist", "public-site");
+  return configured ? path.resolve(configured) : path.join(workspaceRoot(), "dist", "public-site");
 }
 
 export function isInternalAssetStorageConfigured(): boolean {
   loadWorkspaceEnv();
   return Boolean(
     process.env[S3_BUCKET_ENV_NAME]?.trim() &&
-      process.env[S3_PUBLIC_BASE_URL_ENV_NAME]?.trim() &&
-      process.env[S3_ACCESS_KEY_ID_ENV_NAME]?.trim() &&
-      process.env[S3_SECRET_ACCESS_KEY_ENV_NAME]?.trim(),
+    process.env[S3_PUBLIC_BASE_URL_ENV_NAME]?.trim() &&
+    process.env[S3_ACCESS_KEY_ID_ENV_NAME]?.trim() &&
+    process.env[S3_SECRET_ACCESS_KEY_ENV_NAME]?.trim(),
   );
 }
 
@@ -135,7 +132,7 @@ export function isCloudflarePagesDeployConfigured(): boolean {
   loadWorkspaceEnv();
   return Boolean(
     process.env[CF_PAGES_PROJECT_NAME_ENV_NAME]?.trim() &&
-      process.env[CF_ACCOUNT_ID_ENV_NAME]?.trim() &&
-      process.env[CF_API_TOKEN_ENV_NAME]?.trim(),
+    process.env[CF_ACCOUNT_ID_ENV_NAME]?.trim() &&
+    process.env[CF_API_TOKEN_ENV_NAME]?.trim(),
   );
 }

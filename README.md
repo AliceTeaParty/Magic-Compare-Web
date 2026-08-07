@@ -43,7 +43,7 @@ Publish a case from the internal site, then explicitly export or deploy the publ
 apps/internal-site/   Server-backed internal workspace
 apps/public-site/     Static public viewer
 packages/              Shared schemas, viewer logic, UI, and utilities
-content/published/     Published manifest and demo content
+output/published/      Generated published manifest and demo content
 docs/                  Workflow, API, deployment, and UI notes
 ```
 

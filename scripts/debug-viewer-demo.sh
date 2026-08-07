@@ -49,8 +49,8 @@ find_published_root() {
     exit 1
   fi
 
-  if has_published_groups "${ROOT_DIR}/content/published"; then
-    printf '%s\n' "${ROOT_DIR}/content/published"
+  if has_published_groups "${ROOT_DIR}/output/published"; then
+    printf '%s\n' "${ROOT_DIR}/output/published"
     return 0
   fi
 

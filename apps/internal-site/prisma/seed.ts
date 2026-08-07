@@ -2,6 +2,10 @@ import path from "node:path";
 import { existsSync } from "node:fs";
 import type { ImportManifest } from "@magic-compare/content-schema";
 import { DEMO_CASE_SLUG, buildPublicGroupSlug } from "@magic-compare/shared-utils";
+import {
+  resolveDefaultPublishedRoot,
+  resolveWorkspaceRoot,
+} from "@magic-compare/shared-utils/workspace-env";
 import { prisma } from "../lib/server/db/client";
 import { publishCase } from "../lib/server/publish/publish-case";
 import { applyImportManifest } from "../lib/server/repositories/content-repository";
@@ -139,7 +143,7 @@ function demoPublishedAssetRoot(): string {
 }
 
 function bundledPublishedRoot(): string {
-  return path.resolve(process.cwd(), "../../content/published");
+  return resolveDefaultPublishedRoot(resolveWorkspaceRoot(import.meta.url, 3));
 }
 
 function shouldRepublishDemoBundle(): boolean {
@@ -153,7 +157,10 @@ function shouldRepublishDemoBundle(): boolean {
 
 async function syncDemoAssets(): Promise<void> {
   for (const asset of demoAssets) {
-    await uploadLocalFileToInternalAsset(path.join(demoPublishedAssetRoot(), asset.source), asset.target);
+    await uploadLocalFileToInternalAsset(
+      path.join(demoPublishedAssetRoot(), asset.source),
+      asset.target,
+    );
   }
 }
 
@@ -263,11 +270,15 @@ async function main() {
     await publishCase(demoCaseId);
 
     if (existingDemoCase) {
-      console.log("Repaired existing demo case, refreshed demo assets in external storage, and republished the demo bundle.");
+      console.log(
+        "Repaired existing demo case, refreshed demo assets in external storage, and republished the demo bundle.",
+      );
       return;
     }
 
-    console.log("Seeded demo case into SQLite, published the demo bundle, and uploaded demo assets to external storage.");
+    console.log(
+      "Seeded demo case into SQLite, published the demo bundle, and uploaded demo assets to external storage.",
+    );
     return;
   }
 

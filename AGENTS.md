@@ -42,7 +42,7 @@ Next 开发服务器使用各应用的 `.next-dev`，Playwright 使用 `.next-e2
 仓库分三条独立责任线，不能混用：
 
 - `apps/internal-site/`：带服务端能力的 Next.js 内部工作站。负责 case catalog、case workspace、group viewer、`/api/ops/*`、SQLite/Prisma metadata、S3/R2 内部素材访问、publish bundle 生成，以及显式 public export/deploy 触发。
-- `apps/public-site/`：静态导出站点。只读取 `content/published/groups/*/manifest.json` 并服务 `/g/[publicSlug]`，没有 catalog、上传 UI 或写接口。
+- `apps/public-site/`：静态导出站点。只读取 published root（宿主机默认 `output/published`）下的 `groups/*/manifest.json` 并服务 `/g/[publicSlug]`，没有 catalog、上传 UI 或写接口。
 
 共享包：
 

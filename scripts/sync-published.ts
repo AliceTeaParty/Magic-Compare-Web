@@ -2,6 +2,7 @@ import { cpSync, existsSync, mkdirSync, rmSync } from "node:fs";
 import path from "node:path";
 import {
   loadWorkspaceEnvFromModule,
+  resolveDefaultPublishedRoot,
   resolveWorkspaceRoot,
 } from "../packages/shared-utils/src/workspace-env";
 
@@ -16,14 +17,8 @@ function main(): void {
 
   const sourceDir = process.env.MAGIC_COMPARE_PUBLISHED_ROOT
     ? path.resolve(process.env.MAGIC_COMPARE_PUBLISHED_ROOT)
-    : path.join(workspaceRoot, "content", "published");
-  const destinationDir = path.join(
-    workspaceRoot,
-    "apps",
-    "public-site",
-    "public",
-    "published",
-  );
+    : resolveDefaultPublishedRoot(workspaceRoot);
+  const destinationDir = path.join(workspaceRoot, "apps", "public-site", "public", "published");
 
   mkdirSync(path.dirname(destinationDir), { recursive: true });
   rmSync(destinationDir, { recursive: true, force: true });

@@ -43,7 +43,7 @@ pnpm dev
 apps/internal-site/   带服务端能力的内部工作区
 apps/public-site/     静态公开 viewer
 packages/              共享 schema、viewer 逻辑、UI 和工具函数
-content/published/     已发布 manifest 与 demo 内容
+output/published/      生成的 published manifest 与 demo 内容
 docs/                  工作流、API、部署和 UI 文档
 ```
 

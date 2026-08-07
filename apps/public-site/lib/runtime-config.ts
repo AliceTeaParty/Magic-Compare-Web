@@ -6,6 +6,7 @@ import {
   parseEnvFlag,
   PUBLISHED_ROOT_ENV_NAME,
 } from "@magic-compare/shared-utils";
+import { resolveDefaultPublishedRoot } from "@magic-compare/shared-utils/workspace-env";
 import { loadWorkspaceEnv } from "./env/load-workspace-env";
 
 function workspaceRoot(): string {
@@ -27,6 +28,6 @@ export function getPublishedGroupsRoot(): string {
   const configured = process.env[PUBLISHED_ROOT_ENV_NAME]?.trim();
   const publishedRoot = configured
     ? path.resolve(configured)
-    : path.join(workspaceRoot(), "content", "published");
+    : resolveDefaultPublishedRoot(workspaceRoot());
   return path.join(publishedRoot, "groups");
 }

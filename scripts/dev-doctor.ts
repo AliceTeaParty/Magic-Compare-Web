@@ -6,6 +6,7 @@ import process from "node:process";
 import { pathToFileURL } from "node:url";
 import {
   loadWorkspaceEnvFromModule,
+  resolveDefaultPublishedRoot,
   resolveWorkspaceRoot,
 } from "../packages/shared-utils/src/workspace-env";
 
@@ -178,7 +179,7 @@ export async function validatePorts(
 function inspectPublishedRoot(environment: NodeJS.ProcessEnv, workspaceRoot: string): DoctorCheck {
   const publishedRoot = environment.MAGIC_COMPARE_PUBLISHED_ROOT?.trim()
     ? path.resolve(environment.MAGIC_COMPARE_PUBLISHED_ROOT)
-    : path.join(workspaceRoot, "content", "published");
+    : resolveDefaultPublishedRoot(workspaceRoot);
   const groupsRoot = path.join(publishedRoot, "groups");
 
   if (!existsSync(groupsRoot)) {

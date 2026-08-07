@@ -93,7 +93,7 @@ function main() {
   }
   console.log("");
   console.log("Skipped on purpose:");
-  console.log("- content/ (published data root when using default host config)");
+  console.log("- output/published/ (published bundle)");
   console.log("- docker-data/ (persistent Docker runtime data)");
   console.log("- apps/internal-site/prisma/*.db (local SQLite data)");
 }

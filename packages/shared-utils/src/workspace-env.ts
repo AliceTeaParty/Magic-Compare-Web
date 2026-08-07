@@ -9,6 +9,11 @@ export function resolveWorkspaceRoot(fromModuleUrl: string, levelsUp: number): s
   return path.resolve(currentDir, ...Array(levelsUp).fill(".."));
 }
 
+/** Keeps generated published bundles under the ignored workspace output directory. */
+export function resolveDefaultPublishedRoot(workspaceRoot: string): string {
+  return path.join(workspaceRoot, "output", "published");
+}
+
 export function loadWorkspaceEnvFromModule(fromModuleUrl: string, levelsUp: number): void {
   const workspaceRoot = resolveWorkspaceRoot(fromModuleUrl, levelsUp);
   if (loadedWorkspaceRoots.has(workspaceRoot)) {
