@@ -24,6 +24,7 @@ export function ABCompareStage({
   mediaRect,
   onCycleSide,
   panZoomState,
+  pixelRenderingEnabled,
   prefersReducedMotion,
   rotateStage,
   side,
@@ -38,6 +39,7 @@ export function ABCompareStage({
   mediaRect: ViewerMediaRect;
   onCycleSide: () => void;
   panZoomState: ViewerPanZoomState;
+  pixelRenderingEnabled: boolean;
   prefersReducedMotion: boolean;
   rotateStage: boolean;
   side: "before" | "after";
@@ -166,7 +168,9 @@ export function ABCompareStage({
             rotateStage={rotateStage}
             panZoomState={panZoomState}
             effectiveScale={effectiveScale}
-            imageRendering="pixelated"
+            // Sampling is a visual preference only. Keeping it out of pan/zoom state preserves the
+            // existing physical-pixel scale and translation when the toolbar toggle changes.
+            imageRendering={pixelRenderingEnabled ? "pixelated" : "auto"}
             loading="eager"
             decoding="async"
             fetchPriority={isVisibleLayer ? "high" : "auto"}

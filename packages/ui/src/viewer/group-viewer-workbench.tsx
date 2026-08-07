@@ -23,6 +23,7 @@ import { viewerTokens } from "./workbench/viewer-tokens";
 import { ViewerGuidePanel } from "./workbench/viewer-guide-panel";
 import { readViewerGuideState, writeViewerGuideState } from "./workbench/viewer-guide-storage";
 import { ViewerOnboardingNudge } from "./workbench/viewer-onboarding-nudge";
+import { PixelRenderingAutoDisableNudge } from "./workbench/pixel-rendering-auto-disable-nudge";
 
 interface GroupViewerWorkbenchProps {
   dataset: ViewerDataset;
@@ -88,12 +89,18 @@ export function GroupViewerWorkbench({
   const abInspect = useAbInspectState();
   const {
     displayedScale: abDisplayedScale,
+    disablePixelRenderingAutoEnable,
+    dismissPixelRenderingAutoPromptForSession,
+    keepPixelRenderingAutoEnable,
     panZoomState: abPanZoomState,
+    pixelRenderingAutoDisablePromptOpen,
+    pixelRenderingEnabled,
     reset: resetAbInspect,
     setPanZoomState: setAbPanZoomState,
     setScale: setAbScale,
     setStageActive: setAbStageActive,
     stageActive: abStageActive,
+    togglePixelRendering,
   } = abInspect;
   const {
     mediaPreferencesReady,
@@ -262,9 +269,11 @@ export function GroupViewerWorkbench({
           onOpenGuide={openViewerGuide}
           onModeChange={setMode}
           onOverlayOpacityChange={setOverlayOpacity}
+          onPixelRenderingToggle={togglePixelRendering}
           onScaleChange={setAbScale}
           onScrollStageIntoView={stageShell.scrollStageIntoView}
           onToggleSidebar={toggleSidebar}
+          pixelRenderingEnabled={pixelRenderingEnabled}
           sidebarOpen={sidebarOpen}
         />
 
@@ -308,6 +317,7 @@ export function GroupViewerWorkbench({
                   onCycleAbSide={() => setAbSide(cycleAbSide(abSide))}
                   overlayOpacity={overlayOpacity}
                   panZoomState={abPanZoomState}
+                  pixelRenderingEnabled={pixelRenderingEnabled}
                   prefersReducedMotion={resolvedPrefersReducedMotion}
                   rotateStage={resolvedRotateStage}
                   setAbStageActive={setAbStageActive}
@@ -317,7 +327,24 @@ export function GroupViewerWorkbench({
                   stageRef={stageShell.stageRef}
                   swipePosition={swipePosition}
                 />
-                {showGuideNudge ? (
+                {pixelRenderingAutoDisablePromptOpen ? (
+                  <Box
+                    sx={{
+                      position: "absolute",
+                      zIndex: 2,
+                      top: { xs: 8, md: 12 },
+                      right: { xs: 8, md: 12 },
+                    }}
+                  >
+                    {/* This lightweight choice shares the guide nudge anchor so it cannot lock the
+                        document scroll or shift the page when the browser scrollbar disappears. */}
+                    <PixelRenderingAutoDisableNudge
+                      onAutoClose={dismissPixelRenderingAutoPromptForSession}
+                      onDisableAutoEnable={disablePixelRenderingAutoEnable}
+                      onKeepAutoEnable={keepPixelRenderingAutoEnable}
+                    />
+                  </Box>
+                ) : showGuideNudge ? (
                   <Box
                     sx={{
                       position: "absolute",

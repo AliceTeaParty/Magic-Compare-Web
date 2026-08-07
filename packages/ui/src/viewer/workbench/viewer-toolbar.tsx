@@ -58,9 +58,11 @@ interface ViewerToolbarProps {
   onOpenGuide: () => void;
   onModeChange: (mode: ViewerMode) => void;
   onOverlayOpacityChange: (value: number) => void;
+  onPixelRenderingToggle: () => void;
   onScaleChange: (nextScale: number) => void;
   onScrollStageIntoView: () => void;
   onToggleSidebar: () => void;
+  pixelRenderingEnabled: boolean;
   sidebarOpen: boolean;
 }
 
@@ -239,9 +241,11 @@ export function ViewerToolbar({
   onOpenGuide,
   onModeChange,
   onOverlayOpacityChange,
+  onPixelRenderingToggle,
   onScaleChange,
   onScrollStageIntoView,
   onToggleSidebar,
+  pixelRenderingEnabled,
   sidebarOpen,
 }: ViewerToolbarProps) {
   const prefersReducedMotion = useReducedMotion();
@@ -444,7 +448,9 @@ export function ViewerToolbar({
                   comparisonAssets={comparisonAssets}
                   onAbSideChange={handleAbSideChange}
                   onComparisonAssetChange={onComparisonAssetChange}
+                  onPixelRenderingToggle={onPixelRenderingToggle}
                   onScaleChange={handleScaleChange}
+                  pixelRenderingEnabled={pixelRenderingEnabled}
                 />
               ) : null
             ) : (

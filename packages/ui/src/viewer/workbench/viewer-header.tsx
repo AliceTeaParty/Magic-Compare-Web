@@ -23,9 +23,11 @@ interface ViewerHeaderProps {
   onOpenGuide: () => void;
   onModeChange: (mode: ViewerMode) => void;
   onOverlayOpacityChange: (value: number) => void;
+  onPixelRenderingToggle: () => void;
   onScaleChange: (nextScale: number) => void;
   onScrollStageIntoView: () => void;
   onToggleSidebar: () => void;
+  pixelRenderingEnabled: boolean;
   sidebarOpen: boolean;
 }
 
@@ -51,9 +53,11 @@ export function ViewerHeader({
   onOpenGuide,
   onModeChange,
   onOverlayOpacityChange,
+  onPixelRenderingToggle,
   onScaleChange,
   onScrollStageIntoView,
   onToggleSidebar,
+  pixelRenderingEnabled,
   sidebarOpen,
 }: ViewerHeaderProps) {
   return (
@@ -175,9 +179,11 @@ export function ViewerHeader({
         onOpenGuide={onOpenGuide}
         onModeChange={onModeChange}
         onOverlayOpacityChange={onOverlayOpacityChange}
+        onPixelRenderingToggle={onPixelRenderingToggle}
         onScaleChange={onScaleChange}
         onScrollStageIntoView={onScrollStageIntoView}
         onToggleSidebar={onToggleSidebar}
+        pixelRenderingEnabled={pixelRenderingEnabled}
         sidebarOpen={sidebarOpen}
       />
     </Box>

@@ -191,6 +191,7 @@ function ViewerStageContent({
   onCycleAbSide,
   overlayOpacity,
   panZoomState,
+  pixelRenderingEnabled,
   prefersReducedMotion,
   rotateStage,
   setAbStageActive,
@@ -208,6 +209,7 @@ function ViewerStageContent({
   onCycleAbSide: () => void;
   overlayOpacity: number;
   panZoomState: ViewerPanZoomState;
+  pixelRenderingEnabled: boolean;
   prefersReducedMotion: boolean;
   rotateStage: boolean;
   setAbStageActive: (nextActive: boolean) => void;
@@ -260,6 +262,7 @@ function ViewerStageContent({
           mediaRect={mediaRect}
           onCycleSide={onCycleAbSide}
           panZoomState={panZoomState}
+          pixelRenderingEnabled={pixelRenderingEnabled}
           prefersReducedMotion={prefersReducedMotion}
           rotateStage={rotateStage}
           side={abSide}
@@ -328,6 +331,7 @@ interface ViewerStageProps {
   onCycleAbSide: () => void;
   overlayOpacity: number;
   panZoomState: ViewerPanZoomState;
+  pixelRenderingEnabled: boolean;
   prefersReducedMotion: boolean;
   rotateStage: boolean;
   setAbStageActive: (nextActive: boolean) => void;
@@ -353,6 +357,7 @@ export function ViewerStage({
   onCycleAbSide,
   overlayOpacity,
   panZoomState,
+  pixelRenderingEnabled,
   prefersReducedMotion,
   rotateStage,
   setAbStageActive,
@@ -396,6 +401,7 @@ export function ViewerStage({
           onCycleAbSide={onCycleAbSide}
           overlayOpacity={overlayOpacity}
           panZoomState={panZoomState}
+          pixelRenderingEnabled={pixelRenderingEnabled}
           prefersReducedMotion={prefersReducedMotion}
           rotateStage={rotateStage}
           setAbStageActive={setAbStageActive}

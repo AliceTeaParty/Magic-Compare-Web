@@ -1,7 +1,7 @@
 "use client";
 
-import { Add, Remove } from "@mui/icons-material";
-import { Box, FormControl, IconButton, MenuItem, Select, Stack } from "@mui/material";
+import { Add, Grid4x4, Remove } from "@mui/icons-material";
+import { Box, FormControl, IconButton, MenuItem, Select, Stack, Tooltip } from "@mui/material";
 import {
   getComparisonAssetKey,
   VIEWER_MAX_PRESET_SCALE,
@@ -19,7 +19,9 @@ interface AbInspectControlsProps {
   comparisonAssets: ViewerAsset[];
   onAbSideChange: (side: "before" | "after") => void;
   onComparisonAssetChange: (assetKey: string) => void;
+  onPixelRenderingToggle: () => void;
   onScaleChange: (nextScale: number) => void;
+  pixelRenderingEnabled: boolean;
 }
 
 /**
@@ -34,14 +36,16 @@ export function AbInspectControls({
   comparisonAssets,
   onAbSideChange,
   onComparisonAssetChange,
+  onPixelRenderingToggle,
   onScaleChange,
+  pixelRenderingEnabled,
 }: AbInspectControlsProps) {
   const isAtMinScale = abScale <= VIEWER_MIN_PRESET_SCALE;
   const isAtMaxScale = abScale >= VIEWER_MAX_PRESET_SCALE;
   // Match the viewer toolbar target size so mode switching and zoom adjustment feel like one
   // control family instead of mixing desktop-tight and touch-friendly hit areas.
   const compactControlHeight = { xs: 42, md: 40 };
-  const tripleControlWidth = 144;
+  const inspectControlWidth = 186;
   const selectedAssetValue = abSide === "before" ? BASELINE_ASSET_VALUE : comparisonAssetKey;
 
   /**
@@ -78,13 +82,18 @@ export function AbInspectControls({
       spacing={0.75}
       sx={{
         alignItems: "center",
+        justifyContent: "flex-end",
         flexShrink: 0,
+        width: "100%",
+        minWidth: 0,
         minHeight: compactControlHeight,
       }}
     >
       <Box
         sx={{
-          width: 128,
+          width: { xs: "auto", sm: 128 },
+          minWidth: 0,
+          flex: { xs: "1 1 0", sm: "0 0 128px" },
           height: compactControlHeight,
           minHeight: compactControlHeight,
         }}
@@ -139,7 +148,8 @@ export function AbInspectControls({
       </Box>
       <Box
         sx={{
-          width: tripleControlWidth,
+          width: inspectControlWidth,
+          flex: `0 0 ${inspectControlWidth}px`,
           height: compactControlHeight,
           minHeight: compactControlHeight,
         }}
@@ -150,7 +160,9 @@ export function AbInspectControls({
             width: "100%",
             height: "100%",
             display: "grid",
-            gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+            // The percentage track uses its full content width instead of clipping; the two zoom
+            // buttons share the recovered space while the pixel toggle keeps a stable final cell.
+            gridTemplateColumns: "minmax(44px, 1fr) max-content minmax(44px, 1fr) 42px",
             overflow: "hidden",
             boxSizing: "border-box",
             border: "1px solid",
@@ -180,18 +192,17 @@ export function AbInspectControls({
           </IconButton>
           <Box
             sx={{
-              width: "100%",
               height: "100%",
-              minWidth: 0,
+              minWidth: "max-content",
               minHeight: 0,
-              px: 0.25,
+              px: 0.5,
               display: "grid",
               placeItems: "center",
               fontSize: "0.9rem",
               fontWeight: 550,
               fontVariantNumeric: "tabular-nums",
               whiteSpace: "nowrap",
-              overflow: "hidden",
+              overflow: "visible",
             }}
           >
             {formatZoomPercentage(abScale)}
@@ -215,6 +226,28 @@ export function AbInspectControls({
           >
             <Add sx={{ fontSize: 16 }} />
           </IconButton>
+          <Tooltip title={pixelRenderingEnabled ? "关闭像素渲染" : "开启像素渲染"}>
+            <IconButton
+              size="small"
+              aria-label={pixelRenderingEnabled ? "关闭 A/B 像素渲染" : "开启 A/B 像素渲染"}
+              aria-pressed={pixelRenderingEnabled}
+              onClick={onPixelRenderingToggle}
+              sx={{
+                width: "100%",
+                height: "100%",
+                borderLeft: "1px solid",
+                borderLeftColor: "divider",
+                borderRadius: 0,
+                "&[aria-pressed='true']": {
+                  color: "primary.onContainer",
+                  backgroundColor: "primary.light",
+                },
+              }}
+            >
+              {/* Grid4x4 reads as image pixels at toolbar size; GridOn resembled a data table. */}
+              <Grid4x4 sx={{ fontSize: 18 }} />
+            </IconButton>
+          </Tooltip>
         </Box>
       </Box>
     </Stack>
