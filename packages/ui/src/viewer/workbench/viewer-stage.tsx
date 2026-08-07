@@ -113,6 +113,7 @@ function StagePresentationShell({
   stageAspectRatio: number;
 }) {
   const hasMeasuredStageSize = Boolean(stageSize);
+  const activeStageShadow = `inset 0 0 0 1px ${viewerTokens.stage.activeBorder}, ${viewerTokens.stage.activeShadow}`;
 
   return (
     <Box
@@ -128,27 +129,22 @@ function StagePresentationShell({
         aspectRatio: hasMeasuredStageSize ? undefined : stageAspectRatio,
         minHeight: hasMeasuredStageSize ? 0 : { xs: 80 },
         marginInline: "auto",
-        // One shell owns radius, clipping, and the active/focus edge. Splitting those jobs across
-        // compare modes previously produced mismatched corners and two theme-colored strokes.
+        // A real border reserved a dark one-pixel strip around every image and only changed color
+        // while A/B was active. The inset ring now overlays the image without changing stage size,
+        // keeping inactive edges identical across A/B, Swipe, and Heatmap.
         borderRadius: 1.5,
         overflow: "hidden",
-        border: "1px solid",
-        borderColor: inspectActive
-          ? viewerTokens.stage.activeBorder
-          : hasMeasuredStageSize
-            ? viewerTokens.stage.measuredBorder
-            : "divider",
+        border: 0,
         background: viewerTokens.stage.surface,
         boxShadow: inspectActive
-          ? viewerTokens.stage.activeShadow
+          ? activeStageShadow
           : hasMeasuredStageSize
             ? viewerTokens.stage.measuredShadow
             : "none",
         transition:
-          "width 180ms cubic-bezier(0.2, 0, 0, 1), height 180ms cubic-bezier(0.2, 0, 0, 1), box-shadow 180ms cubic-bezier(0.2, 0, 0, 1), border-color 180ms cubic-bezier(0.2, 0, 0, 1)",
+          "width 180ms cubic-bezier(0.2, 0, 0, 1), height 180ms cubic-bezier(0.2, 0, 0, 1), box-shadow 180ms cubic-bezier(0.2, 0, 0, 1)",
         "&:focus-within": {
-          borderColor: viewerTokens.stage.activeBorder,
-          boxShadow: viewerTokens.stage.activeShadow,
+          boxShadow: activeStageShadow,
         },
       }}
     >

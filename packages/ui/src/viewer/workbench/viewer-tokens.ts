@@ -18,7 +18,6 @@ export const viewerTokens = {
   },
   stage: {
     activeBorder: "var(--mc-primary, rgba(232, 198, 246, 0.42))",
-    measuredBorder: "var(--mc-outline, rgba(232, 198, 246, 0.36))",
     surface:
       "radial-gradient(circle at top, rgba(232, 198, 246, 0.1), transparent 28%), rgba(13, 24, 54, 0.94)",
     activeShadow: "var(--mc-viewer-shadow, 0 18px 44px rgba(8, 15, 35, 0.28))",
