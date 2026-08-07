@@ -4,6 +4,7 @@ import type { ViewerDataset } from "@magic-compare/compare-core/viewer-data";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useAppNotifications } from "./notifications/use-app-notifications";
 import { ViewerDatasetCache, ViewerDatasetRequestRegistry } from "./viewer-dataset-cache";
+import { postJson } from "@/lib/client/internal-api";
 
 type HistoryMode = "none" | "push";
 
@@ -37,19 +38,25 @@ async function requestViewerDataset(
   target: ViewerRouteTarget,
   signal: AbortSignal,
 ): Promise<ViewerDataset> {
-  const response = await fetch("/api/ops/group-viewer", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ caseSlug: target.caseSlug, groupSlug: target.groupSlug }),
-    signal,
-  });
-  const payload = await response.json().catch(() => null);
-
-  if (!response.ok || !payload?.dataset) {
-    throw new Error(payload?.error || "加载图组失败。");
-  }
-
-  return payload.dataset as ViewerDataset;
+  return postJson<ViewerDataset>(
+    "/api/ops/group-viewer",
+    { caseSlug: target.caseSlug, groupSlug: target.groupSlug },
+    {
+      fallbackMessage: "加载图组失败。",
+      signal,
+      parse: (payload) => {
+        if (
+          typeof payload !== "object" ||
+          payload === null ||
+          !("dataset" in payload) ||
+          !payload.dataset
+        ) {
+          throw new Error("加载图组失败。");
+        }
+        return payload.dataset as ViewerDataset;
+      },
+    },
+  );
 }
 
 function isAbortError(error: unknown): boolean {

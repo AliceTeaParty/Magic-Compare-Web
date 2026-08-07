@@ -15,6 +15,7 @@ import {
 import { cjkKebabCase } from "@magic-compare/shared-utils";
 import { useRootScrollLock } from "@magic-compare/ui";
 import { useRouter } from "next/navigation";
+import { postJson } from "@/lib/client/internal-api";
 import { useAppNotifications } from "./notifications/use-app-notifications";
 import { InternalNavigationItem } from "./internal-navigation-item";
 
@@ -62,21 +63,15 @@ export function CaseCreateButton({ navigation = false }: { navigation?: boolean 
 
     startTransition(async () => {
       try {
-        const response = await fetch("/api/ops/case-create", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({
+        const result = await postJson<{ caseSlug?: string }>(
+          "/api/ops/case-create",
+          {
             slug: normalizedSlug,
             title: normalizedTitle,
             summary: summary.trim(),
-          }),
-        });
-        if (!response.ok) {
-          const payload = await response.json().catch(() => null);
-          throw new Error(payload?.error || "创建项目失败。");
-        }
-
-        const result = (await response.json()) as { caseSlug?: string };
+          },
+          { fallbackMessage: "创建项目失败。" },
+        );
         setOpen(false);
         resetDraft();
         router.push(`/cases/${result.caseSlug ?? normalizedSlug}`);

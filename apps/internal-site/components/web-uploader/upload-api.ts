@@ -1,4 +1,5 @@
 import type { GroupUploadStartInput, UploadFrameDescriptor } from "@/lib/server/uploads/contracts";
+import { postJson } from "@/lib/client/internal-api";
 
 export interface UploadFrameState {
   frameOrder: number;
@@ -45,33 +46,6 @@ export interface GroupUploadCancelResult {
   groupUploadJobId: string;
   status: "cancelled";
   deletedPendingPrefixCount: number;
-}
-
-/**
- * Keeps upload endpoints behind one JSON helper so the runner reports API validation failures with
- * the same message style regardless of which phase failed.
- */
-async function postJson<TResponse>(url: string, body: unknown): Promise<TResponse> {
-  const response = await fetch(url, {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-    },
-    body: JSON.stringify(body),
-  });
-
-  if (!response.ok) {
-    let message = `Request failed with ${response.status}.`;
-    try {
-      const payload = (await response.json()) as { error?: string; message?: string };
-      message = payload.error || payload.message || message;
-    } catch {
-      // Non-JSON failures usually come from the dev server or a proxy; keep the HTTP status.
-    }
-    throw new Error(message);
-  }
-
-  return (await response.json()) as TResponse;
 }
 
 export function startGroupUpload(input: GroupUploadStartInput) {

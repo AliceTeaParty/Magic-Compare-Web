@@ -1,6 +1,7 @@
 import type { MutableRefObject, TransitionStartFunction } from "react";
 import { arrayMove } from "@dnd-kit/sortable";
 import type { CaseWorkspaceData } from "@/lib/server/repositories/content-repository";
+import { postJson } from "@/lib/client/internal-api";
 import type { AppNotificationTone } from "../notifications/use-app-notifications";
 
 type GroupItem = CaseWorkspaceData["groups"][number];
@@ -31,27 +32,6 @@ export interface WorkspaceGroupMutationContext extends WorkspaceMutationContext 
 export interface WorkspaceCaseMetadataMutationContext extends WorkspaceMutationContext {
   setCaseSummary: (nextSummary: string) => void;
   summaryRef: MutableRefObject<string>;
-}
-
-/**
- * Normalizes JSON POST handling so workspace actions surface API errors with the same message
- * shape regardless of which operation triggered them.
- */
-export async function postJson(url: string, body: unknown) {
-  const response = await fetch(url, {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-    },
-    body: JSON.stringify(body),
-  });
-
-  if (!response.ok) {
-    const payload = await response.json().catch(() => null);
-    throw new Error(payload?.error || `Request failed: ${url}`);
-  }
-
-  return response.json().catch(() => null);
 }
 
 /**
@@ -215,7 +195,7 @@ export function updateWorkspaceCaseSummary(
 
   return (async () => {
     try {
-      const result = await postJson("/api/ops/case-update", {
+      const result = await postJson<{ summary?: string }>("/api/ops/case-update", {
         caseSlug: context.data.slug,
         summary: normalizedSummary,
       });
@@ -268,12 +248,15 @@ export function updateWorkspaceGroupMetadata(
 
   return (async () => {
     try {
-      const result = await postJson("/api/ops/group-update", {
-        caseSlug: context.data.slug,
-        groupSlug: targetGroup.slug,
-        title,
-        description,
-      });
+      const result = await postJson<{ title?: string; description?: string }>(
+        "/api/ops/group-update",
+        {
+          caseSlug: context.data.slug,
+          groupSlug: targetGroup.slug,
+          title,
+          description,
+        },
+      );
       const savedTitle = result && typeof result.title === "string" ? result.title : title;
       const savedDescription =
         result && typeof result.description === "string" ? result.description : description;

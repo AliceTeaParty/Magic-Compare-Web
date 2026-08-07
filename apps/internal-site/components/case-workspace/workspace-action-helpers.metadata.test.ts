@@ -55,13 +55,12 @@ describe("workspace metadata actions", () => {
     const startTransition = vi.fn();
     const setCaseSummary = vi.fn();
     const summaryRef = { current: "Original summary" };
-    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue({
-      ok: true,
-      json: async () => ({
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      Response.json({
         caseSlug: "mono",
         summary: "Updated summary",
       }),
-    } as Response);
+    );
     const context = {
       data: baseCase,
       notifications,
@@ -102,15 +101,14 @@ describe("workspace metadata actions", () => {
     const setGroups = vi.fn((updater: GroupItem[] | ((current: GroupItem[]) => GroupItem[])) => {
       groupsRef.current = typeof updater === "function" ? updater(groupsRef.current) : updater;
     });
-    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue({
-      ok: true,
-      json: async () => ({
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      Response.json({
         caseSlug: "mono",
         groupSlug: "comparison",
         title: "New title",
         description: "New description",
       }),
-    } as Response);
+    );
     const context = {
       data: baseCase,
       groupsRef,
@@ -164,14 +162,13 @@ describe("workspace metadata actions", () => {
     const setGroups = vi.fn((updater: GroupItem[] | ((current: GroupItem[]) => GroupItem[])) => {
       groupsRef.current = typeof updater === "function" ? updater(groupsRef.current) : updater;
     });
-    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue({
-      ok: true,
-      json: async () => ({
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      Response.json({
         caseSlug: "mono",
         groupSlug: "comparison",
         deleted: true,
       }),
-    } as Response);
+    );
     const context = {
       data: baseCase,
       groupsRef,

@@ -240,6 +240,57 @@ describe("upload-service", () => {
     deleteInternalAssetPrefix.mockReset();
   });
 
+  it("validates upload identity before invoking persistence helpers", async () => {
+    const invalidInput = {
+      case: {
+        slug: "bad--case",
+        title: "Bad case",
+        summary: "",
+        tags: [],
+        coverAssetLabel: null,
+      },
+      group: {
+        slug: "test-group",
+        title: "Test Group",
+        description: "",
+        order: 0,
+        defaultMode: "before-after",
+        tags: [],
+      },
+      frames: [
+        {
+          order: 0,
+          title: "Frame 1",
+          caption: "",
+          assets: ["before", "after"].map((kind, index) => ({
+            slot: kind,
+            kind,
+            label: kind === "before" ? "Before" : "After",
+            note: "",
+            width: 1,
+            height: 1,
+            isPrimaryDisplay: true,
+            original: {
+              extension: ".png",
+              contentType: "image/png",
+              sha256: String(index + 1).repeat(64),
+              size: 1,
+            },
+            thumbnail: {
+              extension: ".png",
+              contentType: "image/png",
+              sha256: String(index + 3).repeat(64),
+              size: 1,
+            },
+          })),
+        },
+      ],
+    };
+
+    await expect(startGroupUpload(invalidInput)).rejects.toThrow();
+    expect(helperMocks.ensureCaseAndGroup).not.toHaveBeenCalled();
+  });
+
   it("cancels expired active jobs before looking for a resumable upload", async () => {
     helperMocks.ensureCaseAndGroup.mockResolvedValue({
       caseRow: { id: "case-1" },

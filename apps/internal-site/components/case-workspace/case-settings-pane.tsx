@@ -26,6 +26,7 @@ import {
 import { useRootScrollLock } from "@magic-compare/ui";
 import { useRouter } from "next/navigation";
 import type { CaseWorkspaceData } from "@/lib/server/repositories/content-repository";
+import { postJson } from "@/lib/client/internal-api";
 import type { AppNotificationTone } from "../notifications/use-app-notifications";
 import { DestructiveConfirmationDialog } from "./destructive-confirmation-dialog";
 
@@ -121,20 +122,15 @@ export function CaseSettingsPane({
     if (!canSave) return;
     startTransition(async () => {
       try {
-        const response = await fetch("/api/ops/case-update", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ caseSlug: data.slug, title, summary, tags }),
-        });
-        if (!response.ok) {
-          const payload = await response.json().catch(() => null);
-          throw new Error(payload?.error || "保存项目失败。");
-        }
-        const result = (await response.json()) as {
+        const result = await postJson<{
           title: string;
           summary: string;
           tags: string[];
-        };
+        }>(
+          "/api/ops/case-update",
+          { caseSlug: data.slug, title, summary, tags },
+          { fallbackMessage: "保存项目失败。" },
+        );
         onMetadataSaved(result);
         onNotify("项目设置已保存。", "success");
         onOpenChange(false);
@@ -148,15 +144,11 @@ export function CaseSettingsPane({
   function deleteCase() {
     startTransition(async () => {
       try {
-        const response = await fetch("/api/ops/case-delete", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ caseSlug: data.slug }),
-        });
-        if (!response.ok) {
-          const payload = await response.json().catch(() => null);
-          throw new Error(payload?.error || "删除项目失败。");
-        }
+        await postJson(
+          "/api/ops/case-delete",
+          { caseSlug: data.slug },
+          { fallbackMessage: "删除项目失败。" },
+        );
         router.push("/");
         router.refresh();
       } catch (error) {
