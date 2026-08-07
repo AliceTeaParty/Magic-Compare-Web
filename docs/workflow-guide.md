@@ -379,7 +379,7 @@ Web 上传链路是：
 
 - Case / Group metadata 更新
 - Group 可见性切换
-- Group / Frame 排序更新
+- Group 排序更新
 
 结果：
 
@@ -387,7 +387,9 @@ Web 上传链路是：
 
 仓库不再提供独立的 `case-publish` API。内容写操作只在 Case 含公开 Group 时重新生成 manifest；Group 改为内部时会删除对应 published bundle，最后一个公开 Group 被移除后会同步清理 Case 发布状态。
 
-manifest 生成只查询公开 Group、Frame 和所需字段。新上传或 manifest 导入在对象检查成功后写入 `Asset.storageValidatedAt`；旧素材首次生成 manifest 时检查未记录的原图和缩略图，后续信任 UUID 不可变路径，不再重复读取 R2。日志记录查询、校验和总耗时以及信任/新增校验数量。
+manifest 生成只查询公开 Group、Frame 和所需字段。新上传或 manifest 导入在对象检查成功后写入 `Asset.storageValidatedAt`；旧素材首次生成 manifest 时以 8 路并发检查未记录的原图和缩略图，后续信任 UUID 不可变路径，不再重复读取 R2。日志记录查询、校验和总耗时以及信任/新增校验数量。
+
+manifest 同步不会自动导出或部署公开站。
 
 Web 上传替换已有公开 Group 时会先将其改为内部并删除旧 bundle，避免上传过程中暴露不完整内容；上传完成后由操作者重新标记为公开。
 
@@ -400,7 +402,6 @@ Web 上传替换已有公开 Group 时会先将其改为内部并删除旧 bundl
 入口：
 
 - `pnpm public:export`
-- `POST /api/ops/public-export`
 
 结果：
 
@@ -410,8 +411,8 @@ Web 上传替换已有公开 Group 时会先将其改为内部并删除旧 bundl
 
 作用：
 
-- 先做一次 fresh export
-- 再调用 Wrangler 上传到 Cloudflare Pages
+- 读取完整的当前 published root
+- 做一次 fresh export，再调用 Wrangler 上传到 Cloudflare Pages
 
 入口：
 
@@ -450,7 +451,7 @@ public deploy 会为以下输入计算指纹：
 部署任务记录这些真实阶段：
 
 - 检查发布内容
-- 同步并构建公开页面
+- 构建公开页面
 - 整理部署文件
 - 上传到 Cloudflare Pages
 
@@ -640,9 +641,9 @@ docker build --platform linux/amd64 -f docker/internal-site.Dockerfile -t magic-
 
 ### 对 public deploy 的建议
 
-- published manifest 同步由内容写操作负责，public deploy 固定处理全站
+- 内容写入与 public deploy 应拆开；CI 不要调用已经删除的 case publish 或 public export HTTP 路由
 - Pages 部署 job 不要并发
-- 优先把 export 结果作为可观察产物保留下来，便于排错
+- 只需构建静态产物时使用 `pnpm public:export`，并优先把 export 结果作为可观察产物保留下来
 - CI 中不要直接复用本地 `docker-data` bind mount；优先走基础 compose 的 named volumes，必要时再叠加专用 override
 
 ## 推荐的协作顺序
