@@ -39,8 +39,10 @@ function runtimeState(): DeployJobRuntimeState {
 }
 
 function cloneJob(job: PublicDeployJob): PublicDeployJob {
+  const snapshot = { ...job } as PublicDeployJob & { caseId?: unknown };
+  delete snapshot.caseId;
   return {
-    ...job,
+    ...snapshot,
     stageSequence: [...job.stageSequence],
     stageDurationsMs: { ...job.stageDurationsMs },
     uploadProgress: job.uploadProgress ? { ...job.uploadProgress } : null,
@@ -63,10 +65,8 @@ function resolvePublicSiteUrl(projectName: string): string | null {
   return configured || (projectName ? `https://${projectName}.pages.dev` : null);
 }
 
-function stageSequence(caseId: string | null): PublicDeployStage[] {
-  return caseId
-    ? ["checking", "publishing", "building", "preparing", "uploading"]
-    : ["checking", "building", "preparing", "uploading"];
+function stageSequence(): PublicDeployStage[] {
+  return ["checking", "building", "preparing", "uploading"];
 }
 
 /** Finalizes timing for the previous stage before moving the persistent job to the next phase. */
@@ -151,10 +151,10 @@ async function finishJob(
   await state.persistQueue;
 }
 
-/** Runs outside the request lifecycle while continually publishing small, recoverable snapshots. */
+/** Runs outside the request lifecycle while continually persisting small, recoverable snapshots. */
 async function executeJob(job: PublicDeployJob): Promise<void> {
   try {
-    const result = await deployPublicSite(job.caseId ?? undefined, {
+    const result = await deployPublicSite({
       onStage: (stage) => moveToStage(job, stage),
       onOutput: (event) => {
         if (event.source === "wrangler") updateWranglerProgress(job, event.text);
@@ -168,7 +168,7 @@ async function executeJob(job: PublicDeployJob): Promise<void> {
 }
 
 /** Starts one deployment or returns the currently running job for repeat clicks. */
-export async function startPublicDeployJob(caseId?: string): Promise<StartPublicDeployJobResult> {
+export async function startPublicDeployJob(): Promise<StartPublicDeployJobResult> {
   const state = runtimeState();
   if (state.activeJob?.status === "running") {
     return { job: cloneJob(state.activeJob), reused: true };
@@ -177,13 +177,11 @@ export async function startPublicDeployJob(caseId?: string): Promise<StartPublic
 
   const now = new Date();
   const projectName = getCfPagesProjectName() ?? "";
-  const normalizedCaseId = caseId?.trim() || null;
   const job: PublicDeployJob = {
     id: randomUUID(),
-    caseId: normalizedCaseId,
     status: "running",
     stage: "checking",
-    stageSequence: stageSequence(normalizedCaseId),
+    stageSequence: stageSequence(),
     completedStageCount: 0,
     startedAt: now.toISOString(),
     updatedAt: now.toISOString(),
@@ -222,15 +220,16 @@ export async function getPublicDeployJob(jobId?: string | null): Promise<PublicD
 
   const persisted = await readPublicDeployState<PublicDeployJob>(LATEST_JOB_FILENAME);
   if (!persisted || (jobId && persisted.id !== jobId)) return null;
-  if (persisted.status !== "running") return persisted;
+  const restored = cloneJob(persisted);
+  if (restored.status !== "running") return restored;
 
   const now = Date.now();
   const interrupted: PublicDeployJob = {
-    ...persisted,
+    ...restored,
     status: "failed",
     completedAt: new Date(now).toISOString(),
     updatedAt: new Date(now).toISOString(),
-    elapsedMs: now - new Date(persisted.startedAt).getTime(),
+    elapsedMs: now - new Date(restored.startedAt).getTime(),
     error: "部署进程已中断，请重新部署。",
   };
   await writePublicDeployState(LATEST_JOB_FILENAME, interrupted);

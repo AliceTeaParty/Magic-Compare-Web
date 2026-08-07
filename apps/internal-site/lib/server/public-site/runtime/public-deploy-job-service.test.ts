@@ -34,9 +34,9 @@ vi.mock("../../runtime-config", () => ({
 }));
 
 function persistedRunningJob(): PublicDeployJob {
-  return {
+  const job: PublicDeployJob & { caseId: string } = {
     id: "persisted-job",
-    caseId: null,
+    caseId: "legacy-case",
     status: "running",
     stage: "building",
     stageSequence: ["checking", "building", "preparing", "uploading"],
@@ -53,6 +53,7 @@ function persistedRunningJob(): PublicDeployJob {
     skipped: false,
     error: null,
   };
+  return job;
 }
 
 beforeEach(() => {
@@ -86,7 +87,7 @@ describe("public deploy job progress", () => {
 
 describe("public deploy job lifecycle", () => {
   it("streams stages and keeps the completed job available", async () => {
-    mocks.deployPublicSite.mockImplementation(async (_caseId, observer) => {
+    mocks.deployPublicSite.mockImplementation(async (observer) => {
       observer?.onStage?.("building");
       observer?.onStage?.("preparing");
       observer?.onStage?.("uploading");
@@ -139,6 +140,7 @@ describe("public deploy job lifecycle", () => {
       status: "failed",
       error: "部署进程已中断，请重新部署。",
     });
+    expect(restored).not.toHaveProperty("caseId");
     expect(mocks.writePublicDeployState).toHaveBeenCalledWith(
       "latest-job.json",
       expect.objectContaining({ status: "failed" }),

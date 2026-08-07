@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { z } from "zod";
 import { withApiRoute } from "@/lib/server/api/with-api-route";
 import {
   getPublicDeployJob,
@@ -7,17 +6,11 @@ import {
   startPublicDeployJob,
 } from "@/lib/server/public-site/runtime";
 
-const schema = z.object({
-  caseId: z.string().min(1).optional(),
-});
-
 export const dynamic = "force-dynamic";
 
 export const POST = withApiRoute(
-  async (request: Request) => {
-    const rawBody = await request.text();
-    const payload = schema.parse(rawBody ? JSON.parse(rawBody) : {});
-    const result = await startPublicDeployJob(payload.caseId);
+  async () => {
+    const result = await startPublicDeployJob();
     return NextResponse.json(result, { status: 202 });
   },
   {

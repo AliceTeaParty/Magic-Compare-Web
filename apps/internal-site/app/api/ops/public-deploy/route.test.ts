@@ -17,7 +17,6 @@ vi.mock("@/lib/server/public-site/runtime", () => ({
 
 const runningJob = {
   id: "job-1",
-  caseId: null,
   status: "running",
   stage: "checking",
   stageSequence: ["checking", "building", "preparing", "uploading"],
@@ -53,23 +52,7 @@ describe("/api/ops/public-deploy", () => {
 
     expect(response.status).toBe(202);
     expect(await response.json()).toEqual({ job: runningJob, reused: false });
-    expect(startPublicDeployJob).toHaveBeenCalledWith(undefined);
-  });
-
-  it("passes optional caseId when creating the job", async () => {
-    startPublicDeployJob.mockResolvedValue({
-      job: { ...runningJob, caseId: "case-1" },
-      reused: false,
-    });
-
-    await POST(
-      new Request("http://localhost:3000/api/ops/public-deploy", {
-        method: "POST",
-        body: JSON.stringify({ caseId: "case-1" }),
-      }),
-    );
-
-    expect(startPublicDeployJob).toHaveBeenCalledWith("case-1");
+    expect(startPublicDeployJob).toHaveBeenCalledWith();
   });
 
   it("accepts an empty body", async () => {
@@ -82,7 +65,7 @@ describe("/api/ops/public-deploy", () => {
     );
 
     expect(response.status).toBe(202);
-    expect(startPublicDeployJob).toHaveBeenCalledWith(undefined);
+    expect(startPublicDeployJob).toHaveBeenCalledWith();
   });
 
   it("uses the operation error classifier for rejected starts", async () => {

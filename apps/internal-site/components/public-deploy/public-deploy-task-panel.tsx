@@ -38,9 +38,9 @@ function formatDuration(durationMs: number): string {
 function formatStageDurations(
   durations: Partial<Record<PublicDeployStage, number>>,
 ): string | null {
-  const visibleStages: PublicDeployStage[] = ["publishing", "building", "uploading"];
+  // Content writes already refresh manifests, so deployment timing only covers full-site work.
+  const visibleStages: PublicDeployStage[] = ["building", "uploading"];
   const shortLabels: Partial<Record<PublicDeployStage, string>> = {
-    publishing: "发布",
     building: "构建",
     uploading: "上传",
   };

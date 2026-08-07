@@ -6,7 +6,6 @@ import {
   CF_PAGES_PROJECT_NAME_ENV_NAME,
   isCloudflarePagesDeployConfigured,
 } from "../../runtime-config";
-import { publishCase } from "../../publish/publish-case";
 import {
   CommandResult,
   getPublicSiteBuildArgs,
@@ -142,23 +141,14 @@ export function ensurePublicDeployConfigured(): void {
   }
 }
 
-/**
- * Optionally republishes one case before exporting so the deploy path can produce a fresh public
- * site in one operator action without requiring a separate manual publish step.
- */
+/** Deploys the complete current published root without request-scoped content context. */
 export async function deployPublicSite(
-  caseId?: string,
   observer?: PublicDeployObserver,
 ): Promise<PublicDeployResult> {
   ensurePublicDeployConfigured();
 
   return withPublicSiteOperationLock("deploy", async () => {
     observer?.onStage?.("checking");
-    if (caseId) {
-      observer?.onStage?.("publishing");
-      await publishCase(caseId);
-    }
-
     await ensurePublishedGroupsExist();
     const projectName = process.env[CF_PAGES_PROJECT_NAME_ENV_NAME]?.trim() || "";
     const branch = process.env[CF_PAGES_BRANCH_ENV_NAME]?.trim() || null;

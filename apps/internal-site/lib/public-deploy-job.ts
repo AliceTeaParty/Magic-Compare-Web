@@ -1,10 +1,4 @@
-export const PUBLIC_DEPLOY_STAGES = [
-  "checking",
-  "publishing",
-  "building",
-  "preparing",
-  "uploading",
-] as const;
+export const PUBLIC_DEPLOY_STAGES = ["checking", "building", "preparing", "uploading"] as const;
 
 export type PublicDeployStage = (typeof PUBLIC_DEPLOY_STAGES)[number];
 export type PublicDeployJobStatus = "running" | "succeeded" | "failed";
@@ -16,7 +10,6 @@ export interface PublicDeployUploadProgress {
 
 export interface PublicDeployJob {
   id: string;
-  caseId: string | null;
   status: PublicDeployJobStatus;
   stage: PublicDeployStage;
   stageSequence: PublicDeployStage[];
@@ -41,7 +34,6 @@ export interface StartPublicDeployJobResult {
 
 export const PUBLIC_DEPLOY_STAGE_LABELS: Record<PublicDeployStage, string> = {
   checking: "检查发布内容",
-  publishing: "生成 Case 发布内容",
   building: "同步并构建公开页面",
   preparing: "整理部署文件",
   uploading: "上传到 Cloudflare Pages",

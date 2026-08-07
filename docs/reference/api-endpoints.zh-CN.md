@@ -800,13 +800,7 @@
 
 实现：`apps/internal-site/app/api/ops/public-deploy/route.ts`
 
-请求体可以为空，也可以指定一个 `caseId`：
-
-```json
-{
-  "caseId": "case-1"
-}
-```
+请求体：无。
 
 成功响应：
 
@@ -823,7 +817,7 @@
 
 说明：
 
-- 如果传入 `caseId`，服务端会先调用 `publishCase(caseId)`，再执行导出和部署。
+- 部署任务读取完整的当前 published root，不接收 Case 上下文。
 - 如果没有配置 Cloudflare Pages 所需环境变量，会返回 `400`。
 - 这个接口与 `public-export` 共用同一把运行时锁，因此导出与部署不能并发。
 
