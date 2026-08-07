@@ -78,10 +78,10 @@ describe("public group metadata", () => {
       url: new URL("https://compare.example.com/g/mono--comparison"),
       images: [
         {
-          url: new URL("https://compare.example.com/published/groups/mono--comparison/share.webp"),
+          url: new URL("https://compare.example.com/published/groups/mono--comparison/share.jpg"),
           width: 1200,
           height: 630,
-          type: "image/webp",
+          type: "image/jpeg",
           alt: "随机抽检 - mono，1 Groups 图像对比",
         },
       ],
@@ -90,7 +90,7 @@ describe("public group metadata", () => {
       card: "summary_large_image",
       images: [
         {
-          url: new URL("https://compare.example.com/published/groups/mono--comparison/share.webp"),
+          url: new URL("https://compare.example.com/published/groups/mono--comparison/share.jpg"),
         },
       ],
     });

@@ -61,7 +61,7 @@ function buildPreviewImage(manifest: PublishManifest, baseUrl: URL | null) {
       url: new URL(buildPublicShareImagePath(manifest.publicSlug), baseUrl),
       width: PUBLIC_SHARE_IMAGE_WIDTH,
       height: PUBLIC_SHARE_IMAGE_HEIGHT,
-      type: "image/webp",
+      type: "image/jpeg",
       alt: truncateMetadataText(shareData.alt, 120),
     };
   }

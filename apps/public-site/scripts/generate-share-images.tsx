@@ -26,10 +26,10 @@ async function main(): Promise<void> {
     try {
       const manifest = parsePublishManifest(JSON.parse(await readFile(manifestPath, "utf8")));
       const response = await renderPublicShareImage(manifest);
-      // The renderer emits PNG, but these photo-heavy cards are substantially smaller as WebP.
-      // Quality 80 keeps labels crisp while maximum effort minimizes every static deployment.
+      // Social link crawlers support JPEG more consistently than WebP. MozJPEG quality 85 keeps
+      // card typography crisp without carrying the renderer's much larger PNG output.
       const shareImage = await sharp(Buffer.from(await response.arrayBuffer()))
-        .webp({ quality: 80, effort: 6, smartSubsample: true })
+        .jpeg({ quality: 85, mozjpeg: true })
         .toBuffer();
       await writeFile(path.join(groupDirectory, PUBLIC_SHARE_IMAGE_FILE_NAME), shareImage);
       generatedCount += 1;

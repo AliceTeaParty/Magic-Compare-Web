@@ -2,7 +2,7 @@ import type { PublishManifest } from "@magic-compare/content-schema";
 
 export const PUBLIC_SHARE_IMAGE_WIDTH = 1200;
 export const PUBLIC_SHARE_IMAGE_HEIGHT = 630;
-export const PUBLIC_SHARE_IMAGE_FILE_NAME = "share.webp";
+export const PUBLIC_SHARE_IMAGE_FILE_NAME = "share.jpg";
 
 type PublishAsset = PublishManifest["frames"][number]["assets"][number];
 

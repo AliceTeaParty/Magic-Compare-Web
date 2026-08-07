@@ -111,7 +111,7 @@ describe("public share image data", () => {
 
   it("exposes one stable 1200 by 630 URL for each public group", () => {
     expect(buildPublicShareImagePath("case--group")).toBe(
-      "/published/groups/case--group/share.webp",
+      "/published/groups/case--group/share.jpg",
     );
     expect([PUBLIC_SHARE_IMAGE_WIDTH, PUBLIC_SHARE_IMAGE_HEIGHT]).toEqual([1200, 630]);
   });
