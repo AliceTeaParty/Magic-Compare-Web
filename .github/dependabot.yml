@@ -4,8 +4,60 @@
 # https://docs.github.com/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
 
 version: 2
+
 updates:
+  # pnpm workspace. Dependabot's npm updater reads the root lockfile and workspace manifests.
   - package-ecosystem: "npm"
-    directory: "/" # Location of package manifests
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    groups:
+      npm-patch:
+        patterns:
+          - "*"
+        update-types:
+          - "patch"
+      npm-minor:
+        patterns:
+          - "*"
+        exclude-patterns:
+          - "next"
+          - "react"
+          - "react-dom"
+          - "@mui/*"
+          - "@prisma/*"
+          - "prisma"
+          - "sharp"
+          - "@playwright/*"
+          - "wrangler"
+        update-types:
+          - "minor"
+    cooldown:
+      semver-major-days: 14
+      semver-minor-days: 5
+      semver-patch-days: 3
+
+  # GitHub Actions used by CI and image publishing.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    groups:
+      github-actions-minor-patch:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+
+  # Base images used by Dockerfiles.
+  - package-ecosystem: "docker"
+    directory: "/docker"
+    schedule:
+      interval: "weekly"
+
+  # Images pinned in docker/*.compose*.yml files.
+  - package-ecosystem: "docker-compose"
+    directory: "/docker"
     schedule:
       interval: "weekly"

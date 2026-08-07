@@ -10,8 +10,7 @@ RUN apt-get update \
   && apt-get install -y --no-install-recommends sqlite3 ca-certificates \
   && rm -rf /var/lib/apt/lists/*
 
-RUN corepack enable \
-  && corepack install --global pnpm@10.32.1
+RUN corepack enable
 
 WORKDIR /app
 
