@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Box, Tooltip, Typography } from "@mui/material";
+import { Menu } from "@mui/icons-material";
+import { AppBar, Box, IconButton, Toolbar, Tooltip, Typography } from "@mui/material";
 
 export const MAGIC_NAV_RAIL_WIDTH = 80;
 export const MAGIC_NAV_RAIL_MIN_WIDTH = 700;
@@ -49,6 +50,45 @@ export function MagicNavigationLogo({
         "M"
       )}
     </Box>
+  );
+}
+
+/**
+ * Keeps mobile brand chrome shared by both sites. The duplicated public title previously drifted
+ * to a heavier weight and tighter spacing than the internal title despite serving the same role.
+ */
+export function MagicMobileNavigationBar({
+  logoUrl,
+  onOpenNavigation,
+}: {
+  logoUrl?: string | null;
+  onOpenNavigation: () => void;
+}) {
+  return (
+    <AppBar
+      position="sticky"
+      elevation={0}
+      color="transparent"
+      sx={{
+        display: "block",
+        height: 56,
+        borderBottom: "1px solid",
+        borderColor: "divider",
+        // An opaque shared surface keeps scrolling content from changing title and icon contrast.
+        backgroundColor: "var(--mui-palette-surface-container)",
+        [MAGIC_NAV_RAIL_MEDIA_QUERY]: { display: "none" },
+      }}
+    >
+      <Toolbar disableGutters sx={{ minHeight: "56px !important", px: 1.5 }}>
+        <IconButton aria-label="打开导航" onClick={onOpenNavigation} sx={{ mr: 0.75 }}>
+          <Menu />
+        </IconButton>
+        <MagicNavigationLogo logoUrl={logoUrl} size={32} />
+        <Typography variant="subtitle1" noWrap sx={{ ml: 1, flex: 1, minWidth: 0 }}>
+          Magic Compare
+        </Typography>
+      </Toolbar>
+    </AppBar>
   );
 }
 

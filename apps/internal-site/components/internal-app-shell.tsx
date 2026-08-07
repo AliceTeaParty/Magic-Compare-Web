@@ -6,23 +6,20 @@ import {
   CloudUploadOutlined,
   DashboardOutlined,
   FolderCopyOutlined,
-  Menu,
 } from "@mui/icons-material";
 import {
-  AppBar,
   Box,
   CircularProgress,
   Divider,
   Drawer,
-  IconButton,
   List,
   Stack,
-  Toolbar,
   Typography,
   useMediaQuery,
 } from "@mui/material";
 import {
   MagicBuildVersionLabel,
+  MagicMobileNavigationBar,
   MagicNavigationLogo,
   MagicThemeControls,
   useRootScrollLock,
@@ -279,35 +276,10 @@ function InternalAppShellScaffold({
         </Drawer>
 
         <Box sx={{ minWidth: 0 }}>
-          <AppBar
-            position="sticky"
-            elevation={0}
-            color="transparent"
-            sx={{
-              display: "block",
-              height: 56,
-              borderBottom: "1px solid",
-              borderColor: "divider",
-              // A fully opaque app bar prevents scrolling content from bleeding into text and icons at
-              // the viewport edge, which was especially visible in the narrow workbench layout.
-              backgroundColor: "var(--mui-palette-surface-container)",
-              [NAV_RAIL_MEDIA_QUERY]: { display: "none" },
-            }}
-          >
-            <Toolbar disableGutters sx={{ minHeight: "56px !important", px: 1.5 }}>
-              <IconButton
-                aria-label="打开导航"
-                onClick={() => setMobileOpen(true)}
-                sx={{ mr: 0.75 }}
-              >
-                <Menu />
-              </IconButton>
-              <MagicNavigationLogo logoUrl={logoUrl} size={32} />
-              <Typography variant="subtitle1" sx={{ ml: 1, flex: 1, minWidth: 0 }} noWrap>
-                Magic Compare
-              </Typography>
-            </Toolbar>
-          </AppBar>
+          <MagicMobileNavigationBar
+            logoUrl={logoUrl}
+            onOpenNavigation={() => setMobileOpen(true)}
+          />
           <InternalRouteTransition>{children}</InternalRouteTransition>
         </Box>
       </Box>

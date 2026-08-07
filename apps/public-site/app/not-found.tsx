@@ -18,10 +18,11 @@ export default function NotFoundPage() {
       <Box sx={{ width: "100%", px: { xs: 1, sm: 2 }, py: 6 }}>
         <Stack spacing={1.5} sx={{ maxWidth: 520 }}>
           <LinkOffOutlined aria-hidden="true" sx={{ color: "primary.main", fontSize: 40 }} />
-          <Typography variant="h2">Group not found</Typography>
+          {/* The public document is zh-CN; keeping its only standalone error page in English made
+              navigation failures feel like a separate legacy surface. */}
+          <Typography variant="h2">未找到 Group</Typography>
           <Typography variant="body1" sx={{ maxWidth: "62ch", color: "text.secondary" }}>
-            This address does not map to a published compare group. Check the shared link or ask the
-            publisher to publish the group again.
+            此地址没有对应的已发布对比 Group。请检查分享链接，或请发布者重新发布该 Group。
           </Typography>
         </Stack>
       </Box>

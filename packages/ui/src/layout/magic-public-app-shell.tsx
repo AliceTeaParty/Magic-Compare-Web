@@ -1,17 +1,7 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
-import { Menu } from "@mui/icons-material";
-import {
-  AppBar,
-  Box,
-  Divider,
-  Drawer,
-  IconButton,
-  Stack,
-  Toolbar,
-  useMediaQuery,
-} from "@mui/material";
+import { Box, Divider, Drawer, Stack, useMediaQuery } from "@mui/material";
 import { useRootScrollLock } from "../overlays/use-root-scroll-lock";
 import { MagicThemeControls } from "../theme/magic-theme-controls";
 import {
@@ -19,6 +9,7 @@ import {
   MAGIC_NAV_RAIL_MIN_WIDTH,
   MAGIC_NAV_RAIL_WIDTH,
   MagicBuildVersionLabel,
+  MagicMobileNavigationBar,
   MagicNavigationLogo,
 } from "./magic-navigation-rail";
 
@@ -109,6 +100,9 @@ export function MagicPublicAppShell({
           borderRight: "1px solid",
           borderColor: "divider",
           backgroundColor: "var(--mui-palette-surface-containerLow)",
+          // Unlike MUI Paper, this rail Box does not receive the theme's surface transition.
+          // Matching the internal rail prevents an abrupt public-only flash on theme changes.
+          transition: "background-color 250ms cubic-bezier(0.2, 0, 0, 1)",
           [MAGIC_NAV_RAIL_MEDIA_QUERY]: { display: "block" },
         }}
       >
@@ -158,26 +152,9 @@ export function MagicPublicAppShell({
           [MAGIC_NAV_RAIL_MEDIA_QUERY]: { "--magic-public-app-bar-height": "0px" },
         }}
       >
-        <AppBar
-          position="sticky"
-          elevation={0}
-          color="transparent"
-          sx={{
-            display: "block",
-            height: 56,
-            borderBottom: "1px solid",
-            borderColor: "divider",
-            backgroundColor: "var(--mui-palette-surface-container)",
-            [MAGIC_NAV_RAIL_MEDIA_QUERY]: { display: "none" },
-          }}
-        >
-          <Toolbar disableGutters sx={{ minHeight: "56px !important", px: 1.5 }}>
-            <IconButton aria-label="打开导航" onClick={() => setMobileOpen(true)} sx={{ mr: 0.75 }}>
-              <Menu />
-            </IconButton>
-            <MagicNavigationLogo logoUrl={logoUrl} size={32} />
-          </Toolbar>
-        </AppBar>
+        {/* The compact mark alone hid the public identity; the shared bar now keeps its title
+            typography and spacing identical to the internal site. */}
+        <MagicMobileNavigationBar logoUrl={logoUrl} onOpenNavigation={() => setMobileOpen(true)} />
 
         <Box component="main" sx={{ flex: 1, minWidth: 0 }}>
           {children}
