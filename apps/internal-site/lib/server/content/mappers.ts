@@ -3,7 +3,7 @@ import type { ViewerDataset } from "@magic-compare/compare-core/viewer-data";
 import type { CaseStatus, ViewerMode } from "@magic-compare/content-schema";
 import { resolvePublishedGroupUrl } from "@/lib/server/public-site/url";
 import { resolvePublicInternalAssetUrl } from "@/lib/server/storage/internal-assets";
-import type { CaseCatalogItem, CaseSearchResult, CaseWorkspaceData } from "./types";
+import type { CaseCatalogItem, CaseWorkspaceData } from "./types";
 
 type OrderedItem = { order: number };
 
@@ -182,37 +182,6 @@ export function mapCaseCatalogItem(
     coverThumbUrl: coverThumbPath ? resolvePublicInternalAssetUrl(coverThumbPath) : null,
     groupCount: caseRow.groups.length,
     publicGroupCount: caseRow.groups.filter((group) => group.isPublic).length,
-  };
-}
-
-/**
- * Reuses the catalog summary mapper so search results stay structurally aligned with the main case
- * listing while adding only the extra group matches the search UI needs.
- */
-export function mapCaseSearchResult(caseRow: {
-  id: string;
-  slug: string;
-  title: string;
-  summary: string;
-  tagsJson: string;
-  status: string;
-  publishedAt: Date | null;
-  updatedAt: Date;
-  groups: Array<{
-    slug: string;
-    title: string;
-    isPublic: boolean;
-    order: number;
-  }>;
-}): CaseSearchResult {
-  const summary = mapCaseCatalogItem(caseRow);
-
-  return {
-    ...summary,
-    groups: sortByOrder(caseRow.groups).map((group) => ({
-      slug: group.slug,
-      title: group.title,
-    })),
   };
 }
 

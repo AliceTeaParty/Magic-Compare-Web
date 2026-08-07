@@ -137,32 +137,6 @@ export async function reorderGroups(caseId: string, groupIds: string[]): Promise
 }
 
 /**
- * Mirrors frame reorder state from the client as-is so group viewers and import/publish pipelines
- * continue to agree on frame order.
- */
-export async function reorderFrames(groupId: string, frameIds: string[]): Promise<void> {
-  const groupRow = await prisma.group.findUnique({
-    where: { id: groupId },
-    select: { caseId: true, isPublic: true },
-  });
-  await prisma.$transaction(
-    frameIds.map((frameId, order) =>
-      prisma.frame.updateMany({
-        where: {
-          id: frameId,
-          groupId,
-        },
-        data: { order },
-      }),
-    ),
-  );
-
-  if (groupRow?.isPublic) {
-    await publishCase(groupRow.caseId);
-  }
-}
-
-/**
  * Toggles a group's public eligibility and synchronizes the published bundle before returning.
  */
 export async function setGroupVisibility(caseSlug: string, groupSlug: string, isPublic: boolean) {

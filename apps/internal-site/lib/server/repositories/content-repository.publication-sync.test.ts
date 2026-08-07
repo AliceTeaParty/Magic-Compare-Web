@@ -1,12 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { reorderFrames, reorderGroups, setGroupVisibility } from "./content-repository";
+import { reorderGroups, setGroupVisibility } from "./content-repository";
 
 const mocks = vi.hoisted(() => ({
   caseFindUnique: vi.fn(),
   deletePublishedGroup: vi.fn(),
-  frameUpdateMany: vi.fn(),
   groupCount: vi.fn(),
-  groupFindUnique: vi.fn(),
   groupUpdate: vi.fn(),
   groupUpdateMany: vi.fn(),
   publishCase: vi.fn(),
@@ -17,10 +15,8 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@/lib/server/db/client", () => ({
   prisma: {
     case: { findUnique: mocks.caseFindUnique },
-    frame: { updateMany: mocks.frameUpdateMany },
     group: {
       count: mocks.groupCount,
-      findUnique: mocks.groupFindUnique,
       update: mocks.groupUpdate,
       updateMany: mocks.groupUpdateMany,
     },
@@ -47,14 +43,6 @@ describe("published manifest synchronization", () => {
     mocks.groupCount.mockResolvedValue(1);
 
     await reorderGroups("case-1", ["group-2", "group-1"]);
-
-    expect(mocks.publishCase).toHaveBeenCalledWith("case-1");
-  });
-
-  it("refreshes a public group after frame order changes", async () => {
-    mocks.groupFindUnique.mockResolvedValue({ caseId: "case-1", isPublic: true });
-
-    await reorderFrames("group-1", ["frame-2", "frame-1"]);
 
     expect(mocks.publishCase).toHaveBeenCalledWith("case-1");
   });

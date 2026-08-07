@@ -14,15 +14,6 @@ export interface CaseCatalogItem {
   publicGroupCount: number;
 }
 
-export interface CaseSearchGroupSummary {
-  slug: string;
-  title: string;
-}
-
-export interface CaseSearchResult extends CaseCatalogItem {
-  groups: CaseSearchGroupSummary[];
-}
-
 export interface CaseWorkspaceGroup {
   id: string;
   slug: string;
