@@ -121,6 +121,9 @@ function buildInternalTheme(seedValue: string) {
         styleOverrides: {
           "*, *::before, *::after": { boxSizing: "border-box" },
           html: {
+            margin: 0,
+            padding: 0,
+            minHeight: "100%",
             backgroundColor: "var(--mui-palette-background-default)",
             // Catalog routes scroll while short workspaces may not. Reserving the scrollbar gutter
             // prevents the shared header divider and right-aligned actions from shifting by 17px.
@@ -128,6 +131,8 @@ function buildInternalTheme(seedValue: string) {
             transition: "background-color 250ms cubic-bezier(0.2, 0, 0, 1)",
           },
           body: {
+            margin: 0,
+            padding: 0,
             minWidth: 0,
             minHeight: "100vh",
             fontWeight: 450,
@@ -135,6 +140,7 @@ function buildInternalTheme(seedValue: string) {
             transition:
               "background-color 250ms cubic-bezier(0.2, 0, 0, 1), color 250ms cubic-bezier(0.2, 0, 0, 1)",
           },
+          a: { color: "inherit" },
           ".MuiPaper-root, .MuiDrawer-paper, .MuiAppBar-root, .MuiInputBase-root": {
             // Theme switching previously disabled every transition, making the whole workbench
             // flash. Limiting interpolation to painted colors keeps geometry and controls stable.

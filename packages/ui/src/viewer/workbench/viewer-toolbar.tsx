@@ -17,9 +17,12 @@ import type { ViewerAsset } from "@magic-compare/compare-core/viewer-data";
 import { clampNumber } from "@magic-compare/shared-utils";
 import { AbInspectControls } from "./ab-inspect-controls";
 import { ComparisonAssetControls } from "./comparison-asset-controls";
+import {
+  VIEWER_COMPACT_CONTROL_HEIGHT,
+  VIEWER_SEGMENTED_CONTROL_STYLES,
+} from "./viewer-control-styles";
 import { type ViewerInteractionStore, useViewerOverlayOpacity } from "./viewer-interaction-store";
 
-const compactControlHeight = { xs: 42, md: 40 } as const;
 const tripleControlWidth = 144;
 const contextualControlsEnter = keyframes`
   from {
@@ -87,8 +90,8 @@ function HeatmapOpacityControls({
         // Heatmap uses the same fixed-height tonal surface as the Viewer segmented controls, so
         // switching modes changes content without introducing a visually unrelated bare slider.
         width: "min(100%, 240px)",
-        height: compactControlHeight,
-        minHeight: compactControlHeight,
+        height: VIEWER_COMPACT_CONTROL_HEIGHT,
+        minHeight: VIEWER_COMPACT_CONTROL_HEIGHT,
         alignItems: "center",
         gap: 0.75,
         px: 1.25,
@@ -138,7 +141,7 @@ export function ViewerUtilityControls({
 }: ViewerUtilityControlsProps) {
   const stageControlHidden = compact || hideStageScrollControl;
   const controlWidth = compact ? 80 : stageControlHidden ? 96 : tripleControlWidth;
-  const controlHeight = compact ? 40 : compactControlHeight;
+  const controlHeight = compact ? 40 : VIEWER_COMPACT_CONTROL_HEIGHT;
   const utilityIconButtonSx = {
     width: "100%",
     height: "100%",
@@ -308,45 +311,25 @@ export function ViewerToolbar({
           sx={{
             flexShrink: 0,
             width: { xs: "100%", sm: 216 },
-            height: compactControlHeight,
+            height: VIEWER_COMPACT_CONTROL_HEIGHT,
             display: "grid",
             gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
             gap: 0,
-            overflow: "hidden",
+            ...VIEWER_SEGMENTED_CONTROL_STYLES,
             alignItems: "stretch",
-            border: "1px solid",
-            borderColor: "divider",
-            borderRadius: 999,
-            backgroundColor: "surface.containerHigh",
             "& .MuiToggleButtonGroup-grouped": {
+              ...VIEWER_SEGMENTED_CONTROL_STYLES["& .MuiToggleButtonGroup-grouped"],
               // Fixed segment widths keep the utility controls stationary when the selected mode
               // or translated label changes. Mobile segments share the available row so icon
               // utilities never get clipped against the Viewer shell.
               width: "auto",
               minWidth: 0,
               flex: "none",
-              height: "100%",
               minHeight: 0,
               px: 1,
               fontSize: "0.86rem",
               fontWeight: 600,
               whiteSpace: "nowrap",
-              margin: "0 !important",
-              border: "0 !important",
-              borderRadius: "0 !important",
-              backgroundColor: "transparent",
-            },
-            "& .MuiToggleButtonGroup-grouped:not(:first-of-type)": {
-              borderLeft: "1px solid !important",
-              borderLeftColor: "var(--mui-palette-divider) !important",
-            },
-            "& .MuiToggleButton-root.Mui-selected": {
-              color: "primary.onContainer",
-              backgroundColor: "primary.light",
-            },
-            "& .MuiToggleButton-root.Mui-selected:hover": {
-              backgroundColor:
-                "color-mix(in srgb, currentColor 8%, var(--mui-palette-primary-light))",
             },
           }}
           onChange={handleModeChange}
@@ -364,8 +347,8 @@ export function ViewerToolbar({
           position: "relative",
           width: "100%",
           minWidth: 0,
-          height: compactControlHeight,
-          minHeight: compactControlHeight,
+          height: VIEWER_COMPACT_CONTROL_HEIGHT,
+          minHeight: VIEWER_COMPACT_CONTROL_HEIGHT,
           display: "flex",
           alignItems: "center",
           justifyContent: "flex-end",

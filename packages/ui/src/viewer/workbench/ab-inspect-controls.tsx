@@ -8,6 +8,7 @@ import {
   VIEWER_MIN_PRESET_SCALE,
 } from "@magic-compare/compare-core";
 import type { ViewerAsset } from "@magic-compare/compare-core/viewer-data";
+import { VIEWER_COMPACT_CONTROL_HEIGHT } from "./viewer-control-styles";
 import { type ViewerInteractionStore, useViewerAbInteraction } from "./viewer-interaction-store";
 
 const BASELINE_ASSET_VALUE = "__baseline__";
@@ -43,9 +44,6 @@ export function AbInspectControls({
   );
   const isAtMinScale = abScale <= VIEWER_MIN_PRESET_SCALE;
   const isAtMaxScale = abScale >= VIEWER_MAX_PRESET_SCALE;
-  // Match the viewer toolbar target size so mode switching and zoom adjustment feel like one
-  // control family instead of mixing desktop-tight and touch-friendly hit areas.
-  const compactControlHeight = { xs: 42, md: 40 };
   const inspectControlWidth = 186;
   const selectedAssetValue = abSide === "before" ? BASELINE_ASSET_VALUE : comparisonAssetKey;
 
@@ -87,7 +85,7 @@ export function AbInspectControls({
         flexShrink: 0,
         width: "100%",
         minWidth: 0,
-        minHeight: compactControlHeight,
+        minHeight: VIEWER_COMPACT_CONTROL_HEIGHT,
       }}
     >
       <Box
@@ -95,8 +93,8 @@ export function AbInspectControls({
           width: { xs: "auto", sm: 128 },
           minWidth: 0,
           flex: { xs: "1 1 0", sm: "0 0 128px" },
-          height: compactControlHeight,
-          minHeight: compactControlHeight,
+          height: VIEWER_COMPACT_CONTROL_HEIGHT,
+          minHeight: VIEWER_COMPACT_CONTROL_HEIGHT,
         }}
       >
         <FormControl
@@ -104,8 +102,8 @@ export function AbInspectControls({
           fullWidth
           sx={{
             "& .MuiOutlinedInput-root": {
-              height: compactControlHeight,
-              minHeight: compactControlHeight,
+              height: VIEWER_COMPACT_CONTROL_HEIGHT,
+              minHeight: VIEWER_COMPACT_CONTROL_HEIGHT,
               boxSizing: "border-box",
               borderRadius: 999,
               backgroundColor: "surface.containerHigh",
@@ -151,8 +149,8 @@ export function AbInspectControls({
         sx={{
           width: inspectControlWidth,
           flex: `0 0 ${inspectControlWidth}px`,
-          height: compactControlHeight,
-          minHeight: compactControlHeight,
+          height: VIEWER_COMPACT_CONTROL_HEIGHT,
+          minHeight: VIEWER_COMPACT_CONTROL_HEIGHT,
         }}
       >
         <Box
