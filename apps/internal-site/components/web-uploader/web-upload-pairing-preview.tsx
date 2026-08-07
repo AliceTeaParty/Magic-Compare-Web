@@ -1,6 +1,6 @@
 "use client";
 
-import { CSSProperties, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   closestCenter,
   DndContext,
@@ -13,66 +13,32 @@ import {
 import {
   SortableContext,
   sortableKeyboardCoordinates,
-  useSortable,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
-import {
-  Check,
-  CheckCircle,
-  Close,
-  DragIndicator,
-  EditOutlined,
-  ErrorOutlined,
-  KeyboardArrowDown,
-  WarningAmber,
-} from "@mui/icons-material";
+import { CheckCircle, ErrorOutlined, WarningAmber } from "@mui/icons-material";
 import {
   Alert,
   Box,
-  Collapse,
   FormControl,
-  IconButton,
   MenuItem,
   Paper,
   Select,
   Stack,
   ToggleButton,
   ToggleButtonGroup,
-  Tooltip,
   Typography,
 } from "@mui/material";
 import { FluentFolderEmoji } from "../fluent-emoji";
-import type { BrowserUploadFile, WebUploadFramePlan, WebUploadPlan } from "./web-upload-types";
-import {
-  webUploadColors,
-  webUploadMotion,
-  webUploadPanelSx,
-  webUploadRadii,
-  webUploadSizes,
-  webUploadSurfaces,
-} from "./web-upload-design";
+import { PairingTableHeader } from "./web-upload-pairing-header";
+import { SortablePairingRow, type PairingPreviewUrls } from "./web-upload-pairing-row";
+import type { WebUploadPlan } from "./web-upload-types";
+import { webUploadPanelSx, webUploadRadii, webUploadSizes } from "./web-upload-design";
 import {
   frameIdForFrame,
-  compactUploadFilename,
   type FrameTitleMode,
-  type FramePreviewRow,
   type PlanView,
   type UploadPlanImageColumn,
 } from "./web-upload-view-model";
-
-const PANEL_TRANSITION = `background-color ${webUploadMotion.standard}`;
-const REDUCED_MOTION = "@media (prefers-reduced-motion: reduce)";
-
-interface PreviewUrls {
-  items: Array<{ key: string; label: string; path: string; url: string }>;
-}
-
-interface ImageCellProps {
-  path: string | null;
-  source: BrowserUploadFile | null;
-  muted?: boolean;
-}
 
 interface PairingPreviewPanelProps {
   plan: WebUploadPlan | null;
@@ -95,452 +61,10 @@ function frameForId(plan: WebUploadPlan | null, frameId: string | null) {
   return plan.frames.find((frame) => frameIdForFrame(frame) === frameId) ?? null;
 }
 
-function alternateAssetForLabel(frame: WebUploadFramePlan | null, label: string) {
-  return frame?.misc.find((asset) => asset.label === label) ?? null;
-}
-
-function SmallLazyThumbnail({ alt, source }: { alt: string; source: BrowserUploadFile | null }) {
-  const rootRef = useRef<HTMLSpanElement | null>(null);
-  const [isVisible, setIsVisible] = useState(false);
-  const [url, setUrl] = useState<string | null>(null);
-
-  useEffect(() => {
-    const element = rootRef.current;
-    if (!element || isVisible) {
-      return undefined;
-    }
-
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry?.isIntersecting) {
-          setIsVisible(true);
-          observer.disconnect();
-        }
-      },
-      { rootMargin: "720px" },
-    );
-    observer.observe(element);
-    return () => observer.disconnect();
-  }, [isVisible]);
-
-  useEffect(() => {
-    if (!source || !isVisible) {
-      setUrl(null);
-      return undefined;
-    }
-
-    // The collapsed table may contain hundreds of source files. Create object URLs only after the
-    // cell scrolls near the viewport, and revoke them with the row so previews do not become a
-    // hidden cache of the entire directory.
-    const nextUrl = URL.createObjectURL(source.file);
-    setUrl(nextUrl);
-    return () => URL.revokeObjectURL(nextUrl);
-  }, [isVisible, source]);
-
-  return (
-    <Box
-      ref={rootRef}
-      component="span"
-      sx={{
-        width: webUploadSizes.tinyThumbnailWidth,
-        height: webUploadSizes.tinyThumbnailHeight,
-        flex: "0 0 auto",
-        overflow: "hidden",
-        borderRadius: webUploadRadii.thumbnail,
-        border: "1px solid",
-        borderColor: webUploadSurfaces.thumbnailBorder,
-        backgroundColor: webUploadSurfaces.controlBackground,
-      }}
-    >
-      {url ? (
-        <Box
-          component="img"
-          src={url}
-          alt={alt}
-          loading="lazy"
-          decoding="async"
-          fetchPriority="low"
-          sx={{
-            display: "block",
-            width: "100%",
-            height: "100%",
-            objectFit: "cover",
-          }}
-        />
-      ) : null}
-    </Box>
-  );
-}
-
-function ImageCell({ muted = false, path, source }: ImageCellProps) {
-  if (!path) {
-    return (
-      <Typography
-        variant="body2"
-        noWrap
-        sx={{
-          color: "text.disabled",
-        }}
-      >
-        —
-      </Typography>
-    );
-  }
-
-  return (
-    <Box
-      title={path}
-      sx={{
-        minWidth: 0,
-        display: "flex",
-        alignItems: "center",
-        gap: 0.65,
-        color: muted ? "text.disabled" : "text.primary",
-      }}
-    >
-      <SmallLazyThumbnail alt={path} source={source} />
-      <Typography
-        variant="body2"
-        noWrap
-        sx={{
-          minWidth: 0,
-          fontVariantNumeric: "tabular-nums",
-        }}
-      >
-        {compactUploadFilename(path)}
-      </Typography>
-    </Box>
-  );
-}
-
-function IssueStatus({ row }: { row: FramePreviewRow }) {
-  if (row.hasError) {
-    return <ErrorOutlined color="error" fontSize="small" />;
-  }
-  if (row.hasWarning) {
-    return <WarningAmber color="warning" fontSize="small" />;
-  }
-  return <CheckCircle color="success" fontSize="small" />;
-}
-
-function ExpandedPreview({ frame, urls }: { frame: WebUploadFramePlan; urls: PreviewUrls | null }) {
-  return (
-    <Collapse in={Boolean(urls)} timeout={180} unmountOnExit>
-      <Box
-        sx={{
-          px: { xs: 1, md: 1.25 },
-          pb: 1.15,
-        }}
-      >
-        {urls ? (
-          <Box
-            sx={{
-              display: "grid",
-              gridTemplateColumns: {
-                xs: "1fr",
-                sm: "repeat(auto-fit, minmax(160px, 1fr))",
-              },
-              gap: 1,
-            }}
-          >
-            {urls.items.map((preview) => (
-              <Box
-                key={preview.key}
-                sx={{
-                  overflow: "hidden",
-                  border: "1px solid",
-                  borderColor: "divider",
-                  borderRadius: webUploadRadii.control,
-                  backgroundColor: webUploadSurfaces.row,
-                }}
-              >
-                <Box
-                  component="img"
-                  src={preview.url}
-                  alt={`${frame.title} ${preview.label}`}
-                  decoding="async"
-                  sx={{
-                    display: "block",
-                    width: "100%",
-                    aspectRatio: "16 / 9",
-                    objectFit: "cover",
-                  }}
-                />
-                <Typography
-                  variant="caption"
-                  noWrap
-                  title={preview.path}
-                  sx={{ display: "block", px: 1, py: 0.65, color: "text.secondary" }}
-                >
-                  {preview.label} · {compactUploadFilename(preview.path)}
-                </Typography>
-              </Box>
-            ))}
-          </Box>
-        ) : null}
-      </Box>
-    </Collapse>
-  );
-}
-
-function EditableColumnHeader({
-  canEdit,
-  label,
-  onRename,
-}: {
-  canEdit: boolean;
-  label: string;
-  onRename: (currentLabel: string, nextLabel: string) => void;
-}) {
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(label);
-
-  useEffect(() => {
-    if (!editing) {
-      setDraft(label);
-    }
-  }, [editing, label]);
-
-  function save() {
-    const nextLabel = draft.trim();
-    if (nextLabel && nextLabel !== label) {
-      onRename(label, nextLabel);
-    }
-    setEditing(false);
-  }
-
-  if (!canEdit) {
-    return <>{label}</>;
-  }
-
-  return (
-    <Box sx={{ display: "inline-flex", alignItems: "center", gap: 0.35, minWidth: 0 }}>
-      {editing ? (
-        <>
-          <Box
-            component="input"
-            value={draft}
-            aria-label={`编辑 ${label} 列名`}
-            onChange={(event) => setDraft(event.target.value)}
-            onClick={(event) => event.stopPropagation()}
-            onKeyDown={(event) => {
-              if (event.key === "Enter") {
-                event.preventDefault();
-                save();
-              }
-              if (event.key === "Escape") {
-                event.preventDefault();
-                setEditing(false);
-              }
-            }}
-            sx={{
-              width: "9ch",
-              minWidth: 0,
-              border: 0,
-              borderBottom: "1px solid currentColor",
-              outline: 0,
-              p: 0,
-              color: "inherit",
-              background: "transparent",
-              font: "inherit",
-            }}
-          />
-          <IconButton
-            aria-label="保存列名"
-            size="small"
-            onClick={save}
-            sx={{ width: webUploadSizes.inlineIconButton, height: webUploadSizes.inlineIconButton }}
-          >
-            <Check sx={{ fontSize: 15 }} />
-          </IconButton>
-          <IconButton
-            aria-label="取消编辑列名"
-            size="small"
-            onClick={() => setEditing(false)}
-            sx={{ width: webUploadSizes.inlineIconButton, height: webUploadSizes.inlineIconButton }}
-          >
-            <Close sx={{ fontSize: 15 }} />
-          </IconButton>
-        </>
-      ) : (
-        <>
-          <Typography component="span" variant="inherit" noWrap sx={{ minWidth: 0 }}>
-            {label}
-          </Typography>
-          <IconButton
-            aria-label={`编辑 ${label} 列名`}
-            size="small"
-            onClick={(event) => {
-              event.stopPropagation();
-              setEditing(true);
-            }}
-            sx={{
-              width: webUploadSizes.inlineIconButton,
-              height: webUploadSizes.inlineIconButton,
-              opacity: 0.72,
-              "&:hover": { opacity: 1 },
-            }}
-          >
-            <EditOutlined sx={{ fontSize: 14 }} />
-          </IconButton>
-        </>
-      )}
-    </Box>
-  );
-}
-
-function SortablePairingRow({
-  row,
-  alternateColumns,
-  disabled,
-  expanded,
-  previewFrame,
-  previewUrls,
-  onToggleExpanded,
-}: {
-  row: FramePreviewRow;
-  alternateColumns: string[];
-  disabled: boolean;
-  expanded: boolean;
-  previewFrame: WebUploadFramePlan | null;
-  previewUrls: PreviewUrls | null;
-  onToggleExpanded: () => void;
-}) {
-  const { attributes, listeners, setNodeRef, transform, transition } = useSortable({
-    id: row.frameId,
-    disabled,
-  });
-  const style: CSSProperties = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-  };
-  const imageColumnCount = 2 + alternateColumns.length;
-  const imageColumnMin = alternateColumns.length >= 2 ? 118 : 150;
-  const desktopGridColumns = `42px 54px minmax(88px, 0.58fr) repeat(${imageColumnCount}, minmax(${imageColumnMin}px, 1fr)) 54px 40px`;
-
-  return (
-    <Box
-      ref={setNodeRef}
-      style={style}
-      sx={{
-        borderBottom: "1px solid",
-        borderColor: webUploadSurfaces.subtleBorder,
-        backgroundColor: expanded ? webUploadSurfaces.rowSelected : "transparent",
-        transition: PANEL_TRANSITION,
-        "&:hover": {
-          backgroundColor: expanded
-            ? webUploadSurfaces.rowSelectedHover
-            : webUploadSurfaces.rowHover,
-        },
-        [REDUCED_MOTION]: {
-          transition: "none",
-        },
-        "&:last-of-type": {
-          borderBottom: 0,
-        },
-      }}
-    >
-      <Box
-        role="button"
-        tabIndex={0}
-        onClick={onToggleExpanded}
-        onKeyDown={(event) => {
-          if (event.key === "Enter" || event.key === " ") {
-            event.preventDefault();
-            onToggleExpanded();
-          }
-        }}
-        sx={{
-          display: "grid",
-          gridTemplateColumns: {
-            // Drag and expand controls keep a 40px acquisition target even in the dense mobile row.
-            xs: "40px 42px minmax(0, 1fr) 24px 40px",
-            md: desktopGridColumns,
-          },
-          gap: { xs: 0.75, md: 1 },
-          alignItems: "center",
-          px: { xs: 0.75, md: 1.1 },
-          py: 0.85,
-          cursor: "pointer",
-          outline: 0,
-          "&:focus-visible": {
-            boxShadow: `inset 0 0 0 2px ${webUploadColors.focusRing}`,
-          },
-        }}
-      >
-        <Tooltip title={disabled ? "扫描完成后可调整顺序" : "拖动调整上传顺序"}>
-          <span>
-            <IconButton
-              {...attributes}
-              {...listeners}
-              aria-label="拖动调整上传顺序"
-              disabled={disabled}
-              size="small"
-              onClick={(event) => event.stopPropagation()}
-              sx={{
-                width: webUploadSizes.dragHandleButton,
-                height: webUploadSizes.dragHandleButton,
-                borderRadius: webUploadRadii.control,
-                border: 0,
-                backgroundColor: "transparent",
-              }}
-            >
-              <DragIndicator fontSize="small" />
-            </IconButton>
-          </span>
-        </Tooltip>
-        <Typography
-          variant="body2"
-          sx={{
-            color: "text.secondary",
-          }}
-        >
-          {String(row.order + 1).padStart(3, "0")}
-        </Typography>
-        <Typography variant="body2" noWrap title={row.title}>
-          {row.title}
-        </Typography>
-        <Box sx={{ display: { xs: "none", md: "block" }, minWidth: 0 }}>
-          <ImageCell path={row.beforePath} source={previewFrame?.before.source ?? null} />
-        </Box>
-        <Box sx={{ display: { xs: "none", md: "block" }, minWidth: 0 }}>
-          <ImageCell path={row.afterPath} source={previewFrame?.after.source ?? null} />
-        </Box>
-        {alternateColumns.map((label) => {
-          const alternate = row.alternateAfter.find((item) => item.label === label);
-          const alternateAsset = alternateAssetForLabel(previewFrame, label);
-          return (
-            <Box key={label} sx={{ display: { xs: "none", md: "block" }, minWidth: 0 }}>
-              <ImageCell
-                muted={!alternate}
-                path={alternate?.path ?? null}
-                source={alternateAsset?.source ?? null}
-              />
-            </Box>
-          );
-        })}
-        <Box sx={{ display: "block" }}>
-          <IssueStatus row={row} />
-        </Box>
-        <KeyboardArrowDown
-          fontSize="small"
-          sx={{
-            color: "text.secondary",
-            transform: expanded ? "rotate(180deg)" : "rotate(0deg)",
-            transition: `transform ${webUploadMotion.standard}`,
-            [REDUCED_MOTION]: {
-              transition: "none",
-            },
-          }}
-        />
-      </Box>
-      {previewFrame ? (
-        <ExpandedPreview frame={previewFrame} urls={expanded ? previewUrls : null} />
-      ) : null}
-    </Box>
-  );
-}
-
+/**
+ * Coordinates pairing controls, DnD sensors, and the one expanded preview URL set. Column editing
+ * and sortable row rendering live in focused child modules so this component owns only the table.
+ */
 export function PairingPreviewPanel({
   plan,
   planView,
@@ -559,7 +83,7 @@ export function PairingPreviewPanel({
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
   const expandedFrame = frameForId(plan, expandedFrameId);
-  const [previewUrls, setPreviewUrls] = useState<PreviewUrls | null>(null);
+  const [previewUrls, setPreviewUrls] = useState<PairingPreviewUrls | null>(null);
   const frameIds = useMemo(
     () => planView?.frames.map((row) => row.frameId) ?? [],
     [planView?.frames],
@@ -585,8 +109,7 @@ export function PairingPreviewPanel({
       return undefined;
     }
 
-    // Large upload directories can contain hundreds of frames. Keep object URLs scoped to the one
-    // expanded row so preview inspection does not pin every source image in memory.
+    // Keep object URLs scoped to the expanded row so large plans do not pin every source image.
     const previewItems = [
       { key: "before", label: expandedFrame.before.label, asset: expandedFrame.before },
       { key: "after", label: expandedFrame.after.label, asset: expandedFrame.after },
@@ -659,8 +182,7 @@ export function PairingPreviewPanel({
               minWidth: 0,
             }}
           >
-            {/* Automatic titles stay compact; this mode control exposes the filename fallback that
-              previously existed only as an unused formatter. */}
+            {/* This explicit fallback exposes filename titles when structured inference is wrong. */}
             <ToggleButtonGroup
               exclusive
               size="small"
@@ -668,16 +190,12 @@ export function PairingPreviewPanel({
               disabled={!canReorder}
               aria-label="Frame 标题格式"
               onChange={(_event, nextMode: FrameTitleMode | null) => {
-                if (nextMode) {
-                  onFrameTitleModeChange(nextMode);
-                }
+                if (nextMode) onFrameTitleModeChange(nextMode);
               }}
               sx={{
                 height: webUploadSizes.compactControlHeight,
                 width: 168,
                 "& .MuiToggleButton-root": {
-                  // CJK labels can break between any characters; reserve equal one-line segments so
-                  // 文件名 never becomes a two-line button in the compact toolbar.
                   flex: "1 1 0",
                   minWidth: 0,
                   px: 0.5,
@@ -703,9 +221,9 @@ export function PairingPreviewPanel({
               sx={{ minWidth: 184, flex: "1 1 184px", maxWidth: 260 }}
             >
               <Select
-                value={planView?.heatmapReferenceLabel ?? ""}
+                value={planView.heatmapReferenceLabel ?? ""}
                 onChange={(event) => onHeatmapReferenceChange(event.target.value)}
-                disabled={!canReorder || (planView?.heatmapReferenceOptions.length ?? 0) <= 1}
+                disabled={!canReorder || planView.heatmapReferenceOptions.length <= 1}
                 displayEmpty
                 renderValue={(value) => (value ? `Heatmap: ${value}` : "Heatmap")}
                 sx={{
@@ -723,7 +241,7 @@ export function PairingPreviewPanel({
                   },
                 }}
               >
-                {(planView?.heatmapReferenceOptions ?? []).map((label) => (
+                {planView.heatmapReferenceOptions.map((label) => (
                   <MenuItem key={label} value={label}>
                     Heatmap: {label}
                   </MenuItem>
@@ -758,66 +276,19 @@ export function PairingPreviewPanel({
       <Box sx={{ flex: 1, minHeight: 0, overflow: "auto" }}>
         {planView && planView.frames.length > 0 ? (
           <DndContext
-            // Keep dnd-kit aria ids stable across SSR/hydration and hot reloads.
             id="web-upload-pairing-preview"
             sensors={sensors}
             collisionDetection={closestCenter}
             onDragEnd={handleDragEnd}
           >
             <SortableContext items={frameIds} strategy={verticalListSortingStrategy}>
-              <Box
-                sx={{
-                  display: "grid",
-                  gridTemplateColumns: {
-                    xs: "40px 42px minmax(0, 1fr) 24px 40px",
-                    md: desktopGridColumns,
-                  },
-                  gap: { xs: 0.75, md: 1 },
-                  px: { xs: 0.75, md: 1.1 },
-                  py: 0.85,
-                  position: "sticky",
-                  top: 0,
-                  zIndex: 1,
-                  color: "text.secondary",
-                  backgroundColor: webUploadSurfaces.stickyHeader,
-                  borderBottom: "1px solid",
-                  borderColor: "divider",
-                  fontSize: 13,
-                }}
-              >
-                <span />
-                <span>序号</span>
-                <span>Frame</span>
-                <Box component="span" sx={{ display: { xs: "none", md: "block" } }}>
-                  <EditableColumnHeader
-                    canEdit={canReorder}
-                    label={planView.beforeLabel}
-                    onRename={(_label, nextLabel) => onRenameColumn({ kind: "before" }, nextLabel)}
-                  />
-                </Box>
-                <Box component="span" sx={{ display: { xs: "none", md: "block" } }}>
-                  <EditableColumnHeader
-                    canEdit={canReorder}
-                    label={planView.afterLabel}
-                    onRename={(_label, nextLabel) => onRenameColumn({ kind: "after" }, nextLabel)}
-                  />
-                </Box>
-                {alternateColumns.map((label) => (
-                  <Box key={label} component="span" sx={{ display: { xs: "none", md: "block" } }}>
-                    <EditableColumnHeader
-                      canEdit={canReorder}
-                      label={label}
-                      onRename={(_label, nextLabel) =>
-                        onRenameColumn({ kind: "misc", label }, nextLabel)
-                      }
-                    />
-                  </Box>
-                ))}
-                <Box component="span" sx={{ display: "block" }}>
-                  状态
-                </Box>
-                <span />
-              </Box>
+              <PairingTableHeader
+                alternateColumns={alternateColumns}
+                canEdit={canReorder}
+                desktopGridColumns={desktopGridColumns}
+                onRenameColumn={onRenameColumn}
+                planView={planView}
+              />
               {planView.frames.map((row) => (
                 <SortablePairingRow
                   key={row.frameId}
@@ -881,12 +352,7 @@ export function PairingPreviewPanel({
             </Alert>
           ))}
           {planView.issues.length > 3 ? (
-            <Typography
-              variant="caption"
-              sx={{
-                color: "text.secondary",
-              }}
-            >
+            <Typography variant="caption" sx={{ color: "text.secondary" }}>
               还有 {planView.issues.length - 3} 个问题未显示。
             </Typography>
           ) : null}

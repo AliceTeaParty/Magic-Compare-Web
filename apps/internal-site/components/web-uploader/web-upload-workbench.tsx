@@ -1,6 +1,6 @@
 "use client";
 
-import { type ChangeEvent, useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import {
   CheckCircleOutlined,
   CloudUpload,
@@ -29,10 +29,7 @@ import { cjkKebabCase } from "@magic-compare/shared-utils";
 import { useRouter } from "next/navigation";
 import type { CaseCatalogItem } from "@/lib/server/repositories/content-repository";
 import { InternalPageHeader } from "../internal-page-shell";
-import { useAppNotifications } from "../notifications/use-app-notifications";
-import type { GenerationProgress, PreflightedUploadFrame } from "./asset-generator";
-import { scanBrowserUploadFiles } from "./source-scanner";
-import { WebUploadRunner } from "./upload-runner";
+import type { GenerationProgress } from "./asset-generator";
 import {
   webUploadPanelSx,
   webUploadRadii,
@@ -46,122 +43,20 @@ import {
   UploadIntakePanel,
   type UploadGroupMeta,
 } from "./web-upload-workspace-sections";
-import type { BrowserUploadFile, UploadRunnerSnapshot, WebUploadPlan } from "./web-upload-types";
-import {
-  buildPlanView,
-  renameUploadPlanAssetLabel,
-  reorderUploadPlan,
-  setUploadPlanFrameTitleMode,
-  setUploadPlanHeatmapReference,
-  type FrameTitleMode,
-  type PlanView,
-  type UploadPlanImageColumn,
-} from "./web-upload-view-model";
+import type { UploadRunnerSnapshot, WebUploadPlan } from "./web-upload-types";
+import type { PlanView } from "./web-upload-view-model";
+import { useWebUploadPlan } from "./use-web-upload-plan";
+import { useWebUploadSession } from "./use-web-upload-session";
 
-const INPUT_HASH_STORAGE_PREFIX = "magic_compare_web_upload:";
 const UPLOAD_QUEUE_VISIBLE_LIMIT = 12;
-const BROWSER_RECOMMENDATION_MESSAGE = "推荐使用 Chrome / Edge 选择整个目录上传。";
 
 interface WebUploadWorkbenchProps {
   cases: CaseCatalogItem[];
   initialCaseSlug: string | null;
 }
 
-type BrowserDirectoryHandle = {
-  name: string;
-  values(): AsyncIterable<BrowserFileSystemHandle>;
-};
-
-type BrowserFileSystemHandle =
-  | { kind: "file"; name: string; getFile(): Promise<File> }
-  | { kind: "directory"; name: string; values(): AsyncIterable<BrowserFileSystemHandle> };
-
-type DirectoryPickerWindow = Window & {
-  showDirectoryPicker?: () => Promise<BrowserDirectoryHandle>;
-};
-
 function normalizeSlug(value: string, fallback = "uploaded-group") {
   return cjkKebabCase(value, fallback);
-}
-
-function buildInitialSnapshot(): UploadRunnerSnapshot {
-  return {
-    stage: "idle",
-    jobId: null,
-    inputHash: null,
-    completedFrames: 0,
-    totalFrames: 0,
-    completedFiles: 0,
-    totalFiles: 0,
-    failedCount: 0,
-    retriedCount: 0,
-    message: "选择文件夹后开始检查。",
-    frames: [],
-    result: null,
-  };
-}
-
-function getCaseInput(cases: CaseCatalogItem[], selectedCaseSlug: string) {
-  const existing = cases.find((item) => item.slug === selectedCaseSlug);
-  if (!existing) throw new Error("请先新建并选择目标项目。");
-  return {
-    slug: existing.slug,
-    title: existing.title,
-    summary: existing.summary,
-    tags: existing.tags,
-    coverAssetLabel: null,
-  };
-}
-
-async function readDirectoryHandle(handle: BrowserDirectoryHandle): Promise<BrowserUploadFile[]> {
-  const entries: BrowserUploadFile[] = [];
-
-  async function walk(directory: BrowserDirectoryHandle, prefix: string) {
-    for await (const entry of directory.values()) {
-      const relativePath = prefix ? `${prefix}/${entry.name}` : entry.name;
-      if (entry.kind === "file") {
-        entries.push({
-          relativePath,
-          file: await entry.getFile(),
-        });
-      } else {
-        await walk(entry, relativePath);
-      }
-    }
-  }
-
-  await walk(handle, "");
-  return entries;
-}
-
-function filesFromInput(fileList: FileList): BrowserUploadFile[] {
-  return [...fileList].map((file) => ({
-    file,
-    relativePath:
-      typeof file.webkitRelativePath === "string" && file.webkitRelativePath
-        ? file.webkitRelativePath
-        : file.name,
-  }));
-}
-
-/**
- * Upload resume hints are helpful but optional; blocked storage must not break the live upload
- * runner after frames have already been generated.
- */
-function writeUploadResumeHint(groupSlug: string, inputHash: string) {
-  try {
-    window.localStorage.setItem(`${INPUT_HASH_STORAGE_PREFIX}${groupSlug}`, inputHash);
-  } catch {
-    // Browser privacy settings can disable storage. The active runner still owns this session.
-  }
-}
-
-function removeUploadResumeHint(groupSlug: string) {
-  try {
-    window.localStorage.removeItem(`${INPUT_HASH_STORAGE_PREFIX}${groupSlug}`);
-  } catch {
-    // Storage is optional for uploads; inability to clear a hint must not block abandonment.
-  }
 }
 
 function UploadStageIcon({ marker }: { marker: string }) {
@@ -475,13 +370,28 @@ function UploadDetails({
  */
 export function WebUploadWorkbench({ cases, initialCaseSlug }: WebUploadWorkbenchProps) {
   const router = useRouter();
-  const inputRef = useRef<HTMLInputElement | null>(null);
-  const planRef = useRef<WebUploadPlan | null>(null);
-  const preflightFramesRef = useRef<PreflightedUploadFrame[] | null>(null);
-  const runnerRef = useRef<WebUploadRunner | null>(null);
-  const unsubscribeRunnerRef = useRef<(() => void) | null>(null);
-  const generationAbortRef = useRef<AbortController | null>(null);
-  const { pushNotification } = useAppNotifications();
+  const {
+    changeFrameTitleMode,
+    changeHeatmapReference,
+    chooseDirectory,
+    ensurePreflightedFrames,
+    expandedFrameId,
+    frameTitleMode,
+    generationProgress,
+    handleFallbackInput,
+    inputRef,
+    isScanning,
+    planRef,
+    planView,
+    renamePairingColumn,
+    reorderPairingRows,
+    reportGenerationProgress,
+    resetPlan,
+    setExpandedFrameId,
+    sourceRootName,
+  } = useWebUploadPlan();
+  const { abandonUpload, pauseUpload, resetSession, snapshot, startOrResumeUpload } =
+    useWebUploadSession();
   const [selectedCaseSlug, setSelectedCaseSlug] = useState(() => {
     if (initialCaseSlug && cases.some((item) => item.slug === initialCaseSlug)) {
       return initialCaseSlug;
@@ -495,12 +405,6 @@ export function WebUploadWorkbench({ cases, initialCaseSlug }: WebUploadWorkbenc
     description: "",
     defaultMode: "before-after",
   });
-  const [planView, setPlanView] = useState<PlanView | null>(null);
-  const [frameTitleMode, setFrameTitleMode] = useState<FrameTitleMode>("inferred");
-  const [generationProgress, setGenerationProgress] = useState<GenerationProgress | null>(null);
-  const [expandedFrameId, setExpandedFrameId] = useState<string | null>(null);
-  const [isScanning, setIsScanning] = useState(false);
-  const [snapshot, setSnapshot] = useState<UploadRunnerSnapshot>(() => buildInitialSnapshot());
 
   // Failed uploads can be resumed against the existing server job. Keep metadata locked there too
   // so visible inputs cannot drift away from the payload already owned by the runner.
@@ -526,259 +430,34 @@ export function WebUploadWorkbench({ cases, initialCaseSlug }: WebUploadWorkbenc
   );
   const canAbandon =
     Boolean(planRef.current) && snapshot.stage !== "idle" && snapshot.stage !== "completed";
-  const sourceRootName = planRef.current?.sourceRootName ?? null;
   const showProgressPanel = snapshot.stage !== "idle" && snapshot.stage !== "scanned";
   const overallProgress =
     snapshot.totalFiles > 0 ? (snapshot.completedFiles / snapshot.totalFiles) * 100 : 0;
 
-  useEffect(() => {
-    // Browser guidance is contextual: Chromium users already have the preferred directory picker,
-    // so showing the recommendation on every visit only covers useful upload information.
-    if (!(window as DirectoryPickerWindow).showDirectoryPicker) {
-      pushNotification(BROWSER_RECOMMENDATION_MESSAGE, "info", {
-        key: "web-upload-browser-recommendation",
-      });
-    }
-  }, [pushNotification]);
-
-  useEffect(() => {
-    return () => {
-      generationAbortRef.current?.abort();
-      unsubscribeRunnerRef.current?.();
-      runnerRef.current?.dispose();
-    };
-  }, []);
-
-  /**
-   * Runs the scanner and stores the heavy plan outside React state; the component receives only a
-   * compact render model. Row previews create object URLs lazily inside the expanded row.
-   */
-  function applyScannedFiles(entries: BrowserUploadFile[], sourceRootName: string) {
-    const plan = scanBrowserUploadFiles(entries, sourceRootName);
-    planRef.current = plan;
-    preflightFramesRef.current = null;
-    generationAbortRef.current?.abort();
-    generationAbortRef.current = null;
-    runnerRef.current?.dispose();
-    runnerRef.current = null;
-    unsubscribeRunnerRef.current?.();
-    unsubscribeRunnerRef.current = null;
-    setSnapshot({ ...buildInitialSnapshot(), stage: "scanned" });
-    setGenerationProgress(null);
-    setExpandedFrameId(null);
-    setFrameTitleMode("inferred");
+  /** A fresh source plan starts a distinct runner session and refreshes inferred group identity. */
+  function acceptPlan(plan: WebUploadPlan) {
+    resetSession("scanned");
     setGroupMeta((current) => ({
       ...current,
-      // Choosing a new directory starts a new upload intent. Refresh the inferred identity so a
-      // previous folder's auto-filled slug/title cannot silently leak into the next upload.
       slug: plan.suggestedGroupSlug,
       title: plan.suggestedGroupTitle,
     }));
-    setPlanView(buildPlanView(plan));
-    pushNotification(
-      plan.issues.some((issue) => issue.severity === "error")
-        ? "检查发现阻塞问题，请先修正文件夹。"
-        : "检查完成，可以开始上传。",
-      plan.issues.some((issue) => issue.severity === "error") ? "warning" : "success",
-      { key: "web-upload-scan-result" },
-    );
   }
 
-  async function chooseDirectory() {
-    if (isLocked) {
-      return;
-    }
-
-    const picker = window as DirectoryPickerWindow;
-    if (!picker.showDirectoryPicker) {
-      inputRef.current?.click();
-      return;
-    }
-
-    try {
-      const handle = await picker.showDirectoryPicker();
-      setIsScanning(true);
-      const entries = await readDirectoryHandle(handle);
-      applyScannedFiles(entries, handle.name);
-    } catch (error) {
-      if (error instanceof DOMException && error.name === "AbortError") {
-        return;
-      }
-      pushNotification(error instanceof Error ? error.message : "读取目录失败。", "error", {
-        key: "web-upload-directory-error",
-      });
-    } finally {
-      setIsScanning(false);
-    }
+  function beginUpload() {
+    void startOrResumeUpload({
+      canStart,
+      cases,
+      ensurePreflightedFrames,
+      groupInput: { ...groupMeta, slug: normalizeSlug(groupMeta.slug) },
+      onGenerationProgress: reportGenerationProgress,
+      selectedCaseSlug,
+    });
   }
 
-  function handleFallbackInput(event: ChangeEvent<HTMLInputElement>) {
-    const files = event.target.files;
-    if (!files || files.length === 0) {
-      return;
-    }
-
-    setIsScanning(true);
-    try {
-      const entries = filesFromInput(files);
-      const sourceRootName =
-        entries[0]?.relativePath.split("/").filter(Boolean)[0] ?? "uploaded-group";
-      applyScannedFiles(entries, sourceRootName);
-    } catch (error) {
-      pushNotification(error instanceof Error ? error.message : "读取目录失败。", "error", {
-        key: "web-upload-directory-error",
-      });
-    } finally {
-      setIsScanning(false);
-    }
-    event.target.value = "";
-  }
-
-  /** Completes source decode, dimensions, and hashing before creating the remote upload job. */
-  async function ensurePreflightedFrames() {
-    const plan = planRef.current;
-    if (!plan) {
-      throw new Error("请先选择文件夹。");
-    }
-    if (plan.frames.length === 0) {
-      throw new Error("所选目录中没有可上传的对比帧。");
-    }
-
-    if (preflightFramesRef.current) {
-      return preflightFramesRef.current;
-    }
-
-    const abortController = new AbortController();
-    generationAbortRef.current = abortController;
-    setSnapshot({ ...buildInitialSnapshot(), stage: "generating", message: "正在完整预检素材。" });
-    const { preflightUploadFrames } = await import("./asset-generator");
-    try {
-      const frames = await preflightUploadFrames(
-        plan.frames,
-        (progress) => {
-          setGenerationProgress(progress);
-        },
-        {
-          heatmapReferenceLabel: plan.heatmapReferenceLabel,
-          signal: abortController.signal,
-        },
-      );
-      if (abortController.signal.aborted) {
-        throw new DOMException("Upload generation was abandoned.", "AbortError");
-      }
-      preflightFramesRef.current = frames;
-      setSnapshot({ ...buildInitialSnapshot(), stage: "ready", message: "完整预检已通过。" });
-      return frames;
-    } finally {
-      if (generationAbortRef.current === abortController) {
-        generationAbortRef.current = null;
-      }
-    }
-  }
-
-  async function startOrResumeUpload() {
-    if (!canStart) {
-      return;
-    }
-
-    try {
-      const frames = await ensurePreflightedFrames();
-      const generation = await import("./asset-generator");
-      const framesByOrder = new Map(frames.map((frame) => [frame.descriptor.order, frame]));
-      const caseInput = getCaseInput(cases, selectedCaseSlug);
-      const runner =
-        runnerRef.current ??
-        new WebUploadRunner({
-          caseInput,
-          groupInput: {
-            slug: normalizeSlug(groupMeta.slug),
-            title: groupMeta.title.trim() || "上传图组",
-            description: groupMeta.description.trim(),
-            defaultMode: groupMeta.defaultMode,
-            order: 0,
-            tags: [],
-          },
-          uploadConcurrency: generation.WEB_UPLOAD_WORKER_CONCURRENCY,
-          stream: {
-            frames: frames.map((frame) => frame.descriptor),
-            generateFrame: async (frameOrder, signal) => {
-              const frame = framesByOrder.get(frameOrder);
-              if (!frame) throw new Error(`找不到 Frame ${frameOrder + 1} 的预检结果。`);
-              return generation.generateUploadFrame(frame, {
-                signal,
-                onProgress: setGenerationProgress,
-              });
-            },
-          },
-        });
-
-      if (!runnerRef.current) {
-        runnerRef.current = runner;
-        unsubscribeRunnerRef.current = runner.subscribe((nextSnapshot) => {
-          setSnapshot(nextSnapshot);
-          if (nextSnapshot.inputHash) {
-            writeUploadResumeHint(
-              nextSnapshot.result?.groupSlug ?? groupMeta.slug,
-              nextSnapshot.inputHash,
-            );
-          }
-        });
-      }
-
-      await runner.start();
-    } catch (error) {
-      if (error instanceof DOMException && error.name === "AbortError") {
-        return;
-      }
-      pushNotification(error instanceof Error ? error.message : "上传失败。", "error", {
-        key: "web-upload-runner-error",
-      });
-      setSnapshot({
-        ...buildInitialSnapshot(),
-        stage: "failed",
-        message: error instanceof Error ? error.message : "上传失败。",
-      });
-    }
-  }
-
-  function pauseUpload() {
-    runnerRef.current?.pause();
-  }
-
-  function resetLocalUploadState() {
-    generationAbortRef.current?.abort();
-    generationAbortRef.current = null;
-    unsubscribeRunnerRef.current?.();
-    unsubscribeRunnerRef.current = null;
-    runnerRef.current?.dispose();
-    runnerRef.current = null;
-    planRef.current = null;
-    preflightFramesRef.current = null;
-    setPlanView(null);
-    setGenerationProgress(null);
-    setExpandedFrameId(null);
-    setFrameTitleMode("inferred");
-    setSnapshot(buildInitialSnapshot());
-  }
-
-  async function abandonUpload() {
-    if (!canAbandon) {
-      return;
-    }
-
-    const runner = runnerRef.current;
-    try {
-      generationAbortRef.current?.abort();
-      if (runner) {
-        await runner.cancel();
-      }
-      removeUploadResumeHint(groupMeta.slug);
-      resetLocalUploadState();
-      pushNotification("已放弃上传。", "info", { key: "web-upload-abandoned" });
-    } catch (error) {
-      pushNotification(error instanceof Error ? error.message : "放弃上传失败。", "error", {
-        key: "web-upload-abandon-error",
-      });
+  async function abandonCurrentUpload() {
+    if (canAbandon && (await abandonUpload(groupMeta.slug))) {
+      resetPlan();
     }
   }
 
@@ -789,71 +468,6 @@ export function WebUploadWorkbench({ cases, initialCaseSlug }: WebUploadWorkbenc
     }
 
     router.push(`/cases/${result.caseSlug}/groups/${result.groupSlug}`);
-  }
-
-  function reorderPairingRows(activeFrameId: string, overFrameId: string | null) {
-    if (snapshot.stage !== "scanned") {
-      return;
-    }
-
-    const plan = planRef.current;
-    if (!plan) {
-      return;
-    }
-
-    const reorderedPlan = reorderUploadPlan(plan, activeFrameId, overFrameId);
-    if (!reorderedPlan) {
-      return;
-    }
-
-    planRef.current = reorderedPlan;
-    // Preflight descriptors embed frame order in the signed source manifest, so any pre-upload
-    // reorder must invalidate them before the user starts the remote job.
-    preflightFramesRef.current = null;
-    setPlanView(buildPlanView(reorderedPlan));
-  }
-
-  function applyPlanUpdate(nextPlan: WebUploadPlan | null) {
-    if (!nextPlan) {
-      return;
-    }
-
-    planRef.current = nextPlan;
-    // Labels and heatmap references enter the preflight manifest; invalidating here prevents the
-    // progress UI from claiming an older validation still covers the edited plan.
-    preflightFramesRef.current = null;
-    setPlanView(buildPlanView(nextPlan));
-  }
-
-  function renamePairingColumn(column: UploadPlanImageColumn, nextLabel: string) {
-    const plan = planRef.current;
-    if (!plan || snapshot.stage !== "scanned") {
-      return;
-    }
-
-    applyPlanUpdate(renameUploadPlanAssetLabel(plan, column, nextLabel));
-  }
-
-  function changeHeatmapReference(nextLabel: string) {
-    const plan = planRef.current;
-    if (!plan || snapshot.stage !== "scanned") {
-      return;
-    }
-
-    applyPlanUpdate(setUploadPlanHeatmapReference(plan, nextLabel));
-  }
-
-  function changeFrameTitleMode(nextMode: FrameTitleMode) {
-    const plan = planRef.current;
-    if (!plan || snapshot.stage !== "scanned" || nextMode === frameTitleMode) {
-      return;
-    }
-
-    // Structured recognition stays the efficient default, while filename mode is an explicit
-    // recovery path when episode/source-marker inference does not match the operator's naming.
-    setExpandedFrameId(null);
-    setFrameTitleMode(nextMode);
-    applyPlanUpdate(setUploadPlanFrameTitleMode(plan, nextMode));
   }
 
   return (
@@ -895,7 +509,7 @@ export function WebUploadWorkbench({ cases, initialCaseSlug }: WebUploadWorkbenc
                   startIcon={snapshot.stage === "failed" ? <Refresh /> : <CloudUpload />}
                   disabled={!canStart}
                   loading={snapshot.stage === "generating"}
-                  onClick={startOrResumeUpload}
+                  onClick={beginUpload}
                   sx={{ minWidth: 140 }}
                 >
                   {snapshot.stage === "generating"
@@ -935,7 +549,7 @@ export function WebUploadWorkbench({ cases, initialCaseSlug }: WebUploadWorkbenc
                   disabled={!canAbandon}
                   onClick={() => {
                     setActionMenuAnchor(null);
-                    void abandonUpload();
+                    void abandonCurrentUpload();
                   }}
                 >
                   <ListItemIcon>
@@ -953,7 +567,7 @@ export function WebUploadWorkbench({ cases, initialCaseSlug }: WebUploadWorkbenc
           type="file"
           multiple
           hidden
-          onChange={handleFallbackInput}
+          onChange={(event) => handleFallbackInput(event, acceptPlan)}
           {...({ webkitdirectory: "", directory: "" } as Record<string, string>)}
         />
 
@@ -971,7 +585,7 @@ export function WebUploadWorkbench({ cases, initialCaseSlug }: WebUploadWorkbenc
             isScanning={isScanning}
             selectedCaseSlug={selectedCaseSlug}
             onCaseChange={setSelectedCaseSlug}
-            onChooseDirectory={() => void chooseDirectory()}
+            onChooseDirectory={() => void chooseDirectory(isLocked, acceptPlan)}
           />
         ) : (
           <Box
@@ -1014,7 +628,7 @@ export function WebUploadWorkbench({ cases, initialCaseSlug }: WebUploadWorkbenc
                 selectedCaseSlug={selectedCaseSlug}
                 sourceRootName={sourceRootName ?? groupMeta.title}
                 onCaseChange={setSelectedCaseSlug}
-                onChooseDirectory={() => void chooseDirectory()}
+                onChooseDirectory={() => void chooseDirectory(isLocked, acceptPlan)}
                 onGroupMetaChange={(nextMeta) =>
                   setGroupMeta({ ...nextMeta, slug: normalizeSlug(nextMeta.slug) })
                 }
@@ -1029,10 +643,18 @@ export function WebUploadWorkbench({ cases, initialCaseSlug }: WebUploadWorkbenc
               frameTitleMode={frameTitleMode}
               hasBlockingIssues={hasBlockingIssues}
               onExpandedFrameChange={setExpandedFrameId}
-              onFrameTitleModeChange={changeFrameTitleMode}
-              onHeatmapReferenceChange={changeHeatmapReference}
-              onRenameColumn={renamePairingColumn}
-              onReorder={reorderPairingRows}
+              onFrameTitleModeChange={(mode) =>
+                changeFrameTitleMode(mode, snapshot.stage === "scanned")
+              }
+              onHeatmapReferenceChange={(label) =>
+                changeHeatmapReference(label, snapshot.stage === "scanned")
+              }
+              onRenameColumn={(column, label) =>
+                renamePairingColumn(column, label, snapshot.stage === "scanned")
+              }
+              onReorder={(activeFrameId, overFrameId) =>
+                reorderPairingRows(activeFrameId, overFrameId, snapshot.stage === "scanned")
+              }
             />
           </Box>
         )}
