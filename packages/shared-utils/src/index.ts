@@ -25,6 +25,22 @@ export interface SiteBrandConfig {
   logoUrl: string | null;
 }
 
+/** Converts mounted branding file URLs into their public route and drops private file paths. */
+function resolveBrandAssetUrl(value: string | undefined): string | null {
+  const normalized = value?.trim();
+  if (!normalized) return null;
+  if (!normalized.startsWith("file:")) return normalized;
+
+  try {
+    // Older Docker examples encouraged file-like values even though browsers cannot read the
+    // container filesystem. Only the mounted /branding tree has an equivalent public URL.
+    const pathname = new URL(normalized).pathname;
+    return pathname.startsWith("/branding/") ? pathname : null;
+  } catch {
+    return null;
+  }
+}
+
 /** Keeps public and internal brand overrides isolated so one deployment cannot inherit the other. */
 export function resolveSiteBrandConfig(
   env: Record<string, string | undefined>,
@@ -33,8 +49,8 @@ export function resolveSiteBrandConfig(
   const prefix = profile === "internal" ? "MAGIC_COMPARE_INTERNAL" : "MAGIC_COMPARE_PUBLIC";
 
   return {
-    faviconUrl: env[`${prefix}_FAVICON_URL`]?.trim() || null,
-    logoUrl: env[`${prefix}_LOGO_URL`]?.trim() || null,
+    faviconUrl: resolveBrandAssetUrl(env[`${prefix}_FAVICON_URL`]),
+    logoUrl: resolveBrandAssetUrl(env[`${prefix}_LOGO_URL`]),
   };
 }
 

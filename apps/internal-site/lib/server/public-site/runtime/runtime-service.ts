@@ -1,5 +1,5 @@
 import { cp, mkdir, readdir, rm } from "node:fs/promises";
-import { dirname } from "node:path";
+import { dirname, join } from "node:path";
 import type { PublicDeployStage } from "../../../public-deploy-job";
 import {
   CF_PAGES_BRANCH_ENV_NAME,
@@ -44,6 +44,18 @@ export interface PublicDeployObserver {
     stream: "stdout" | "stderr";
     text: string;
   }) => void;
+}
+
+/**
+ * Clears transient build artifacts without replacing the directory itself. Docker may mount the
+ * build directory as a volume, and removing that mount root fails with EBUSY on Linux.
+ */
+export async function clearDirectoryContents(directory: string): Promise<void> {
+  await mkdir(directory, { recursive: true });
+  const entries = await readdir(directory);
+  await Promise.all(
+    entries.map((entry) => rm(join(directory, entry), { recursive: true, force: true })),
+  );
 }
 
 /**
@@ -92,7 +104,7 @@ async function performPublicExport(observer?: PublicDeployObserver): Promise<Pub
   const exportDir = resolvePublicExportDirectory();
 
   await ensurePublishedGroupsExist();
-  await rm(buildOutputDir, { recursive: true, force: true });
+  await clearDirectoryContents(buildOutputDir);
 
   observer?.onStage?.("building");
   const commandResult = await runCommand("pnpm", getPublicSiteBuildArgs(), getWorkspaceRoot(), {

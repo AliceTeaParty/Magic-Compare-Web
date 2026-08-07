@@ -79,4 +79,31 @@ describe("shared slug helpers", () => {
       logoUrl: null,
     });
   });
+
+  it("maps mounted branding file URLs to public paths and rejects private file paths", () => {
+    expect(
+      resolveSiteBrandConfig(
+        {
+          MAGIC_COMPARE_INTERNAL_FAVICON_URL: "file:///branding/internal-favicon.ico",
+          MAGIC_COMPARE_INTERNAL_LOGO_URL: "file:/branding/internal-logo.webp",
+        },
+        "internal",
+      ),
+    ).toEqual({
+      faviconUrl: "/branding/internal-favicon.ico",
+      logoUrl: "/branding/internal-logo.webp",
+    });
+    expect(
+      resolveSiteBrandConfig(
+        {
+          MAGIC_COMPARE_PUBLIC_FAVICON_URL: "file:/app/private/favicon.ico",
+          MAGIC_COMPARE_PUBLIC_LOGO_URL: "file:/home/operator/logo.webp",
+        },
+        "public",
+      ),
+    ).toEqual({
+      faviconUrl: null,
+      logoUrl: null,
+    });
+  });
 });

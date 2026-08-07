@@ -93,8 +93,12 @@ function main(): void {
     : resolveDefaultPublishedRoot(workspaceRoot);
   const destinationDir = path.join(workspaceRoot, "apps", "public-site", "public", "published");
 
-  mkdirSync(path.dirname(destinationDir), { recursive: true });
-  rmSync(destinationDir, { recursive: true, force: true });
+  mkdirSync(destinationDir, { recursive: true });
+  // Docker deployments may mount this build-input directory. Preserve the mount root because
+  // removing it fails with EBUSY on Linux; only the copied bundle contents are disposable.
+  for (const entry of readdirSync(destinationDir)) {
+    rmSync(path.join(destinationDir, entry), { recursive: true, force: true });
+  }
 
   if (existsSync(sourceDir)) {
     cpSync(sourceDir, destinationDir, { recursive: true });

@@ -261,17 +261,13 @@ MAGIC_COMPARE_PUBLIC_FAVICON_URL=/branding/public-favicon.ico
 ```
 
 - 相对宿主机路径以 compose 项目目录为基准；留空时使用空的 `branding-assets` named volume。
+- Logo/Favicon 变量填写浏览器路径 `/branding/<文件名>`；`file:/...` 和宿主机绝对路径不是浏览器地址。
 - 同一目录会挂到 `apps/internal-site/public/branding` 与 `apps/public-site/public/branding`，无需重建镜像。
 - 公开导出会复制该目录的全部文件。目录中不能放密钥、内部素材或其他不应公开的内容。
 - 替换同名公开 Logo/Favicon 后再次执行部署即可；部署指纹包含挂载目录内容，不会因为 URL 没变而跳过。
 
-其他会重复写入的构建目录也使用 named volume：
-
-- `public-build-output`：Next 静态导出暂存目录
-- `public-build-published`：构建前同步的 published 静态资源
-- `public-deploy-cache`：Wrangler 本地缓存
-
-这些目录不能放在容器 writable diff layer。构建仍由部署动作按需启动，完成后进程退出；持久化的只有磁盘文件，不长期占用 CPU 或内存。
+Wrangler 本地缓存使用 `public-deploy-cache` named volume。构建前同步的
+`apps/public-site/public/published` 与 Next 静态导出的 `out` 都是单次部署暂存目录，每次构建都会清空，因此保留在容器 writable layer。构建仍由部署动作按需启动，完成后进程退出；持久化的缓存只占用磁盘，不长期占用 CPU 或内存。
 
 ### Docker 中最容易踩的坑
 

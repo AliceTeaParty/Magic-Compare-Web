@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { readdir, readFile, stat } from "node:fs/promises";
 import path from "node:path";
+import { resolveSiteBrandConfig } from "@magic-compare/shared-utils";
 import {
   getCfPagesBranch,
   getCfPagesProjectName,
@@ -87,6 +88,7 @@ async function hashPublishedTree(hash: ReturnType<typeof createHash>) {
 /** Includes every input that can change public output or its Cloudflare deployment target. */
 export async function computePublicDeploymentFingerprint(): Promise<string> {
   const hash = createHash("sha256");
+  const publicBrand = resolveSiteBrandConfig(process.env, "public");
   hash.update(
     JSON.stringify({
       projectName: getCfPagesProjectName(),
@@ -98,8 +100,8 @@ export async function computePublicDeploymentFingerprint(): Promise<string> {
       footerYearStart: process.env.MAGIC_COMPARE_FOOTER_YEAR_START?.trim() || null,
       // Public brand assets change exported head tags and navigation even when manifests do not,
       // so they must invalidate the successful-deployment shortcut.
-      publicFaviconUrl: process.env.MAGIC_COMPARE_PUBLIC_FAVICON_URL?.trim() || null,
-      publicLogoUrl: process.env.MAGIC_COMPARE_PUBLIC_LOGO_URL?.trim() || null,
+      publicFaviconUrl: publicBrand.faviconUrl,
+      publicLogoUrl: publicBrand.logoUrl,
       appVersion: process.env.MAGIC_COMPARE_APP_VERSION?.trim() || null,
       commitHash: process.env.MAGIC_COMPARE_COMMIT_SHA?.trim() || null,
     }),

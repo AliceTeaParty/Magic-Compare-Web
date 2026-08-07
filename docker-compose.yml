@@ -76,8 +76,6 @@ services:
       - ${MAGIC_COMPARE_BRANDING_MOUNT:-branding-assets}:/app/apps/public-site/public/branding:ro
       # Public build cache must stay outside Docker's writable layer to reduce repeated overlay IO.
       - ${MAGIC_COMPARE_PUBLIC_BUILD_CACHE_MOUNT:-public-build-cache}:/app/apps/public-site/.next
-      - public-build-output:/app/apps/public-site/out
-      - public-build-published:/app/apps/public-site/public/published
       - public-deploy-cache:/app/node_modules/.cache/wrangler
     healthcheck:
       test:
@@ -96,6 +94,4 @@ volumes:
   internal-data:
   branding-assets:
   public-build-cache:
-  public-build-output:
-  public-build-published:
   public-deploy-cache:
