@@ -12,8 +12,14 @@ loadWorkspaceEnv();
 const brandConfig = resolveSiteBrandConfig(process.env, "internal");
 
 export const metadata: Metadata = {
-  title: "Magic Compare Internal",
-  description: "Internal image compare workbench for encoding groups.",
+  applicationName: "Magic Compare",
+  // Every internal route previously inherited one generic title, which made several open
+  // workspaces indistinguishable in browser tabs. Child pages now supply the identifying prefix.
+  title: {
+    default: "Magic Compare 内部工作台",
+    template: "%s | Magic Compare",
+  },
+  description: "Magic Compare 内部图像对比、素材上传与发布工作台。",
   icons: {
     // Defaults live outside app/ because Next file-based icons would override this configurable
     // metadata object before the site-specific environment value can take effect.
@@ -25,6 +31,8 @@ export const metadata: Metadata = {
         ],
     apple: [{ url: "/default-apple-icon.png", sizes: "180x180", type: "image/png" }],
   },
+  // The internal workbench has no useful search or social-preview surface.
+  robots: { index: false, follow: false, noarchive: true },
 };
 
 export const viewport: Viewport = {
