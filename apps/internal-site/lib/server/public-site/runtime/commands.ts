@@ -12,7 +12,8 @@ export interface CommandOutputEvent {
 }
 
 export interface RunCommandOptions {
-  env?: NodeJS.ProcessEnv;
+  env?: Partial<NodeJS.ProcessEnv>;
+  unsetEnv?: readonly string[];
   onOutput?: (event: CommandOutputEvent) => void;
 }
 
@@ -56,6 +57,15 @@ function commandName(base: string): string {
   return process.platform === "win32" ? `${base}.cmd` : base;
 }
 
+/** Applies overrides before removals so callers can explicitly suppress inherited process flags. */
+function resolveCommandEnvironment(options?: RunCommandOptions): NodeJS.ProcessEnv {
+  const env = { ...process.env, ...options?.env };
+  for (const name of options?.unsetEnv ?? []) {
+    delete env[name];
+  }
+  return env;
+}
+
 /**
  * Keeps the public build invocation in one place so export and test code cannot drift on the exact
  * app/package being built.
@@ -94,7 +104,7 @@ export async function runCommand(
     const child = spawn(commandName(command), args, {
       cwd,
       detached: process.platform !== "win32",
-      env: { ...process.env, ...options?.env },
+      env: resolveCommandEnvironment(options),
       stdio: ["ignore", "pipe", "pipe"],
     });
 

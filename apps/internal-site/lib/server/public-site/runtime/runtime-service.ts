@@ -104,6 +104,9 @@ async function performPublicExport(observer?: PublicDeployObserver): Promise<Pub
       NODE_OPTIONS:
         process.env.MAGIC_COMPARE_PUBLIC_BUILD_NODE_OPTIONS ?? "--max-old-space-size=1024",
     },
+    // `next dev` exports TURBOPACK=1 to its process tree, while this nested build deliberately uses
+    // `--webpack`; remove the inherited flag after env merging so Next sees only one bundler.
+    unsetEnv: ["TURBOPACK"],
     onOutput: (event) => observer?.onOutput?.({ source: "build", ...event }),
   });
   observer?.onStage?.("preparing");
