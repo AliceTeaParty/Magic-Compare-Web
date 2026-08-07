@@ -226,10 +226,12 @@ export function AbInspectControls({
           >
             <Add sx={{ fontSize: 16 }} />
           </IconButton>
-          <Tooltip title={pixelRenderingEnabled ? "关闭像素渲染" : "开启像素渲染"}>
+          {/* The toggle changes the resize sampler, so "nearest-neighbor sampling" describes the
+              behavior more precisely than the broader "pixel rendering" label. */}
+          <Tooltip title={pixelRenderingEnabled ? "关闭最近邻采样" : "开启最近邻采样"}>
             <IconButton
               size="small"
-              aria-label={pixelRenderingEnabled ? "关闭 A/B 像素渲染" : "开启 A/B 像素渲染"}
+              aria-label={pixelRenderingEnabled ? "关闭 A/B 最近邻采样" : "开启 A/B 最近邻采样"}
               aria-pressed={pixelRenderingEnabled}
               onClick={onPixelRenderingToggle}
               sx={{
