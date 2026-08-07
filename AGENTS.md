@@ -15,9 +15,10 @@
 
 ```bash
 # 开发
-pnpm dev            # internal-site；检查环境并同步 schema
+pnpm dev:internal   # internal-site；检查环境并同步 schema
 pnpm dev:bootstrap  # internal-site；创建或修复 demo 数据与素材
-pnpm dev:all        # internal-site :3000 + public-site :3001
+pnpm dev:public     # public-site 源码开发服务器 :3001
+pnpm dev:all        # internal-site :3000 + 部署产物监看服务器 :3001
 pnpm dev:doctor all # 只检查 Node/pnpm、端口、SQLite、S3 与公开内容
 
 # 数据与公开站
@@ -31,11 +32,11 @@ pnpm check          # format、lint、typecheck、Vitest
 pnpm test:e2e       # 本地 Chromium 冒烟
 ```
 
-单站调试使用 `pnpm dev`（internal-site）或 `pnpm dev:public`（public-site）；`pnpm dev:internal` 与 `pnpm dev` 等价。单包验证使用 `pnpm --filter <package> <script>`，其中 `<script>` 为 `lint`、`typecheck` 或 `test`。需要分项检查时运行 `pnpm lint`、`pnpm typecheck` 或 `pnpm test`。
+单站调试使用 `pnpm dev:internal`（internal-site）或 `pnpm dev:public`（public-site 源码开发）。`pnpm dev:all` 的 3001 直接服务 `output/public-site`，用于监看内部站部署完成后的静态产物。单包验证使用 `pnpm --filter <package> <script>`，其中 `<script>` 为 `lint`、`typecheck` 或 `test`。需要分项检查时运行 `pnpm lint`、`pnpm typecheck` 或 `pnpm test`。
 
 `pnpm format:check` 只检查当前变更；需要查看全仓库既有格式欠账时使用 `pnpm format:check:all`。MCP 相关命令见 `docs/mcp-usage-guide.md`。`public:export` 与 `public:deploy` 共享构建目录，需按顺序执行。
 
-Next 开发服务器使用各应用的 `.next-dev`，Playwright 使用 `.next-e2e`，生产构建、Docker 与公开部署使用 `.next`。不要为了运行检查、构建或浏览器冒烟停止开发服务器。
+Next 开发服务器使用各应用的 `.next-dev`，Playwright 使用 `.next-e2e`，生产构建、Docker 与公开部署使用 `.next`。`dev:all` 的公开监看服务器只读 `output/public-site`，部署完成后直接看到新的静态文件。不要为了运行检查、构建或浏览器冒烟停止开发服务器。
 
 ## 架构边界
 

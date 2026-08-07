@@ -21,12 +21,14 @@ import {
   Tooltip,
   Typography,
 } from "@mui/material";
+import { usePathname } from "next/navigation";
 import {
   PUBLIC_DEPLOY_STAGE_LABELS,
   summarizePublicDeployError,
   type PublicDeployJob,
   type PublicDeployStage,
 } from "@/lib/public-deploy-job";
+import { resolvePublicDeployMonitorUrl } from "./public-deploy-links";
 
 function formatDuration(durationMs: number): string {
   if (durationMs < 1000) return `${durationMs} ms`;
@@ -88,6 +90,7 @@ function PublicDeployTaskPanelContent({
   onClose: () => void;
   onRetry: () => void;
 }) {
+  const pathname = usePathname();
   const elapsedMs = useElapsedMs(job);
   const stageDurationSummary = useMemo(
     () => formatStageDurations(job.stageDurationsMs),
@@ -97,6 +100,9 @@ function PublicDeployTaskPanelContent({
     ? Math.min(100, (job.uploadProgress.completed / job.uploadProgress.total) * 100)
     : null;
   const isRunning = job.status === "running";
+  // dev:all points the job base URL at port 3001; preserving the current Group alias here makes
+  // the completion action open the exact static deployment that the operator was reviewing.
+  const monitorUrl = resolvePublicDeployMonitorUrl(job.publicSiteUrl, pathname);
   const title =
     job.status === "failed"
       ? "部署失败"
@@ -185,14 +191,14 @@ function PublicDeployTaskPanelContent({
                   {statusText}
                 </Typography>
               </Box>
-              {job.status === "succeeded" && job.publicSiteUrl ? (
-                <Tooltip title="打开公开站点">
+              {job.status === "succeeded" && monitorUrl ? (
+                <Tooltip title="打开部署结果">
                   <IconButton
                     component="a"
-                    href={job.publicSiteUrl}
+                    href={monitorUrl}
                     target="_blank"
                     rel="noreferrer"
-                    aria-label="打开公开站点"
+                    aria-label="打开部署结果"
                     size="small"
                     sx={{ width: 32, height: 32 }}
                   >

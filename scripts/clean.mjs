@@ -21,6 +21,7 @@ const safeGeneratedPaths = [
   "packages/shared-utils/tsconfig.tsbuildinfo",
   "packages/ui/tsconfig.tsbuildinfo",
   "output/playwright",
+  "output/public-site",
   "dist",
   "coverage",
   ".turbo",

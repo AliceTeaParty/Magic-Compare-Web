@@ -4,6 +4,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx scripts/dev.ts",
+    "dev:all": "tsx scripts/dev.ts",
     "dev:bootstrap": "tsx scripts/dev.ts --seed",
     "build": "next build",
     "start": "next start",

@@ -819,7 +819,7 @@
   "stdout": "...",
   "stderr": "",
   "buildOutputDir": "/abs/path/apps/public-site/out",
-  "exportDir": "/abs/path/.output/public-export"
+  "exportDir": "/abs/path/output/public-site"
 }
 ```
 
@@ -848,7 +848,7 @@
   "stdout": "...",
   "stderr": "",
   "buildOutputDir": "/abs/path/apps/public-site/out",
-  "exportDir": "/abs/path/.output/public-export",
+  "exportDir": "/abs/path/output/public-site",
   "projectName": "magic-compare-public",
   "branch": "main"
 }

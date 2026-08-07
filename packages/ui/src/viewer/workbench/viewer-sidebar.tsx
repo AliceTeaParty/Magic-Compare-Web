@@ -289,7 +289,6 @@ function ViewerSidebarContent({
   publishStatus: ViewerDataset["publishStatus"];
   variant: "public" | "internal";
 }) {
-  const isInternal = variant === "internal";
   const localizedPublishDate = useLocalizedPublishDate(publishStatus?.publishedAt);
 
   return (
@@ -320,6 +319,8 @@ function ViewerSidebarContent({
       ) : null}
 
       <Stack spacing={0.75}>
+        {/* Site variant controls read/write capability, not language; both viewers share the same
+            Chinese product vocabulary so public pages do not drift back to legacy English copy. */}
         <Typography
           variant="body2"
           sx={{
@@ -327,7 +328,7 @@ function ViewerSidebarContent({
             fontWeight: 500,
           }}
         >
-          {isInternal ? "画面信息" : "Frame details"}
+          画面信息
         </Typography>
         <Typography variant="subtitle1">{currentFrame?.title}</Typography>
         <Typography
@@ -336,8 +337,7 @@ function ViewerSidebarContent({
             color: "text.secondary",
           }}
         >
-          {currentFrame?.caption.replace(/\bepisode\b/gi, "clip") ||
-            (isInternal ? "暂无备注。" : "No frame note.")}
+          {currentFrame?.caption.replace(/\bepisode\b/gi, "clip") || "暂无备注。"}
         </Typography>
       </Stack>
 
@@ -351,24 +351,14 @@ function ViewerSidebarContent({
             fontWeight: 500,
           }}
         >
-          {isInternal ? "素材信息" : "Asset metadata"}
+          素材信息
         </Typography>
         <Typography variant="body2">
           {/* Use the same asset resolver as the toolbar so extra columns such as Flt do not
               disappear from the metadata summary after a three-way upload. */}
-          {isInternal ? "可用变量：" : "Available variables: "}
-          {getAvailableVariableLabels(currentFrame).join(", ") || (isInternal ? "无" : "None")}
+          可用变量：{getAvailableVariableLabels(currentFrame).join(", ") || "无"}
         </Typography>
-        <Typography variant="body2">
-          {isInternal ? "热图：" : "Heatmap: "}
-          {heatmapAsset
-            ? isInternal
-              ? "可用"
-              : "Available"
-            : isInternal
-              ? "不可用"
-              : "Unavailable"}
-        </Typography>
+        <Typography variant="body2">热图：{heatmapAsset ? "可用" : "不可用"}</Typography>
       </Stack>
 
       {variant === "internal" && publishStatus ? (
@@ -506,8 +496,8 @@ export function ViewerSidebar({
             sx={{
               borderLeft: "1px solid",
               borderColor: "divider",
-              backgroundColor:
-                variant === "internal" ? "surface.containerLow" : "rgba(255,255,255,0.03)",
+              // Public details use the same supporting surface; variant only trims internal data.
+              backgroundColor: "surface.containerLow",
             }}
           >
             <ViewerSidebarContent {...contentProps} />
@@ -529,8 +519,7 @@ export function ViewerSidebar({
               borderColor: "divider",
               // Match the inline supporting pane so the Group list keeps its container contrast
               // when the same content moves into a modal Drawer on narrower viewports.
-              backgroundColor:
-                variant === "internal" ? "surface.containerLow" : "rgba(20, 33, 70, 0.98)",
+              backgroundColor: "surface.containerLow",
               backgroundImage: "none",
             },
           },

@@ -43,6 +43,7 @@ export function GroupViewerWorkbench({
   pendingGroupHref,
   variant,
 }: GroupViewerWorkbenchProps) {
+  const viewportHeight = variant === "internal" ? "calc(100svh - 64px)" : "100svh";
   const controller = useViewerController(dataset.group);
   const {
     abSide,
@@ -213,9 +214,9 @@ export function GroupViewerWorkbench({
   return (
     <Box
       sx={{
-        minHeight: variant === "internal" ? "calc(100svh - 64px)" : "100svh",
-        px: variant === "internal" ? 0 : { xs: 1.25, md: 2.5 },
-        py: variant === "internal" ? 0 : { xs: 1.25, md: 2.25 },
+        // Public viewing is the same edge-to-edge workbench surface. The variant only accounts for
+        // the internal app bar and controls which read-only metadata is exposed elsewhere.
+        minHeight: viewportHeight,
         background: viewerTokens.workbench.pageWash,
       }}
     >
@@ -231,14 +232,10 @@ export function GroupViewerWorkbench({
           // A min-height grid stretches auto tracks by default, which made the viewer header absorb
           // the unused viewport height and pushed the stage far below its controls.
           alignContent: "start",
-          minHeight: {
-            xs: variant === "internal" ? "calc(100svh - 64px)" : "calc(100svh - 20px)",
-            md: variant === "internal" ? "calc(100svh - 64px)" : "calc(100svh - 36px)",
-          },
+          minHeight: viewportHeight,
           overflow: "hidden",
-          border: variant === "internal" ? 0 : "1px solid",
-          borderColor: "divider",
-          borderRadius: variant === "internal" ? 0 : 3,
+          border: 0,
+          borderRadius: 0,
           background: viewerTokens.workbench.panelSurface,
         }}
       >

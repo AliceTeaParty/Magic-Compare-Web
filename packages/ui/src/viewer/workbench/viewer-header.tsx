@@ -73,19 +73,14 @@ export function ViewerHeader({
         alignItems: { xs: "stretch", sm: "center" },
         justifyContent: "space-between",
         gap: { xs: 1, md: 2 },
-        minHeight: variant === "internal" ? { md: 112 } : undefined,
+        minHeight: { md: 112 },
         px: { xs: 1.5, md: 3 },
         // The desktop header shares the catalog/workspace divider coordinate. Two compact toolbar
-        // rows fit inside this height; mobile uses explicit responsive rows below this breakpoint.
-        py: variant === "internal" ? { xs: 1.75, md: 1.5 } : { xs: 1.75, md: 3 },
+        // rows fit inside this height in both viewers; public used to carry a taller legacy banner.
+        py: { xs: 1.75, md: 1.5 },
         borderBottom: "1px solid",
         borderColor: "divider",
-        backgroundColor:
-          variant === "internal" ? "var(--mui-palette-surface-container)" : undefined,
-        background:
-          variant === "public"
-            ? "linear-gradient(180deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.018) 100%)"
-            : undefined,
+        backgroundColor: "var(--mui-palette-surface-container)",
       }}
     >
       <Stack
@@ -114,7 +109,7 @@ export function ViewerHeader({
           }}
         >
           <Typography
-            variant={variant === "internal" ? "h5" : "h4"}
+            variant="h5"
             noWrap
             sx={{
               lineHeight: 1.18,

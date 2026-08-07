@@ -9,12 +9,11 @@
   },
   "scripts": {
     "build": "pnpm --filter @magic-compare/internal-site build && pnpm --filter @magic-compare/public-site build",
-    "dev": "pnpm dev:internal",
     "dev:doctor": "tsx scripts/dev-doctor.ts",
     "dev:internal": "pnpm dev:doctor internal && pnpm --filter @magic-compare/internal-site dev",
     "dev:bootstrap": "pnpm dev:doctor internal && pnpm --filter @magic-compare/internal-site dev:bootstrap",
     "dev:public": "pnpm dev:doctor public && pnpm --filter @magic-compare/public-site dev",
-    "dev:all": "pnpm dev:doctor all && pnpm --parallel --stream --filter @magic-compare/internal-site --filter @magic-compare/public-site dev",
+    "dev:all": "pnpm dev:doctor all && MAGIC_COMPARE_PUBLIC_SITE_BASE_URL=http://localhost:3001 pnpm --parallel --stream --filter @magic-compare/internal-site --filter @magic-compare/public-site dev:all",
     "debug:viewer-demo": "./scripts/debug-viewer-demo.sh",
     "typecheck": "pnpm --recursive --if-present typecheck",
     "lint": "eslint apps packages scripts tests playwright.config.ts --config eslint.config.mjs",

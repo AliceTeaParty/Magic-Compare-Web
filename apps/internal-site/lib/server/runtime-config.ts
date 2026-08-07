@@ -6,7 +6,10 @@ import {
   parseEnvFlag,
   PUBLISHED_ROOT_ENV_NAME,
 } from "@magic-compare/shared-utils";
-import { resolveDefaultPublishedRoot } from "@magic-compare/shared-utils/workspace-env";
+import {
+  resolveDefaultPublishedRoot,
+  resolveDefaultPublicExportDir,
+} from "@magic-compare/shared-utils/workspace-env";
 import { loadWorkspaceEnv } from "./env/load-workspace-env";
 export const PUBLIC_EXPORT_DIR_ENV_NAME = "MAGIC_COMPARE_PUBLIC_EXPORT_DIR";
 export const S3_BUCKET_ENV_NAME = "MAGIC_COMPARE_S3_BUCKET";
@@ -91,7 +94,7 @@ export function getPublishedRoot(): string {
 export function getPublicExportDir(): string {
   loadWorkspaceEnv();
   const configured = process.env[PUBLIC_EXPORT_DIR_ENV_NAME]?.trim();
-  return configured ? path.resolve(configured) : path.join(workspaceRoot(), "dist", "public-site");
+  return configured ? path.resolve(configured) : resolveDefaultPublicExportDir(workspaceRoot());
 }
 
 export function isInternalAssetStorageConfigured(): boolean {

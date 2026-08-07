@@ -29,8 +29,8 @@ export function MagicSiteFooter({
         position: "relative",
         borderTop: "1px solid",
         borderColor: "divider",
-        background:
-          "linear-gradient(180deg, rgba(255,255,255,0.012) 0%, rgba(255,255,255,0.028) 100%)",
+        // The public footer belongs to the same tonal surface stack as the viewer above it.
+        backgroundColor: "surface.containerLow",
       }}
     >
       <Box
@@ -88,22 +88,17 @@ export function MagicSiteFooter({
                 alignItems: "center",
                 justifyContent: "center",
                 minHeight: 30,
-                px: 1.15,
-                borderRadius: 999,
-                border: "1px solid",
-                borderColor: "rgba(232, 198, 246, 0.16)",
-                backgroundColor: "rgba(255,255,255,0.02)",
+                px: 0.5,
                 color: "text.secondary",
                 fontSize: "0.8rem",
-                fontWeight: 500,
+                fontWeight: 600,
                 // Footer links keep their geometry fixed; hover changes paint only, matching the
                 // same Material state-layer rule used by the internal workbench controls.
-                transition:
-                  "border-color 150ms cubic-bezier(0.2, 0, 0, 1), color 150ms cubic-bezier(0.2, 0, 0, 1), background-color 150ms cubic-bezier(0.2, 0, 0, 1)",
+                textUnderlineOffset: "0.2em",
+                transition: "color 150ms cubic-bezier(0.2, 0, 0, 1)",
                 "&:hover": {
-                  color: "primary.light",
-                  borderColor: "rgba(232, 198, 246, 0.28)",
-                  backgroundColor: "rgba(255,255,255,0.038)",
+                  color: "primary.main",
+                  textDecoration: "underline",
                 },
               }}
             >

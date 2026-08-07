@@ -203,7 +203,6 @@ export function ViewerFilmstrip({
     prefersReducedMotion,
   });
   const renderWindow = getFilmstripRenderWindow({
-    activeIndex,
     clientWidth: filmstripScrollState.clientWidth,
     frameCount: frames.length,
     scrollLeft: filmstripScrollState.scrollLeft,
@@ -223,8 +222,8 @@ export function ViewerFilmstrip({
       return;
     }
 
-    // Selection can come from keyboard or restored state, so synchronize native scroll after the
-    // active card has entered the virtual window instead of leaving an empty viewport segment.
+    // Selection can come from keyboard or restored state. Moving the native viewport first lets its
+    // scroll event update the virtual window without pinning rendering to a stale selected frame.
     viewport.scrollLeft = Math.max(0, cardLeft - (viewport.clientWidth - FILMSTRIP_CARD_WIDTH) / 2);
   }, [activeIndex, filmstripScrollState.clientWidth, viewportRef]);
 

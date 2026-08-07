@@ -1,12 +1,12 @@
-# Internal UI 设计基线
+# 共享 UI 设计基线
 
-内部工作台以 [Material Design 3](https://m3.material.io/) 的信息架构、颜色角色和组件状态为设计基线，使用 MUI 作为 React 实现层。公开站继续使用原有视觉主题。
+内部工作台与公开 Viewer 统一以 [Material Design 3](https://m3.material.io/) 的信息架构、颜色角色和组件状态为设计基线，使用 MUI 作为 React 实现层。公开站直接复用内部 Viewer 的主题、布局和检查交互，再移除内部导航、写操作与发布管理信息。
 
 ## 主题
 
 - 颜色由 `SchemeExpressive` 和一个 seed color 生成，组件只消费 `primary`、`secondary`、`tertiary`、状态色与 `surfaceContainer*` 语义角色。
 - 默认提供鸢尾、泻湖、珊瑚三组主题色，并允许输入自定义十六进制 seed。
-- 明暗模式首次访问跟随系统；用户切换后由 MUI color schemes 持久化。
+- 明暗模式首次访问跟随系统；内部站的用户切换由 MUI color schemes 持久化，公开站直接采用同一套 scheme。
 - Surface 层级负责区分导航、页面、列表和浮层。常规页面不使用渐变、阴影或嵌套卡片制造层级。
 
 ## 导航与页面
@@ -16,6 +16,14 @@
 - 桌面使用 224px extended navigation rail。
 - 页面标题统一使用固定高度的 `InternalPageHeader`。返回、标题和 actions 均有稳定布局槽，异步状态和按钮显隐不得推动相邻元素。
 - Case 目录、Case workspace、Upload 共用同一 app shell；viewer 在该 shell 的内容区内全宽显示。
+- 公开 Viewer 不渲染内部 app shell，仍使用相同的全宽 workbench、header、stage、filmstrip 和 details pane。
+
+## 公开站边界
+
+- 公开站只读取 published manifest 和公开素材 URL，不引入 SQLite、S3 内部访问或 `/api/ops/*`。
+- Viewer 的对比模式、缩放、胶片条、详情 Drawer 和使用引导与内部站保持一致。
+- 内部 Group 跳转、发布状态、公开 Slug、上传、部署和主题设置不进入公开站。
+- 公开站的 404 与 footer 使用相同的 surface、排版和状态颜色，不保留独立旧主题。
 
 ## 控件与反馈
 

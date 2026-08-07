@@ -8,7 +8,6 @@ import {
 describe("filmstrip render window", () => {
   it("keeps a 183-frame desktop strip below 25 mounted image cards", () => {
     const window = getFilmstripRenderWindow({
-      activeIndex: 80,
       clientWidth: 1440,
       frameCount: 183,
       scrollLeft: 80 * FILMSTRIP_ITEM_STRIDE,
@@ -19,22 +18,21 @@ describe("filmstrip render window", () => {
     expect(window.trailingSpacerWidth).toBeGreaterThan(0);
   });
 
-  it("mounts an active frame outside the previous viewport window", () => {
+  it("follows a manually scrolled viewport instead of pinning the initial cards", () => {
     const window = getFilmstripRenderWindow({
-      activeIndex: 170,
       clientWidth: 930,
       frameCount: 183,
-      scrollLeft: 0,
+      scrollLeft: 80 * FILMSTRIP_ITEM_STRIDE,
     });
 
-    expect(window.start).toBeLessThanOrEqual(170);
-    expect(window.end).toBeGreaterThan(170);
+    expect(window.start).toBeLessThanOrEqual(80);
+    expect(window.end).toBeGreaterThan(80);
+    expect(window.start).toBeGreaterThan(0);
   });
 
   it("preserves the full fixed-width strip through virtual spacers", () => {
     const frameCount = 183;
     const window = getFilmstripRenderWindow({
-      activeIndex: 80,
       clientWidth: 930,
       frameCount,
       scrollLeft: 80 * FILMSTRIP_ITEM_STRIDE,

@@ -16,16 +16,16 @@ Magic Compare Web is a monorepo for reviewing and publishing image comparisons. 
 cp .env.example .env
 # Fill in the required MAGIC_COMPARE_S3_* values.
 pnpm install
-pnpm dev
+pnpm dev:internal
 ```
 
 Local entry points:
 
 - Internal site: <http://localhost:3000>
-- Public site: <http://localhost:3001>
+- Public deploy monitor (`pnpm dev:all`): <http://localhost:3001>
 - Demo page: <http://localhost:3001/g/demo-grain-study--banding-check>
 
-Use `pnpm dev:bootstrap` when demo data needs repair, or `pnpm dev:all` to run both sites.
+Use `pnpm dev:bootstrap` when demo data needs repair, `pnpm dev:public` for public-site source development, or `pnpm dev:all` to monitor static deploy output beside the internal site.
 
 ## Workflows
 
@@ -51,8 +51,9 @@ docs/                  Workflow, API, deployment, and UI notes
 
 | Task                       | Command              |
 | -------------------------- | -------------------- |
-| Start internal site        | `pnpm dev`           |
-| Start both sites           | `pnpm dev:all`       |
+| Start internal site        | `pnpm dev:internal`  |
+| Develop public-site source | `pnpm dev:public`    |
+| Start deploy monitoring    | `pnpm dev:all`       |
 | Repair demo and start      | `pnpm dev:bootstrap` |
 | Build both apps            | `pnpm build`         |
 | Run checks and tests       | `pnpm check`         |

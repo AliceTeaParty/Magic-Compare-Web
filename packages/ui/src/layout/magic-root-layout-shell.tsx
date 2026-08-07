@@ -24,7 +24,7 @@ interface MagicRootLayoutShellProps {
   profile?: MagicThemeProfile;
 }
 
-/** Separates the public visual profile from the adaptive internal workbench theme. */
+/** Shares one adaptive theme while keeping public-only and internal-only shell capabilities apart. */
 export function MagicRootLayoutShell({
   children,
   initialThemeSeed,
@@ -45,15 +45,15 @@ export function MagicRootLayoutShell({
         {/* The App Router cache owns Emotion insertion order across server streaming and hydration,
             preventing duplicate style tags without changing the incumbent CSS priority model. */}
         <AppRouterCacheProvider>
-          {profile === "internal" ? (
-            <InitColorSchemeScript
-              attribute="data"
-              defaultMode="system"
-              modeStorageKey="mc-internal-mode"
-              colorSchemeStorageKey="mc-internal-color-scheme"
-            />
-          ) : null}
-          <MagicThemeProvider profile={profile} initialThemeSeed={initialThemeSeed}>
+          {/* Public comparison pages use the same M3 color schemes as the internal viewer, so the
+              first paint must resolve the scheme before either shell hydrates. */}
+          <InitColorSchemeScript
+            attribute="data"
+            defaultMode="system"
+            modeStorageKey="mc-internal-mode"
+            colorSchemeStorageKey="mc-internal-color-scheme"
+          />
+          <MagicThemeProvider initialThemeSeed={initialThemeSeed}>
             <Box sx={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
               <Box component="main" sx={{ flex: 1, minWidth: 0 }}>
                 {children}

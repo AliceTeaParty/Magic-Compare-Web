@@ -92,7 +92,7 @@ Docker compose 会自动把它指向持久化卷路径：
 
 如果留空：
 
-- 宿主机默认导出到 `dist/public-site`
+- 宿主机默认导出到 `output/public-site`
 
 Docker compose 会把它指向：
 
@@ -171,19 +171,21 @@ pnpm db:seed
 ```bash
 cp .env.example .env
 pnpm install
-pnpm dev
+pnpm dev:internal
 ```
 
 当前行为：
 
-- `pnpm dev` 先检查 Node/pnpm、端口、SQLite 与 S3 配置，再直接执行幂等 schema sync
+- `pnpm dev:internal` 先检查 Node/pnpm、端口、SQLite 与 S3 配置，再直接执行幂等 schema sync
 - 默认启动不会 seed，也不会向远端对象存储重复上传 demo 素材
 - 需要创建或修复 demo 时使用 `pnpm dev:bootstrap`
-- `pnpm dev:all` 同时启动 internal-site 3000 和 public-site 3001；单站仍可使用 `dev:internal`、`dev:public`
+- `pnpm dev:public` 单独启动 public-site 的 Next 开发服务器，用于公开站源码调试
+- `pnpm dev:all` 同时启动 internal-site 3000 和部署产物监看服务器 3001；后者直接服务 `output/public-site`
+- `dev:all` 会在子进程内把公开站基址设为 `http://localhost:3001`，部署完成入口因此打开本地静态产物；不会覆盖 `.env` 中的生产公开站地址
 
 如果没有配置外部对象存储，doctor 会警告，internal-site 仍可用于 Case 管理；上传、素材检查和发布需要完整 S3/R2 配置。
 
-两个应用的 Next 开发产物写入 `.next-dev`。`pnpm build`、`pnpm typecheck`、Docker 构建和公开部署继续使用 `.next`，因此生产构建不再删除运行中开发服务器的缓存。类型检查使用 `next typegen + tsc`，不会执行页面数据收集和静态导出。
+单站 Next 开发产物写入 `.next-dev`。`pnpm build`、`pnpm typecheck`、Docker 构建和公开部署继续使用 `.next`，因此生产构建不会删除 internal-site 的开发缓存。类型检查使用 `next typegen + tsc`，不会执行页面数据收集和静态导出。
 
 提交前使用 `pnpm check` 统一执行格式检查、lint、类型检查和 Vitest。本地 Chromium 冒烟测试使用 `pnpm test:e2e`；它使用 `output/playwright/e2e` 下的隔离 SQLite、固定公开 manifest 和 `.next-e2e`，报告与附件写入 `output/playwright/`，可以在日常 `.next-dev` 服务器运行时执行，不进入默认 CI。
 
@@ -404,6 +406,7 @@ Web 上传链路是：
 - 全局入口调用不带 `caseId` 的 `POST /api/ops/public-deploy`，只部署已经发布的 bundle
 - `POST` 返回 `202` 和任务 id；`GET /api/ops/public-deploy?jobId=...` 返回可恢复的阶段状态
 - Case publish 仍由显式 publish 操作负责，不会因为打开某个工作区而隐式改变全站部署内容
+- `dev:all` 下的 3001 直接服务本次部署写入的 `output/public-site`；从 Group Viewer 发起部署时，完成面板打开对应的导出兼容路径
 - 浏览器已经授予通知权限且页面在后台时才发送完成通知，部署点击本身不会弹权限请求
 
 ### 部署缓存与性能记录
@@ -603,7 +606,7 @@ docker build --platform linux/amd64 -f docker/internal-site.Dockerfile -t magic-
 ### 不要在 CI 里假设这些目录永远存在
 
 - `output/published`（默认 published bundle）
-- `dist/public-site`
+- `output/public-site`
 - `apps/public-site/public/published`
 
 它们都可能在构建前为空，需要由导出流程生成。

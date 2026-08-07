@@ -14,16 +14,15 @@ export interface FilmstripRenderWindow {
 }
 
 /**
- * Converts fixed card geometry into one bounded render window while ensuring a newly selected frame
- * is mounted before the viewport scroll position is synchronized.
+ * Converts fixed card geometry into one bounded render window anchored to the real scroll position.
+ * Keeping the active frame in this window pinned the first cards while users scrolled elsewhere,
+ * leaving the visible portion as an empty virtual spacer until selection changed.
  */
 export function getFilmstripRenderWindow({
-  activeIndex,
   clientWidth,
   frameCount,
   scrollLeft,
 }: {
-  activeIndex: number;
   clientWidth: number;
   frameCount: number;
   scrollLeft: number;
@@ -38,21 +37,12 @@ export function getFilmstripRenderWindow({
       : FALLBACK_VISIBLE_ITEMS;
   const windowSize = Math.min(frameCount, visibleItems + FILMSTRIP_OVERSCAN_ITEMS * 2);
   const visibleStart = Math.floor(Math.max(0, scrollLeft) / FILMSTRIP_ITEM_STRIDE);
-  let start = clampNumber(
+  const start = clampNumber(
     visibleStart - FILMSTRIP_OVERSCAN_ITEMS,
     0,
     Math.max(0, frameCount - windowSize),
   );
-  let end = Math.min(frameCount, start + windowSize);
-
-  if (activeIndex >= 0 && (activeIndex < start || activeIndex >= end)) {
-    start = clampNumber(
-      activeIndex - Math.floor(windowSize / 2),
-      0,
-      Math.max(0, frameCount - windowSize),
-    );
-    end = Math.min(frameCount, start + windowSize);
-  }
+  const end = Math.min(frameCount, start + windowSize);
 
   const remainingItems = frameCount - end;
   return {

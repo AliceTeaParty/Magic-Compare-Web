@@ -14,6 +14,11 @@ export function resolveDefaultPublishedRoot(workspaceRoot: string): string {
   return path.join(workspaceRoot, "output", "published");
 }
 
+/** Keeps the deployable public export beside other ignored workspace output. */
+export function resolveDefaultPublicExportDir(workspaceRoot: string): string {
+  return path.join(workspaceRoot, "output", "public-site");
+}
+
 export function loadWorkspaceEnvFromModule(fromModuleUrl: string, levelsUp: number): void {
   const workspaceRoot = resolveWorkspaceRoot(fromModuleUrl, levelsUp);
   if (loadedWorkspaceRoots.has(workspaceRoot)) {
