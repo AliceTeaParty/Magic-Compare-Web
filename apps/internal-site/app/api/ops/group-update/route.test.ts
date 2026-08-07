@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { NotFoundError } from "@/lib/server/api/errors";
 import { POST } from "./route";
 
 const { updateGroupMetadata } = vi.hoisted(() => ({
@@ -84,8 +85,8 @@ describe("POST /api/ops/group-update", () => {
     expect(response.status).toBe(400);
   });
 
-  it("keeps repository errors in the 400 range", async () => {
-    updateGroupMetadata.mockRejectedValue(new Error("Group not found."));
+  it("returns 404 when the group no longer exists", async () => {
+    updateGroupMetadata.mockRejectedValue(new NotFoundError("Group not found."));
 
     const response = await POST(
       new Request("http://localhost:3000/api/ops/group-update", {
@@ -102,7 +103,7 @@ describe("POST /api/ops/group-update", () => {
       }),
     );
 
-    expect(response.status).toBe(400);
+    expect(response.status).toBe(404);
     expect(await response.json()).toEqual({ error: "Group not found." });
   });
 });

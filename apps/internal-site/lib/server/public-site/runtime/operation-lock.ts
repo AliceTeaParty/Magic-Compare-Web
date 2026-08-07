@@ -1,4 +1,6 @@
-export class PublicSiteOperationConflictError extends Error {}
+import { ConflictError } from "@/lib/server/api/errors";
+
+export class PublicSiteOperationConflictError extends ConflictError {}
 
 let activePublicSiteOperation: {
   label: "export" | "deploy";

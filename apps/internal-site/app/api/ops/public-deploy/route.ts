@@ -1,22 +1,13 @@
 import { NextResponse } from "next/server";
 import { withApiRoute } from "@/lib/server/api/with-api-route";
-import {
-  getPublicDeployJob,
-  getPublicSiteOperationErrorStatus,
-  startPublicDeployJob,
-} from "@/lib/server/public-site/runtime";
+import { getPublicDeployJob, startPublicDeployJob } from "@/lib/server/public-site/runtime";
 
 export const dynamic = "force-dynamic";
 
-export const POST = withApiRoute(
-  async () => {
-    const result = await startPublicDeployJob();
-    return NextResponse.json(result, { status: 202 });
-  },
-  {
-    classifyError: (error) => getPublicSiteOperationErrorStatus(error),
-  },
-);
+export const POST = withApiRoute(async () => {
+  const result = await startPublicDeployJob();
+  return NextResponse.json(result, { status: 202 });
+});
 
 export const GET = withApiRoute(async (request: Request) => {
   const jobId = new URL(request.url).searchParams.get("jobId");

@@ -23,7 +23,7 @@ import {
   publishedGroupsDirectory,
   resolvePublicExportDirectory,
 } from "./paths";
-import { PublicSiteOperationConflictError, withPublicSiteOperationLock } from "./operation-lock";
+import { withPublicSiteOperationLock } from "./operation-lock";
 
 export interface PublicExportResult extends CommandResult {
   buildOutputDir: string;
@@ -114,14 +114,6 @@ async function performPublicExport(observer?: PublicDeployObserver): Promise<Pub
     buildOutputDir,
     exportDir,
   };
-}
-
-/**
- * Maps the runtime lock error to HTTP status so route handlers can distinguish "already running"
- * from ordinary operator errors.
- */
-export function getPublicSiteOperationErrorStatus(error: unknown): number {
-  return error instanceof PublicSiteOperationConflictError ? 409 : 400;
 }
 
 /**

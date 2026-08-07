@@ -127,6 +127,8 @@ describe("updateCaseSummary", () => {
 
 describe("updateCaseMetadata", () => {
   beforeEach(() => {
+    caseFindUnique.mockReset();
+    caseFindUnique.mockResolvedValue({ id: "case-1" });
     caseUpdate.mockReset();
     groupCount.mockReset();
     groupCount.mockResolvedValue(1);
@@ -150,7 +152,7 @@ describe("updateCaseMetadata", () => {
     });
 
     expect(caseUpdate).toHaveBeenCalledWith({
-      where: { slug: "mono" },
+      where: { id: "case-1" },
       data: {
         title: "Mono Study",
         summary: "Updated summary",

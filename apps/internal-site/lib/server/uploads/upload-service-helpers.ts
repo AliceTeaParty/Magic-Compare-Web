@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { Prisma } from "@prisma/client";
+import { ConflictError, NotFoundError } from "@/lib/server/api/errors";
 import { prisma } from "@/lib/server/db/client";
 import {
   recomputeCaseCoverAsset,
@@ -148,7 +149,7 @@ function assertUploadJobIsActive(
   expiresAt: Date | null;
 } {
   if (!job || job.status !== ACTIVE_JOB_STATUS || isExpiredUploadJob(job.expiresAt, now)) {
-    throw new Error("Upload job not found.");
+    throw new NotFoundError("Upload job not found.");
   }
 }
 
@@ -571,7 +572,7 @@ export async function requireActiveFrameUploadJob(
   });
 
   if (!frameJob) {
-    throw new Error("Frame upload job not found.");
+    throw new NotFoundError("Frame upload job not found.");
   }
 
   assertUploadJobIsActive(frameJob.groupUploadJob, now);
@@ -599,7 +600,7 @@ export async function countUncommittedFrameJobs(groupUploadJobId: string): Promi
  */
 export function assertFrameCanPrepare(frameJob: ActiveFrameUploadJob): void {
   if (frameJob.status === COMMITTED_FRAME_STATUS) {
-    throw new Error("Frame is already committed.");
+    throw new ConflictError("Frame is already committed.");
   }
 }
 
@@ -618,7 +619,7 @@ export function assertFrameCanCommit(
     !frameJob.pendingPrefix ||
     !frameJob.preparedAssetsJson
   ) {
-    throw new Error("Frame is not ready to commit.");
+    throw new ConflictError("Frame is not ready to commit.");
   }
 }
 

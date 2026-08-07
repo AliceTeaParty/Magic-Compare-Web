@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { NotFoundError } from "@/lib/server/api/errors";
 import { POST } from "./route";
 
 const { updateCaseMetadata } = vi.hoisted(() => ({
@@ -64,8 +65,8 @@ describe("POST /api/ops/case-update", () => {
     expect(response.status).toBe(400);
   });
 
-  it("keeps repository errors in the 400 range", async () => {
-    updateCaseMetadata.mockRejectedValue(new Error("Case not found."));
+  it("returns 404 when the case no longer exists", async () => {
+    updateCaseMetadata.mockRejectedValue(new NotFoundError("Case not found."));
 
     const response = await POST(
       new Request("http://localhost:3000/api/ops/case-update", {
@@ -80,7 +81,7 @@ describe("POST /api/ops/case-update", () => {
       }),
     );
 
-    expect(response.status).toBe(400);
+    expect(response.status).toBe(404);
     expect(await response.json()).toEqual({ error: "Case not found." });
   });
 });

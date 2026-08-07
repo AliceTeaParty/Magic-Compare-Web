@@ -5,16 +5,16 @@ import { reorderGroups } from "@/lib/server/repositories/content-repository";
 
 const schema = z.object({
   caseId: z.string().min(1),
-  groupIds: z.array(z.string().min(1)).min(1),
+  groupIds: z
+    .array(z.string().min(1))
+    .min(1)
+    .refine((groupIds) => new Set(groupIds).size === groupIds.length, {
+      message: "Group ids must be unique.",
+    }),
 });
 
-export const POST = withApiRoute(
-  async (request: Request) => {
-    const payload = schema.parse(await request.json());
-    await reorderGroups(payload.caseId, payload.groupIds);
-    return NextResponse.json({ ok: true });
-  },
-  {
-    classifyError: () => 400,
-  },
-);
+export const POST = withApiRoute(async (request: Request) => {
+  const payload = schema.parse(await request.json());
+  await reorderGroups(payload.caseId, payload.groupIds);
+  return NextResponse.json({ ok: true });
+});

@@ -2,7 +2,6 @@ export {
   exportPublicSite,
   deployPublicSite,
   ensurePublicDeployConfigured,
-  getPublicSiteOperationErrorStatus,
   type PublicDeployObserver,
   type PublicDeployResult,
   type PublicExportResult,

@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/server/db/client";
+import { BadRequestError, ConflictError } from "@/lib/server/api/errors";
 import { deleteInternalAssetPrefix } from "@/lib/server/storage/internal-assets";
 import {
   type GroupUploadStartInput,
@@ -169,14 +170,16 @@ function resolveStreamFrameSnapshot(
   generatedFrame: UploadFrameDescriptor | undefined,
 ): UploadFrameDescriptor {
   if (!generatedFrame) {
-    throw new Error("stream-v2 frame prepare requires a generated frame descriptor.");
+    throw new BadRequestError("stream-v2 frame prepare requires a generated frame descriptor.");
   }
   if (
     generatedFrame.order !== sourceFrame.order ||
     generatedFrame.title !== sourceFrame.title ||
     generatedFrame.caption !== sourceFrame.caption
   ) {
-    throw new Error("Generated frame identity no longer matches the validated source manifest.");
+    throw new BadRequestError(
+      "Generated frame identity no longer matches the validated source manifest.",
+    );
   }
 
   const sourceBySlot = new Map(sourceFrame.assets.map((asset) => [asset.slot, asset]));
@@ -185,7 +188,7 @@ function resolveStreamFrameSnapshot(
     sourceBySlot.size !== sourceFrame.assets.length ||
     generatedBySlot.size !== generatedFrame.assets.length
   ) {
-    throw new Error("Generated frame contains duplicate asset slots.");
+    throw new BadRequestError("Generated frame contains duplicate asset slots.");
   }
   for (const sourceAsset of sourceFrame.assets) {
     const generatedAsset = generatedBySlot.get(sourceAsset.slot);
@@ -199,7 +202,7 @@ function resolveStreamFrameSnapshot(
       generatedAsset.isPrimaryDisplay !== sourceAsset.isPrimaryDisplay ||
       !sameFileDescriptor(generatedAsset.original, sourceAsset.original)
     ) {
-      throw new Error(
+      throw new BadRequestError(
         `Generated asset ${sourceAsset.slot} no longer matches the preflight result.`,
       );
     }
@@ -230,7 +233,9 @@ function resolveStreamFrameSnapshot(
       heatmap.height !== after.height ||
       heatmap.isPrimaryDisplay
     ) {
-      throw new Error("Generated heatmap no longer matches the validated source manifest.");
+      throw new BadRequestError(
+        "Generated heatmap no longer matches the validated source manifest.",
+      );
     }
     expectedSlots.add(heatmapPlan.slot);
   }
@@ -238,7 +243,7 @@ function resolveStreamFrameSnapshot(
     generatedFrame.assets.length !== expectedSlots.size ||
     generatedFrame.assets.some((asset) => !expectedSlots.has(asset.slot))
   ) {
-    throw new Error("Generated frame contains an unexpected asset set.");
+    throw new BadRequestError("Generated frame contains an unexpected asset set.");
   }
 
   return generatedFrame;
@@ -297,7 +302,7 @@ export async function completeGroupUpload(rawInput: unknown) {
     job.expectedFrameCount !== job.committedFrameCount ||
     (await countUncommittedFrameJobs(job.id)) > 0
   ) {
-    throw new Error("Not every frame in the upload job has been committed.");
+    throw new ConflictError("Not every frame in the upload job has been committed.");
   }
 
   await markUploadJobCompleted(job);

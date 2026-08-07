@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { ConflictError } from "@/lib/server/api/errors";
 import { POST } from "./route";
 
 const { commitGroupUploadFrame } = vi.hoisted(() => ({
@@ -37,8 +38,8 @@ describe("POST /api/ops/group-upload-frame-commit", () => {
     });
   });
 
-  it("keeps expected upload-state errors in the 400 range", async () => {
-    commitGroupUploadFrame.mockRejectedValue(new Error("Frame is not ready to commit."));
+  it("returns 409 when the frame is not ready to commit", async () => {
+    commitGroupUploadFrame.mockRejectedValue(new ConflictError("Frame is not ready to commit."));
 
     const response = await POST(
       new Request("http://localhost:3000/api/ops/group-upload-frame-commit", {
@@ -53,7 +54,7 @@ describe("POST /api/ops/group-upload-frame-commit", () => {
       }),
     );
 
-    expect(response.status).toBe(400);
+    expect(response.status).toBe(409);
     expect(await response.json()).toEqual({
       error: "Frame is not ready to commit.",
     });

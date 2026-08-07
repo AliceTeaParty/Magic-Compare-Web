@@ -1,12 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { reorderFrames, reorderGroups, setGroupVisibility } from "./content-repository";
+import { ConflictError } from "@/lib/server/api/errors";
+import { reorderGroups, setGroupVisibility } from "./content-repository";
 
 const mocks = vi.hoisted(() => ({
   caseFindUnique: vi.fn(),
   deletePublishedGroup: vi.fn(),
-  frameUpdateMany: vi.fn(),
   groupCount: vi.fn(),
-  groupFindUnique: vi.fn(),
+  groupFindMany: vi.fn(),
   groupUpdate: vi.fn(),
   groupUpdateMany: vi.fn(),
   publishCase: vi.fn(),
@@ -17,10 +17,9 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@/lib/server/db/client", () => ({
   prisma: {
     case: { findUnique: mocks.caseFindUnique },
-    frame: { updateMany: mocks.frameUpdateMany },
     group: {
       count: mocks.groupCount,
-      findUnique: mocks.groupFindUnique,
+      findMany: mocks.groupFindMany,
       update: mocks.groupUpdate,
       updateMany: mocks.groupUpdateMany,
     },
@@ -44,6 +43,7 @@ beforeEach(() => {
 
 describe("published manifest synchronization", () => {
   it("refreshes public manifests after group order changes", async () => {
+    mocks.groupFindMany.mockResolvedValue([{ id: "group-1" }, { id: "group-2" }]);
     mocks.groupCount.mockResolvedValue(1);
 
     await reorderGroups("case-1", ["group-2", "group-1"]);
@@ -51,12 +51,19 @@ describe("published manifest synchronization", () => {
     expect(mocks.publishCase).toHaveBeenCalledWith("case-1");
   });
 
-  it("refreshes a public group after frame order changes", async () => {
-    mocks.groupFindUnique.mockResolvedValue({ caseId: "case-1", isPublic: true });
+  it.each([
+    ["duplicate ids", ["group-1", "group-1"]],
+    ["missing ids", ["group-1"]],
+    ["foreign ids", ["group-1", "group-foreign"]],
+  ])("rejects %s before writing or publishing", async (_label, groupIds) => {
+    mocks.groupFindMany.mockResolvedValue([{ id: "group-1" }, { id: "group-2" }]);
 
-    await reorderFrames("group-1", ["frame-2", "frame-1"]);
+    await expect(reorderGroups("case-1", groupIds)).rejects.toBeInstanceOf(ConflictError);
 
-    expect(mocks.publishCase).toHaveBeenCalledWith("case-1");
+    expect(mocks.groupUpdateMany).not.toHaveBeenCalled();
+    expect(mocks.transaction).not.toHaveBeenCalled();
+    expect(mocks.groupCount).not.toHaveBeenCalled();
+    expect(mocks.publishCase).not.toHaveBeenCalled();
   });
 
   it("removes the bundle and clears publication state for the last hidden group", async () => {

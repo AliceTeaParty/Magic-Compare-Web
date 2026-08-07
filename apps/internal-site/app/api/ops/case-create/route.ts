@@ -10,13 +10,8 @@ const schema = z.object({
   summary: z.string().default(""),
 });
 
-export const POST = withApiRoute(
-  async (request: Request) => {
-    const payload = schema.parse(await request.json());
-    const result = await createCase(payload);
-    return NextResponse.json(result);
-  },
-  {
-    classifyError: () => 400,
-  },
-);
+export const POST = withApiRoute(async (request: Request) => {
+  const payload = schema.parse(await request.json());
+  const result = await createCase(payload);
+  return NextResponse.json(result);
+});

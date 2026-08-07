@@ -3,17 +3,12 @@ import type { ViewerDataset } from "@magic-compare/compare-core/viewer-data";
 import { DEMO_CASE_SLUG } from "@magic-compare/shared-utils";
 import { prisma } from "@/lib/server/db/client";
 import { isHiddenDemoCaseSlug, shouldHideDemoContent } from "@/lib/server/runtime-config";
-import {
-  buildViewerDataset,
-  mapCaseCatalogItem,
-  mapCaseSearchResult,
-  mapCaseWorkspaceData,
-} from "./mappers";
-import type { CaseCatalogItem, CaseSearchResult, CaseWorkspaceData } from "./types";
+import { buildViewerDataset, mapCaseCatalogItem, mapCaseWorkspaceData } from "./mappers";
+import type { CaseCatalogItem, CaseWorkspaceData } from "./types";
 
 /**
- * Centralizes demo hiding so list and search flows cannot drift on whether the sample case should
- * be visible in the current runtime.
+ * Centralizes demo hiding so catalog queries cannot drift on whether the sample case should be
+ * visible in the current runtime.
  */
 function buildDemoFilter() {
   return {
@@ -21,41 +16,6 @@ function buildDemoFilter() {
       not: DEMO_CASE_SLUG,
     },
   } satisfies Prisma.CaseWhereInput;
-}
-
-/**
- * Keeps the search route consistent with the runtime demo visibility flag so hidden demo content
- * never leaks back in through partial slug/title matches.
- */
-function buildCaseSearchWhere(query: string, hideDemo: boolean): Prisma.CaseWhereInput | undefined {
-  const normalizedQuery = query.trim();
-
-  if (!normalizedQuery) {
-    return hideDemo ? buildDemoFilter() : undefined;
-  }
-
-  const searchFilter = {
-    OR: [
-      {
-        slug: {
-          contains: normalizedQuery,
-        },
-      },
-      {
-        title: {
-          contains: normalizedQuery,
-        },
-      },
-    ],
-  } satisfies Prisma.CaseWhereInput;
-
-  if (!hideDemo) {
-    return searchFilter;
-  }
-
-  return {
-    AND: [buildDemoFilter(), searchFilter],
-  };
 }
 
 /**
@@ -109,30 +69,6 @@ export async function listCases(): Promise<CaseCatalogItem[]> {
       caseRow.coverAssetId ? (coverThumbs.get(caseRow.coverAssetId) ?? null) : null,
     ),
   );
-}
-
-/** Drives the internal search palette with runtime demo-visibility filtering. */
-export async function searchCases(query: string, limit = 8): Promise<CaseSearchResult[]> {
-  const cases = await prisma.case.findMany({
-    where: buildCaseSearchWhere(query, shouldHideDemoContent()),
-    include: {
-      groups: {
-        select: {
-          slug: true,
-          title: true,
-          isPublic: true,
-          order: true,
-        },
-        orderBy: {
-          order: "asc",
-        },
-      },
-    },
-    orderBy: [{ updatedAt: "desc" }],
-    take: limit,
-  });
-
-  return cases.map(mapCaseSearchResult);
 }
 
 /**
