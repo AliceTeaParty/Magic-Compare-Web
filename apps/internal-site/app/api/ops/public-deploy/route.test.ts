@@ -1,17 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { GET, POST } from "./route";
 
-const { getPublicDeployJob, getPublicSiteOperationErrorStatus, startPublicDeployJob } = vi.hoisted(
-  () => ({
-    getPublicDeployJob: vi.fn(),
-    getPublicSiteOperationErrorStatus: vi.fn(),
-    startPublicDeployJob: vi.fn(),
-  }),
-);
+const { getPublicDeployJob, startPublicDeployJob } = vi.hoisted(() => ({
+  getPublicDeployJob: vi.fn(),
+  startPublicDeployJob: vi.fn(),
+}));
 
 vi.mock("@/lib/server/public-site/runtime", () => ({
   getPublicDeployJob,
-  getPublicSiteOperationErrorStatus,
   startPublicDeployJob,
 }));
 
@@ -68,9 +64,9 @@ describe("/api/ops/public-deploy", () => {
     expect(startPublicDeployJob).toHaveBeenCalledWith();
   });
 
-  it("uses the operation error classifier for rejected starts", async () => {
+  it("returns 500 and logs unexpected deployment start failures", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
     startPublicDeployJob.mockRejectedValue(new Error("Cloudflare Pages deploy is not configured."));
-    getPublicSiteOperationErrorStatus.mockReturnValue(400);
 
     const response = await POST(
       new Request("http://localhost:3000/api/ops/public-deploy", {
@@ -78,10 +74,12 @@ describe("/api/ops/public-deploy", () => {
       }),
     );
 
-    expect(response.status).toBe(400);
+    expect(response.status).toBe(500);
     expect(await response.json()).toEqual({
       error: "Cloudflare Pages deploy is not configured.",
     });
+    expect(consoleError).toHaveBeenCalledOnce();
+    consoleError.mockRestore();
   });
 
   it("returns the requested deployment job", async () => {

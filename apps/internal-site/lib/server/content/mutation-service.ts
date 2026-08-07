@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/server/db/client";
+import { BadRequestError, ConflictError, NotFoundError } from "@/lib/server/api/errors";
 import { publishCase } from "@/lib/server/publish/publish-case";
 import { deletePublishedGroup } from "@/lib/server/storage/published-content";
 import { deleteInternalAssetPrefix } from "@/lib/server/storage/internal-assets";
@@ -50,7 +51,7 @@ async function requireCaseWithGroups(
   });
 
   if (!caseRow) {
-    throw new Error("Case not found.");
+    throw new NotFoundError("Case not found.");
   }
 
   return caseRow;
@@ -64,7 +65,7 @@ function requireTargetGroup<T extends { slug: string }>(groups: T[], groupSlug: 
   const targetGroup = groups.find((group) => group.slug === groupSlug);
 
   if (!targetGroup) {
-    throw new Error("Group not found.");
+    throw new NotFoundError("Group not found.");
   }
 
   return targetGroup;
@@ -80,7 +81,7 @@ export async function createCase(metadata: { slug: string; title: string; summar
   const summary = metadata.summary?.trim() ?? "";
 
   if (!title) {
-    throw new Error("Case title is required.");
+    throw new BadRequestError("Case title is required.");
   }
 
   const existingCase = await prisma.case.findUnique({
@@ -89,7 +90,7 @@ export async function createCase(metadata: { slug: string; title: string; summar
   });
 
   if (existingCase) {
-    throw new Error("Case already exists.");
+    throw new ConflictError("Case already exists.");
   }
 
   const caseRow = await prisma.case.create({
@@ -201,7 +202,7 @@ export async function updateCaseMetadata(
 
   if (metadata.title !== undefined) {
     const title = metadata.title.trim();
-    if (!title) throw new Error("Case title is required.");
+    if (!title) throw new BadRequestError("Case title is required.");
     data.title = title;
   }
   if (metadata.summary !== undefined) data.summary = metadata.summary.trim();
@@ -209,10 +210,20 @@ export async function updateCaseMetadata(
     const tags = [...new Set(metadata.tags.map((tag) => tag.trim()).filter(Boolean))];
     data.tagsJson = JSON.stringify(tags);
   }
-  if (Object.keys(data).length === 0) throw new Error("No Case metadata to update.");
+  if (Object.keys(data).length === 0) {
+    throw new BadRequestError("No Case metadata to update.");
+  }
+
+  const existingCase = await prisma.case.findUnique({
+    where: { slug: caseSlug },
+    select: { id: true },
+  });
+  if (!existingCase) {
+    throw new NotFoundError("Case not found.");
+  }
 
   const caseRow = await prisma.case.update({
-    where: { slug: caseSlug },
+    where: { id: existingCase.id },
     data,
     select: { id: true, slug: true, title: true, summary: true, tagsJson: true, status: true },
   });
@@ -240,7 +251,7 @@ export async function updateGroupMetadata(
   const description = metadata.description.trim();
 
   if (!title) {
-    throw new Error("Group title is required.");
+    throw new BadRequestError("Group title is required.");
   }
 
   const caseRow = await requireCaseWithGroups(caseSlug, {
@@ -296,7 +307,7 @@ export async function deleteGroup(caseSlug: string, groupSlug: string) {
   });
 
   if (!caseRow) {
-    throw new Error("Case not found.");
+    throw new NotFoundError("Case not found.");
   }
 
   const targetGroup = requireTargetGroup(caseRow.groups, groupSlug);
@@ -342,11 +353,11 @@ export async function deleteCase(caseSlug: string) {
   });
 
   if (!caseRow) {
-    throw new Error("Case not found.");
+    throw new NotFoundError("Case not found.");
   }
 
   if (caseRow.groups.length > 0) {
-    throw new Error("Case must be empty before deletion.");
+    throw new ConflictError("Case must be empty before deletion.");
   }
 
   await prisma.case.delete({

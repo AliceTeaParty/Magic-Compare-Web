@@ -28,11 +28,7 @@ describe("POST /api/ops/group-reorder", () => {
 
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ ok: true });
-    expect(reorderGroups).toHaveBeenCalledWith("case-1", [
-      "group-2",
-      "group-1",
-      "group-3",
-    ]);
+    expect(reorderGroups).toHaveBeenCalledWith("case-1", ["group-2", "group-1", "group-3"]);
   });
 
   it("rejects invalid payloads", async () => {
@@ -52,8 +48,9 @@ describe("POST /api/ops/group-reorder", () => {
     expect(response.status).toBe(400);
   });
 
-  it("keeps business errors in the 400 range", async () => {
-    reorderGroups.mockRejectedValue(new Error("Case not found."));
+  it("returns 500 for unexpected repository failures", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    reorderGroups.mockRejectedValue(new Error("Database unavailable."));
 
     const response = await POST(
       new Request("http://localhost:3000/api/ops/group-reorder", {
@@ -68,7 +65,9 @@ describe("POST /api/ops/group-reorder", () => {
       }),
     );
 
-    expect(response.status).toBe(400);
-    expect(await response.json()).toEqual({ error: "Case not found." });
+    expect(response.status).toBe(500);
+    expect(await response.json()).toEqual({ error: "Database unavailable." });
+    expect(consoleError).toHaveBeenCalledOnce();
+    consoleError.mockRestore();
   });
 });

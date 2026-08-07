@@ -12,8 +12,9 @@
 
 ## 错误约定
 
-- 大多数端点在参数校验失败或业务规则失败时返回 `400`，响应体形如 `{ "error": "..." }`。
-- `POST /api/ops/public-deploy` 在公共站点操作锁冲突时返回 `409`，其他失败通常返回 `400`。
+- Zod 参数校验失败返回 `400`；其他明确的无效输入也返回 `400`。
+- 目标 Case、Group 或上传作业不存在时返回 `404`；重复创建、陈旧状态或未满足前置条件时返回 `409`。
+- 未分类的数据库、对象存储、部署配置或程序异常会记录服务端日志并返回 `500`。
 
 ## 端点总览
 
@@ -66,7 +67,7 @@
 
 - 只创建一个空的 `draft` case，不创建 group、frame 或对象存储内容。
 - `slug` 使用 `SlugSchema`，因此不允许 `bad--case` 这类 public slug 分隔符形式。
-- 如果 slug 已存在，返回 `400` 和 `{ "error": "Case already exists." }`。
+- 如果 slug 已存在，返回 `409` 和 `{ "error": "Case already exists." }`。
 - 创建 case 不会触发 publish、public export 或 deploy。
 
 ### `POST /api/ops/case-delete`
@@ -93,7 +94,7 @@
 说明：
 
 - 只允许删除空 case。
-- 如果 case 下仍有任意 group，会返回 `400`，错误消息为 `Case must be empty before deletion.`。
+- 如果 case 下仍有任意 group，会返回 `409`，错误消息为 `Case must be empty before deletion.`。
 - 这个接口不会递归清理 group，也不会触发对象存储递归删除。
 
 ### `POST /api/ops/case-update`
@@ -122,7 +123,7 @@
 
 - 当前只修改 `Case.summary`，不修改 slug、title、status 或发布状态。
 - `summary` 会 trim 后保存，允许为空字符串。
-- 如果 case 不存在，返回 `400` 和 `{ "error": "Case not found." }`。
+- 如果 case 不存在，返回 `404` 和 `{ "error": "Case not found." }`。
 
 ## Group / Frame 工作区端点
 
@@ -206,7 +207,7 @@
 
 - 当前只修改 `Group.title` 和 `Group.description`，不修改 slug、排序、公开状态或素材；公开 Group 的 manifest 会同步刷新。
 - `title` trim 后必须非空；`description` trim 后允许为空。
-- 如果 group 不存在，返回 `400` 和 `{ "error": "Group not found." }`。
+- 如果 group 不存在，返回 `404` 和 `{ "error": "Group not found." }`。
 
 ### `POST /api/ops/group-visibility`
 
@@ -518,7 +519,7 @@
 - `frameOrder` 使用 frame 的业务顺序值，不是数据库主键。
 - `pendingPrefix` 的中间层目录使用 `frameOrder + 1`，因此 `frameOrder=12` 时路径里会出现 `/13/`。
 - 如果这个 frame 在当前 job 下已经存在旧的 pending revision，服务端会先删掉旧 pending 前缀，再签发新 URL。
-- 如果该 frame 已经是 `committed`，这个接口会返回 `400`，避免重复 prepare。
+- 如果该 frame 已经是 `committed`，这个接口会返回 `409`，避免重复 prepare。
 - presign 组装和对象路径命名都在服务端完成，客户端不自行决定最终 bucket key。
 - `stream-v2` 必须在 prepare 请求中附带该 frame 的完整生成描述；服务端会与 start 的源摘要、尺寸、slot 和 heatmap 计划逐项核对。
 - prepare 的 presign 和 commit 前的对象签名读取都使用有界并发；SQLite commit 仍按 frame 串行。
@@ -581,7 +582,7 @@
 
 - 只有当当前 job 里的所有 frame 都已经 `committed` 时，complete 才会成功。
 - complete 成功后，group upload job 会标记为 `completed`，group 会记录本次 `inputHash`，然后重算 case cover 和 case 发布状态。
-- 如果还有任意 frame 未提交，会返回 `400`，错误消息为 `Not every frame in the upload job has been committed.`。
+- 如果还有任意 frame 未提交，会返回 `409`，错误消息为 `Not every frame in the upload job has been committed.`。
 
 ### `POST /api/ops/group-upload-cancel`
 
@@ -636,8 +637,8 @@
 说明：
 
 - 部署任务读取完整的当前 published root，不接收 Case 上下文。
-- 如果没有配置 Cloudflare Pages 所需环境变量，会返回 `400`。
-- 同一时间只允许一个公共站点部署任务运行；并发请求会返回 `409`。
+- 如果没有配置 Cloudflare Pages 所需环境变量，启动请求会返回 `500` 并记录服务端日志。
+- 已有部署任务运行时，重复请求返回当前任务并标记 `reused=true`。
 
 ## 当前没有的端点
 

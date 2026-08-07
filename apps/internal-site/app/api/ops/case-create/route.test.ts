@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { ConflictError } from "@/lib/server/api/errors";
 import { POST } from "./route";
 
 const { createCase } = vi.hoisted(() => ({
@@ -69,8 +70,8 @@ describe("POST /api/ops/case-create", () => {
     expect(createCase).not.toHaveBeenCalled();
   });
 
-  it("keeps repository errors in the 400 range", async () => {
-    createCase.mockRejectedValue(new Error("Case already exists."));
+  it("returns 409 when the case already exists", async () => {
+    createCase.mockRejectedValue(new ConflictError("Case already exists."));
 
     const response = await POST(
       new Request("http://localhost:3000/api/ops/case-create", {
@@ -86,7 +87,7 @@ describe("POST /api/ops/case-create", () => {
       }),
     );
 
-    expect(response.status).toBe(400);
+    expect(response.status).toBe(409);
     expect(await response.json()).toEqual({ error: "Case already exists." });
   });
 });
