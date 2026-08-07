@@ -73,7 +73,7 @@ describe("workspace metadata actions", () => {
 
     updateWorkspaceCaseSummary(" Updated summary ", context);
     await vi.waitFor(() => {
-      expect(notifications.pushNotification).toHaveBeenCalledWith("Case 描述已保存。", "success");
+      expect(notifications.pushNotification).toHaveBeenCalledWith("项目描述已保存。", "success");
     });
 
     expect(fetchMock).toHaveBeenCalledWith(
@@ -129,10 +129,7 @@ describe("workspace metadata actions", () => {
       context,
     );
     await vi.waitFor(() => {
-      expect(notifications.pushNotification).toHaveBeenCalledWith(
-        "Group 元数据已保存。",
-        "success",
-      );
+      expect(notifications.pushNotification).toHaveBeenCalledWith("图组元数据已保存。", "success");
     });
 
     expect(fetchMock).toHaveBeenCalledWith(
@@ -186,7 +183,7 @@ describe("workspace metadata actions", () => {
 
     deleteWorkspaceGroup(baseGroup, context);
     await vi.waitFor(() => {
-      expect(notifications.pushNotification).toHaveBeenCalledWith("Group 已删除。", "success");
+      expect(notifications.pushNotification).toHaveBeenCalledWith("图组已删除。", "success");
     });
 
     expect(groupsRef.current).toEqual([]);

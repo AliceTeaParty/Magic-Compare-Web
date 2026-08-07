@@ -101,9 +101,9 @@ describe("public share image data", () => {
 
     expect(data).toMatchObject({
       title: "随机 - 2026",
-      countLabel: "2 Groups",
+      countLabel: "2 图组",
       description: "Imported from 随机.",
-      alt: "随机 - 2026，2 Groups 图像对比",
+      alt: "随机 - 2026，2 图组 图像对比",
       leftAsset: { id: "first-before", label: "Source" },
       rightAsset: { id: "first-after", label: "Processed" },
     });

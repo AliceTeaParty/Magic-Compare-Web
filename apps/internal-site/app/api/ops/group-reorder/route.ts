@@ -9,7 +9,7 @@ const schema = z.object({
     .array(z.string().min(1))
     .min(1)
     .refine((groupIds) => new Set(groupIds).size === groupIds.length, {
-      message: "Group ids must be unique.",
+      message: "图组 ID 必须唯一。",
     }),
 });
 

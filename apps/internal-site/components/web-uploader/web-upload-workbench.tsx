@@ -103,7 +103,7 @@ function buildInitialSnapshot(): UploadRunnerSnapshot {
 
 function getCaseInput(cases: CaseCatalogItem[], selectedCaseSlug: string) {
   const existing = cases.find((item) => item.slug === selectedCaseSlug);
-  if (!existing) throw new Error("请先新建并选择目标 Case。");
+  if (!existing) throw new Error("请先新建并选择目标项目。");
   return {
     slug: existing.slug,
     title: existing.title,
@@ -491,7 +491,7 @@ export function WebUploadWorkbench({ cases, initialCaseSlug }: WebUploadWorkbenc
   const [actionMenuAnchor, setActionMenuAnchor] = useState<HTMLElement | null>(null);
   const [groupMeta, setGroupMeta] = useState<UploadGroupMeta>({
     slug: "uploaded-group",
-    title: "Uploaded Group",
+    title: "上传图组",
     description: "",
     defaultMode: "before-after",
   });
@@ -692,7 +692,7 @@ export function WebUploadWorkbench({ cases, initialCaseSlug }: WebUploadWorkbenc
           caseInput,
           groupInput: {
             slug: normalizeSlug(groupMeta.slug),
-            title: groupMeta.title.trim() || "Uploaded Group",
+            title: groupMeta.title.trim() || "上传图组",
             description: groupMeta.description.trim(),
             defaultMode: groupMeta.defaultMode,
             order: 0,
@@ -878,7 +878,7 @@ export function WebUploadWorkbench({ cases, initialCaseSlug }: WebUploadWorkbenc
                   onClick={openCompletedGroup}
                   sx={{ minWidth: 140 }}
                 >
-                  打开 Group
+                  打开图组
                 </Button>
               ) : snapshot.stage === "uploading" ? (
                 <Button

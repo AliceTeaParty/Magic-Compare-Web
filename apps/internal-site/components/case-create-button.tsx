@@ -73,7 +73,7 @@ export function CaseCreateButton({ navigation = false }: { navigation?: boolean 
         });
         if (!response.ok) {
           const payload = await response.json().catch(() => null);
-          throw new Error(payload?.error || "创建 Case 失败。");
+          throw new Error(payload?.error || "创建项目失败。");
         }
 
         const result = (await response.json()) as { caseSlug?: string };
@@ -82,7 +82,7 @@ export function CaseCreateButton({ navigation = false }: { navigation?: boolean 
         router.push(`/cases/${result.caseSlug ?? normalizedSlug}`);
       } catch (error) {
         notifications.pushNotification(
-          error instanceof Error ? error.message : "创建 Case 失败。",
+          error instanceof Error ? error.message : "创建项目失败。",
           "error",
         );
       }
@@ -100,7 +100,7 @@ export function CaseCreateButton({ navigation = false }: { navigation?: boolean 
         />
       ) : (
         <Button variant="contained" startIcon={<Add />} onClick={() => setOpen(true)}>
-          新建 Case
+          新建项目
         </Button>
       )}
 
@@ -133,7 +133,7 @@ export function CaseCreateButton({ navigation = false }: { navigation?: boolean 
             lineHeight: 1.3,
           }}
         >
-          新建 Case
+          新建项目
         </DialogTitle>
         <DialogContent>
           <DialogContentText

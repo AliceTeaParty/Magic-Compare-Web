@@ -224,11 +224,11 @@ export function updateWorkspaceCaseSummary(
 
       context.summaryRef.current = savedSummary;
       context.setCaseSummary(savedSummary);
-      context.notifications.pushNotification("Case 描述已保存。", "success");
+      context.notifications.pushNotification("项目描述已保存。", "success");
     } catch (error) {
       context.summaryRef.current = previousSummary;
       context.setCaseSummary(previousSummary);
-      pushWorkspaceError(context.notifications, error, "保存 Case 描述失败。");
+      pushWorkspaceError(context.notifications, error, "保存项目描述失败。");
     } finally {
       context.notifications.dismissWorkspaceSavingNotification();
     }
@@ -248,7 +248,7 @@ export function updateWorkspaceGroupMetadata(
   const description = metadata.description.trim();
 
   if (!title) {
-    context.notifications.pushNotification("Group 标题不能为空。", "error");
+    context.notifications.pushNotification("图组标题不能为空。", "error");
     return Promise.resolve();
   }
 
@@ -288,10 +288,10 @@ export function updateWorkspaceGroupMetadata(
       );
 
       replaceWorkspaceGroups(context.groupsRef, context.setGroups, savedGroups);
-      context.notifications.pushNotification("Group 元数据已保存。", "success");
+      context.notifications.pushNotification("图组元数据已保存。", "success");
     } catch (error) {
       replaceWorkspaceGroups(context.groupsRef, context.setGroups, previousGroups);
-      pushWorkspaceError(context.notifications, error, "保存 Group 元数据失败。");
+      pushWorkspaceError(context.notifications, error, "保存图组元数据失败。");
     } finally {
       context.notifications.dismissWorkspaceSavingNotification();
     }
@@ -314,10 +314,10 @@ export function deleteWorkspaceGroup(
   }
 
   runOptimisticGroupMutation({
-    fallbackErrorMessage: "删除 Group 失败。",
+    fallbackErrorMessage: "删除图组失败。",
     nextGroups,
     onSuccess: () => {
-      context.notifications.pushNotification("Group 已删除。", "success");
+      context.notifications.pushNotification("图组已删除。", "success");
     },
     previousGroups,
     request: async () =>

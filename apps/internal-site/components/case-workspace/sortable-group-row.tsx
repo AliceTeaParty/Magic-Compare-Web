@@ -289,7 +289,7 @@ export function SortableGroupRow({
             p: { xs: 1.5, md: 1.75 },
           }}
         >
-          <Tooltip title="拖动调整此 Case 内的顺序。">
+          <Tooltip title="拖动调整此项目内的顺序。">
             <IconButton
               {...attributes}
               {...listeners}
@@ -332,9 +332,9 @@ export function SortableGroupRow({
                   component="span"
                   variant="subtitle1"
                   role={isEditing ? "textbox" : undefined}
-                  aria-label={isEditing ? "Group 标题" : undefined}
+                  aria-label={isEditing ? "图组标题" : undefined}
                   contentEditable={isEditing && !isPending}
-                  data-placeholder="Group 标题"
+                  data-placeholder="图组标题"
                   suppressContentEditableWarning
                   onInput={
                     isEditing
@@ -376,9 +376,9 @@ export function SortableGroupRow({
                   component="span"
                   variant="body2"
                   role={isEditing ? "textbox" : undefined}
-                  aria-label={isEditing ? "Group 描述" : undefined}
+                  aria-label={isEditing ? "图组描述" : undefined}
                   contentEditable={isEditing && !isPending}
-                  data-placeholder="暂无 Group 描述。"
+                  data-placeholder="暂无图组描述。"
                   suppressContentEditableWarning
                   onInput={
                     isEditing
@@ -396,7 +396,7 @@ export function SortableGroupRow({
                     }),
                   ]}
                 >
-                  {isEditing ? null : group.description || "暂无 Group 描述。"}
+                  {isEditing ? null : group.description || "暂无图组描述。"}
                 </Typography>
                 {isEditing ? (
                   <Typography
@@ -529,11 +529,11 @@ export function SortableGroupRow({
             >
               {isEditing ? (
                 <>
-                  <Tooltip title="保存 Group">
+                  <Tooltip title="保存图组">
                     <IconButton
                       size="small"
                       color="primary"
-                      aria-label="保存 Group 元数据"
+                      aria-label="保存图组元数据"
                       disabled={isPending || hasMetadataError}
                       onPointerDown={stopPointerPropagation}
                       onClick={(event) => {
@@ -548,7 +548,7 @@ export function SortableGroupRow({
                   <Tooltip title="取消编辑">
                     <IconButton
                       size="small"
-                      aria-label="取消编辑 Group 元数据"
+                      aria-label="取消编辑图组元数据"
                       disabled={isPending}
                       onPointerDown={stopPointerPropagation}
                       onClick={(event) => {
@@ -563,10 +563,10 @@ export function SortableGroupRow({
                 </>
               ) : (
                 <>
-                  <Tooltip title="编辑 Group">
+                  <Tooltip title="编辑图组">
                     <IconButton
                       size="small"
-                      aria-label="编辑 Group"
+                      aria-label="编辑图组"
                       disabled={isPending}
                       onPointerDown={stopPointerPropagation}
                       onClick={(event) => {
@@ -578,11 +578,11 @@ export function SortableGroupRow({
                       <EditOutlined fontSize="small" />
                     </IconButton>
                   </Tooltip>
-                  <Tooltip title="删除 Group">
+                  <Tooltip title="删除图组">
                     <IconButton
                       size="small"
                       color="error"
-                      aria-label="删除 Group"
+                      aria-label="删除图组"
                       disabled={isPending}
                       onPointerDown={stopPointerPropagation}
                       onClick={handleDeleteClick}

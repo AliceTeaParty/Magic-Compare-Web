@@ -629,7 +629,7 @@ function deriveGroupIdentity(sourceRootName: string, candidates: SourceCandidate
   if (sourceSlug && sourceSlug !== "uploaded-group") {
     return {
       slug: sourceSlug,
-      title: titleCase(sourceRootName) || "Uploaded Group",
+      title: titleCase(sourceRootName) || "上传图组",
     };
   }
 
@@ -649,10 +649,10 @@ function deriveGroupIdentity(sourceRootName: string, candidates: SourceCandidate
   if (slug.length < 3) {
     return {
       slug: cjkKebabCase(sourceRootName, "uploaded-group"),
-      title: titleCase(sourceRootName) || "Uploaded Group",
+      title: titleCase(sourceRootName) || "上传图组",
     };
   }
-  return { slug, title: titleCase(commonPrefix) || titleCase(sourceRootName) || "Uploaded Group" };
+  return { slug, title: titleCase(commonPrefix) || titleCase(sourceRootName) || "上传图组" };
 }
 
 function orderedComparisonLabels(frame: WebUploadFramePlan) {

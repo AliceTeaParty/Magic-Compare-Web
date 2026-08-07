@@ -46,7 +46,7 @@ async function requestViewerDataset(
   const payload = await response.json().catch(() => null);
 
   if (!response.ok || !payload?.dataset) {
-    throw new Error(payload?.error || "加载 Group 失败。");
+    throw new Error(payload?.error || "加载图组失败。");
   }
 
   return payload.dataset as ViewerDataset;
@@ -130,7 +130,7 @@ export function useInternalViewerNavigation(initialDataset: ViewerDataset) {
       } catch (error) {
         if (sequence !== navigationSequenceRef.current) return;
         if (isAbortError(error)) return;
-        pushNotification(error instanceof Error ? error.message : "加载 Group 失败。", "error");
+        pushNotification(error instanceof Error ? error.message : "加载图组失败。", "error");
       } finally {
         if (sequence === navigationSequenceRef.current) setPendingGroupHref(null);
       }

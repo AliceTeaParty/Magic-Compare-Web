@@ -82,7 +82,7 @@ describe("public group metadata", () => {
           width: 1200,
           height: 630,
           type: "image/jpeg",
-          alt: "随机抽检 - mono，1 Groups 图像对比",
+          alt: "随机抽检 - mono，1 图组 图像对比",
         },
       ],
     });

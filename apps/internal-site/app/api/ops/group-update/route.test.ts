@@ -86,7 +86,7 @@ describe("POST /api/ops/group-update", () => {
   });
 
   it("returns 404 when the group no longer exists", async () => {
-    updateGroupMetadata.mockRejectedValue(new NotFoundError("Group not found."));
+    updateGroupMetadata.mockRejectedValue(new NotFoundError("图组不存在。"));
 
     const response = await POST(
       new Request("http://localhost:3000/api/ops/group-update", {
@@ -104,6 +104,6 @@ describe("POST /api/ops/group-update", () => {
     );
 
     expect(response.status).toBe(404);
-    expect(await response.json()).toEqual({ error: "Group not found." });
+    expect(await response.json()).toEqual({ error: "图组不存在。" });
   });
 });

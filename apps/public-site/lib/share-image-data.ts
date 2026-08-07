@@ -48,7 +48,7 @@ export function buildPublicShareImageData(manifest: PublishManifest): PublicShar
   const caseTitle = normalizeShareText(manifest.case.title);
   const description = normalizeShareText(manifest.group.description);
   const title = `${groupTitle} - ${caseTitle}`;
-  const countLabel = `${manifest.frames.length} Groups`;
+  const countLabel = `${manifest.frames.length} 图组`;
   const [leftAsset, rightAsset] = selectShareAssets(manifest);
 
   return {

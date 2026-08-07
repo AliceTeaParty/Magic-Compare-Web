@@ -76,12 +76,12 @@ export async function publishCase(caseId: string) {
   });
 
   if (!caseRow) {
-    throw new Error("Case not found.");
+    throw new Error("项目不存在。");
   }
 
   const publishableGroups = caseRow.groups;
   if (publishableGroups.length === 0) {
-    throw new Error("No public groups are available for publishing.");
+    throw new Error("没有可发布的公开图组。");
   }
 
   const queryCompletedAt = performance.now();

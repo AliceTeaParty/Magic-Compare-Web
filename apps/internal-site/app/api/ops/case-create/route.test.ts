@@ -71,7 +71,7 @@ describe("POST /api/ops/case-create", () => {
   });
 
   it("returns 409 when the case already exists", async () => {
-    createCase.mockRejectedValue(new ConflictError("Case already exists."));
+    createCase.mockRejectedValue(new ConflictError("项目已存在。"));
 
     const response = await POST(
       new Request("http://localhost:3000/api/ops/case-create", {
@@ -88,6 +88,6 @@ describe("POST /api/ops/case-create", () => {
     );
 
     expect(response.status).toBe(409);
-    expect(await response.json()).toEqual({ error: "Case already exists." });
+    expect(await response.json()).toEqual({ error: "项目已存在。" });
   });
 });

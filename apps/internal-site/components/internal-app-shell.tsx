@@ -38,7 +38,7 @@ import { PublicDeployTaskPanel } from "./public-deploy/public-deploy-task-panel"
 import { usePublicDeployJob } from "./public-deploy/use-public-deploy-job";
 
 const destinations = [
-  { href: "/", label: "Case", icon: <FolderCopyOutlined />, iconFeedback: "case" },
+  { href: "/", label: "项目", icon: <FolderCopyOutlined />, iconFeedback: "case" },
   {
     href: "/upload",
     label: "上传",
@@ -135,14 +135,14 @@ function NavigationContent({
               href={currentCaseWorkspaceHref ?? undefined}
               icon={<DashboardOutlined />}
               iconFeedback="workspace"
-              label="工作区"
+              label="图组"
               selected={
                 Boolean(currentCaseWorkspaceHref) &&
                 (pathname === currentCaseWorkspaceHref ||
                   pathname.startsWith(`${currentCaseWorkspaceHref}/`))
               }
               onClick={onNavigate}
-              title={currentCaseWorkspaceHref ? "当前 Case 工作区" : "进入 Case 后可打开工作区"}
+              title={currentCaseWorkspaceHref ? "当前项目图组" : "进入项目后可打开图组"}
             />,
           ];
         })}

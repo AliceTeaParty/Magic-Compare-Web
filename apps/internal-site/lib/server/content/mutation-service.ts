@@ -51,7 +51,7 @@ async function requireCaseWithGroups(
   });
 
   if (!caseRow) {
-    throw new NotFoundError("Case not found.");
+    throw new NotFoundError("项目不存在。");
   }
 
   return caseRow;
@@ -65,7 +65,7 @@ function requireTargetGroup<T extends { slug: string }>(groups: T[], groupSlug: 
   const targetGroup = groups.find((group) => group.slug === groupSlug);
 
   if (!targetGroup) {
-    throw new NotFoundError("Group not found.");
+    throw new NotFoundError("图组不存在。");
   }
 
   return targetGroup;
@@ -81,7 +81,7 @@ export async function createCase(metadata: { slug: string; title: string; summar
   const summary = metadata.summary?.trim() ?? "";
 
   if (!title) {
-    throw new BadRequestError("Case title is required.");
+    throw new BadRequestError("项目标题不能为空。");
   }
 
   const existingCase = await prisma.case.findUnique({
@@ -90,7 +90,7 @@ export async function createCase(metadata: { slug: string; title: string; summar
   });
 
   if (existingCase) {
-    throw new ConflictError("Case already exists.");
+    throw new ConflictError("项目已存在。");
   }
 
   const caseRow = await prisma.case.create({
@@ -134,7 +134,7 @@ export async function reorderGroups(caseId: string, groupIds: string[]): Promise
     currentGroups.length !== groupIds.length ||
     currentGroups.some((group) => !requestedGroupIds.has(group.id))
   ) {
-    throw new ConflictError("Group order is stale. Refresh the Case and try again.");
+    throw new ConflictError("图组顺序已过期，请刷新项目后重试。");
   }
 
   await prisma.$transaction(
@@ -216,7 +216,7 @@ export async function updateCaseMetadata(
 
   if (metadata.title !== undefined) {
     const title = metadata.title.trim();
-    if (!title) throw new BadRequestError("Case title is required.");
+    if (!title) throw new BadRequestError("项目标题不能为空。");
     data.title = title;
   }
   if (metadata.summary !== undefined) data.summary = metadata.summary.trim();
@@ -225,7 +225,7 @@ export async function updateCaseMetadata(
     data.tagsJson = JSON.stringify(tags);
   }
   if (Object.keys(data).length === 0) {
-    throw new BadRequestError("No Case metadata to update.");
+    throw new BadRequestError("没有可更新的项目元数据。");
   }
 
   const existingCase = await prisma.case.findUnique({
@@ -233,7 +233,7 @@ export async function updateCaseMetadata(
     select: { id: true },
   });
   if (!existingCase) {
-    throw new NotFoundError("Case not found.");
+    throw new NotFoundError("项目不存在。");
   }
 
   const caseRow = await prisma.case.update({
@@ -265,7 +265,7 @@ export async function updateGroupMetadata(
   const description = metadata.description.trim();
 
   if (!title) {
-    throw new BadRequestError("Group title is required.");
+    throw new BadRequestError("图组标题不能为空。");
   }
 
   const caseRow = await requireCaseWithGroups(caseSlug, {
@@ -321,7 +321,7 @@ export async function deleteGroup(caseSlug: string, groupSlug: string) {
   });
 
   if (!caseRow) {
-    throw new NotFoundError("Case not found.");
+    throw new NotFoundError("项目不存在。");
   }
 
   const targetGroup = requireTargetGroup(caseRow.groups, groupSlug);
@@ -367,11 +367,11 @@ export async function deleteCase(caseSlug: string) {
   });
 
   if (!caseRow) {
-    throw new NotFoundError("Case not found.");
+    throw new NotFoundError("项目不存在。");
   }
 
   if (caseRow.groups.length > 0) {
-    throw new ConflictError("Case must be empty before deletion.");
+    throw new ConflictError("删除项目前必须先清空全部图组。");
   }
 
   await prisma.case.delete({

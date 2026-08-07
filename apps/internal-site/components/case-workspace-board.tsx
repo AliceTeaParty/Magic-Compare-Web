@@ -64,9 +64,9 @@ export function CaseWorkspaceBoard({ data }: { data: CaseWorkspaceData }) {
         title={caseTitle}
         subtitle={caseSummary || "暂无描述。"}
         actions={
-          <Tooltip title="管理 Case">
+          <Tooltip title="管理项目">
             <IconButton
-              aria-label="管理 Case"
+              aria-label="管理项目"
               onClick={() => setSettingsOpen(true)}
               sx={{ display: { lg: "none" } }}
             >
@@ -130,7 +130,7 @@ export function CaseWorkspaceBoard({ data }: { data: CaseWorkspaceData }) {
                 borderRadius: 2,
               }}
             >
-              <Typography variant="h4">还没有 Group</Typography>
+              <Typography variant="h4">还没有图组</Typography>
             </Stack>
           )}
         </Stack>
@@ -166,7 +166,7 @@ export function CaseWorkspaceBoard({ data }: { data: CaseWorkspaceData }) {
           setPendingDeleteGroup(null);
         }}
         open={Boolean(pendingDeleteGroup)}
-        title="删除 Group？"
+        title="删除图组？"
       />
     </>
   );

@@ -90,9 +90,7 @@ async function ensurePublishedGroupsExist(): Promise<void> {
     // Fall through to the explicit error below.
   }
 
-  throw new Error(
-    `No published groups were found in ${publishedGroupsDirectory()}. Publish at least one case first.`,
-  );
+  throw new Error(`在 ${publishedGroupsDirectory()} 中找不到已发布图组，请先发布至少一个项目。`);
 }
 
 /**

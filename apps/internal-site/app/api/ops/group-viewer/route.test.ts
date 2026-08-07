@@ -53,6 +53,6 @@ describe("POST /api/ops/group-viewer", () => {
     );
 
     expect(response.status).toBe(404);
-    expect(await response.json()).toEqual({ error: "Group not found." });
+    expect(await response.json()).toEqual({ error: "图组不存在。" });
   });
 });

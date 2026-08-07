@@ -84,7 +84,7 @@ describe("createCase", () => {
     caseFindUnique.mockResolvedValue({ id: "case-1" });
 
     await expect(createCase({ slug: "mono", title: "mono", summary: "" })).rejects.toThrow(
-      "Case already exists.",
+      "项目已存在。",
     );
     expect(caseCreate).not.toHaveBeenCalled();
   });
@@ -235,7 +235,7 @@ describe("updateGroupMetadata", () => {
         title: " ",
         description: "",
       }),
-    ).rejects.toThrow("Group title is required.");
+    ).rejects.toThrow("图组标题不能为空。");
     expect(groupUpdate).not.toHaveBeenCalled();
   });
 });
