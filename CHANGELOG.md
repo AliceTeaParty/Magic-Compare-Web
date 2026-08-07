@@ -6,6 +6,43 @@ Entries before that date are summarized at release level instead of being recons
 
 ## Unreleased
 
+## v2.0.0-alpha - 2026-08-07
+
+Major workspace and deployment pre-release. This alpha rebuilds the internal Case workflow, advances the browser uploader and image inspection tools, and modernizes the runtime and public publishing pipeline around the current Web-first architecture.
+
+### Added
+
+- Added a redesigned Case catalog and settings pane with focused metadata editing, navigation, destructive confirmations, and centralized workspace feedback.
+- Added in-place Group switching, A/B pixel rendering controls, refined pan/zoom and filmstrip interactions, and stricter viewer input boundaries.
+- Added streaming browser upload generation after source preflight, multi-target comparison support, stronger storage validation, and clearer pairing and progress workspaces.
+- Added asynchronous public deployment jobs with deployment fingerprints, progress reporting, refreshed asset URLs, and aligned internal/public deployment previews.
+- Added configurable shared branding, unified navigation chrome, route-aware page titles, public share metadata, and compact generated social images.
+- Added a development environment doctor, isolated development and end-to-end build caches, and local browser smoke coverage.
+
+### Changed
+
+- Reworked the internal Case workspace, catalog, uploader, notifications, and viewer shells into a consistent MUI workbench with stable responsive controls.
+- Made public deploys independent of the active Case while keeping published manifests synchronized with current metadata and assets.
+- Consolidated content queries and mutations behind server-side services and removed obsolete internal operations routes.
+- Moved generated published data and deployment output under `output/`, with matching maintenance scripts, documentation, and ignore rules.
+- Upgraded the workspace to Node.js 24, Next.js 16, TypeScript 6, Vitest 4, MUI 9, current build tooling, and patched transitive dependencies.
+- Removed the deprecated Python uploader and its binary workflow; browser upload is now the maintained ingestion path.
+- Tightened CI, Docker build metadata, runtime health checks, dependency update policy, and release-path documentation.
+
+### Fixed
+
+- Fixed stale published asset URLs and manifests after metadata, asset, or visibility changes.
+- Fixed public build environment leakage and kept build-time version and commit metadata consistent across internal and public sites.
+- Fixed viewer stage edges, image preload pressure, cookie-storage duplication, long workspace titles, modal scroll locking, and multi-target comparison behavior.
+- Fixed API error semantics and complete Group ordering validation after the operations cleanup.
+
+### Migration notes
+
+- Runtime development and builds now require Node.js `>=24.13.0 <25` and pnpm `10.32.1`.
+- Replace legacy Python uploader usage with the `/upload` browser workspace.
+- Update paths or mounts that still point at the former published root to use `output/published` and the documented `output/` deployment layout.
+- Integrations calling removed operations routes must use the current Case workspace, Group viewer, publish, and deploy contracts documented under `docs/reference/`.
+
 ## v1.9.5 - 2026-08-04
 
 Web upload and internal interaction reliability patch. This release preserves comparison-variable intent, reports background deploy completion, and keeps workbench controls stable through navigation and upload state changes.
