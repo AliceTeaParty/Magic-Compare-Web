@@ -20,26 +20,30 @@ import {
   JOB_TTL_MS,
   PENDING_FRAME_STATUS,
   PREPARED_FRAME_STATUS,
+  cancelExpiredActiveUploadJobs,
+  countUncommittedFrameJobs,
+  findActiveUploadJobByGroup,
+  markUploadJobCompleted,
+  parsePersistedJson,
+  requireActiveFrameUploadJob,
+  requireActiveUploadJob,
+  summarizeUploadJob,
+} from "./upload-job-repository";
+import {
+  clearGroupForRestart,
+  downgradeGroupVisibility,
+  ensureCaseAndGroup,
+} from "./upload-group-lifecycle";
+import {
   assertFrameCanCommit,
   assertFrameCanPrepare,
   assertPreparedAssetsUploaded,
   buildFramePendingPrefix,
   buildPreparedUploadAssets,
   buildPresignedFiles,
-  cancelExpiredActiveUploadJobs,
-  countUncommittedFrameJobs,
-  clearGroupForRestart,
   deleteReplacedFramePrefixes,
-  downgradeGroupVisibility,
-  ensureCaseAndGroup,
-  findActiveUploadJobByGroup,
-  markUploadJobCompleted,
-  parsePersistedJson,
-  requireActiveUploadJob,
-  requireActiveFrameUploadJob,
-  summarizeUploadJob,
   type PreparedUploadAsset,
-} from "./upload-service-helpers";
+} from "./upload-storage-operations";
 
 /**
  * Start either resumes the current active job, converts a matching completed upload into an

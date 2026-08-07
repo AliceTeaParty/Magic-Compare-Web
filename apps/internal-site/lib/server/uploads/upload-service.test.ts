@@ -92,14 +92,46 @@ vi.mock("@/lib/server/storage/internal-assets", async () => {
   };
 });
 
-vi.mock("./upload-service-helpers", async () => {
-  const actual = await vi.importActual<typeof import("./upload-service-helpers")>(
-    "./upload-service-helpers",
-  );
-
+vi.mock("./upload-job-repository", async () => {
+  const actual =
+    await vi.importActual<typeof import("./upload-job-repository")>("./upload-job-repository");
   return {
     ...actual,
-    ...helperMocks,
+    cancelExpiredActiveUploadJobs: helperMocks.cancelExpiredActiveUploadJobs,
+    findActiveUploadJobByGroup: helperMocks.findActiveUploadJobByGroup,
+    summarizeUploadJob: helperMocks.summarizeUploadJob,
+    requireActiveFrameUploadJob: helperMocks.requireActiveFrameUploadJob,
+    requireActiveUploadJob: helperMocks.requireActiveUploadJob,
+    countUncommittedFrameJobs: helperMocks.countUncommittedFrameJobs,
+    markUploadJobCompleted: helperMocks.markUploadJobCompleted,
+  };
+});
+
+vi.mock("./upload-group-lifecycle", async () => {
+  const actual = await vi.importActual<typeof import("./upload-group-lifecycle")>(
+    "./upload-group-lifecycle",
+  );
+  return {
+    ...actual,
+    ensureCaseAndGroup: helperMocks.ensureCaseAndGroup,
+    downgradeGroupVisibility: helperMocks.downgradeGroupVisibility,
+    clearGroupForRestart: helperMocks.clearGroupForRestart,
+  };
+});
+
+vi.mock("./upload-storage-operations", async () => {
+  const actual = await vi.importActual<typeof import("./upload-storage-operations")>(
+    "./upload-storage-operations",
+  );
+  return {
+    ...actual,
+    buildFramePendingPrefix: helperMocks.buildFramePendingPrefix,
+    buildPreparedUploadAssets: helperMocks.buildPreparedUploadAssets,
+    buildPresignedFiles: helperMocks.buildPresignedFiles,
+    assertFrameCanPrepare: helperMocks.assertFrameCanPrepare,
+    assertFrameCanCommit: helperMocks.assertFrameCanCommit,
+    assertPreparedAssetsUploaded: helperMocks.assertPreparedAssetsUploaded,
+    deleteReplacedFramePrefixes: helperMocks.deleteReplacedFramePrefixes,
   };
 });
 

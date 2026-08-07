@@ -1,9 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  cancelExpiredActiveUploadJobs,
-  clearGroupForRestart,
-  downgradeGroupVisibility,
-} from "./upload-service-helpers";
+import { clearGroupForRestart, downgradeGroupVisibility } from "./upload-group-lifecycle";
+import { cancelExpiredActiveUploadJobs } from "./upload-job-repository";
 
 const {
   transaction,
@@ -87,7 +84,7 @@ vi.mock("@/lib/server/content/case-maintenance", () => ({
   syncCasePublicationState,
 }));
 
-describe("upload-service-helpers", () => {
+describe("upload job repository and group lifecycle", () => {
   beforeEach(() => {
     transaction.mockReset();
     frameUploadJobUpdateMany.mockReset();
@@ -178,10 +175,7 @@ describe("upload-service-helpers", () => {
         id: true,
       },
     });
-    expect(transaction).toHaveBeenCalledWith([
-      "frame-upload-jobs",
-      "group-upload-jobs",
-    ]);
+    expect(transaction).toHaveBeenCalledWith(["frame-upload-jobs", "group-upload-jobs"]);
     expect(frameUploadJobUpdateMany).toHaveBeenCalledWith({
       where: {
         groupUploadJobId: {

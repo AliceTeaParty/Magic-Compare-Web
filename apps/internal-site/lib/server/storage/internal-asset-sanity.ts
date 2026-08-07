@@ -1,5 +1,6 @@
 import { extname } from "node:path";
 import type { ImportManifest } from "@magic-compare/content-schema";
+import { mapWithConcurrency } from "@/lib/server/concurrency/map-with-concurrency";
 import { readInternalAssetPrefix } from "./internal-assets";
 
 type PublicAssetLike = {
@@ -14,22 +15,6 @@ const STORAGE_VALIDATION_CONCURRENCY = 8;
 
 export function isKeyCompareAssetKind(kind: string): boolean {
   return KEY_ASSET_KINDS.has(kind);
-}
-
-/** Runs remote object checks with a fixed worker count so large legacy groups gain concurrency
- * without materializing hundreds of simultaneous R2 requests. */
-async function validateWithConcurrency(tasks: Array<() => Promise<void>>): Promise<void> {
-  let nextIndex = 0;
-  const workerCount = Math.min(STORAGE_VALIDATION_CONCURRENCY, tasks.length);
-  await Promise.all(
-    Array.from({ length: workerCount }, async () => {
-      while (nextIndex < tasks.length) {
-        const task = tasks[nextIndex];
-        nextIndex += 1;
-        await task();
-      }
-    }),
-  );
 }
 
 function hasPrefix(bytes: Uint8Array, signature: number[]): boolean {
@@ -109,7 +94,7 @@ export async function assertLikelyImportManifestAssets(manifest: ImportManifest)
       }
     }
   }
-  await validateWithConcurrency(tasks);
+  await mapWithConcurrency(tasks, STORAGE_VALIDATION_CONCURRENCY, (task) => task());
 }
 
 /** Validates a publish batch as one bounded queue rather than waiting for every frame in series. */
@@ -122,5 +107,5 @@ export async function assertLikelyPublicAssets(assets: PublicAssetLike[]): Promi
         ]
       : [],
   );
-  await validateWithConcurrency(tasks);
+  await mapWithConcurrency(tasks, STORAGE_VALIDATION_CONCURRENCY, (task) => task());
 }
