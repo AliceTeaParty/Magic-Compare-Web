@@ -5,6 +5,7 @@ import {
   useEffect,
   useRef,
   type PointerEvent as ReactPointerEvent,
+  type MutableRefObject,
   type TouchEvent as ReactTouchEvent,
 } from "react";
 import type { ViewerPanZoomState } from "@magic-compare/compare-core";
@@ -29,16 +30,15 @@ export function useStagePanZoomInteractions({
   active,
   applyPanZoom,
   effectiveScale,
-  panZoomState,
+  panZoomStateRef,
 }: {
   active: boolean;
   applyPanZoom: (nextState: ViewerPanZoomState) => void;
   effectiveScale: number;
-  panZoomState: ViewerPanZoomState;
+  panZoomStateRef: MutableRefObject<ViewerPanZoomState>;
 }) {
   const panGestureRef = useRef<StagePanGesture | null>(null);
   const touchGestureRef = useRef<StageTouchGesture | null>(null);
-  const panZoomStateRef = useRef(panZoomState);
   const suppressStageClickRef = useRef(false);
   const clearSuppressedClickTimerRef = useRef<number | null>(null);
 
@@ -49,12 +49,6 @@ export function useStagePanZoomInteractions({
       clearSuppressedClickTimerRef.current = null;
     }
   }, []);
-
-  // Gesture handlers outlive a single render, so they read the latest pan/zoom state from refs
-  // instead of closing over stale React values mid-interaction.
-  useEffect(() => {
-    panZoomStateRef.current = panZoomState;
-  }, [panZoomState]);
 
   useEffect(() => {
     if (active) {

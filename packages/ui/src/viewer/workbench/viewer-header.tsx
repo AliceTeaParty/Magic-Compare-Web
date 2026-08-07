@@ -4,30 +4,27 @@ import { Box, Stack, Typography } from "@mui/material";
 import type { ViewerMode } from "@magic-compare/content-schema";
 import type { ViewerAsset } from "@magic-compare/compare-core/viewer-data";
 import { ViewerToolbar, ViewerUtilityControls } from "./viewer-toolbar";
+import type { ViewerInteractionStore } from "./viewer-interaction-store";
 
 interface ViewerHeaderProps {
-  abScale: number;
   abSide: "before" | "after";
   beforeAsset: ViewerAsset | undefined;
   canUseHeatmap: boolean;
   caseTitle: string;
   comparisonAssetKey: string | undefined;
   comparisonAssets: ViewerAsset[];
+  frameId: string | undefined;
   guideOpen: boolean;
   groupTitle: string;
   hideStageScrollControl: boolean;
+  interactionStore: ViewerInteractionStore;
   mode: ViewerMode;
-  overlayOpacity: number;
   onAbSideChange: (side: "before" | "after") => void;
   onComparisonAssetChange: (assetKey: string) => void;
   onOpenGuide: () => void;
   onModeChange: (mode: ViewerMode) => void;
-  onOverlayOpacityChange: (value: number) => void;
-  onPixelRenderingToggle: () => void;
-  onScaleChange: (nextScale: number) => void;
   onScrollStageIntoView: () => void;
   onToggleSidebar: () => void;
-  pixelRenderingEnabled: boolean;
   sidebarOpen: boolean;
 }
 
@@ -36,28 +33,24 @@ interface ViewerHeaderProps {
  * the stage and sidebar swap between internal and public variants.
  */
 export function ViewerHeader({
-  abScale,
   abSide,
   beforeAsset,
   canUseHeatmap,
   caseTitle,
   comparisonAssetKey,
   comparisonAssets,
+  frameId,
   guideOpen,
   groupTitle,
   hideStageScrollControl,
+  interactionStore,
   mode,
-  overlayOpacity,
   onAbSideChange,
   onComparisonAssetChange,
   onOpenGuide,
   onModeChange,
-  onOverlayOpacityChange,
-  onPixelRenderingToggle,
-  onScaleChange,
   onScrollStageIntoView,
   onToggleSidebar,
-  pixelRenderingEnabled,
   sidebarOpen,
 }: ViewerHeaderProps) {
   return (
@@ -164,26 +157,22 @@ export function ViewerHeader({
       </Stack>
 
       <ViewerToolbar
-        abScale={abScale}
         abSide={abSide}
         beforeAsset={beforeAsset}
         canUseHeatmap={canUseHeatmap}
         comparisonAssetKey={comparisonAssetKey}
         comparisonAssets={comparisonAssets}
+        frameId={frameId}
         guideOpen={guideOpen}
         hideStageScrollControl={hideStageScrollControl}
+        interactionStore={interactionStore}
         mode={mode}
-        overlayOpacity={overlayOpacity}
         onAbSideChange={onAbSideChange}
         onComparisonAssetChange={onComparisonAssetChange}
         onOpenGuide={onOpenGuide}
         onModeChange={onModeChange}
-        onOverlayOpacityChange={onOverlayOpacityChange}
-        onPixelRenderingToggle={onPixelRenderingToggle}
-        onScaleChange={onScaleChange}
         onScrollStageIntoView={onScrollStageIntoView}
         onToggleSidebar={onToggleSidebar}
-        pixelRenderingEnabled={pixelRenderingEnabled}
         sidebarOpen={sidebarOpen}
       />
     </Box>

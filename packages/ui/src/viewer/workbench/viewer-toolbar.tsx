@@ -18,6 +18,7 @@ import { clampNumber } from "@magic-compare/shared-utils";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { AbInspectControls } from "./ab-inspect-controls";
 import { ComparisonAssetControls } from "./comparison-asset-controls";
+import { type ViewerInteractionStore, useViewerOverlayOpacity } from "./viewer-interaction-store";
 
 const compactControlHeight = { xs: 42, md: 40 } as const;
 const tripleControlWidth = 144;
@@ -43,37 +44,32 @@ interface ViewerUtilityControlsProps {
 }
 
 interface ViewerToolbarProps {
-  abScale: number;
   abSide: "before" | "after";
   beforeAsset: ViewerAsset | undefined;
   canUseHeatmap: boolean;
   comparisonAssetKey: string | undefined;
   comparisonAssets: ViewerAsset[];
+  frameId: string | undefined;
   guideOpen: boolean;
   hideStageScrollControl: boolean;
   mode: ViewerMode;
-  overlayOpacity: number;
+  interactionStore: ViewerInteractionStore;
   onAbSideChange: (side: "before" | "after") => void;
   onComparisonAssetChange: (assetKey: string) => void;
   onOpenGuide: () => void;
   onModeChange: (mode: ViewerMode) => void;
-  onOverlayOpacityChange: (value: number) => void;
-  onPixelRenderingToggle: () => void;
-  onScaleChange: (nextScale: number) => void;
   onScrollStageIntoView: () => void;
   onToggleSidebar: () => void;
-  pixelRenderingEnabled: boolean;
   sidebarOpen: boolean;
 }
 
 /** Keeps Heatmap intensity inside the stable toolbar slot instead of moving the filmstrip. */
 function HeatmapOpacityControls({
-  onChange,
-  value,
+  interactionStore,
 }: {
-  onChange: (value: number) => void;
-  value: number;
+  interactionStore: ViewerInteractionStore;
 }) {
+  const value = useViewerOverlayOpacity(interactionStore);
   return (
     <Stack
       direction="row"
@@ -104,7 +100,9 @@ function HeatmapOpacityControls({
         size="small"
         value={value}
         onChange={(_, nextValue) =>
-          onChange(clampNumber(Array.isArray(nextValue) ? nextValue[0] : nextValue, 20, 95))
+          interactionStore.setOverlayOpacity(
+            clampNumber(Array.isArray(nextValue) ? nextValue[0] : nextValue, 20, 95),
+          )
         }
         sx={{ flex: 1, minWidth: 64 }}
       />
@@ -226,26 +224,22 @@ export function ViewerUtilityControls({
  * consistent between the internal and public shells.
  */
 export function ViewerToolbar({
-  abScale,
   abSide,
   beforeAsset,
   canUseHeatmap,
   comparisonAssetKey,
   comparisonAssets,
+  frameId,
   guideOpen,
   hideStageScrollControl,
   mode,
-  overlayOpacity,
+  interactionStore,
   onAbSideChange,
   onComparisonAssetChange,
   onOpenGuide,
   onModeChange,
-  onOverlayOpacityChange,
-  onPixelRenderingToggle,
-  onScaleChange,
   onScrollStageIntoView,
   onToggleSidebar,
-  pixelRenderingEnabled,
   sidebarOpen,
 }: ViewerToolbarProps) {
   const prefersReducedMotion = useReducedMotion();
@@ -262,14 +256,6 @@ export function ViewerToolbar({
    */
   function handleAbSideChange(nextSide: "before" | "after") {
     onAbSideChange(nextSide);
-  }
-
-  /**
-   * Clamps preset changes through the shared controller entry point so toolbar buttons and keyboard
-   * shortcuts cannot diverge from stage zoom bounds.
-   */
-  function handleScaleChange(nextScale: number) {
-    onScaleChange(nextScale);
   }
 
   /**
@@ -441,20 +427,18 @@ export function ViewerToolbar({
             ) : mode === "a-b" ? (
               beforeAsset && comparisonAssetKey && comparisonAssets.length > 0 ? (
                 <AbInspectControls
-                  abScale={abScale}
                   abSide={abSide}
                   baselineAsset={beforeAsset}
                   comparisonAssetKey={comparisonAssetKey}
                   comparisonAssets={comparisonAssets}
+                  frameId={frameId}
+                  interactionStore={interactionStore}
                   onAbSideChange={handleAbSideChange}
                   onComparisonAssetChange={onComparisonAssetChange}
-                  onPixelRenderingToggle={onPixelRenderingToggle}
-                  onScaleChange={handleScaleChange}
-                  pixelRenderingEnabled={pixelRenderingEnabled}
                 />
               ) : null
             ) : (
-              <HeatmapOpacityControls onChange={onOverlayOpacityChange} value={overlayOpacity} />
+              <HeatmapOpacityControls interactionStore={interactionStore} />
             )}
           </Box>
         </AnimatePresence>

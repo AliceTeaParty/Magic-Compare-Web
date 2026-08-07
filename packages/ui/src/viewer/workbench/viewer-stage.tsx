@@ -1,8 +1,8 @@
 "use client";
 
 import { PhotoLibrary } from "@mui/icons-material";
-import { Alert, Box, Stack, Typography } from "@mui/material";
-import { getContainedMediaRect, type ViewerPanZoomState } from "@magic-compare/compare-core";
+import { Box, Stack, Typography } from "@mui/material";
+import { getContainedMediaRect } from "@magic-compare/compare-core";
 import type { ViewerMode } from "@magic-compare/content-schema";
 import type { ViewerAsset } from "@magic-compare/compare-core/viewer-data";
 import { useEffect, useMemo, useRef, type ReactNode, type RefObject, useState } from "react";
@@ -10,6 +10,11 @@ import { ABCompareStage } from "./ab-compare-stage";
 import { PositionedStageMedia } from "./positioned-stage-media";
 import { SwipeCompareStage } from "./swipe-compare-stage";
 import { viewerTokens } from "./viewer-tokens";
+import {
+  type ViewerInteractionStore,
+  useViewerAbStageActive,
+  useViewerOverlayOpacity,
+} from "./viewer-interaction-store";
 
 export { DEFAULT_PAN_ZOOM } from "./positioned-stage-media";
 
@@ -136,65 +141,35 @@ function StagePresentationShell({
 }
 
 /**
- * Explains the forced mode fallback when a frame lacks heatmap assets, which would otherwise look
- * like a broken blank panel.
- */
-export function HeatmapNotice() {
-  return (
-    <Alert
-      severity="info"
-      sx={{
-        borderRadius: 2.5,
-        bgcolor: viewerTokens.heatmapNotice.surface,
-        color: "text.primary",
-      }}
-    >
-      No heatmap for this frame. Viewer has fallen back to a primary compare mode.
-    </Alert>
-  );
-}
-
-/**
  * Chooses the active stage implementation and computes the contained media rect from the currently
  * visible asset so all compare modes share the same fitted geometry.
  */
 function ViewerStageContent({
   abSide,
-  abStageActive,
   afterAsset,
   beforeAsset,
   devicePixelRatio,
+  frameId,
   heatmapAsset,
+  interactionStore,
   mode,
   onCycleAbSide,
-  overlayOpacity,
-  panZoomState,
-  pixelRenderingEnabled,
   prefersReducedMotion,
   rotateStage,
-  setAbStageActive,
-  setPanZoomState,
-  setSwipePosition,
-  swipePosition,
 }: {
   abSide: "before" | "after";
-  abStageActive: boolean;
   afterAsset: ViewerAsset | undefined;
   beforeAsset: ViewerAsset | undefined;
   devicePixelRatio: number;
+  frameId: string | undefined;
   heatmapAsset: ViewerAsset | undefined;
+  interactionStore: ViewerInteractionStore;
   mode: ViewerMode;
   onCycleAbSide: () => void;
-  overlayOpacity: number;
-  panZoomState: ViewerPanZoomState;
-  pixelRenderingEnabled: boolean;
   prefersReducedMotion: boolean;
   rotateStage: boolean;
-  setAbStageActive: (nextActive: boolean) => void;
-  setPanZoomState: (nextState: ViewerPanZoomState) => void;
-  setSwipePosition: (value: number) => void;
-  swipePosition: number;
 }) {
+  const overlayOpacity = useViewerOverlayOpacity(interactionStore);
   const stageViewportRef = useRef<HTMLDivElement | null>(null);
   const viewportSize = useElementSize(stageViewportRef);
   const referenceAsset = afterAsset ?? beforeAsset;
@@ -233,19 +208,16 @@ function ViewerStageContent({
     return (
       <Box ref={stageViewportRef} sx={{ width: "100%", height: "100%", borderRadius: "inherit" }}>
         <ABCompareStage
-          active={abStageActive}
           afterAsset={afterAsset}
           beforeAsset={beforeAsset}
           devicePixelRatio={devicePixelRatio}
+          frameId={frameId}
+          interactionStore={interactionStore}
           mediaRect={mediaRect}
           onCycleSide={onCycleAbSide}
-          panZoomState={panZoomState}
-          pixelRenderingEnabled={pixelRenderingEnabled}
           prefersReducedMotion={prefersReducedMotion}
           rotateStage={rotateStage}
           side={abSide}
-          setActive={setAbStageActive}
-          setPanZoomState={setPanZoomState}
           viewportSize={viewportSize}
         />
       </Box>
@@ -288,11 +260,11 @@ function ViewerStageContent({
       <SwipeCompareStage
         beforeAsset={beforeAsset}
         afterAsset={afterAsset}
+        frameId={frameId}
+        interactionStore={interactionStore}
         mediaRect={mediaRect}
         rotateStage={rotateStage}
         prefersReducedMotion={prefersReducedMotion}
-        setSwipePosition={setSwipePosition}
-        swipePosition={swipePosition}
       />
     </Box>
   );
@@ -300,23 +272,17 @@ function ViewerStageContent({
 
 interface ViewerStageProps {
   abSide: "before" | "after";
-  abStageActive: boolean;
   afterAsset: ViewerAsset | undefined;
   beforeAsset: ViewerAsset | undefined;
   devicePixelRatio: number;
+  frameId: string | undefined;
   heatmapAsset: ViewerAsset | undefined;
+  interactionStore: ViewerInteractionStore;
   mode: ViewerMode;
   onCycleAbSide: () => void;
-  overlayOpacity: number;
-  panZoomState: ViewerPanZoomState;
-  pixelRenderingEnabled: boolean;
   prefersReducedMotion: boolean;
   rotateStage: boolean;
-  setAbStageActive: (nextActive: boolean) => void;
-  setPanZoomState: (nextState: ViewerPanZoomState) => void;
-  setSwipePosition: (value: number) => void;
   stageRef: RefObject<HTMLDivElement | null>;
-  swipePosition: number;
 }
 
 /**
@@ -325,24 +291,19 @@ interface ViewerStageProps {
  */
 export function ViewerStage({
   abSide,
-  abStageActive,
   afterAsset,
   beforeAsset,
   devicePixelRatio,
+  frameId,
   heatmapAsset,
+  interactionStore,
   mode,
   onCycleAbSide,
-  overlayOpacity,
-  panZoomState,
-  pixelRenderingEnabled,
   prefersReducedMotion,
   rotateStage,
-  setAbStageActive,
-  setPanZoomState,
-  setSwipePosition,
   stageRef,
-  swipePosition,
 }: ViewerStageProps) {
+  const abStageActive = useViewerAbStageActive(interactionStore, frameId);
   return (
     <Box
       ref={stageRef}
@@ -357,22 +318,16 @@ export function ViewerStage({
       <StagePresentationShell inspectActive={mode === "a-b" && abStageActive}>
         <ViewerStageContent
           abSide={abSide}
-          abStageActive={abStageActive}
           afterAsset={afterAsset}
           beforeAsset={beforeAsset}
           devicePixelRatio={devicePixelRatio}
+          frameId={frameId}
           heatmapAsset={heatmapAsset}
+          interactionStore={interactionStore}
           mode={mode}
           onCycleAbSide={onCycleAbSide}
-          overlayOpacity={overlayOpacity}
-          panZoomState={panZoomState}
-          pixelRenderingEnabled={pixelRenderingEnabled}
           prefersReducedMotion={prefersReducedMotion}
           rotateStage={rotateStage}
-          setAbStageActive={setAbStageActive}
-          setPanZoomState={setPanZoomState}
-          setSwipePosition={setSwipePosition}
-          swipePosition={swipePosition}
         />
       </StagePresentationShell>
     </Box>

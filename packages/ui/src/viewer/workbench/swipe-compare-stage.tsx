@@ -9,6 +9,7 @@ import { PositionedStageMedia } from "./positioned-stage-media";
 import { getSwipeCompareGeometry, getSwipeCssValues } from "./swipe-compare-geometry";
 import { useSwipeCompareDrag } from "./use-swipe-compare-drag";
 import { viewerTokens } from "./viewer-tokens";
+import { type ViewerInteractionStore, useViewerSwipePosition } from "./viewer-interaction-store";
 
 /** Draws the visible compare boundary using transform-only movement during drag. */
 function SwipeDivider({
@@ -112,20 +113,21 @@ function SwipeHandle({
 export function SwipeCompareStage({
   beforeAsset,
   afterAsset,
+  frameId,
+  interactionStore,
   mediaRect,
   prefersReducedMotion,
   rotateStage,
-  setSwipePosition,
-  swipePosition,
 }: {
   beforeAsset: ViewerAsset;
   afterAsset: ViewerAsset;
+  frameId: string | undefined;
+  interactionStore: ViewerInteractionStore;
   mediaRect: ViewerMediaRect;
   prefersReducedMotion: boolean;
   rotateStage: boolean;
-  setSwipePosition: (value: number) => void;
-  swipePosition: number;
 }) {
+  const swipePosition = useViewerSwipePosition(interactionStore, frameId);
   const clampedSwipePosition = clampNumber(swipePosition, 0, 100);
   const { axisLength, isVertical } = getSwipeCompareGeometry({
     mediaRect,
@@ -145,7 +147,7 @@ export function SwipeCompareStage({
       axisLength,
       mediaRect,
       rotateStage,
-      setSwipePosition,
+      setSwipePosition: (value) => interactionStore.setSwipePosition(frameId, value),
       swipePosition: clampedSwipePosition,
     });
 

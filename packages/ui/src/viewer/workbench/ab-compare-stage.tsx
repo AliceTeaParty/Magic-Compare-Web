@@ -7,46 +7,51 @@ import type {
   ViewerStageSize,
 } from "@magic-compare/compare-core";
 import type { ViewerAsset } from "@magic-compare/compare-core/viewer-data";
-import { useEffect, useRef, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import { useCallback, useEffect, useRef, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { PositionedStageMedia } from "./positioned-stage-media";
+import { activateInspectForWheel } from "./stage-pan-zoom-gestures";
 import { useStagePanZoom } from "./use-stage-pan-zoom";
+import { type ViewerInteractionStore, useViewerAbInteraction } from "./viewer-interaction-store";
 
 /**
  * Wraps A/B inspect mode so activation, side cycling, and pan/zoom all stay tied to the same stage
  * surface.
  */
 export function ABCompareStage({
-  active,
   afterAsset,
   viewportSize,
   beforeAsset,
   devicePixelRatio,
+  frameId,
+  interactionStore,
   mediaRect,
   onCycleSide,
-  panZoomState,
-  pixelRenderingEnabled,
   prefersReducedMotion,
   rotateStage,
   side,
-  setActive,
-  setPanZoomState,
 }: {
-  active: boolean;
   afterAsset: ViewerAsset;
   beforeAsset: ViewerAsset;
   viewportSize: ViewerStageSize;
   devicePixelRatio: number;
+  frameId: string | undefined;
+  interactionStore: ViewerInteractionStore;
   mediaRect: ViewerMediaRect;
   onCycleSide: () => void;
-  panZoomState: ViewerPanZoomState;
-  pixelRenderingEnabled: boolean;
   prefersReducedMotion: boolean;
   rotateStage: boolean;
   side: "before" | "after";
-  setActive: (nextActive: boolean) => void;
-  setPanZoomState: (nextState: ViewerPanZoomState) => void;
 }) {
+  const {
+    panZoomState,
+    pixelRenderingEnabled,
+    stageActive: active,
+  } = useViewerAbInteraction(interactionStore, frameId);
   const stageSurfaceRef = useRef<HTMLDivElement | null>(null);
+  const setPanZoomState = useCallback(
+    (nextState: ViewerPanZoomState) => interactionStore.setPanZoomState(frameId, nextState),
+    [frameId, interactionStore],
+  );
   const { consumeStageClick, effectiveScale, handleNonPassiveWheel, stageHandlers } =
     useStagePanZoom({
       active,
@@ -72,6 +77,13 @@ export function ABCompareStage({
      * listeners passively, which still applies the zoom but pollutes the console during smoke/CI.
      */
     function handleWheel(event: WheelEvent) {
+      activateInspectForWheel(event, () => {
+        if (!interactionStore.getAbStageActive(frameId)) {
+          // Activating before scale notification ensures the first zoomed paint uses full-stage
+          // clipping instead of the inactive contained mask.
+          interactionStore.setStageActive(frameId, true);
+        }
+      });
       handleNonPassiveWheel(event);
     }
 
@@ -79,7 +91,7 @@ export function ABCompareStage({
     return () => {
       stageNode.removeEventListener("wheel", handleWheel);
     };
-  }, [handleNonPassiveWheel]);
+  }, [frameId, handleNonPassiveWheel, interactionStore]);
 
   /**
    * Uses a single click target for both entry and side cycling so A/B mode stays compact on mobile
@@ -91,7 +103,7 @@ export function ABCompareStage({
     }
 
     if (!active) {
-      setActive(true);
+      interactionStore.setStageActive(frameId, true);
       return;
     }
 

@@ -8,20 +8,19 @@ import {
   VIEWER_MIN_PRESET_SCALE,
 } from "@magic-compare/compare-core";
 import type { ViewerAsset } from "@magic-compare/compare-core/viewer-data";
+import { type ViewerInteractionStore, useViewerAbInteraction } from "./viewer-interaction-store";
 
 const BASELINE_ASSET_VALUE = "__baseline__";
 
 interface AbInspectControlsProps {
-  abScale: number;
   abSide: "before" | "after";
   baselineAsset: ViewerAsset;
   comparisonAssetKey: string;
   comparisonAssets: ViewerAsset[];
+  frameId: string | undefined;
+  interactionStore: ViewerInteractionStore;
   onAbSideChange: (side: "before" | "after") => void;
   onComparisonAssetChange: (assetKey: string) => void;
-  onPixelRenderingToggle: () => void;
-  onScaleChange: (nextScale: number) => void;
-  pixelRenderingEnabled: boolean;
 }
 
 /**
@@ -29,17 +28,19 @@ interface AbInspectControlsProps {
  * the mode where the side selector and zoom buttons are meaningful.
  */
 export function AbInspectControls({
-  abScale,
   abSide,
   baselineAsset,
   comparisonAssetKey,
   comparisonAssets,
+  frameId,
+  interactionStore,
   onAbSideChange,
   onComparisonAssetChange,
-  onPixelRenderingToggle,
-  onScaleChange,
-  pixelRenderingEnabled,
 }: AbInspectControlsProps) {
+  const { displayedScale: abScale, pixelRenderingEnabled } = useViewerAbInteraction(
+    interactionStore,
+    frameId,
+  );
   const isAtMinScale = abScale <= VIEWER_MIN_PRESET_SCALE;
   const isAtMaxScale = abScale >= VIEWER_MAX_PRESET_SCALE;
   // Match the viewer toolbar target size so mode switching and zoom adjustment feel like one
@@ -176,7 +177,10 @@ export function AbInspectControls({
             aria-label="缩小 A/B 视图"
             disabled={isAtMinScale}
             onClick={() =>
-              onScaleChange(Math.max(VIEWER_MIN_PRESET_SCALE, Math.floor(abScale - 0.001)))
+              interactionStore.setScale(
+                frameId,
+                Math.max(VIEWER_MIN_PRESET_SCALE, Math.floor(abScale - 0.001)),
+              )
             }
             sx={{
               width: "100%",
@@ -212,7 +216,10 @@ export function AbInspectControls({
             aria-label="放大 A/B 视图"
             disabled={isAtMaxScale}
             onClick={() =>
-              onScaleChange(Math.min(VIEWER_MAX_PRESET_SCALE, Math.ceil(abScale + 0.001)))
+              interactionStore.setScale(
+                frameId,
+                Math.min(VIEWER_MAX_PRESET_SCALE, Math.ceil(abScale + 0.001)),
+              )
             }
             sx={{
               width: "100%",
@@ -233,7 +240,7 @@ export function AbInspectControls({
               size="small"
               aria-label={pixelRenderingEnabled ? "关闭 A/B 最近邻采样" : "开启 A/B 最近邻采样"}
               aria-pressed={pixelRenderingEnabled}
-              onClick={onPixelRenderingToggle}
+              onClick={() => interactionStore.togglePixelRendering(frameId)}
               sx={{
                 width: "100%",
                 height: "100%",
