@@ -2,10 +2,7 @@
 
 import type { ReactNode } from "react";
 import { AppNotifications } from "./app-notifications";
-import {
-  AppNotificationsContext,
-  useAppNotificationQueue,
-} from "./use-app-notifications";
+import { AppNotificationsContext, useAppNotificationQueue } from "./use-app-notifications";
 
 /**
  * Owns one notification queue above route transitions so deployment, workspace, creation, and

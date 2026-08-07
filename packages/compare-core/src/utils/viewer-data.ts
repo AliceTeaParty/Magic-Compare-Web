@@ -148,9 +148,7 @@ export function resolveViewerMode(
   return "before-after";
 }
 
-export function createViewerDatasetFromPublishManifest(
-  manifest: PublishManifest,
-): ViewerDataset {
+export function createViewerDatasetFromPublishManifest(manifest: PublishManifest): ViewerDataset {
   return {
     caseMeta: {
       slug: manifest.case.slug,

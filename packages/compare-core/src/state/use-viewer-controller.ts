@@ -48,9 +48,7 @@ export interface ViewerController {
  */
 export function useViewerController(group: ViewerGroup): ViewerController {
   const frames = useMemo(() => getOrderedFrames(group), [group]);
-  const [currentFrameId, setCurrentFrameId] = useState<string | undefined>(
-    frames[0]?.id,
-  );
+  const [currentFrameId, setCurrentFrameId] = useState<string | undefined>(frames[0]?.id);
   const [mode, setModeState] = useState<ViewerMode>(group.defaultMode);
   const [overlayOpacity, setOverlayOpacityState] = useState<number>(58);
   const [abSide, setAbSideState] = useState<"before" | "after">("after");
@@ -72,19 +70,12 @@ export function useViewerController(group: ViewerGroup): ViewerController {
     () => buildFrameState(frames, currentFrameId),
     [currentFrameId, frames],
   );
-  const {
-    afterAsset,
-    beforeAsset,
-    comparisonAssets,
-    heatmapAsset,
-    heatmapReferenceAsset,
-  } = useMemo(
-    () => buildFrameAssets(currentFrame, comparisonAssetPreferenceKey),
-    [comparisonAssetPreferenceKey, currentFrame],
-  );
-  const comparisonAssetKey = afterAsset
-    ? getComparisonAssetKey(afterAsset)
-    : undefined;
+  const { afterAsset, beforeAsset, comparisonAssets, heatmapAsset, heatmapReferenceAsset } =
+    useMemo(
+      () => buildFrameAssets(currentFrame, comparisonAssetPreferenceKey),
+      [comparisonAssetPreferenceKey, currentFrame],
+    );
+  const comparisonAssetKey = afterAsset ? getComparisonAssetKey(afterAsset) : undefined;
   const framesRef = useRef(frames);
   const currentFrameRef = useRef(currentFrame);
   const currentFrameIndexRef = useRef(currentFrameIndex);
@@ -125,8 +116,7 @@ export function useViewerController(group: ViewerGroup): ViewerController {
       return;
     }
 
-    const nextIndex =
-      (currentIndex + delta + currentFrames.length) % currentFrames.length;
+    const nextIndex = (currentIndex + delta + currentFrames.length) % currentFrames.length;
     setCurrentFrameId(currentFrames[nextIndex]?.id);
   }, []);
 
@@ -135,13 +125,7 @@ export function useViewerController(group: ViewerGroup): ViewerController {
    * some modes disappear on a per-frame basis and mode buttons must not churn callback identity.
    */
   const setMode = useCallback((nextMode: ViewerMode): void => {
-    setModeState(
-      resolveViewerMode(
-        nextMode,
-        currentFrameRef.current,
-        defaultModeRef.current,
-      ),
-    );
+    setModeState(resolveViewerMode(nextMode, currentFrameRef.current, defaultModeRef.current));
   }, []);
 
   /**

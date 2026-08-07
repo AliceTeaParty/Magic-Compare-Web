@@ -73,10 +73,7 @@ describe("workspace metadata actions", () => {
 
     updateWorkspaceCaseSummary(" Updated summary ", context);
     await vi.waitFor(() => {
-      expect(notifications.pushNotification).toHaveBeenCalledWith(
-        "Case 描述已保存。",
-        "success",
-      );
+      expect(notifications.pushNotification).toHaveBeenCalledWith("Case 描述已保存。", "success");
     });
 
     expect(fetchMock).toHaveBeenCalledWith(
@@ -102,12 +99,9 @@ describe("workspace metadata actions", () => {
     const startTransition = vi.fn();
     const previousGroups: GroupItem[] = [baseGroup];
     const groupsRef = { current: previousGroups };
-    const setGroups = vi.fn(
-      (updater: GroupItem[] | ((current: GroupItem[]) => GroupItem[])) => {
-        groupsRef.current =
-          typeof updater === "function" ? updater(groupsRef.current) : updater;
-      },
-    );
+    const setGroups = vi.fn((updater: GroupItem[] | ((current: GroupItem[]) => GroupItem[])) => {
+      groupsRef.current = typeof updater === "function" ? updater(groupsRef.current) : updater;
+    });
     const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue({
       ok: true,
       json: async () => ({
@@ -170,12 +164,9 @@ describe("workspace metadata actions", () => {
     const startTransition = vi.fn((callback: () => void) => callback());
     const previousGroups: GroupItem[] = [baseGroup];
     const groupsRef = { current: previousGroups };
-    const setGroups = vi.fn(
-      (updater: GroupItem[] | ((current: GroupItem[]) => GroupItem[])) => {
-        groupsRef.current =
-          typeof updater === "function" ? updater(groupsRef.current) : updater;
-      },
-    );
+    const setGroups = vi.fn((updater: GroupItem[] | ((current: GroupItem[]) => GroupItem[])) => {
+      groupsRef.current = typeof updater === "function" ? updater(groupsRef.current) : updater;
+    });
     const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue({
       ok: true,
       json: async () => ({
@@ -195,10 +186,7 @@ describe("workspace metadata actions", () => {
 
     deleteWorkspaceGroup(baseGroup, context);
     await vi.waitFor(() => {
-      expect(notifications.pushNotification).toHaveBeenCalledWith(
-        "Group 已删除。",
-        "success",
-      );
+      expect(notifications.pushNotification).toHaveBeenCalledWith("Group 已删除。", "success");
     });
 
     expect(groupsRef.current).toEqual([]);

@@ -6,10 +6,7 @@ import type { ViewerAsset } from "@magic-compare/compare-core/viewer-data";
 import { type CSSProperties } from "react";
 import { clampNumber } from "@magic-compare/shared-utils";
 import { PositionedStageMedia } from "./positioned-stage-media";
-import {
-  getSwipeCompareGeometry,
-  getSwipeCssValues,
-} from "./swipe-compare-geometry";
+import { getSwipeCompareGeometry, getSwipeCssValues } from "./swipe-compare-geometry";
 import { useSwipeCompareDrag } from "./use-swipe-compare-drag";
 import { viewerTokens } from "./viewer-tokens";
 
@@ -52,12 +49,8 @@ function SwipeHandle({
     <Box
       sx={{
         position: "absolute",
-        left: isVertical
-          ? `${mediaRect.x + mediaRect.width / 2}px`
-          : `${mediaRect.x}px`,
-        top: isVertical
-          ? `${mediaRect.y}px`
-          : `${mediaRect.y + mediaRect.height / 2}px`,
+        left: isVertical ? `${mediaRect.x + mediaRect.width / 2}px` : `${mediaRect.x}px`,
+        top: isVertical ? `${mediaRect.y}px` : `${mediaRect.y + mediaRect.height / 2}px`,
         transform: isVertical
           ? "translate(-50%, -50%) translateY(var(--swipe-offset))"
           : "translate(-50%, -50%) translateX(var(--swipe-offset))",
@@ -147,18 +140,14 @@ export function SwipeCompareStage({
     "--swipe-ratio": `${swipeValues.ratio}`,
     "--swipe-offset": `${swipeValues.offset}px`,
   } as CSSProperties;
-  const {
-    finishPointerDrag,
-    handlePointerDown,
-    handlePointerMove,
-    viewportRef,
-  } = useSwipeCompareDrag({
-    axisLength,
-    mediaRect,
-    rotateStage,
-    setSwipePosition,
-    swipePosition: clampedSwipePosition,
-  });
+  const { finishPointerDrag, handlePointerDown, handlePointerMove, viewportRef } =
+    useSwipeCompareDrag({
+      axisLength,
+      mediaRect,
+      rotateStage,
+      setSwipePosition,
+      swipePosition: clampedSwipePosition,
+    });
 
   return (
     <Box

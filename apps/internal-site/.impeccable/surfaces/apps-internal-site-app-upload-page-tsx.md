@@ -2,7 +2,11 @@
 version: 1
 slug: "apps-internal-site-app-upload-page-tsx"
 primary_target: "apps/internal-site/app/upload/page.tsx"
-related_targets: ["apps/internal-site/components/web-uploader/web-upload-workbench.tsx","apps/internal-site/components/web-uploader/web-upload-pairing-preview.tsx"]
+related_targets:
+  [
+    "apps/internal-site/components/web-uploader/web-upload-workbench.tsx",
+    "apps/internal-site/components/web-uploader/web-upload-pairing-preview.tsx",
+  ]
 ---
 
 Scope: `/upload` internal Web upload workspace.

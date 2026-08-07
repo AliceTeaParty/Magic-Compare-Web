@@ -44,8 +44,7 @@ export function buildFrameState(
   currentFrame: ViewerFrame | undefined;
   currentFrameIndex: number;
 } {
-  const currentFrame =
-    frames.find((frame) => frame.id === currentFrameId) ?? frames[0];
+  const currentFrame = frames.find((frame) => frame.id === currentFrameId) ?? frames[0];
   const currentFrameIndex = currentFrame
     ? frames.findIndex((frame) => frame.id === currentFrame.id)
     : -1;
@@ -53,9 +52,7 @@ export function buildFrameState(
   return {
     currentFrame,
     currentFrameIndex,
-    availableModes: currentFrame
-      ? getAvailableModes(currentFrame)
-      : ["before-after"],
+    availableModes: currentFrame ? getAvailableModes(currentFrame) : ["before-after"],
   };
 }
 

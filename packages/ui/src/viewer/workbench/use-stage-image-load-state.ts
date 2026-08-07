@@ -1,10 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import {
-  isViewerStageImageLoaded,
-  markViewerStageImageLoaded,
-} from "./stage-image-load-cache";
+import { isViewerStageImageLoaded, markViewerStageImageLoaded } from "./stage-image-load-cache";
 
 /**
  * Bridges browser image load events, preloader hits, and React rendering into one visible state.
@@ -52,8 +49,7 @@ export function useStageImageLoadState(imageUrl: string) {
     setLoadState({ imageUrl, status: "error" });
   }
 
-  const currentImageErrored =
-    loadState.imageUrl === imageUrl && loadState.status === "error";
+  const currentImageErrored = loadState.imageUrl === imageUrl && loadState.status === "error";
   const showImage =
     !currentImageErrored &&
     (isViewerStageImageLoaded(imageUrl) ||

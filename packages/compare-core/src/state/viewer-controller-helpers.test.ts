@@ -1,9 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  buildFrameAssets,
-  buildFrameState,
-  resolveFrameId,
-} from "./viewer-controller-helpers";
+import { buildFrameAssets, buildFrameState, resolveFrameId } from "./viewer-controller-helpers";
 
 const frames = [
   {

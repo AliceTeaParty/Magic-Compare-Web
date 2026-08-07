@@ -9,11 +9,7 @@ import {
   type SetStateAction,
 } from "react";
 
-export type AppNotificationTone =
-  | "error"
-  | "info"
-  | "success"
-  | "warning";
+export type AppNotificationTone = "error" | "info" | "success" | "warning";
 
 export interface AppNotification {
   id: string;
@@ -43,10 +39,7 @@ const NOTIFICATION_TIMEOUT_MS = 4200;
  * Stable keys intentionally replace older notifications in place so long-running mutations can
  * update one visible toast instead of flooding the fixed stack with progress variants.
  */
-function upsertNotification(
-  current: AppNotification[],
-  nextNotification: AppNotification,
-) {
+function upsertNotification(current: AppNotification[], nextNotification: AppNotification) {
   return [
     nextNotification,
     ...current.filter((notification) => notification.id !== nextNotification.id),
@@ -57,10 +50,7 @@ function upsertNotification(
  * Centralizes timer cleanup because reused notification ids would otherwise leave stale dismissal
  * timeouts behind that can remove a newer toast with the same key.
  */
-function clearNotificationTimeout(
-  timeoutIds: Map<string, number>,
-  notificationId: string,
-) {
+function clearNotificationTimeout(timeoutIds: Map<string, number>, notificationId: string) {
   const timeoutId = timeoutIds.get(notificationId);
   if (timeoutId) {
     window.clearTimeout(timeoutId);
@@ -76,13 +66,16 @@ function useDismissNotification(
   setNotifications: Dispatch<SetStateAction<AppNotification[]>>,
   timeoutIdsRef: MutableRefObject<Map<string, number>>,
 ) {
-  return useCallback((notificationId: string) => {
-    clearNotificationTimeout(timeoutIdsRef.current, notificationId);
+  return useCallback(
+    (notificationId: string) => {
+      clearNotificationTimeout(timeoutIdsRef.current, notificationId);
 
-    setNotifications((current) =>
-      current.filter((notification) => notification.id !== notificationId),
-    );
-  }, [setNotifications, timeoutIdsRef]);
+      setNotifications((current) =>
+        current.filter((notification) => notification.id !== notificationId),
+      );
+    },
+    [setNotifications, timeoutIdsRef],
+  );
 }
 
 /**
@@ -95,13 +88,8 @@ function usePushNotification(
   timeoutIdsRef: MutableRefObject<Map<string, number>>,
 ) {
   return useCallback(
-    (
-      message: string,
-      tone: AppNotificationTone,
-      options?: { key?: string; sticky?: boolean },
-    ) => {
-      const notificationId =
-        options?.key ?? `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    (message: string, tone: AppNotificationTone, options?: { key?: string; sticky?: boolean }) => {
+      const notificationId = options?.key ?? `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 
       clearNotificationTimeout(timeoutIdsRef.current, notificationId);
 
@@ -134,14 +122,9 @@ function usePushNotification(
  * live in smaller helpers so the exported workspace hook stays readable.
  */
 function useNotificationQueue() {
-  const [notifications, setNotifications] = useState<AppNotification[]>(
-    [],
-  );
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const timeoutIdsRef = useRef(new Map<string, number>());
-  const dismissNotification = useDismissNotification(
-    setNotifications,
-    timeoutIdsRef,
-  );
+  const dismissNotification = useDismissNotification(setNotifications, timeoutIdsRef);
   const pushNotification = usePushNotification(
     dismissNotification,
     setNotifications,
@@ -160,8 +143,7 @@ function useNotificationQueue() {
  * behavior without reimplementing page-local notification stacks.
  */
 export function useAppNotificationQueue(): AppNotificationsApi {
-  const { notifications, dismissNotification, pushNotification } =
-    useNotificationQueue();
+  const { notifications, dismissNotification, pushNotification } = useNotificationQueue();
 
   /**
    * Uses a dedicated sticky notification so multiple save operations can share one visible
