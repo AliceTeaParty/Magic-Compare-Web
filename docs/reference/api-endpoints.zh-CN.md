@@ -27,7 +27,6 @@
 | `POST /api/ops/case-create`                | 新建一个空的 internal case                     |
 | `POST /api/ops/case-update`                | 修改 case summary                              |
 | `POST /api/ops/case-delete`                | 删除空 case                                    |
-| `POST /api/ops/case-publish`               | 重新发布一个 case 下当前可公开的 group         |
 | `POST /api/ops/group-viewer`               | 返回单个 group 的 viewer dataset               |
 | `POST /api/ops/group-update`               | 修改 group 标题和描述                          |
 | `POST /api/ops/group-visibility`           | 切换 group 的 `isPublic` 状态                  |
@@ -40,7 +39,7 @@
 | `POST /api/ops/group-upload-complete`      | 在全部 frame 提交后完成整个 group 上传         |
 | `POST /api/ops/group-upload-cancel`        | 放弃 active 上传作业并清理未提交 pending 前缀  |
 | `POST /api/ops/public-export`              | 导出当前 public-site 静态产物                  |
-| `POST /api/ops/public-deploy`              | 可选先发布一个 case，再导出并部署 public-site  |
+| `POST /api/ops/public-deploy`              | 导出并部署完整 public-site                     |
 
 ## Case 相关端点
 
@@ -257,39 +256,6 @@
 - `summary` 会 trim 后保存，允许为空字符串。
 - 如果 case 不存在，返回 `400` 和 `{ "error": "Case not found." }`。
 
-### `POST /api/ops/case-publish`
-
-实现：`apps/internal-site/app/api/ops/case-publish/route.ts`
-
-请求体：
-
-```json
-{
-  "caseId": "case-1"
-}
-```
-
-成功响应：
-
-```json
-{
-  "publishedAt": "2026-03-26T10:00:00.000Z",
-  "groups": [
-    {
-      "groupId": "group-1",
-      "publicSlug": "2026/test-group"
-    }
-  ]
-}
-```
-
-说明：
-
-- 只会发布当前 `isPublic=true` 的 group。
-- 如果 case 下没有任何 public group，或 public group 没有可发布 frame，会返回 `400`。
-- 首次发布某个 group 时会分配稳定的 `publicSlug`；后续发布复用同一个 slug。
-- 这个接口会把 case 的 `status` 设为 `published`，并写入 `publishedAt`。
-
 ## Group / Frame 工作区端点
 
 ### `POST /api/ops/group-viewer`
@@ -370,7 +336,7 @@
 
 说明：
 
-- 当前只修改 `Group.title` 和 `Group.description`，不修改 slug、排序、公开状态或素材。
+- 当前只修改 `Group.title` 和 `Group.description`，不修改 slug、排序、公开状态或素材；公开 Group 的 manifest 会同步刷新。
 - `title` trim 后必须非空；`description` trim 后允许为空。
 - 如果 group 不存在，返回 `400` 和 `{ "error": "Group not found." }`。
 
@@ -400,8 +366,7 @@
 
 说明：
 
-- 只切换 group 的公开资格，不会自动重新发布 public-site。
-- 要让公开内容真正进入已发布产物，还需要调用 `POST /api/ops/case-publish`。
+- 切换 group 的公开资格时会同步刷新 published manifest；改为内部时会删除对应 bundle。
 
 ### `POST /api/ops/group-delete`
 
@@ -459,6 +424,7 @@
 
 - 按 `groupIds` 数组顺序直接写入 `order`。
 - 这个接口不检查 slug，只按数据库 `id` 和所属 `caseId` 更新。
+- Case 含公开 Group 时会同步刷新 published manifest。
 
 ### `POST /api/ops/frame-reorder`
 
@@ -485,6 +451,7 @@
 
 - 按 `frameIds` 数组顺序直接写入 `order`。
 - 这个接口同样直接按数据库 `id` 和所属 `groupId` 更新。
+- Group 已公开时会同步刷新 published manifest。
 
 ## Frame 级上传事务端点
 

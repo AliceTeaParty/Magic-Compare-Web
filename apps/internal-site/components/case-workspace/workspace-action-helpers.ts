@@ -182,8 +182,8 @@ export function toggleWorkspaceGroupVisibility(
     onSuccess: () => {
       context.notifications.pushNotification(
         nextVisibility
-          ? `Marked ${targetGroup.title} as public. Publish the case to refresh the public bundle.`
-          : `Marked ${targetGroup.title} as internal. Publish the case to remove it from the next public bundle.`,
+          ? `Marked ${targetGroup.title} as public.`
+          : `Marked ${targetGroup.title} as internal.`,
         "success",
       );
     },
@@ -288,12 +288,7 @@ export function updateWorkspaceGroupMetadata(
       );
 
       replaceWorkspaceGroups(context.groupsRef, context.setGroups, savedGroups);
-      context.notifications.pushNotification(
-        targetGroup.isPublic
-          ? "元数据已保存。发布 Case 后会更新公开页面。"
-          : "Group 元数据已保存。",
-        "success",
-      );
+      context.notifications.pushNotification("Group 元数据已保存。", "success");
     } catch (error) {
       replaceWorkspaceGroups(context.groupsRef, context.setGroups, previousGroups);
       pushWorkspaceError(context.notifications, error, "保存 Group 元数据失败。");

@@ -1,7 +1,19 @@
 import { prisma } from "@/lib/server/db/client";
+import { publishCase } from "@/lib/server/publish/publish-case";
 import { deletePublishedGroup } from "@/lib/server/storage/published-content";
 import { deleteInternalAssetPrefix } from "@/lib/server/storage/internal-assets";
 import { recomputeCaseCoverAsset, syncCasePublicationState } from "./case-maintenance";
+
+/** Refreshes existing public content while leaving draft-only cases untouched. */
+async function refreshPublishedCase(caseId: string): Promise<boolean> {
+  const publicGroupCount = await prisma.group.count({
+    where: { caseId, isPublic: true },
+  });
+  if (publicGroupCount === 0) return false;
+
+  await publishCase(caseId);
+  return true;
+}
 
 /**
  * Centralizes the "case must exist before mutating one of its groups" guard so write paths fail
@@ -121,6 +133,7 @@ export async function reorderGroups(caseId: string, groupIds: string[]): Promise
       }),
     ),
   );
+  await refreshPublishedCase(caseId);
 }
 
 /**
@@ -128,6 +141,10 @@ export async function reorderGroups(caseId: string, groupIds: string[]): Promise
  * continue to agree on frame order.
  */
 export async function reorderFrames(groupId: string, frameIds: string[]): Promise<void> {
+  const groupRow = await prisma.group.findUnique({
+    where: { id: groupId },
+    select: { caseId: true, isPublic: true },
+  });
   await prisma.$transaction(
     frameIds.map((frameId, order) =>
       prisma.frame.updateMany({
@@ -139,11 +156,14 @@ export async function reorderFrames(groupId: string, frameIds: string[]): Promis
       }),
     ),
   );
+
+  if (groupRow?.isPublic) {
+    await publishCase(groupRow.caseId);
+  }
 }
 
 /**
- * Toggles a group's public eligibility without publishing immediately, so workspace edits can stay
- * batched and the operator decides when the public bundle should refresh.
+ * Toggles a group's public eligibility and synchronizes the published bundle before returning.
  */
 export async function setGroupVisibility(caseSlug: string, groupSlug: string, isPublic: boolean) {
   const caseRow = await requireCaseWithGroups(caseSlug, {
@@ -151,6 +171,7 @@ export async function setGroupVisibility(caseSlug: string, groupSlug: string, is
     slug: true,
     title: true,
     isPublic: true,
+    publicSlug: true,
   });
   const targetGroup = requireTargetGroup(caseRow.groups, groupSlug);
 
@@ -161,6 +182,13 @@ export async function setGroupVisibility(caseSlug: string, groupSlug: string, is
     },
   });
 
+  if (!isPublic && targetGroup.publicSlug) {
+    await deletePublishedGroup(targetGroup.publicSlug);
+  }
+  if (!(await refreshPublishedCase(caseRow.id))) {
+    await syncCasePublicationState(caseRow.id);
+  }
+
   return {
     caseSlug: caseRow.slug,
     groupSlug: targetGroup.slug,
@@ -169,8 +197,7 @@ export async function setGroupVisibility(caseSlug: string, groupSlug: string, is
 }
 
 /**
- * Updates the workspace-facing case description only; slug/title/publication state remain outside
- * this endpoint so metadata editing cannot accidentally change routing or publishing behavior.
+ * Updates the workspace-facing case description and refreshes existing public manifests.
  */
 export async function updateCaseSummary(caseSlug: string, summary: string) {
   const trimmedSummary = summary.trim();
@@ -178,10 +205,12 @@ export async function updateCaseSummary(caseSlug: string, summary: string) {
     where: { slug: caseSlug },
     data: { summary: trimmedSummary },
     select: {
+      id: true,
       slug: true,
       summary: true,
     },
   });
+  await refreshPublishedCase(caseRow.id);
 
   return {
     caseSlug: caseRow.slug,
@@ -189,7 +218,7 @@ export async function updateCaseSummary(caseSlug: string, summary: string) {
   };
 }
 
-/** Updates operator-managed Case metadata while leaving slug and publication state immutable. */
+/** Updates operator-managed Case metadata and refreshes existing public manifests. */
 export async function updateCaseMetadata(
   caseSlug: string,
   metadata: { title?: string; summary?: string; tags?: string[] },
@@ -211,8 +240,9 @@ export async function updateCaseMetadata(
   const caseRow = await prisma.case.update({
     where: { slug: caseSlug },
     data,
-    select: { slug: true, title: true, summary: true, tagsJson: true, status: true },
+    select: { id: true, slug: true, title: true, summary: true, tagsJson: true, status: true },
   });
+  await refreshPublishedCase(caseRow.id);
 
   return {
     caseSlug: caseRow.slug,
@@ -242,6 +272,7 @@ export async function updateGroupMetadata(
   const caseRow = await requireCaseWithGroups(caseSlug, {
     id: true,
     slug: true,
+    isPublic: true,
   });
   const targetGroup = requireTargetGroup(caseRow.groups, groupSlug);
   const groupRow = await prisma.group.update({
@@ -256,6 +287,10 @@ export async function updateGroupMetadata(
       description: true,
     },
   });
+
+  if (targetGroup.isPublic) {
+    await publishCase(caseRow.id);
+  }
 
   return {
     caseSlug: caseRow.slug,

@@ -6,12 +6,16 @@ import {
   updateGroupMetadata,
 } from "./content-repository";
 
-const { caseCreate, caseUpdate, caseFindUnique, groupUpdate } = vi.hoisted(() => ({
-  caseCreate: vi.fn(),
-  caseUpdate: vi.fn(),
-  caseFindUnique: vi.fn(),
-  groupUpdate: vi.fn(),
-}));
+const { caseCreate, caseUpdate, caseFindUnique, groupCount, groupUpdate, publishCase } = vi.hoisted(
+  () => ({
+    caseCreate: vi.fn(),
+    caseUpdate: vi.fn(),
+    caseFindUnique: vi.fn(),
+    groupCount: vi.fn(),
+    groupUpdate: vi.fn(),
+    publishCase: vi.fn(),
+  }),
+);
 
 vi.mock("@/lib/server/db/client", () => ({
   prisma: {
@@ -21,9 +25,14 @@ vi.mock("@/lib/server/db/client", () => ({
       update: caseUpdate,
     },
     group: {
+      count: groupCount,
       update: groupUpdate,
     },
   },
+}));
+
+vi.mock("@/lib/server/publish/publish-case", () => ({
+  publishCase,
 }));
 
 describe("createCase", () => {
@@ -84,10 +93,15 @@ describe("createCase", () => {
 describe("updateCaseSummary", () => {
   beforeEach(() => {
     caseUpdate.mockReset();
+    groupCount.mockReset();
+    groupCount.mockResolvedValue(1);
+    publishCase.mockReset();
   });
 
   it("trims and writes the case summary field", async () => {
+    groupCount.mockResolvedValue(0);
     caseUpdate.mockResolvedValue({
+      id: "case-1",
       slug: "mono",
       summary: "Updated summary",
     });
@@ -98,10 +112,12 @@ describe("updateCaseSummary", () => {
       where: { slug: "mono" },
       data: { summary: "Updated summary" },
       select: {
+        id: true,
         slug: true,
         summary: true,
       },
     });
+    expect(publishCase).not.toHaveBeenCalled();
     expect(result).toEqual({
       caseSlug: "mono",
       summary: "Updated summary",
@@ -112,10 +128,14 @@ describe("updateCaseSummary", () => {
 describe("updateCaseMetadata", () => {
   beforeEach(() => {
     caseUpdate.mockReset();
+    groupCount.mockReset();
+    groupCount.mockResolvedValue(1);
+    publishCase.mockReset();
   });
 
   it("normalizes editable fields without changing routing or publication fields", async () => {
     caseUpdate.mockResolvedValue({
+      id: "case-1",
       slug: "mono",
       title: "Mono Study",
       summary: "Updated summary",
@@ -137,6 +157,7 @@ describe("updateCaseMetadata", () => {
         tagsJson: '["grain","1080p"]',
       },
       select: {
+        id: true,
         slug: true,
         title: true,
         summary: true,
@@ -144,6 +165,7 @@ describe("updateCaseMetadata", () => {
         status: true,
       },
     });
+    expect(publishCase).toHaveBeenCalledWith("case-1");
     expect(result).toEqual({
       caseSlug: "mono",
       title: "Mono Study",
@@ -158,15 +180,18 @@ describe("updateGroupMetadata", () => {
   beforeEach(() => {
     caseFindUnique.mockReset();
     groupUpdate.mockReset();
+    publishCase.mockReset();
   });
 
   it("finds a group through its case and only updates title and description", async () => {
     caseFindUnique.mockResolvedValue({
+      id: "case-1",
       slug: "mono",
       groups: [
         {
           id: "group-1",
           slug: "comparison",
+          isPublic: true,
         },
       ],
     });
@@ -193,6 +218,7 @@ describe("updateGroupMetadata", () => {
         description: true,
       },
     });
+    expect(publishCase).toHaveBeenCalledWith("case-1");
     expect(result).toEqual({
       caseSlug: "mono",
       groupSlug: "comparison",

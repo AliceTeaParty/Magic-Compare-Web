@@ -35,7 +35,7 @@ Open `/upload`, review the pairing plan, then preflight and upload the selected 
 
 ### Publish
 
-Publish a case from the internal site, then explicitly export or deploy the public site when needed. Publishing, export, and deployment are separate actions.
+Changes to public groups refresh their published manifests automatically. Export or deploy the complete public site explicitly when needed.
 
 ## Repository Layout
 

@@ -136,7 +136,7 @@ describe("workspace metadata actions", () => {
     );
     await vi.waitFor(() => {
       expect(notifications.pushNotification).toHaveBeenCalledWith(
-        "元数据已保存。发布 Case 后会更新公开页面。",
+        "Group 元数据已保存。",
         "success",
       );
     });
