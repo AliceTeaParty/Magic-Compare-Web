@@ -5,12 +5,14 @@ import {
   PropsWithChildren,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
 } from "react";
 import { CssBaseline, GlobalStyles } from "@mui/material";
 import { ThemeProvider, createTheme } from "@mui/material/styles";
 import { buildInternalSchemeColors, resolveInternalThemeSeed } from "./magic-color-tokens";
+import { readMagicThemeSeedCookie, serializeMagicThemeSeedCookie } from "./magic-theme-storage";
 
 export type MagicThemeProfile = "public" | "internal";
 
@@ -305,9 +307,18 @@ function MagicWorkbenchThemeProvider({ children, initialThemeSeed }: MagicThemeP
     () => buildInternalTheme(resolvedSeed.storageValue),
     [resolvedSeed.storageValue],
   );
+
+  useEffect(() => {
+    // Static public exports cannot read request cookies in their root layout, which previously
+    // reset the accent after every reload. Restore it after hydration from the shared cookie.
+    if (initialThemeSeed) return;
+    const storedSeed = readMagicThemeSeedCookie(document.cookie);
+    if (storedSeed) setSeedValueState(resolveInternalThemeSeed(storedSeed).storageValue);
+  }, [initialThemeSeed]);
+
   const setSeedValue = useCallback((value: string) => {
     const resolved = resolveInternalThemeSeed(value);
-    document.cookie = `mc_internal_theme=${encodeURIComponent(resolved.storageValue)}; Path=/; Max-Age=31536000; SameSite=Lax`;
+    document.cookie = serializeMagicThemeSeedCookie(resolved.storageValue);
     setSeedValueState(resolved.storageValue);
   }, []);
   const contextValue = useMemo(

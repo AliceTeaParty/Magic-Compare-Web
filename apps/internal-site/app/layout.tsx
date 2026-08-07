@@ -1,19 +1,29 @@
 import type { Metadata, Viewport } from "next";
 import { cookies } from "next/headers";
-import { MagicRootLayoutShell } from "@magic-compare/ui";
+import { resolveSiteBrandConfig } from "@magic-compare/shared-utils";
+import { MAGIC_THEME_SEED_COOKIE_NAME, MagicRootLayoutShell } from "@magic-compare/ui";
 import { InternalAppShell } from "@/components/internal-app-shell";
 import { loadWorkspaceEnv } from "@/lib/server/env/load-workspace-env";
 import "./globals.css";
+
+// Metadata is evaluated before RootLayout runs, so brand environment values must be loaded at
+// module initialization for custom favicons to reach Next's generated head tags.
+loadWorkspaceEnv();
+const brandConfig = resolveSiteBrandConfig(process.env, "internal");
 
 export const metadata: Metadata = {
   title: "Magic Compare Internal",
   description: "Internal image compare workbench for encoding groups.",
   icons: {
-    icon: [
-      { url: "/favicon.ico", sizes: "any" },
-      { url: "/icon.png", type: "image/png", sizes: "64x64" },
-    ],
-    apple: [{ url: "/apple-icon.png", sizes: "180x180", type: "image/png" }],
+    // Defaults live outside app/ because Next file-based icons would override this configurable
+    // metadata object before the site-specific environment value can take effect.
+    icon: brandConfig.faviconUrl
+      ? [{ url: brandConfig.faviconUrl, sizes: "any" }]
+      : [
+          { url: "/default-favicon.ico", sizes: "any" },
+          { url: "/default-icon.png", type: "image/png", sizes: "64x64" },
+        ],
+    apple: [{ url: "/default-apple-icon.png", sizes: "180x180", type: "image/png" }],
   },
 };
 
@@ -24,15 +34,15 @@ export const viewport: Viewport = {
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
-  loadWorkspaceEnv();
   const cookieStore = await cookies();
-  const initialThemeSeed = cookieStore.get("mc_internal_theme")?.value ?? null;
+  const initialThemeSeed = cookieStore.get(MAGIC_THEME_SEED_COOKIE_NAME)?.value ?? null;
 
   return (
     <MagicRootLayoutShell profile="internal" initialThemeSeed={initialThemeSeed} lang="zh-CN">
       <InternalAppShell
         appVersion={process.env.MAGIC_COMPARE_APP_VERSION}
         commitHash={process.env.MAGIC_COMPARE_COMMIT_SHA}
+        logoUrl={brandConfig.logoUrl}
       >
         {children}
       </InternalAppShell>

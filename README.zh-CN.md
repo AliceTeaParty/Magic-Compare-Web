@@ -66,7 +66,7 @@ docs/                  工作流、API、部署和 UI 文档
 
 ## 配置
 
-复制 `.env.example` 为 `.env`。内部素材使用 S3-compatible 存储；本地 Docker 开发使用 Compose 配置和 named volumes。运行时、存储和部署细节见工作流指南。
+复制 `.env.example` 为 `.env`。内部素材使用 S3-compatible 存储；本地 Docker 开发使用 Compose 配置和 named volumes。导航 Logo 与 favicon 可通过 `MAGIC_COMPARE_INTERNAL_*` 和 `MAGIC_COMPARE_PUBLIC_*` URL 变量分别配置；Docker 可通过 `MAGIC_COMPARE_BRANDING_MOUNT` 暴露一个本地品牌目录。运行时、存储、品牌和部署细节见工作流指南。
 
 ## 相关文档
 

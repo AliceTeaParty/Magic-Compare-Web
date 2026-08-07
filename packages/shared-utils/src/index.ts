@@ -7,12 +7,45 @@ export const PUBLISHED_ROOT_ENV_NAME = "MAGIC_COMPARE_PUBLISHED_ROOT";
 
 export interface FooterConfig {
   author: string;
-  appVersion: string | null;
-  commitHash: string | null;
   joinUsLabel: string | null;
   joinUsUrl: string | null;
   yearEnd: number;
   yearStart: number;
+}
+
+export interface BuildIdentityConfig {
+  appVersion: string | null;
+  commitHash: string | null;
+}
+
+export type SiteBrandProfile = "internal" | "public";
+
+export interface SiteBrandConfig {
+  faviconUrl: string | null;
+  logoUrl: string | null;
+}
+
+/** Keeps public and internal brand overrides isolated so one deployment cannot inherit the other. */
+export function resolveSiteBrandConfig(
+  env: Record<string, string | undefined>,
+  profile: SiteBrandProfile,
+): SiteBrandConfig {
+  const prefix = profile === "internal" ? "MAGIC_COMPARE_INTERNAL" : "MAGIC_COMPARE_PUBLIC";
+
+  return {
+    faviconUrl: env[`${prefix}_FAVICON_URL`]?.trim() || null,
+    logoUrl: env[`${prefix}_LOGO_URL`]?.trim() || null,
+  };
+}
+
+/** Keeps build identity separate after version display moved from the footer into navigation. */
+export function resolveBuildIdentityConfig(
+  env: Record<string, string | undefined>,
+): BuildIdentityConfig {
+  return {
+    appVersion: env.MAGIC_COMPARE_APP_VERSION?.trim() || null,
+    commitHash: env.MAGIC_COMPARE_COMMIT_SHA?.trim() || null,
+  };
 }
 
 export function kebabCase(input: string): string {
@@ -95,8 +128,6 @@ export function resolveFooterConfig(
 
   return {
     author: env.MAGIC_COMPARE_FOOTER_AUTHOR?.trim() || "Magic Compare",
-    appVersion: env.MAGIC_COMPARE_APP_VERSION?.trim() || null,
-    commitHash: env.MAGIC_COMPARE_COMMIT_SHA?.trim() || null,
     joinUsLabel: joinUsUrl ? env.MAGIC_COMPARE_FOOTER_JOIN_US_LABEL?.trim() || "Join us" : null,
     joinUsUrl,
     yearEnd: currentYear,

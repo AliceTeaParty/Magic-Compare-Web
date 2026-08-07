@@ -1,3 +1,7 @@
-export const NAV_RAIL_WIDTH = 80;
-export const NAV_RAIL_MIN_WIDTH = 700;
-export const NAV_RAIL_MEDIA_QUERY = `@media (min-width:${NAV_RAIL_MIN_WIDTH}px)`;
+// Internal navigation keeps these aliases so existing route components share the public rail's
+// geometry without duplicating breakpoint values across application boundaries.
+export {
+  MAGIC_NAV_RAIL_MEDIA_QUERY as NAV_RAIL_MEDIA_QUERY,
+  MAGIC_NAV_RAIL_MIN_WIDTH as NAV_RAIL_MIN_WIDTH,
+  MAGIC_NAV_RAIL_WIDTH as NAV_RAIL_WIDTH,
+} from "@magic-compare/ui";

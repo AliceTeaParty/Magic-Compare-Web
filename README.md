@@ -66,7 +66,7 @@ docs/                  Workflow, API, deployment, and UI notes
 
 ## Configuration
 
-Copy `.env.example` to `.env`. Internal assets use S3-compatible storage; local Docker development uses the Compose configuration and named volumes. See the workflow guide for runtime, storage, and deployment details.
+Copy `.env.example` to `.env`. Internal assets use S3-compatible storage; local Docker development uses the Compose configuration and named volumes. Navigation logos and favicons can be configured independently with the `MAGIC_COMPARE_INTERNAL_*` and `MAGIC_COMPARE_PUBLIC_*` URL variables. Docker can expose one local branding directory through `MAGIC_COMPARE_BRANDING_MOUNT`. See the workflow guide for runtime, storage, branding, and deployment details.
 
 ## Related Docs
 

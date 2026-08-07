@@ -18,11 +18,15 @@ import {
   List,
   Stack,
   Toolbar,
-  Tooltip,
   Typography,
   useMediaQuery,
 } from "@mui/material";
-import { MagicThemeControls, useRootScrollLock } from "@magic-compare/ui";
+import {
+  MagicBuildVersionLabel,
+  MagicNavigationLogo,
+  MagicThemeControls,
+  useRootScrollLock,
+} from "@magic-compare/ui";
 import { usePathname } from "next/navigation";
 import { CaseCreateButton } from "./case-create-button";
 import {
@@ -57,48 +61,12 @@ function getCurrentCaseWorkspaceHref(pathname: string) {
   return caseSlug ? `/cases/${caseSlug}` : null;
 }
 
-/** Keeps build identity in the persistent utility area without turning it into page content. */
-function BuildVersionLabel({
-  appVersion,
-  commitHash,
-}: {
-  appVersion?: string | null;
-  commitHash?: string | null;
-}) {
-  if (!appVersion) return null;
-
-  const shortLabel = `v${appVersion}`;
-  const fullLabel = commitHash
-    ? `Magic Compare ${shortLabel} (${commitHash})`
-    : `Magic Compare ${shortLabel}`;
-
-  return (
-    <Tooltip title={fullLabel} placement="right">
-      <Typography
-        component="div"
-        variant="caption"
-        sx={{
-          width: "100%",
-          px: 0.75,
-          color: "text.disabled",
-          fontVariantNumeric: "tabular-nums",
-          lineHeight: 1.4,
-          textAlign: "left",
-          whiteSpace: "nowrap",
-          [NAV_RAIL_MEDIA_QUERY]: { px: 0, textAlign: "center" },
-        }}
-      >
-        {shortLabel}
-      </Typography>
-    </Tooltip>
-  );
-}
-
 /** Uses one navigation model for the modal drawer and compact desktop rail. */
 function NavigationContent({
   appVersion,
   commitHash,
   isDeployingPublicSite,
+  logoUrl,
   onDeployPublicSite,
   pathname,
   onNavigate,
@@ -106,6 +74,7 @@ function NavigationContent({
   appVersion?: string | null;
   commitHash?: string | null;
   isDeployingPublicSite: boolean;
+  logoUrl?: string | null;
   onDeployPublicSite: () => void;
   pathname: string;
   onNavigate?: () => void;
@@ -126,21 +95,9 @@ function NavigationContent({
           [NAV_RAIL_MEDIA_QUERY]: { justifyContent: "center", px: 0 },
         }}
       >
-        <Box
-          sx={{
-            display: "grid",
-            placeItems: "center",
-            width: 36,
-            height: 36,
-            flex: "0 0 auto",
-            borderRadius: "12px",
-            color: "primary.contrastText",
-            backgroundColor: "primary.main",
-            fontWeight: 750,
-          }}
-        >
-          M
-        </Box>
+        {/* The hard-coded M could not represent separate internal/public identities. A URL-backed
+            shared mark keeps both shells configurable while retaining the original fallback. */}
+        <MagicNavigationLogo logoUrl={logoUrl} />
         <Typography
           variant="subtitle1"
           sx={{
@@ -221,7 +178,12 @@ function NavigationContent({
         <Box sx={{ display: "none", [NAV_RAIL_MEDIA_QUERY]: { display: "block" } }}>
           <MagicThemeControls compact />
         </Box>
-        <BuildVersionLabel appVersion={appVersion} commitHash={commitHash} />
+        <Box sx={{ display: "block", [NAV_RAIL_MEDIA_QUERY]: { display: "none" } }}>
+          <MagicBuildVersionLabel appVersion={appVersion} commitHash={commitHash} />
+        </Box>
+        <Box sx={{ display: "none", [NAV_RAIL_MEDIA_QUERY]: { display: "block" } }}>
+          <MagicBuildVersionLabel appVersion={appVersion} commitHash={commitHash} compact />
+        </Box>
       </Stack>
     </Stack>
   );
@@ -232,10 +194,12 @@ function InternalAppShellScaffold({
   appVersion,
   children,
   commitHash,
+  logoUrl,
 }: {
   appVersion?: string | null;
   children: ReactNode;
   commitHash?: string | null;
+  logoUrl?: string | null;
 }) {
   const pathname = usePathname();
   const railVisible = useMediaQuery(`(min-width:${NAV_RAIL_MIN_WIDTH}px)`);
@@ -280,6 +244,7 @@ function InternalAppShellScaffold({
             appVersion={appVersion}
             commitHash={commitHash}
             isDeployingPublicSite={publicDeploy.isDeploying}
+            logoUrl={logoUrl}
             onDeployPublicSite={() => void publicDeploy.startDeploy()}
             pathname={pathname}
           />
@@ -306,6 +271,7 @@ function InternalAppShellScaffold({
             appVersion={appVersion}
             commitHash={commitHash}
             isDeployingPublicSite={publicDeploy.isDeploying}
+            logoUrl={logoUrl}
             onDeployPublicSite={() => void publicDeploy.startDeploy()}
             pathname={pathname}
             onNavigate={() => setMobileOpen(false)}
@@ -336,7 +302,8 @@ function InternalAppShellScaffold({
               >
                 <Menu />
               </IconButton>
-              <Typography variant="subtitle1" sx={{ flex: 1, minWidth: 0 }} noWrap>
+              <MagicNavigationLogo logoUrl={logoUrl} size={32} />
+              <Typography variant="subtitle1" sx={{ ml: 1, flex: 1, minWidth: 0 }} noWrap>
                 Magic Compare
               </Typography>
             </Toolbar>
@@ -359,14 +326,16 @@ export function InternalAppShell({
   appVersion,
   children,
   commitHash,
+  logoUrl,
 }: {
   appVersion?: string | null;
   children: ReactNode;
   commitHash?: string | null;
+  logoUrl?: string | null;
 }) {
   return (
     <AppNotificationsProvider>
-      <InternalAppShellScaffold appVersion={appVersion} commitHash={commitHash}>
+      <InternalAppShellScaffold appVersion={appVersion} commitHash={commitHash} logoUrl={logoUrl}>
         {children}
       </InternalAppShellScaffold>
     </AppNotificationsProvider>

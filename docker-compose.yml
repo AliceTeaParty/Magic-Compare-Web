@@ -24,6 +24,10 @@ x-internal-site-common: &internal-site-common
     MAGIC_COMPARE_FOOTER_AUTHOR: ${MAGIC_COMPARE_FOOTER_AUTHOR:-Magic Compare}
     MAGIC_COMPARE_FOOTER_JOIN_US_LABEL: ${MAGIC_COMPARE_FOOTER_JOIN_US_LABEL:-}
     MAGIC_COMPARE_FOOTER_JOIN_US_URL: ${MAGIC_COMPARE_FOOTER_JOIN_US_URL:-}
+    MAGIC_COMPARE_INTERNAL_LOGO_URL: ${MAGIC_COMPARE_INTERNAL_LOGO_URL:-}
+    MAGIC_COMPARE_INTERNAL_FAVICON_URL: ${MAGIC_COMPARE_INTERNAL_FAVICON_URL:-}
+    MAGIC_COMPARE_PUBLIC_LOGO_URL: ${MAGIC_COMPARE_PUBLIC_LOGO_URL:-}
+    MAGIC_COMPARE_PUBLIC_FAVICON_URL: ${MAGIC_COMPARE_PUBLIC_FAVICON_URL:-}
     MAGIC_COMPARE_CF_PAGES_PROJECT_NAME: ${MAGIC_COMPARE_CF_PAGES_PROJECT_NAME:-}
     MAGIC_COMPARE_CF_PAGES_BRANCH: ${MAGIC_COMPARE_CF_PAGES_BRANCH:-}
     CLOUDFLARE_ACCOUNT_ID: ${CLOUDFLARE_ACCOUNT_ID:-}
@@ -66,6 +70,10 @@ services:
       - "${MAGIC_COMPARE_INTERNAL_SITE_HOST_PORT:-3000}:3000"
     volumes:
       - ${MAGIC_COMPARE_INTERNAL_DATA_MOUNT:-internal-data}:/app/data
+      # The same read-only source backs /branding in both apps so one host folder can customize
+      # runtime chrome and the static public export without rebuilding the image.
+      - ${MAGIC_COMPARE_BRANDING_MOUNT:-branding-assets}:/app/apps/internal-site/public/branding:ro
+      - ${MAGIC_COMPARE_BRANDING_MOUNT:-branding-assets}:/app/apps/public-site/public/branding:ro
       # Public build cache must stay outside Docker's writable layer to reduce repeated overlay IO.
       - ${MAGIC_COMPARE_PUBLIC_BUILD_CACHE_MOUNT:-public-build-cache}:/app/apps/public-site/.next
       - public-build-output:/app/apps/public-site/out
@@ -86,6 +94,7 @@ services:
 
 volumes:
   internal-data:
+  branding-assets:
   public-build-cache:
   public-build-output:
   public-build-published:

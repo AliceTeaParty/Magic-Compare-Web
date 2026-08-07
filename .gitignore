@@ -72,6 +72,7 @@ apps/public-site/out/
 apps/internal-site/prisma/*.db*
 dist/
 docker-data/
+/branding/
 internal-site.readonly.db
 .agents/skills/
 

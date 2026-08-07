@@ -22,6 +22,15 @@ import { ComparisonAssetControls } from "./comparison-asset-controls";
 const compactControlHeight = { xs: 42, md: 40 } as const;
 const tripleControlWidth = 144;
 const MODE_ORDER: Record<ViewerMode, number> = { "before-after": 0, "a-b": 1, heatmap: 2 };
+// Site variants describe capabilities, not locale. The previous variant branches made the same
+// Chinese viewer switch to English labels after public export, so both surfaces share one copy set.
+const VIEWER_CONTROL_COPY = {
+  heatmap: "热图",
+  heatmapOpacity: "热图透明度",
+  opacity: "透明度",
+  swipe: "滑动",
+  tools: "视图工具",
+} as const;
 
 interface ViewerUtilityControlsProps {
   compact?: boolean;
@@ -31,7 +40,6 @@ interface ViewerUtilityControlsProps {
   onScrollStageIntoView: () => void;
   onToggleSidebar: () => void;
   sidebarOpen: boolean;
-  variant: "public" | "internal";
 }
 
 interface ViewerToolbarProps {
@@ -54,18 +62,15 @@ interface ViewerToolbarProps {
   onScrollStageIntoView: () => void;
   onToggleSidebar: () => void;
   sidebarOpen: boolean;
-  variant: "public" | "internal";
 }
 
 /** Keeps Heatmap intensity inside the stable toolbar slot instead of moving the filmstrip. */
 function HeatmapOpacityControls({
   onChange,
   value,
-  variant,
 }: {
   onChange: (value: number) => void;
   value: number;
-  variant: "public" | "internal";
 }) {
   return (
     <Stack
@@ -88,10 +93,10 @@ function HeatmapOpacityControls({
     >
       <Opacity aria-hidden="true" sx={{ color: "text.secondary", fontSize: 18 }} />
       <Typography variant="body2" sx={{ whiteSpace: "nowrap" }}>
-        {variant === "internal" ? "透明度" : "Opacity"}
+        {VIEWER_CONTROL_COPY.opacity}
       </Typography>
       <Slider
-        aria-label={variant === "internal" ? "热图透明度" : "Heatmap opacity"}
+        aria-label={VIEWER_CONTROL_COPY.heatmapOpacity}
         min={20}
         max={95}
         size="small"
@@ -120,7 +125,6 @@ export function ViewerUtilityControls({
   onScrollStageIntoView,
   onToggleSidebar,
   sidebarOpen,
-  variant,
 }: ViewerUtilityControlsProps) {
   const stageControlHidden = compact || hideStageScrollControl;
   const controlWidth = compact ? 80 : stageControlHidden ? 96 : tripleControlWidth;
@@ -140,7 +144,7 @@ export function ViewerUtilityControls({
   return (
     <Stack
       role="toolbar"
-      aria-label={variant === "internal" ? "视图工具" : "Viewer tools"}
+      aria-label={VIEWER_CONTROL_COPY.tools}
       direction="row"
       useFlexGap
       sx={{
@@ -239,7 +243,6 @@ export function ViewerToolbar({
   onScrollStageIntoView,
   onToggleSidebar,
   sidebarOpen,
-  variant,
 }: ViewerToolbarProps) {
   const prefersReducedMotion = useReducedMotion();
   const previousModeRef = useRef(mode);
@@ -303,7 +306,6 @@ export function ViewerToolbar({
             onScrollStageIntoView={onScrollStageIntoView}
             onToggleSidebar={onToggleSidebar}
             sidebarOpen={sidebarOpen}
-            variant={variant}
           />
         </Box>
 
@@ -357,12 +359,10 @@ export function ViewerToolbar({
           }}
           onChange={handleModeChange}
         >
-          <ToggleButton value="before-after">
-            {variant === "internal" ? "滑动" : "Swipe"}
-          </ToggleButton>
+          <ToggleButton value="before-after">{VIEWER_CONTROL_COPY.swipe}</ToggleButton>
           <ToggleButton value="a-b">A / B</ToggleButton>
           <ToggleButton value="heatmap" disabled={!canUseHeatmap}>
-            {variant === "internal" ? "热图" : "Heatmap"}
+            {VIEWER_CONTROL_COPY.heatmap}
           </ToggleButton>
         </ToggleButtonGroup>
       </Stack>
@@ -448,11 +448,7 @@ export function ViewerToolbar({
                 />
               ) : null
             ) : (
-              <HeatmapOpacityControls
-                onChange={onOverlayOpacityChange}
-                value={overlayOpacity}
-                variant={variant}
-              />
+              <HeatmapOpacityControls onChange={onOverlayOpacityChange} value={overlayOpacity} />
             )}
           </Box>
         </AnimatePresence>

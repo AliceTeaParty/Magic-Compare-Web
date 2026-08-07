@@ -250,6 +250,21 @@ public-site 的 Next.js 构建缓存使用独立挂载点：
 - 默认 Docker named volume：`public-build-cache`
 - 可选宿主机路径：`MAGIC_COMPARE_PUBLIC_BUILD_CACHE_MOUNT`
 
+品牌素材可以从一个宿主机目录只读挂载到两站的 `/branding/`：
+
+```env
+MAGIC_COMPARE_BRANDING_MOUNT=./branding
+MAGIC_COMPARE_INTERNAL_LOGO_URL=/branding/internal-logo.svg
+MAGIC_COMPARE_INTERNAL_FAVICON_URL=/branding/internal-favicon.ico
+MAGIC_COMPARE_PUBLIC_LOGO_URL=/branding/public-logo.svg
+MAGIC_COMPARE_PUBLIC_FAVICON_URL=/branding/public-favicon.ico
+```
+
+- 相对宿主机路径以 compose 项目目录为基准；留空时使用空的 `branding-assets` named volume。
+- 同一目录会挂到 `apps/internal-site/public/branding` 与 `apps/public-site/public/branding`，无需重建镜像。
+- 公开导出会复制该目录的全部文件。目录中不能放密钥、内部素材或其他不应公开的内容。
+- 替换同名公开 Logo/Favicon 后再次执行部署即可；部署指纹包含挂载目录内容，不会因为 URL 没变而跳过。
+
 其他会重复写入的构建目录也使用 named volume：
 
 - `public-build-output`：Next 静态导出暂存目录
@@ -313,12 +328,14 @@ Web 上传链路是：
 - public-export/public-deploy 不再打包图片，Pages 只发布静态页面和 manifest
 - `public-site` 公开页默认不应被搜索引擎索引；页面层防爬通过 metadata / `robots.txt` 声明，真正的图片拦截和限流交给 Cloudflare
 
-## 页脚版本信息
+## 站点品牌与版本信息
 
-- internal-site 和 public-site 的全局 footer 通过 `packages/ui` 共享。
 - Next config 在构建时读取根 `package.json` 的 `version` 和当前 git 短 hash，注入为 `MAGIC_COMPARE_APP_VERSION` / `MAGIC_COMPARE_COMMIT_SHA`。
-- footer 显示为 `v<version>-<hash>`；如果构建环境没有 git 信息，只显示 `v<version>`。
-- 版本文本必须和 copyright 使用同级字号、字重和颜色，不要做成独立 badge 或高对比标签。
+- internal-site 与 public-site 都在导航底部显示 `v<version>`，commit hash 放在提示中；公开页脚不再重复版本。
+- `MAGIC_COMPARE_INTERNAL_LOGO_URL` / `MAGIC_COMPARE_INTERNAL_FAVICON_URL` 只影响内部站，`MAGIC_COMPARE_PUBLIC_LOGO_URL` / `MAGIC_COMPARE_PUBLIC_FAVICON_URL` 只影响公开站。
+- 品牌变量接受绝对 URL，或对应应用已经能够服务的 `/...` 路径；留空时使用内置 Logo 与 favicon。
+- 修改内部站品牌变量后需要重启 internal-site，使布局 metadata 与导航重新读取配置。
+- public-site 是静态导出，修改公开品牌变量后必须重新执行 `public:export` 或 `public:deploy`。这些变量包含在部署指纹中，不会被“内容未变化”分支跳过。
 
 ### 上传链路当前的内部分层
 

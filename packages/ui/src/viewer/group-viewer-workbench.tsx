@@ -43,7 +43,12 @@ export function GroupViewerWorkbench({
   pendingGroupHref,
   variant,
 }: GroupViewerWorkbenchProps) {
-  const viewportHeight = variant === "internal" ? "calc(100svh - 64px)" : "100svh";
+  // Public mobile navigation now occupies a real top app bar; subtracting its shared CSS variable
+  // prevents the viewer plus footer from becoming one extra app-bar height taller than the screen.
+  const viewportHeight =
+    variant === "internal"
+      ? "calc(100svh - 64px)"
+      : "calc(100svh - var(--magic-public-app-bar-height, 0px))";
   const controller = useViewerController(dataset.group);
   const {
     abSide,
@@ -261,7 +266,6 @@ export function GroupViewerWorkbench({
           onScrollStageIntoView={stageShell.scrollStageIntoView}
           onToggleSidebar={toggleSidebar}
           sidebarOpen={sidebarOpen}
-          variant={variant}
         />
 
         <Box

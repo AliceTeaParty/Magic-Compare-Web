@@ -5,7 +5,8 @@ import {
   cjkKebabCase,
   kebabCase,
   parseEnvFlag,
-  resolveFooterConfig,
+  resolveBuildIdentityConfig,
+  resolveSiteBrandConfig,
 } from "./index";
 
 describe("shared slug helpers", () => {
@@ -41,25 +42,41 @@ describe("shared slug helpers", () => {
     expect(parseEnvFlag(undefined)).toBe(false);
   });
 
-  it("passes build version and commit hash through footer config", () => {
+  it("resolves build identity independently from footer content", () => {
     expect(
-      resolveFooterConfig(
-        {
-          MAGIC_COMPARE_APP_VERSION: "1.9.1",
-          MAGIC_COMPARE_COMMIT_SHA: "abc123",
-        },
-        2026,
-      ),
-    ).toMatchObject({
+      resolveBuildIdentityConfig({
+        MAGIC_COMPARE_APP_VERSION: " 1.9.1 ",
+        MAGIC_COMPARE_COMMIT_SHA: " abc123 ",
+      }),
+    ).toEqual({
       appVersion: "1.9.1",
       commitHash: "abc123",
     });
-  });
-
-  it("keeps footer build metadata optional", () => {
-    expect(resolveFooterConfig({}, 2026)).toMatchObject({
+    expect(resolveBuildIdentityConfig({})).toEqual({
       appVersion: null,
       commitHash: null,
+    });
+  });
+
+  it("keeps internal and public brand assets independently configurable", () => {
+    const env = {
+      MAGIC_COMPARE_INTERNAL_FAVICON_URL: " /internal/favicon.svg ",
+      MAGIC_COMPARE_INTERNAL_LOGO_URL: " /internal/logo.svg ",
+      MAGIC_COMPARE_PUBLIC_FAVICON_URL: "https://assets.example.com/public.ico",
+      MAGIC_COMPARE_PUBLIC_LOGO_URL: "https://assets.example.com/public.svg",
+    };
+
+    expect(resolveSiteBrandConfig(env, "internal")).toEqual({
+      faviconUrl: "/internal/favicon.svg",
+      logoUrl: "/internal/logo.svg",
+    });
+    expect(resolveSiteBrandConfig(env, "public")).toEqual({
+      faviconUrl: "https://assets.example.com/public.ico",
+      logoUrl: "https://assets.example.com/public.svg",
+    });
+    expect(resolveSiteBrandConfig({}, "public")).toEqual({
+      faviconUrl: null,
+      logoUrl: null,
     });
   });
 });

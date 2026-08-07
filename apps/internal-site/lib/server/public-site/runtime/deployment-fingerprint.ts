@@ -13,6 +13,9 @@ const LAST_SUCCESS_FILENAME = "last-success.json";
 const PUBLIC_SOURCE_PATHS = [
   "apps/public-site/app",
   "apps/public-site/lib",
+  // Mounted branding bypasses source control, so its bytes must still invalidate the deployment
+  // shortcut when an operator replaces a logo or favicon without changing its URL.
+  "apps/public-site/public/branding",
   "apps/public-site/next.config.mjs",
   "apps/public-site/package.json",
   "packages/compare-core/src",
@@ -46,7 +49,7 @@ async function listFiles(rootPath: string): Promise<string[]> {
   return nested.flat();
 }
 
-/** Hashes source text exactly because it is small and directly controls the exported viewer. */
+/** Hashes public code and mounted branding bytes exactly because both directly control the export. */
 async function hashPublicSource(hash: ReturnType<typeof createHash>) {
   const workspaceRoot = getWorkspaceRoot();
   for (const relativeRoot of PUBLIC_SOURCE_PATHS) {
@@ -93,6 +96,10 @@ export async function computePublicDeploymentFingerprint(): Promise<string> {
       footerJoinLabel: process.env.MAGIC_COMPARE_FOOTER_JOIN_US_LABEL?.trim() || null,
       footerJoinUrl: process.env.MAGIC_COMPARE_FOOTER_JOIN_US_URL?.trim() || null,
       footerYearStart: process.env.MAGIC_COMPARE_FOOTER_YEAR_START?.trim() || null,
+      // Public brand assets change exported head tags and navigation even when manifests do not,
+      // so they must invalidate the successful-deployment shortcut.
+      publicFaviconUrl: process.env.MAGIC_COMPARE_PUBLIC_FAVICON_URL?.trim() || null,
+      publicLogoUrl: process.env.MAGIC_COMPARE_PUBLIC_LOGO_URL?.trim() || null,
       appVersion: process.env.MAGIC_COMPARE_APP_VERSION?.trim() || null,
       commitHash: process.env.MAGIC_COMPARE_COMMIT_SHA?.trim() || null,
     }),

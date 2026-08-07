@@ -27,7 +27,6 @@ interface ViewerHeaderProps {
   onScrollStageIntoView: () => void;
   onToggleSidebar: () => void;
   sidebarOpen: boolean;
-  variant: "public" | "internal";
 }
 
 /**
@@ -56,7 +55,6 @@ export function ViewerHeader({
   onScrollStageIntoView,
   onToggleSidebar,
   sidebarOpen,
-  variant,
 }: ViewerHeaderProps) {
   return (
     <Box
@@ -157,7 +155,6 @@ export function ViewerHeader({
             onScrollStageIntoView={onScrollStageIntoView}
             onToggleSidebar={onToggleSidebar}
             sidebarOpen={sidebarOpen}
-            variant={variant}
           />
         </Box>
       </Stack>
@@ -182,7 +179,6 @@ export function ViewerHeader({
         onScrollStageIntoView={onScrollStageIntoView}
         onToggleSidebar={onToggleSidebar}
         sidebarOpen={sidebarOpen}
-        variant={variant}
       />
     </Box>
   );

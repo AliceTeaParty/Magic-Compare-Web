@@ -3,7 +3,16 @@ import { Box, Container, Stack, Typography } from "@mui/material";
 
 export default function NotFoundPage() {
   return (
-    <Container maxWidth="sm" sx={{ minHeight: "100svh", display: "grid", placeItems: "center" }}>
+    <Container
+      maxWidth="sm"
+      sx={{
+        // The public mobile app bar now owns 56px of the viewport; using the shared budget keeps the
+        // empty state centered in the remaining content area instead of forcing a needless scroll.
+        minHeight: "calc(100svh - var(--magic-public-app-bar-height, 0px))",
+        display: "grid",
+        placeItems: "center",
+      }}
+    >
       {/* The missing-link state uses the workbench surface directly so an unavailable gallery does
           not fall back to the retired public card treatment. */}
       <Box sx={{ width: "100%", px: { xs: 1, sm: 2 }, py: 6 }}>
