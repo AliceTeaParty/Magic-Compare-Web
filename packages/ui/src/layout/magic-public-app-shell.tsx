@@ -117,7 +117,9 @@ export function MagicPublicAppShell({
       <Drawer
         open={mobileDrawerOpen}
         onClose={() => setMobileOpen(false)}
-        ModalProps={{ keepMounted: true, disableScrollLock: true }}
+        // Public navigation controls already exist in the desktop rail, so a closed mobile drawer
+        // should release its duplicate themed controls and listeners.
+        ModalProps={{ disableScrollLock: true }}
         slotProps={{
           paper: {
             sx: {

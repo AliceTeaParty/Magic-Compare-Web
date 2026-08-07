@@ -3,6 +3,7 @@
 import type { ViewerDataset } from "@magic-compare/compare-core/viewer-data";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useAppNotifications } from "./notifications/use-app-notifications";
+import { ViewerDatasetCache, ViewerDatasetRequestRegistry } from "./viewer-dataset-cache";
 
 type HistoryMode = "none" | "push";
 
@@ -32,11 +33,15 @@ function parseViewerRouteTarget(href: string): ViewerRouteTarget | null {
 }
 
 /** Loads the same dataset as the direct route while leaving the mounted Viewer shell untouched. */
-async function requestViewerDataset(target: ViewerRouteTarget): Promise<ViewerDataset> {
+async function requestViewerDataset(
+  target: ViewerRouteTarget,
+  signal: AbortSignal,
+): Promise<ViewerDataset> {
   const response = await fetch("/api/ops/group-viewer", {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ caseSlug: target.caseSlug, groupSlug: target.groupSlug }),
+    signal,
   });
   const payload = await response.json().catch(() => null);
 
@@ -45,6 +50,10 @@ async function requestViewerDataset(target: ViewerRouteTarget): Promise<ViewerDa
   }
 
   return payload.dataset as ViewerDataset;
+}
+
+function isAbortError(error: unknown): boolean {
+  return error instanceof DOMException && error.name === "AbortError";
 }
 
 /** Returns the canonical internal href already supplied by the server's sibling navigation data. */
@@ -64,28 +73,21 @@ export function useInternalViewerNavigation(initialDataset: ViewerDataset) {
   const [dataset, setDataset] = useState(initialDataset);
   const [pendingGroupHref, setPendingGroupHref] = useState<string | null>(null);
   const activeHrefRef = useRef(getCurrentDatasetHref(initialDataset));
-  const cacheRef = useRef(
-    new Map<string, ViewerDataset>([[activeHrefRef.current, initialDataset]]),
-  );
-  const requestsRef = useRef(new Map<string, Promise<ViewerDataset>>());
+  const cacheRef = useRef(new ViewerDatasetCache([[activeHrefRef.current, initialDataset]]));
+  const requestRegistryRef = useRef(new ViewerDatasetRequestRegistry<ViewerDataset>());
   const navigationSequenceRef = useRef(0);
 
   /** Deduplicates pointer, focus, and click intent so each target produces at most one request. */
-  const loadDataset = useCallback((target: ViewerRouteTarget) => {
+  const loadDataset = useCallback((target: ViewerRouteTarget, speculative: boolean) => {
     const cached = cacheRef.current.get(target.pathname);
     if (cached) return Promise.resolve(cached);
 
-    const pendingRequest = requestsRef.current.get(target.pathname);
-    if (pendingRequest) return pendingRequest;
-
-    const request = requestViewerDataset(target)
-      .then((nextDataset) => {
-        cacheRef.current.set(target.pathname, nextDataset);
+    return requestRegistryRef.current.load(target.pathname, speculative, (signal) =>
+      requestViewerDataset(target, signal).then((nextDataset) => {
+        cacheRef.current.set(target.pathname, nextDataset, activeHrefRef.current);
         return nextDataset;
-      })
-      .finally(() => requestsRef.current.delete(target.pathname));
-    requestsRef.current.set(target.pathname, request);
-    return request;
+      }),
+    );
   }, []);
 
   /** Warms route data before click while the shared image preloader handles first-frame assets. */
@@ -93,7 +95,7 @@ export function useInternalViewerNavigation(initialDataset: ViewerDataset) {
     (href: string) => {
       const target = parseViewerRouteTarget(href);
       if (!target || target.caseSlug !== initialDataset.caseMeta.slug) return;
-      void loadDataset(target).catch(() => undefined);
+      void loadDataset(target, true).catch(() => undefined);
     },
     [initialDataset.caseMeta.slug, loadDataset],
   );
@@ -115,7 +117,7 @@ export function useInternalViewerNavigation(initialDataset: ViewerDataset) {
       setPendingGroupHref(target.pathname);
 
       try {
-        const nextDataset = await loadDataset(target);
+        const nextDataset = await loadDataset(target, false);
         if (sequence !== navigationSequenceRef.current) return;
 
         activeHrefRef.current = target.pathname;
@@ -127,6 +129,7 @@ export function useInternalViewerNavigation(initialDataset: ViewerDataset) {
         }
       } catch (error) {
         if (sequence !== navigationSequenceRef.current) return;
+        if (isAbortError(error)) return;
         pushNotification(error instanceof Error ? error.message : "加载 Group 失败。", "error");
       } finally {
         if (sequence === navigationSequenceRef.current) setPendingGroupHref(null);
@@ -146,6 +149,13 @@ export function useInternalViewerNavigation(initialDataset: ViewerDataset) {
     window.addEventListener("popstate", handlePopState);
     return () => window.removeEventListener("popstate", handlePopState);
   }, [initialDataset.caseMeta.slug, navigateGroup]);
+
+  useEffect(
+    () => () => {
+      requestRegistryRef.current.abortAll();
+    },
+    [],
+  );
 
   return {
     dataset,

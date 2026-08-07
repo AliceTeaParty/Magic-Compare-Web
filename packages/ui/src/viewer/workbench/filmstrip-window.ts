@@ -13,6 +13,12 @@ export interface FilmstripRenderWindow {
   trailingSpacerWidth: number;
 }
 
+interface FilmstripWindowScrollState {
+  clientWidth: number;
+  scrollLeft: number;
+  scrollWidth: number;
+}
+
 /**
  * Converts fixed card geometry into one bounded render window anchored to the real scroll position.
  * Keeping the active frame in this window pinned the first cards while users scrolled elsewhere,
@@ -52,4 +58,30 @@ export function getFilmstripRenderWindow({
     trailingSpacerWidth:
       remainingItems > 0 ? remainingItems * FILMSTRIP_ITEM_STRIDE - FILMSTRIP_GAP : 0,
   };
+}
+
+/** React only needs new scroll state when layout or the mounted virtual window actually changes. */
+export function shouldUpdateFilmstripRenderState(
+  currentState: FilmstripWindowScrollState,
+  nextState: FilmstripWindowScrollState,
+  frameCount: number,
+): boolean {
+  if (
+    currentState.clientWidth !== nextState.clientWidth ||
+    currentState.scrollWidth !== nextState.scrollWidth
+  ) {
+    return true;
+  }
+
+  const currentWindow = getFilmstripRenderWindow({
+    clientWidth: currentState.clientWidth,
+    frameCount,
+    scrollLeft: currentState.scrollLeft,
+  });
+  const nextWindow = getFilmstripRenderWindow({
+    clientWidth: nextState.clientWidth,
+    frameCount,
+    scrollLeft: nextState.scrollLeft,
+  });
+  return currentWindow.start !== nextWindow.start || currentWindow.end !== nextWindow.end;
 }

@@ -18,7 +18,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
 import { findAsset, getComparisonTargetAssets } from "@magic-compare/compare-core/viewer-data";
-import { useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
+import { memo, useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
 import type {
   ViewerAsset,
   ViewerDataset,
@@ -132,6 +132,9 @@ function GroupLinks({
     event: ReactMouseEvent<HTMLAnchorElement>,
     group: ViewerDataset["siblingGroups"][number],
   ) {
+    // Touch waits for a real click instead of prefetching on touchstart, which may only be the
+    // beginning of a vertical scroll through the sidebar.
+    handleImmediateGroupIntent(group);
     if (
       !onGroupNavigate ||
       event.defaultPrevented ||
@@ -175,7 +178,6 @@ function GroupLinks({
           onFocus={() => handleImmediateGroupIntent(group)}
           onMouseEnter={() => handleGroupHover(group)}
           onMouseLeave={cancelHoverIntent}
-          onTouchStart={() => handleImmediateGroupIntent(group)}
           sx={{
             minHeight: 44,
             px: 1.25,
@@ -455,7 +457,7 @@ interface ViewerSidebarProps {
  * Switches between inline and drawer sidebars without changing the metadata payload, which keeps
  * viewer state independent from the current responsive layout.
  */
-export function ViewerSidebar({
+export const ViewerSidebar = memo(function ViewerSidebar({
   currentFrame,
   currentGroup,
   groups,
@@ -512,7 +514,9 @@ export function ViewerSidebar({
         open={mobileDrawerOpen}
         onClose={closeSidebar}
         // Viewer owns the root scroll lock so Modal must not add body padding and squeeze the sheet.
-        ModalProps={{ keepMounted: true, disableScrollLock: true }}
+        // Closed mobile details duplicated the full metadata tree beside the desktop pane. Let MUI
+        // unmount it while retaining the shell's explicit root-scroll handling.
+        ModalProps={{ disableScrollLock: true }}
         slotProps={{
           paper: {
             sx: {
@@ -531,4 +535,4 @@ export function ViewerSidebar({
       </Drawer>
     </>
   );
-}
+});

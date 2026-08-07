@@ -1,5 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cancelFilmstripGesture, type FilmstripMotionRefs } from "./filmstrip-drag-physics";
+import {
+  cancelFilmstripGesture,
+  finishFilmstripGesture,
+  type FilmstripMotionRefs,
+} from "./filmstrip-drag-physics";
 
 function ref<T>(current: T) {
   return { current };
@@ -27,6 +31,45 @@ describe("filmstrip drag cancellation", () => {
     expect(motionRefs.suppressClickRef.current).toBe(true);
     expect(syncEdgeOffset).toHaveBeenCalledOnce();
     expect(syncEdgeOffset).toHaveBeenCalledWith(0);
+
+    vi.runAllTimers();
+    expect(motionRefs.suppressClickRef.current).toBe(false);
+  });
+});
+
+describe("filmstrip tap release", () => {
+  it("selects once and suppresses the native click from the captured pointer sequence", () => {
+    vi.useFakeTimers();
+    const onSelectFrame = vi.fn();
+    const motionRefs: FilmstripMotionRefs = {
+      edgeOffsetRef: ref(0),
+      edgeVelocityRef: ref(0),
+      inertiaFrameRef: ref<number | null>(null),
+      reboundFrameRef: ref<number | null>(null),
+      suppressClickRef: ref(false),
+      velocityRef: ref(0),
+    };
+
+    finishFilmstripGesture({
+      dragState: {
+        lastClientX: 20,
+        lastTimestamp: 0,
+        moved: false,
+        originFrameId: "frame-2",
+        pointerId: 1,
+        startScrollLeft: 0,
+        startX: 20,
+      },
+      motionRefs,
+      onSelectFrame,
+      prefersReducedMotion: false,
+      syncEdgeOffset: vi.fn(),
+      viewport: {} as HTMLDivElement,
+    });
+
+    expect(onSelectFrame).toHaveBeenCalledOnce();
+    expect(onSelectFrame).toHaveBeenCalledWith("frame-2");
+    expect(motionRefs.suppressClickRef.current).toBe(true);
 
     vi.runAllTimers();
     expect(motionRefs.suppressClickRef.current).toBe(false);

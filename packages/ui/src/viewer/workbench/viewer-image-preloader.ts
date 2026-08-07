@@ -103,6 +103,14 @@ function createBrowserImage(): ViewerPreloadImageHandle {
         image.decoding = nextDecoding;
       }
     },
+    cancel() {
+      image.onload = null;
+      image.onerror = null;
+      image.src = "";
+    },
+    decode() {
+      return image.decode();
+    },
   };
 }
 
@@ -186,9 +194,11 @@ export function useViewerImagePreloader({
     const entries: Array<{ url: string; priority: number }> = [];
     const currentFrame = frames[currentFrameIndex];
     for (const asset of getPreloadAssetsForFrame(currentFrame, mode, comparisonAssetKey)) {
-      entries.push({ url: asset.imageUrl, priority: 120 });
+      queueRef.current?.promote(asset.imageUrl, 120);
     }
 
+    // Current images are already represented by real stage <img> elements. The speculative queue
+    // is reserved for adjacent frames so it cannot duplicate or outrank the browser's LCP request.
     for (let offset = 1; offset <= radius; offset += 1) {
       const nextFrame = frames[currentFrameIndex + offset];
       const previousFrame = frames[currentFrameIndex - offset];

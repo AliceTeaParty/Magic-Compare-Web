@@ -5,10 +5,12 @@ import { Box, Button, Stack, Typography } from "@mui/material";
 import type { ViewerFrame } from "@magic-compare/compare-core/viewer-data";
 import {
   memo,
+  useCallback,
   useEffect,
   useRef,
   type CSSProperties,
   type DragEvent as ReactDragEvent,
+  type PointerEvent as ReactPointerEvent,
 } from "react";
 import { useFilmstripDrag } from "./use-filmstrip-drag";
 import {
@@ -66,6 +68,12 @@ function ThumbnailButton({
     }, 150);
   }
 
+  function handlePointerDown(event: ReactPointerEvent<HTMLButtonElement>) {
+    if (event.pointerType === "mouse") {
+      handleImmediateIntent();
+    }
+  }
+
   useEffect(() => cancelHoverIntent, []);
 
   return (
@@ -77,7 +85,7 @@ function ThumbnailButton({
       onFocus={handleImmediateIntent}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={cancelHoverIntent}
-      onPointerDown={handleImmediateIntent}
+      onPointerDown={handlePointerDown}
       sx={{
         // This gives the browser permission to skip painting far-off thumbnails until they scroll
         // closer to view, which trims initial work without changing the drag model.
@@ -188,7 +196,7 @@ interface ViewerFilmstripProps {
  * Presents frame navigation as a draggable strip so long cases remain usable on touch devices
  * without exposing the lower-level drag physics to the workbench shell.
  */
-export function ViewerFilmstrip({
+export const ViewerFilmstrip = memo(function ViewerFilmstrip({
   currentFrameId,
   frames,
   prefersReducedMotion,
@@ -196,18 +204,31 @@ export function ViewerFilmstrip({
   onSelectFrame,
 }: ViewerFilmstripProps) {
   const activeIndex = frames.findIndex((frame) => frame.id === currentFrameId);
+  const selectFrameWithIntent = useCallback(
+    (frameId: string) => {
+      const frame = frames.find((candidate) => candidate.id === frameId);
+      if (frame) {
+        // Touch waits until gesture classification confirms a tap, avoiding full-size downloads
+        // when pointer cancellation hands a vertical scroll back to the browser.
+        onFrameIntent(frame);
+      }
+      onSelectFrame(frameId);
+    },
+    [frames, onFrameIntent, onSelectFrame],
+  );
   const {
     filmstripScrollState,
     isDragging,
     scrollbarHandlers,
     scrollbarMetrics,
+    scrollbarRef,
     stripRef,
     viewportHandlers,
     viewportRef,
     handleFrameSelection,
   } = useFilmstripDrag({
     frameCount: frames.length,
-    onSelectFrame,
+    onSelectFrame: selectFrameWithIntent,
     prefersReducedMotion,
   });
   const renderWindow = getFilmstripRenderWindow({
@@ -333,68 +354,66 @@ export function ViewerFilmstrip({
         </Box>
       </Box>
 
-      {scrollbarMetrics.visible ? (
+      <Box
+        ref={scrollbarRef}
+        {...scrollbarHandlers}
+        role="scrollbar"
+        tabIndex={scrollbarMetrics.visible ? 0 : -1}
+        aria-hidden={scrollbarMetrics.visible ? undefined : true}
+        aria-label="Frame strip horizontal scroll"
+        aria-controls="viewer-filmstrip-scrollport"
+        aria-orientation="horizontal"
+        aria-valuemin={0}
+        aria-valuemax={Math.round(scrollbarMetrics.maxScrollLeft)}
+        aria-valuenow={Math.round(scrollbarMetrics.scrollLeft)}
+        sx={{
+          width: "100%",
+          // Keep the visual rail thin while meeting a usable minimum touch target on mobile.
+          height: 24,
+          mt: 0.25,
+          mb: 0,
+          borderRadius: 999,
+          display: scrollbarMetrics.visible ? "flex" : "none",
+          alignItems: "center",
+          cursor: "grab",
+          touchAction: "none",
+          "&:active": {
+            cursor: "grabbing",
+          },
+          "&:focus-visible": {
+            outline: "2px solid",
+            outlineColor: "primary.main",
+            outlineOffset: 4,
+          },
+        }}
+      >
         <Box
-          {...scrollbarHandlers}
-          role="scrollbar"
-          tabIndex={0}
-          aria-label="Frame strip horizontal scroll"
-          aria-controls="viewer-filmstrip-scrollport"
-          aria-orientation="horizontal"
-          aria-valuemin={0}
-          aria-valuemax={Math.round(scrollbarMetrics.maxScrollLeft)}
-          aria-valuenow={Math.round(scrollbarMetrics.scrollLeft)}
+          aria-hidden
           sx={{
             width: "100%",
-            // Keep the visual rail thin while meeting a usable minimum touch target on mobile.
-            height: 24,
-            mt: 0.25,
-            mb: 0,
+            height: 2,
             borderRadius: 999,
-            display: "flex",
-            alignItems: "center",
-            // Keep the rail in normal flow so every viewport retains space beneath it.
-            cursor: "grab",
-            touchAction: "none",
-            "&:active": {
-              cursor: "grabbing",
-            },
-            "&:focus-visible": {
-              outline: "2px solid",
-              outlineColor: "primary.main",
-              outlineOffset: 4,
-            },
+            backgroundColor: viewerTokens.filmstrip.scrollbarTrack,
+            overflow: "visible",
+            pointerEvents: "none",
           }}
         >
           <Box
-            aria-hidden
             sx={{
-              width: "100%",
-              height: 2,
+              width: "var(--filmstrip-thumb-width, 0px)",
+              height: 4,
+              mt: "-1px",
               borderRadius: 999,
-              backgroundColor: viewerTokens.filmstrip.scrollbarTrack,
-              overflow: "visible",
-              pointerEvents: "none",
+              background: viewerTokens.filmstrip.scrollbarThumb,
+              transform: "translate3d(var(--filmstrip-thumb-offset, 0px), 0, 0)",
+              // Scroll position is written once per animation frame; another transform transition
+              // would lag behind the native viewport and make the thumb feel detached.
+              transition: prefersReducedMotion ? "none" : "width 180ms cubic-bezier(0.2, 0, 0, 1)",
+              boxShadow: viewerTokens.filmstrip.scrollbarThumbRing,
             }}
-          >
-            <Box
-              sx={{
-                width: `${scrollbarMetrics.thumbWidth}px`,
-                height: 4,
-                mt: "-1px",
-                borderRadius: 999,
-                background: viewerTokens.filmstrip.scrollbarThumb,
-                transform: `translate3d(${scrollbarMetrics.thumbOffset}px, 0, 0)`,
-                transition:
-                  isDragging || prefersReducedMotion
-                    ? "none"
-                    : "transform 180ms cubic-bezier(0.2, 0, 0, 1), width 180ms cubic-bezier(0.2, 0, 0, 1)",
-                boxShadow: viewerTokens.filmstrip.scrollbarThumbRing,
-              }}
-            />
-          </Box>
+          />
         </Box>
-      ) : null}
+      </Box>
     </Box>
   );
-}
+});

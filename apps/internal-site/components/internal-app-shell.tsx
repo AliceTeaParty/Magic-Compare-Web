@@ -251,7 +251,9 @@ function InternalAppShellScaffold({
           open={mobileDrawerOpen}
           onClose={() => setMobileOpen(false)}
           // The shared root lock avoids MUI's body padding while preserving modal scroll blocking.
-          ModalProps={{ keepMounted: true, disableScrollLock: true }}
+          // The rail remains mounted on desktop; unmounting the closed mobile copy avoids duplicate
+          // navigation controls while the shell keeps ownership of root scroll locking.
+          ModalProps={{ disableScrollLock: true }}
           slotProps={{
             paper: {
               sx: {
