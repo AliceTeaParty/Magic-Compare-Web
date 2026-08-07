@@ -1,44 +1,24 @@
 import type { ViewerMode } from "@magic-compare/content-schema";
+import {
+  readCookieValue,
+  readDocumentCookieValue,
+  serializeCookieValue,
+  writeDocumentCookieValue,
+} from "../../storage/browser-cookie";
 
 const VIEWER_DETAILS_COOKIE_NAME = "magic_compare_open_details";
 const VIEWER_MODE_COOKIE_NAME = "magic_compare_viewer_mode";
 const VIEWER_PIXEL_RENDERING_AUTO_DISABLED_COOKIE_NAME =
   "magic_compare_pixel_rendering_auto_disabled";
-const VIEWER_COOKIE_ATTRIBUTES = "Path=/; Max-Age=31536000; SameSite=Lax";
 
-/** Reads one exact value from a cookie header without matching similarly prefixed names. */
-function readCookieValueFromHeader(name: string, cookieHeader: string): string | null {
-  const entry = cookieHeader.split("; ").find((part) => part.startsWith(`${name}=`));
-  return entry ? (entry.split("=")[1] ?? null) : null;
+/** Converts the details cookie's compact wire value without treating unknown values as false. */
+function parseViewerDetailsValue(value: string | null): boolean | null {
+  return value === "1" ? true : value === "0" ? false : null;
 }
 
-/**
- * Reads a single cookie value without pulling in a heavier cookie helper because the viewer only
- * persists a small set of lightweight preferences on the client.
- */
-function readCookieValue(name: string): string | null {
-  if (typeof document === "undefined") {
-    return null;
-  }
-
-  return readCookieValueFromHeader(name, document.cookie);
-}
-
-/** Serializes viewer cookies through one attribute policy so public and internal routes agree. */
-function serializeCookieValue(name: string, value: string): string {
-  return `${name}=${value}; ${VIEWER_COOKIE_ATTRIBUTES}`;
-}
-
-/**
- * Writes long-lived viewer preferences with a root path so the same setting survives route changes
- * between internal and public viewer pages.
- */
-function writeCookieValue(name: string, value: string): void {
-  if (typeof document === "undefined") {
-    return;
-  }
-
-  document.cookie = serializeCookieValue(name, value);
+/** Keeps stale or unknown mode identifiers from entering the viewer controller. */
+function parseViewerModeValue(value: string | null): ViewerMode | null {
+  return value === "before-after" || value === "a-b" || value === "heatmap" ? value : null;
 }
 
 /**
@@ -46,10 +26,7 @@ function writeCookieValue(name: string, value: string): void {
  * the default high-zoom assistance.
  */
 export function parseViewerPixelRenderingAutoDisabledCookie(cookieHeader: string): boolean {
-  return (
-    readCookieValueFromHeader(VIEWER_PIXEL_RENDERING_AUTO_DISABLED_COOKIE_NAME, cookieHeader) ===
-    "1"
-  );
+  return readCookieValue(cookieHeader, VIEWER_PIXEL_RENDERING_AUTO_DISABLED_COOKIE_NAME) === "1";
 }
 
 /** Returns the exact long-lived cookie written after a manual pixel-rendering close. */
@@ -59,20 +36,17 @@ export function serializeViewerPixelRenderingAutoDisabledCookie(): string {
 
 /** Reads whether this browser has opted out of automatic high-zoom pixel rendering. */
 export function readViewerPixelRenderingAutoDisabledCookie(): boolean {
-  if (typeof document === "undefined") {
-    return false;
-  }
-
-  return parseViewerPixelRenderingAutoDisabledCookie(document.cookie);
+  return readDocumentCookieValue(VIEWER_PIXEL_RENDERING_AUTO_DISABLED_COOKIE_NAME) === "1";
 }
 
 /** Persists the user's manual close so later high-zoom sessions do not override that decision. */
 export function writeViewerPixelRenderingAutoDisabledCookie(): void {
-  if (typeof document === "undefined") {
-    return;
-  }
+  writeDocumentCookieValue(VIEWER_PIXEL_RENDERING_AUTO_DISABLED_COOKIE_NAME, "1");
+}
 
-  document.cookie = serializeViewerPixelRenderingAutoDisabledCookie();
+/** Parses details from a supplied header so malformed browser state can be covered without a DOM. */
+export function parseViewerDetailsCookie(cookieHeader: string): boolean | null {
+  return parseViewerDetailsValue(readCookieValue(cookieHeader, VIEWER_DETAILS_COOKIE_NAME));
 }
 
 /**
@@ -80,19 +54,7 @@ export function writeViewerPixelRenderingAutoDisabledCookie(): void {
  * toggling the details panel.
  */
 export function readViewerDetailsCookie(): boolean | null {
-  const value = readCookieValue(VIEWER_DETAILS_COOKIE_NAME);
-  if (value === null) {
-    return null;
-  }
-
-  if (value === "1") {
-    return true;
-  }
-  if (value === "0") {
-    return false;
-  }
-
-  return null;
+  return parseViewerDetailsValue(readDocumentCookieValue(VIEWER_DETAILS_COOKIE_NAME));
 }
 
 /**
@@ -100,7 +62,12 @@ export function readViewerDetailsCookie(): boolean | null {
  * belong in shared published data.
  */
 export function writeViewerDetailsCookie(open: boolean): void {
-  writeCookieValue(VIEWER_DETAILS_COOKIE_NAME, open ? "1" : "0");
+  writeDocumentCookieValue(VIEWER_DETAILS_COOKIE_NAME, open ? "1" : "0");
+}
+
+/** Parses mode cookies through the shared safe decoder so bad URL encoding cannot break startup. */
+export function parseViewerModeCookie(cookieHeader: string): ViewerMode | null {
+  return parseViewerModeValue(readCookieValue(cookieHeader, VIEWER_MODE_COOKIE_NAME));
 }
 
 /**
@@ -108,17 +75,7 @@ export function writeViewerDetailsCookie(open: boolean): void {
  * app into an unsupported mode.
  */
 export function readViewerModeCookie(): ViewerMode | null {
-  const value = readCookieValue(VIEWER_MODE_COOKIE_NAME);
-  if (!value) {
-    return null;
-  }
-
-  const decodedValue = decodeURIComponent(value);
-  if (decodedValue === "before-after" || decodedValue === "a-b" || decodedValue === "heatmap") {
-    return decodedValue;
-  }
-
-  return null;
+  return parseViewerModeValue(readDocumentCookieValue(VIEWER_MODE_COOKIE_NAME));
 }
 
 /**
@@ -126,5 +83,5 @@ export function readViewerModeCookie(): ViewerMode | null {
  * significant characters again.
  */
 export function writeViewerModeCookie(mode: ViewerMode): void {
-  writeCookieValue(VIEWER_MODE_COOKIE_NAME, encodeURIComponent(mode));
+  writeDocumentCookieValue(VIEWER_MODE_COOKIE_NAME, mode);
 }

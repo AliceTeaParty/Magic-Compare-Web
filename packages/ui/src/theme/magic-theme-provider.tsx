@@ -11,8 +11,9 @@ import {
 } from "react";
 import { CssBaseline, GlobalStyles } from "@mui/material";
 import { ThemeProvider, createTheme } from "@mui/material/styles";
+import { writeDocumentCookieValue } from "../storage/browser-cookie";
 import { buildInternalSchemeColors, resolveInternalThemeSeed } from "./magic-color-tokens";
-import { readMagicThemeSeedCookie, serializeMagicThemeSeedCookie } from "./magic-theme-storage";
+import { MAGIC_THEME_SEED_COOKIE_NAME, readMagicThemeSeedCookie } from "./magic-theme-storage";
 
 export type MagicThemeProfile = "public" | "internal";
 
@@ -318,7 +319,7 @@ function MagicWorkbenchThemeProvider({ children, initialThemeSeed }: MagicThemeP
 
   const setSeedValue = useCallback((value: string) => {
     const resolved = resolveInternalThemeSeed(value);
-    document.cookie = serializeMagicThemeSeedCookie(resolved.storageValue);
+    writeDocumentCookieValue(MAGIC_THEME_SEED_COOKIE_NAME, resolved.storageValue);
     setSeedValueState(resolved.storageValue);
   }, []);
   const contextValue = useMemo(
