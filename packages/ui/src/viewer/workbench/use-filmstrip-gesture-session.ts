@@ -10,6 +10,7 @@ import {
 } from "react";
 import {
   applyFilmstripPointerMove,
+  cancelFilmstripGesture,
   cancelFilmstripMotion,
   finishFilmstripGesture,
   type FilmstripDragState,
@@ -53,10 +54,7 @@ export function useFilmstripGestureSession({
 
   const writeEdgeOffset = useCallback(
     (nextOffset: number) => {
-      stripRef.current?.style.setProperty(
-        "--filmstrip-edge-offset",
-        `${nextOffset}px`,
-      );
+      stripRef.current?.style.setProperty("--filmstrip-edge-offset", `${nextOffset}px`);
     },
     [stripRef],
   );
@@ -112,8 +110,7 @@ export function useFilmstripGestureSession({
       moved: false,
       originFrameId:
         event.target instanceof Element
-          ? (event.target.closest<HTMLElement>("[data-frame-id]")?.dataset
-              .frameId ?? null)
+          ? (event.target.closest<HTMLElement>("[data-frame-id]")?.dataset.frameId ?? null)
           : null,
       pointerId: event.pointerId,
       startScrollLeft: event.currentTarget.scrollLeft,
@@ -171,16 +168,38 @@ export function useFilmstripGestureSession({
   }
 
   /**
-   * Ignores clicks that were produced by a drag gesture so scrolling the strip does not also
-   * switch frames accidentally.
+   * Pointer cancellation means the browser took ownership of the gesture, usually for vertical
+   * scrolling. Clear local drag state without treating the interruption as a tap or release.
    */
-  function handleFrameSelection(frameId: string) {
-    if (suppressClickRef.current) {
+  function cancelPointerDrag(event: ReactPointerEvent<HTMLDivElement>) {
+    const dragState = dragStateRef.current;
+    if (!dragState || dragState.pointerId !== event.pointerId) {
       return;
     }
 
-    onSelectFrame(frameId);
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+
+    setIsDragging(false);
+    dragStateRef.current = null;
+    cancelFilmstripGesture({ syncEdgeOffset, motionRefs });
   }
+
+  /**
+   * Ignores clicks that were produced by a drag gesture so scrolling the strip does not also
+   * switch frames accidentally.
+   */
+  const handleFrameSelection = useCallback(
+    (frameId: string) => {
+      if (suppressClickRef.current) {
+        return;
+      }
+
+      onSelectFrame(frameId);
+    },
+    [onSelectFrame],
+  );
 
   /**
    * Native drag previews interfere with the custom pointer physics, so thumbnail dragging is
@@ -197,7 +216,7 @@ export function useFilmstripGestureSession({
       onPointerDown: handlePointerDown,
       onPointerMove: handlePointerMove,
       onPointerUp: finishPointerDrag,
-      onPointerCancel: finishPointerDrag,
+      onPointerCancel: cancelPointerDrag,
       onDragStart: handleNativeDragStart,
     },
   };

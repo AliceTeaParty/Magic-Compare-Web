@@ -56,13 +56,16 @@ interface FinishFilmstripGestureOptions {
   motionRefs: FilmstripMotionRefs;
 }
 
+interface CancelFilmstripGestureOptions {
+  syncEdgeOffset: (nextOffset: number) => void;
+  motionRefs: FilmstripMotionRefs;
+}
+
 /**
  * Scrollbar metrics depend on live DOM measurements, so the observer effect reads them from the
  * element directly instead of trying to infer them from React props.
  */
-export function getFilmstripScrollState(
-  element: HTMLDivElement,
-): FilmstripScrollState {
+export function getFilmstripScrollState(element: HTMLDivElement): FilmstripScrollState {
   return {
     clientWidth: element.clientWidth,
     scrollLeft: element.scrollLeft,
@@ -108,10 +111,23 @@ function cancelFilmstripInertia(
  */
 export function cancelFilmstripMotion(motionRefs: FilmstripMotionRefs) {
   cancelFilmstripInertia(motionRefs.inertiaFrameRef, motionRefs.velocityRef);
-  cancelFilmstripRebound(
-    motionRefs.reboundFrameRef,
-    motionRefs.edgeVelocityRef,
-  );
+  cancelFilmstripRebound(motionRefs.reboundFrameRef, motionRefs.edgeVelocityRef);
+}
+
+/**
+ * Aborts a pointer session without entering release physics or selecting its origin frame. Native
+ * pointer cancellation represents interrupted intent, most commonly a vertical page scroll.
+ */
+export function cancelFilmstripGesture({
+  syncEdgeOffset,
+  motionRefs,
+}: CancelFilmstripGestureOptions) {
+  cancelFilmstripMotion(motionRefs);
+  // Some mobile engines may still synthesize a click in the cancellation task. Keep selection
+  // suppressed until that task has drained, then restore normal taps for the next gesture.
+  motionRefs.suppressClickRef.current = true;
+  resetFilmstripClickSuppression(motionRefs.suppressClickRef);
+  syncEdgeOffset(0);
 }
 
 /**
@@ -129,10 +145,7 @@ function startFilmstripRebound({
   prefersReducedMotion: boolean;
   syncEdgeOffset: (nextOffset: number) => void;
 }) {
-  cancelFilmstripRebound(
-    motionRefs.reboundFrameRef,
-    motionRefs.edgeVelocityRef,
-  );
+  cancelFilmstripRebound(motionRefs.reboundFrameRef, motionRefs.edgeVelocityRef);
 
   if (prefersReducedMotion || Math.abs(initialOffset) < 0.5) {
     syncEdgeOffset(0);
@@ -144,8 +157,7 @@ function startFilmstripRebound({
 
   const step = () => {
     const currentOffset = motionRefs.edgeOffsetRef.current;
-    const nextVelocity =
-      (motionRefs.edgeVelocityRef.current - currentOffset * 0.14) * 0.82;
+    const nextVelocity = (motionRefs.edgeVelocityRef.current - currentOffset * 0.14) * 0.82;
     const nextOffset = currentOffset + nextVelocity;
 
     if (Math.abs(nextOffset) < 0.35 && Math.abs(nextVelocity) < 0.2) {
@@ -176,15 +188,9 @@ export function applyFilmstripPointerMove({
   viewport,
   motionRefs,
 }: FilmstripPointerMoveOptions) {
-  const dragGain =
-    pointerType === "mouse"
-      ? FILMSTRIP_MOUSE_DRAG_GAIN
-      : FILMSTRIP_TOUCH_DRAG_GAIN;
+  const dragGain = pointerType === "mouse" ? FILMSTRIP_MOUSE_DRAG_GAIN : FILMSTRIP_TOUCH_DRAG_GAIN;
   const travelX = (clientX - dragState.startX) * dragGain;
-  const maxScrollLeft = Math.max(
-    0,
-    viewport.scrollWidth - viewport.clientWidth,
-  );
+  const maxScrollLeft = Math.max(0, viewport.scrollWidth - viewport.clientWidth);
   const nextScrollLeft = dragState.startScrollLeft - travelX;
   const deltaTime = Math.max(now - dragState.lastTimestamp, 1);
   const deltaScroll = dragState.lastClientX - clientX;
@@ -196,8 +202,7 @@ export function applyFilmstripPointerMove({
   }
 
   if (nextScrollLeft < 0 || nextScrollLeft > maxScrollLeft) {
-    const overscroll =
-      nextScrollLeft < 0 ? nextScrollLeft : nextScrollLeft - maxScrollLeft;
+    const overscroll = nextScrollLeft < 0 ? nextScrollLeft : nextScrollLeft - maxScrollLeft;
     const direction = overscroll < 0 ? 1 : -1;
     const overscrollMagnitude = Math.abs(overscroll);
     const visualOffset =
@@ -213,8 +218,7 @@ export function applyFilmstripPointerMove({
     viewport.scrollLeft = nextScrollLeft;
   }
 
-  motionRefs.velocityRef.current =
-    (deltaScroll / deltaTime) * FILMSTRIP_INERTIA_VELOCITY_GAIN;
+  motionRefs.velocityRef.current = (deltaScroll / deltaTime) * FILMSTRIP_INERTIA_VELOCITY_GAIN;
   dragState.lastClientX = clientX;
   dragState.lastTimestamp = now;
 }
@@ -223,10 +227,8 @@ export function applyFilmstripPointerMove({
  * Click suppression has to reset on the next macrotask so the release event from a drag does not
  * immediately trigger thumbnail selection on the same pointer sequence.
  */
-function resetFilmstripClickSuppression(
-  suppressClickRef: MutableRefObject<boolean>,
-) {
-  window.setTimeout(() => {
+function resetFilmstripClickSuppression(suppressClickRef: MutableRefObject<boolean>) {
+  globalThis.setTimeout(() => {
     suppressClickRef.current = false;
   }, 0);
 }
@@ -245,16 +247,12 @@ function startFilmstripInertia({
   viewport: HTMLDivElement;
 }) {
   let lastFrameTime = performance.now();
-  const maxScrollLeft = Math.max(
-    0,
-    viewport.scrollWidth - viewport.clientWidth,
-  );
+  const maxScrollLeft = Math.max(0, viewport.scrollWidth - viewport.clientWidth);
 
   const step = (timestamp: number) => {
     const deltaTime = Math.min(28, timestamp - lastFrameTime || 16);
     lastFrameTime = timestamp;
-    const nextScrollLeft =
-      viewport.scrollLeft + motionRefs.velocityRef.current * deltaTime;
+    const nextScrollLeft = viewport.scrollLeft + motionRefs.velocityRef.current * deltaTime;
 
     if (nextScrollLeft <= 0 || nextScrollLeft >= maxScrollLeft) {
       viewport.scrollLeft = clampNumber(nextScrollLeft, 0, maxScrollLeft);
@@ -264,10 +262,7 @@ function startFilmstripInertia({
             -1 *
             Math.max(
               18,
-              Math.min(
-                FILMSTRIP_EDGE_OFFSET_LIMIT,
-                Math.abs(motionRefs.velocityRef.current) * 14,
-              ),
+              Math.min(FILMSTRIP_EDGE_OFFSET_LIMIT, Math.abs(motionRefs.velocityRef.current) * 14),
             ),
           -FILMSTRIP_EDGE_OFFSET_LIMIT,
           FILMSTRIP_EDGE_OFFSET_LIMIT,
@@ -284,9 +279,7 @@ function startFilmstripInertia({
     viewport.scrollLeft = nextScrollLeft;
     motionRefs.velocityRef.current *= Math.pow(0.996, deltaTime);
 
-    if (
-      Math.abs(motionRefs.velocityRef.current) < FILMSTRIP_INERTIA_MIN_VELOCITY
-    ) {
+    if (Math.abs(motionRefs.velocityRef.current) < FILMSTRIP_INERTIA_MIN_VELOCITY) {
       motionRefs.velocityRef.current = 0;
       motionRefs.inertiaFrameRef.current = null;
       return;

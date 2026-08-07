@@ -77,10 +77,15 @@ function useElementSize(targetRef: RefObject<HTMLElement | null>): StageSize {
         return;
       }
 
-      setSize({
-        width: element.clientWidth,
-        height: element.clientHeight,
-      });
+      const nextWidth = element.clientWidth;
+      const nextHeight = element.clientHeight;
+      // ResizeObserver may repeat an unchanged measurement; retaining the same object prevents
+      // redundant stage and full-size media renders without skipping real transition frames.
+      setSize((currentSize) =>
+        currentSize.width === nextWidth && currentSize.height === nextHeight
+          ? currentSize
+          : { width: nextWidth, height: nextHeight },
+      );
     }
 
     syncSize();
@@ -123,8 +128,8 @@ function StagePresentationShell({
         aspectRatio: hasMeasuredStageSize ? undefined : stageAspectRatio,
         minHeight: hasMeasuredStageSize ? 0 : { xs: 80 },
         marginInline: "auto",
-        // The image is the work surface, not a decorative card; a medium corner keeps it related
-        // to the surrounding M3 shell without softening the inspection boundary.
+        // One shell owns radius, clipping, and the active/focus edge. Splitting those jobs across
+        // compare modes previously produced mismatched corners and two theme-colored strokes.
         borderRadius: 1.5,
         overflow: "hidden",
         border: "1px solid",
@@ -141,6 +146,10 @@ function StagePresentationShell({
             : "none",
         transition:
           "width 180ms cubic-bezier(0.2, 0, 0, 1), height 180ms cubic-bezier(0.2, 0, 0, 1), box-shadow 180ms cubic-bezier(0.2, 0, 0, 1), border-color 180ms cubic-bezier(0.2, 0, 0, 1)",
+        "&:focus-within": {
+          borderColor: viewerTokens.stage.activeBorder,
+          boxShadow: viewerTokens.stage.activeShadow,
+        },
       }}
     >
       {children}
@@ -242,7 +251,7 @@ function ViewerStageContent({
 
   if (mode === "a-b") {
     return (
-      <Box ref={stageViewportRef} sx={{ width: "100%", height: "100%" }}>
+      <Box ref={stageViewportRef} sx={{ width: "100%", height: "100%", borderRadius: "inherit" }}>
         <ABCompareStage
           active={abStageActive}
           afterAsset={afterAsset}
@@ -264,7 +273,10 @@ function ViewerStageContent({
 
   if (mode === "heatmap" && heatmapAsset) {
     return (
-      <Box ref={stageViewportRef} sx={{ width: "100%", height: "100%", position: "relative" }}>
+      <Box
+        ref={stageViewportRef}
+        sx={{ width: "100%", height: "100%", position: "relative", borderRadius: "inherit" }}
+      >
         <PositionedStageMedia
           asset={afterAsset}
           alt={`${afterAsset.label} base`}
@@ -291,7 +303,7 @@ function ViewerStageContent({
   }
 
   return (
-    <Box ref={stageViewportRef} sx={{ width: "100%", height: "100%" }}>
+    <Box ref={stageViewportRef} sx={{ width: "100%", height: "100%", borderRadius: "inherit" }}>
       <SwipeCompareStage
         beforeAsset={beforeAsset}
         afterAsset={afterAsset}

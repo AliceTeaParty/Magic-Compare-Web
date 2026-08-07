@@ -3,7 +3,13 @@
 import { PhotoLibrary } from "@mui/icons-material";
 import { Box, Button, Stack, Typography } from "@mui/material";
 import type { ViewerFrame } from "@magic-compare/compare-core/viewer-data";
-import { useEffect, useRef, type CSSProperties, type DragEvent as ReactDragEvent } from "react";
+import {
+  memo,
+  useEffect,
+  useRef,
+  type CSSProperties,
+  type DragEvent as ReactDragEvent,
+} from "react";
 import { useFilmstripDrag } from "./use-filmstrip-drag";
 import {
   FILMSTRIP_CARD_WIDTH,
@@ -29,14 +35,14 @@ function ThumbnailButton({
   frame,
   isActive,
   isNearActive,
-  onClick,
-  onIntent,
+  onFrameIntent,
+  onSelectFrame,
 }: {
   frame: ViewerFrame;
   isActive: boolean;
   isNearActive: boolean;
-  onClick: () => void;
-  onIntent: () => void;
+  onFrameIntent: (frame: ViewerFrame) => void;
+  onSelectFrame: (frameId: string) => void;
 }) {
   const thumbAsset = resolveThumbnailAsset(frame);
   const hoverIntentTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -51,14 +57,14 @@ function ThumbnailButton({
 
   function handleImmediateIntent() {
     cancelHoverIntent();
-    onIntent();
+    onFrameIntent(frame);
   }
 
   function handleMouseEnter() {
     cancelHoverIntent();
     hoverIntentTimerRef.current = setTimeout(() => {
       hoverIntentTimerRef.current = null;
-      onIntent();
+      onFrameIntent(frame);
     }, 150);
   }
 
@@ -69,7 +75,7 @@ function ThumbnailButton({
       data-frame-id={frame.id}
       aria-label={frame.title}
       aria-pressed={isActive}
-      onClick={onClick}
+      onClick={() => onSelectFrame(frame.id)}
       onFocus={handleImmediateIntent}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={cancelHoverIntent}
@@ -168,6 +174,10 @@ function ThumbnailButton({
   );
 }
 
+// Scrollbar position updates rerender the filmstrip shell every frame. Stable callbacks plus memo
+// keep unchanged thumbnail image subtrees out of that hot path while the virtual window moves.
+const MemoizedThumbnailButton = memo(ThumbnailButton);
+
 interface ViewerFilmstripProps {
   currentFrameId: string | undefined;
   frames: ViewerFrame[];
@@ -241,9 +251,9 @@ export function ViewerFilmstrip({
         minWidth: 0,
         px: { xs: 1.25, md: 1.5 },
         pt: { xs: 1.1, md: 1.25 },
-        // The custom scrollbar needs its own breathing room; a thin bottom inset made the filmstrip
-        // appear clipped against the viewport even though the thumb itself remained interactive.
-        pb: { xs: 1.5, md: 1.75 },
+        // The scrollbar now provides its own 24px hit target, so a smaller inset preserves the
+        // filmstrip's overall density without crowding the visible rail against the shell edge.
+        pb: { xs: 0.5, md: 0.75 },
         borderTop: "1px solid",
         borderBottom: "1px solid",
         borderColor: "divider",
@@ -305,13 +315,13 @@ export function ViewerFilmstrip({
           {visibleFrames.map((frame, windowIndex) => {
             const index = renderWindow.start + windowIndex;
             return (
-              <ThumbnailButton
+              <MemoizedThumbnailButton
                 key={frame.id}
                 frame={frame}
                 isActive={frame.id === currentFrameId}
                 isNearActive={activeIndex === -1 || Math.abs(index - activeIndex) <= 8}
-                onClick={() => handleFrameSelection(frame.id)}
-                onIntent={() => onFrameIntent(frame)}
+                onSelectFrame={handleFrameSelection}
+                onFrameIntent={onFrameIntent}
               />
             );
           })}
@@ -340,9 +350,10 @@ export function ViewerFilmstrip({
           aria-valuenow={Math.round(scrollbarMetrics.scrollLeft)}
           sx={{
             width: "100%",
-            height: 8,
-            mt: { xs: 0.65, md: 0.75 },
-            mb: 0.25,
+            // Keep the visual rail thin while meeting a usable minimum touch target on mobile.
+            height: 24,
+            mt: 0.25,
+            mb: 0,
             borderRadius: 999,
             display: "flex",
             alignItems: "center",

@@ -337,7 +337,9 @@ function ViewerSidebarContent({
             color: "text.secondary",
           }}
         >
-          {currentFrame?.caption.replace(/\bepisode\b/gi, "clip") || "暂无备注。"}
+          {/* Clip is the correct product term and the earlier ep wording was a typo. Captions are
+              authored manifest content, so the viewer must display them verbatim. */}
+          {currentFrame?.caption || "暂无备注。"}
         </Typography>
       </Stack>
 

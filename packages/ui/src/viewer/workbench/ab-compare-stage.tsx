@@ -7,14 +7,9 @@ import type {
   ViewerStageSize,
 } from "@magic-compare/compare-core";
 import type { ViewerAsset } from "@magic-compare/compare-core/viewer-data";
-import {
-  useEffect,
-  useRef,
-  type KeyboardEvent as ReactKeyboardEvent,
-} from "react";
+import { useEffect, useRef, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { PositionedStageMedia } from "./positioned-stage-media";
 import { useStagePanZoom } from "./use-stage-pan-zoom";
-import { viewerTokens } from "./viewer-tokens";
 
 /**
  * Wraps A/B inspect mode so activation, side cycling, and pan/zoom all stay tied to the same stage
@@ -50,21 +45,17 @@ export function ABCompareStage({
   setPanZoomState: (nextState: ViewerPanZoomState) => void;
 }) {
   const stageSurfaceRef = useRef<HTMLDivElement | null>(null);
-  const {
-    consumeStageClick,
-    effectiveScale,
-    handleNonPassiveWheel,
-    stageHandlers,
-  } = useStagePanZoom({
-    active,
-    activeAsset: side === "before" ? beforeAsset : afterAsset,
-    clampViewport: viewportSize,
-    devicePixelRatio,
-    mediaRect,
-    panZoomState,
-    rotateStage,
-    setPanZoomState,
-  });
+  const { consumeStageClick, effectiveScale, handleNonPassiveWheel, stageHandlers } =
+    useStagePanZoom({
+      active,
+      activeAsset: side === "before" ? beforeAsset : afterAsset,
+      clampViewport: viewportSize,
+      devicePixelRatio,
+      mediaRect,
+      panZoomState,
+      rotateStage,
+      setPanZoomState,
+    });
   const activeAsset = side === "before" ? beforeAsset : afterAsset;
 
   useEffect(() => {
@@ -150,19 +141,13 @@ export function ABCompareStage({
         position: "relative",
         width: "100%",
         height: "100%",
-        overflow: "hidden",
         touchAction: active ? "none" : "pan-y",
         cursor: active ? (effectiveScale > 1 ? "grab" : "pointer") : "pointer",
         userSelect: "none",
-        borderRadius: 2.25,
-        outline: active ? viewerTokens.abStage.activeOutline : "1px solid transparent",
-        boxShadow: active ? viewerTokens.abStage.activeShadow : "none",
-        transition:
-          "outline-color 180ms cubic-bezier(0.2, 0, 0, 1), box-shadow 180ms cubic-bezier(0.2, 0, 0, 1)",
-        "&:focus-visible": {
-          outline: viewerTokens.abStage.activeOutline,
-          boxShadow: viewerTokens.abStage.activeShadow,
-        },
+        // The parent presentation shell owns clipping and focus feedback; inheriting its radius
+        // keeps the interactive surface aligned without painting a second colored edge.
+        borderRadius: "inherit",
+        outline: "none",
       }}
     >
       {[
@@ -189,6 +174,7 @@ export function ABCompareStage({
             prefersReducedMotion={prefersReducedMotion}
             showFallback={isVisibleLayer}
             animateOpacity={false}
+            willChangeTransform={active && isVisibleLayer}
           />
         );
       })}

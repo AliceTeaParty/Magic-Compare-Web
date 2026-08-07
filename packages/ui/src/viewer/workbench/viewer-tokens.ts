@@ -1,9 +1,4 @@
 export const viewerTokens = {
-  abStage: {
-    activeOutline: "1px solid var(--mc-primary, rgba(232, 198, 246, 0.48))",
-    activeShadow:
-      "var(--mc-viewer-shadow, 0 0 0 1px rgba(232, 198, 246, 0.08), 0 0 22px rgba(228, 194, 242, 0.14))",
-  },
   control: {
     disabledBorder: "var(--mui-palette-divider, rgba(255,255,255,0.12))",
     disabledSurface: "var(--mui-palette-action-disabledBackground, rgba(255,255,255,0.02))",

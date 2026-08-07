@@ -1,10 +1,7 @@
 "use client";
 
 import { Box } from "@mui/material";
-import type {
-  ViewerMediaRect,
-  ViewerPanZoomState,
-} from "@magic-compare/compare-core";
+import type { ViewerMediaRect, ViewerPanZoomState } from "@magic-compare/compare-core";
 import type { ViewerAsset } from "@magic-compare/compare-core/viewer-data";
 import { type CSSProperties } from "react";
 import { StageImageFallback } from "./stage-image-fallback";
@@ -59,6 +56,7 @@ export function PositionedStageMedia({
   prefersReducedMotion = false,
   showFallback = true,
   animateOpacity = true,
+  willChangeTransform = false,
 }: {
   asset: ViewerAsset;
   alt: string;
@@ -78,9 +76,11 @@ export function PositionedStageMedia({
   prefersReducedMotion?: boolean;
   showFallback?: boolean;
   animateOpacity?: boolean;
+  willChangeTransform?: boolean;
 }) {
-  const { hasError, imageRef, markErrored, markLoaded, showImage } =
-    useStageImageLoadState(asset.imageUrl);
+  const { hasError, imageRef, markErrored, markLoaded, showImage } = useStageImageLoadState(
+    asset.imageUrl,
+  );
 
   const resolvedClipRect = clipRect ?? mediaRect;
 
@@ -95,10 +95,8 @@ export function PositionedStageMedia({
 
   const mediaWidth = rotateStage ? mediaRect.height : mediaRect.width;
   const mediaHeight = rotateStage ? mediaRect.width : mediaRect.height;
-  const mediaCenterX =
-    mediaRect.x + mediaRect.width / 2 - resolvedClipRect.x;
-  const mediaCenterY =
-    mediaRect.y + mediaRect.height / 2 - resolvedClipRect.y;
+  const mediaCenterX = mediaRect.x + mediaRect.width / 2 - resolvedClipRect.x;
+  const mediaCenterY = mediaRect.y + mediaRect.height / 2 - resolvedClipRect.y;
 
   return (
     <Box
@@ -120,13 +118,11 @@ export function PositionedStageMedia({
           top: `${mediaCenterY}px`,
           width: `${mediaWidth}px`,
           height: `${mediaHeight}px`,
-          transform: buildMediaTransform(
-            rotateStage,
-            panZoomState,
-            effectiveScale,
-          ),
+          transform: buildMediaTransform(rotateStage, panZoomState, effectiveScale),
           transformOrigin: "center center",
-          willChange: "transform",
+          // Persistent promotion kept every full-size image in its own compositor layer. Only the
+          // visible A/B asset needs that hint while inspect transforms can change interactively.
+          willChange: willChangeTransform ? "transform" : "auto",
         }}
       >
         {!showImage && showFallback ? (
@@ -160,9 +156,10 @@ export function PositionedStageMedia({
             pointerEvents: "none",
             userSelect: "none",
             WebkitUserDrag: "none",
-            transition: prefersReducedMotion || !animateOpacity
-              ? "none"
-              : "opacity 160ms cubic-bezier(0.2, 0, 0, 1)",
+            transition:
+              prefersReducedMotion || !animateOpacity
+                ? "none"
+                : "opacity 160ms cubic-bezier(0.2, 0, 0, 1)",
           }}
         />
       </Box>
