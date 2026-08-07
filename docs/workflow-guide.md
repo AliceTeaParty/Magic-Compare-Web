@@ -10,8 +10,8 @@
 - `public-site` 是静态导出目标，构建产物可直接推到 Cloudflare Pages。
 - 内部原图、缩略图和 heatmap 已经统一走 S3-compatible 存储，不再使用 `.runtime` 或 `public/internal-assets`。
 - demo 是受控样本，不代表真实业务导入流程。
-- 真实内容的推荐链路是：`Web upload -> group-upload-start -> frame prepare/upload/commit -> group-upload-complete -> internal-site -> case-publish -> public-export/public-deploy`。
-- `public-export` 和 `public-deploy` 必须显式触发，它们不是 `case-publish` 的隐式副作用。
+- 真实内容的推荐链路是：`Web upload -> group-upload-start -> frame prepare/upload/commit -> group-upload-complete -> internal-site 内容编辑 -> published manifest 同步 -> public-export/public-deploy`。
+- 公开 Group 的 metadata、可见性和排序变更会同步刷新 published manifest；`public-export` 和 `public-deploy` 仍需显式触发。
 
 ## 当前架构中的真实分工
 
@@ -328,6 +328,14 @@ Web 上传链路是：
 - public-export/public-deploy 不再打包图片，Pages 只发布静态页面和 manifest
 - `public-site` 公开页默认不应被搜索引擎索引；页面层防爬通过 metadata / `robots.txt` 声明，真正的图片拦截和限流交给 Cloudflare
 
+### 页面标题与分享 metadata
+
+- internal-site 使用 `页面名称 | Magic Compare` 标题模板；Case 与 Group 路由从数据库标题生成标签页标题，不生成 Open Graph 分享数据。
+- public-site 的每个 `/g/[publicSlug]` 从 published manifest 生成独立标题、Group 描述、Open Graph 与 Twitter Card。公开构建会为每个 Group 生成 `1200x630`、quality 80 的 `share.webp`：上方使用第一帧主 Before / After 素材，下方显示 `Group - Case`、Group 数量与 Group 描述。
+- `MAGIC_COMPARE_PUBLIC_SITE_BASE_URL` 同时决定公开页 canonical、`og:url` 与标准分享图的绝对 URL。未配置时仍生成标题和描述，并回退到第一帧主 Before 素材作为分享图，但省略依赖站点 origin 的 URL 字段。
+- 分享图使用与前端一致的 IBM Plex Sans、中文回退字体和 Playwrite US Trad 水印字体；字体下载后缓存在 public-site 的 `.next/cache`，首次公开构建需要能够访问字体源与公开素材 URL。
+- 公开站继续保持 `noindex`，分享 metadata 不改变当前禁止搜索索引的策略。
+
 ## 站点品牌与版本信息
 
 - Next config 在构建时读取根 `package.json` 的 `version` 和当前 git 短 hash，注入为 `MAGIC_COMPARE_APP_VERSION` / `MAGIC_COMPARE_COMMIT_SHA`。
@@ -359,25 +367,29 @@ Web 上传链路是：
 - 不要把 viewer 的键盘、cookie、viewport、A/B outside-click 副作用重新塞回 `group-viewer-workbench.tsx`
 - 不要让 workspace action 自己管理 toast timer、optimistic rollback、transition 样板；复用 action helper 和 notification hook
 
-## 发布、导出、部署三件事要分清
+## 公开内容同步、导出、部署
 
-### 1. publish case
+### 1. published manifest 同步
 
 作用：
 
-- 把当前 case 中 `isPublic=true` 的内容写成 published bundle
+- 把受影响 Case 中 `isPublic=true` 的内容写成 published bundle
 
 入口：
 
-- `POST /api/ops/case-publish`
+- Case / Group metadata 更新
+- Group 可见性切换
+- Group / Frame 排序更新
 
 结果：
 
 - published root 或 `MAGIC_COMPARE_PUBLISHED_ROOT` 更新
 
-发布只查询公开 Group、Frame 和 manifest 所需字段。新上传或 manifest 导入在对象检查成功后写入 `Asset.storageValidatedAt`；旧素材首次发布以 8 路并发检查未记录的原图和缩略图，后续发布信任 UUID 不可变路径，不再重复读取 R2。日志记录查询、校验和总耗时以及信任/新增校验数量。
+仓库不再提供独立的 `case-publish` API。内容写操作只在 Case 含公开 Group 时重新生成 manifest；Group 改为内部时会删除对应 published bundle，最后一个公开 Group 被移除后会同步清理 Case 发布状态。
 
-它**不会**自动部署公开站。
+manifest 生成只查询公开 Group、Frame 和所需字段。新上传或 manifest 导入在对象检查成功后写入 `Asset.storageValidatedAt`；旧素材首次生成 manifest 时检查未记录的原图和缩略图，后续信任 UUID 不可变路径，不再重复读取 R2。日志记录查询、校验和总耗时以及信任/新增校验数量。
+
+Web 上传替换已有公开 Group 时会先将其改为内部并删除旧 bundle，避免上传过程中暴露不完整内容；上传完成后由操作者重新标记为公开。
 
 ### 2. public export
 
@@ -398,7 +410,6 @@ Web 上传链路是：
 
 作用：
 
-- 可选先重新 publish 某一个 case
 - 先做一次 fresh export
 - 再调用 Wrangler 上传到 Cloudflare Pages
 
@@ -420,9 +431,9 @@ Web 上传链路是：
 当前 internal-site workspace 入口：
 
 - 全局导航固定保留“部署”入口
-- 全局入口调用不带 `caseId` 的 `POST /api/ops/public-deploy`，只部署已经发布的 bundle
+- 全局入口以空请求体调用 `POST /api/ops/public-deploy`，部署完整的当前 published root
 - `POST` 返回 `202` 和任务 id；`GET /api/ops/public-deploy?jobId=...` 返回可恢复的阶段状态
-- Case publish 仍由显式 publish 操作负责，不会因为打开某个工作区而隐式改变全站部署内容
+- manifest 由内容写操作同步刷新；部署任务不读取 Case 上下文
 - `dev:all` 下的 3001 直接服务本次部署写入的 `output/public-site`；从 Group Viewer 发起部署时，完成面板打开对应的导出兼容路径
 - 浏览器已经授予通知权限且页面在后台时才发送完成通知，部署点击本身不会弹权限请求
 
@@ -439,7 +450,6 @@ public deploy 会为以下输入计算指纹：
 部署任务记录这些真实阶段：
 
 - 检查发布内容
-- 可选生成 Case 发布内容
 - 同步并构建公开页面
 - 整理部署文件
 - 上传到 Cloudflare Pages
@@ -630,7 +640,7 @@ docker build --platform linux/amd64 -f docker/internal-site.Dockerfile -t magic-
 
 ### 对 public deploy 的建议
 
-- `publish case` 和 `public deploy` 应拆开
+- published manifest 同步由内容写操作负责，public deploy 固定处理全站
 - Pages 部署 job 不要并发
 - 优先把 export 结果作为可观察产物保留下来，便于排错
 - CI 中不要直接复用本地 `docker-data` bind mount；优先走基础 compose 的 named volumes，必要时再叠加专用 override
@@ -670,7 +680,7 @@ docker build --platform linux/amd64 -f docker/internal-site.Dockerfile -t magic-
 把这个仓库理解成三段最安全：
 
 1. `Web upload + S3` 负责把真实素材变成内部可读内容
-2. `internal-site` 负责管理、查看、发布和导出
+2. `internal-site` 负责管理、查看、同步 published manifest，并触发全站导出或部署
 3. `public-site` 只负责静态消费已发布 bundle
 
 只要不把这三段重新揉成一团，就不容易回到之前那些 404、空导出、并发部署和 viewer 布局失控的问题里。
