@@ -2,11 +2,7 @@
 
 import { PhotoLibrary } from "@mui/icons-material";
 import { Alert, Box, Stack, Typography } from "@mui/material";
-import {
-  getContainedMediaRect,
-  getFittedStageSize,
-  type ViewerPanZoomState,
-} from "@magic-compare/compare-core";
+import { getContainedMediaRect, type ViewerPanZoomState } from "@magic-compare/compare-core";
 import type { ViewerMode } from "@magic-compare/content-schema";
 import type { ViewerAsset } from "@magic-compare/compare-core/viewer-data";
 import { useEffect, useMemo, useRef, type ReactNode, type RefObject, useState } from "react";
@@ -103,16 +99,11 @@ function useElementSize(targetRef: RefObject<HTMLElement | null>): StageSize {
  */
 function StagePresentationShell({
   children,
-  stageSize,
   inspectActive,
-  stageAspectRatio,
 }: {
   children: ReactNode;
-  stageSize: StageSize | null;
   inspectActive?: boolean;
-  stageAspectRatio: number;
 }) {
-  const hasMeasuredStageSize = Boolean(stageSize);
   const activeStageShadow = `inset 0 0 0 1px ${viewerTokens.stage.activeBorder}, ${viewerTokens.stage.activeShadow}`;
 
   return (
@@ -121,13 +112,9 @@ function StagePresentationShell({
         position: "relative",
         display: "grid",
         placeItems: "center",
-        width: stageSize ? `${stageSize.width}px` : "100%",
-        height: stageSize ? `${stageSize.height}px` : "100%",
-        maxWidth: "100%",
-        maxHeight: "100%",
+        width: "100%",
+        height: "100%",
         minWidth: 0,
-        aspectRatio: hasMeasuredStageSize ? undefined : stageAspectRatio,
-        minHeight: hasMeasuredStageSize ? 0 : { xs: 80 },
         marginInline: "auto",
         // A real border reserved a dark one-pixel strip around every image and only changed color
         // while A/B was active. The inset ring now overlays the image without changing stage size,
@@ -136,13 +123,8 @@ function StagePresentationShell({
         overflow: "hidden",
         border: 0,
         background: viewerTokens.stage.surface,
-        boxShadow: inspectActive
-          ? activeStageShadow
-          : hasMeasuredStageSize
-            ? viewerTokens.stage.measuredShadow
-            : "none",
-        transition:
-          "width 180ms cubic-bezier(0.2, 0, 0, 1), height 180ms cubic-bezier(0.2, 0, 0, 1), box-shadow 180ms cubic-bezier(0.2, 0, 0, 1)",
+        boxShadow: inspectActive ? activeStageShadow : viewerTokens.stage.measuredShadow,
+        transition: "box-shadow 180ms cubic-bezier(0.2, 0, 0, 1)",
         "&:focus-within": {
           boxShadow: activeStageShadow,
         },
@@ -333,7 +315,6 @@ interface ViewerStageProps {
   setAbStageActive: (nextActive: boolean) => void;
   setPanZoomState: (nextState: ViewerPanZoomState) => void;
   setSwipePosition: (value: number) => void;
-  stageAspectRatio: number;
   stageRef: RefObject<HTMLDivElement | null>;
   swipePosition: number;
 }
@@ -359,17 +340,9 @@ export function ViewerStage({
   setAbStageActive,
   setPanZoomState,
   setSwipePosition,
-  stageAspectRatio,
   stageRef,
   swipePosition,
 }: ViewerStageProps) {
-  const stageViewportSize = useElementSize(stageRef);
-  const stageSize = useMemo(() => {
-    // The parent workbench already collapsed the slot to the fitted shell height, so the stage can
-    // size directly from the measured box instead of carrying a second viewport-height fallback.
-    return getFittedStageSize(stageViewportSize, stageAspectRatio);
-  }, [stageAspectRatio, stageViewportSize]);
-
   return (
     <Box
       ref={stageRef}
@@ -381,11 +354,7 @@ export function ViewerStage({
         placeItems: "center",
       }}
     >
-      <StagePresentationShell
-        stageSize={stageSize}
-        stageAspectRatio={stageAspectRatio}
-        inspectActive={mode === "a-b" && abStageActive}
-      >
+      <StagePresentationShell inspectActive={mode === "a-b" && abStageActive}>
         <ViewerStageContent
           abSide={abSide}
           abStageActive={abStageActive}

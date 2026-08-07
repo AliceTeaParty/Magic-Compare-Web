@@ -34,13 +34,11 @@ function resolveThumbnailAsset(frame: ViewerFrame) {
 function ThumbnailButton({
   frame,
   isActive,
-  isNearActive,
   onFrameIntent,
   onSelectFrame,
 }: {
   frame: ViewerFrame;
   isActive: boolean;
-  isNearActive: boolean;
   onFrameIntent: (frame: ViewerFrame) => void;
   onSelectFrame: (frameId: string) => void;
 }) {
@@ -125,8 +123,8 @@ function ThumbnailButton({
             src={thumbAsset.thumbUrl || thumbAsset.imageUrl}
             alt=""
             draggable={false}
-            loading={isNearActive ? "eager" : "lazy"}
-            fetchPriority={isNearActive ? "high" : "auto"}
+            loading={isActive ? "eager" : "lazy"}
+            fetchPriority={isActive ? "high" : "auto"}
             decoding="async"
             sx={{
               width: "100%",
@@ -312,14 +310,12 @@ export function ViewerFilmstrip({
               }}
             />
           ) : null}
-          {visibleFrames.map((frame, windowIndex) => {
-            const index = renderWindow.start + windowIndex;
+          {visibleFrames.map((frame) => {
             return (
               <MemoizedThumbnailButton
                 key={frame.id}
                 frame={frame}
                 isActive={frame.id === currentFrameId}
-                isNearActive={activeIndex === -1 || Math.abs(index - activeIndex) <= 8}
                 onSelectFrame={handleFrameSelection}
                 onFrameIntent={onFrameIntent}
               />

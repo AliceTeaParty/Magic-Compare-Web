@@ -12,7 +12,7 @@ import {
   useViewerKeyboardShortcuts,
   useViewerMediaPreferences,
   useViewerPreferencePersistence,
-  useViewerViewportMetrics,
+  useViewerDevicePixelRatio,
 } from "./workbench/use-group-viewer-workbench-effects";
 import { ViewerSidebar } from "./workbench/viewer-sidebar";
 import { HeatmapNotice, ViewerStage } from "./workbench/viewer-stage";
@@ -76,12 +76,6 @@ export function GroupViewerWorkbench({
     stepFrame,
     toggleSidebar,
   } = controller;
-  // Start from a zero viewport on the server and first client paint so hydration never bakes in a
-  // stale desktop/mobile height budget before the real window metrics arrive.
-  const [viewportSize, setViewportSize] = useState(() => ({
-    width: 0,
-    height: 0,
-  }));
   const [devicePixelRatio, setDevicePixelRatio] = useState(1);
   const [swipePosition, setSwipePosition] = useState(50);
   const [guideOpen, setGuideOpen] = useState(false);
@@ -117,12 +111,14 @@ export function GroupViewerWorkbench({
     : comparisonAssetKey;
   const referenceAsset = activeAfterAsset ?? beforeAsset;
   const contentAspectRatio = referenceAsset ? referenceAsset.width / referenceAsset.height : 16 / 9;
-  const stageAspectRatio = resolvedRotateStage ? 1 / contentAspectRatio : contentAspectRatio;
   const stageShell = useViewerStageShellState({
-    aspectRatio: stageAspectRatio,
     prefersReducedMotion: resolvedPrefersReducedMotion,
-    viewportSize,
   });
+  const desktopStageOffset = variant === "internal" ? 100 : 36;
+  const portraitStageOffset = variant === "internal" ? 88 : 80;
+  const desktopStageMaxWidth = `calc(${contentAspectRatio * 100}svh - ${contentAspectRatio * desktopStageOffset}px)`;
+  const portraitAspectRatio = 1 / contentAspectRatio;
+  const portraitStageMaxWidth = `calc(${portraitAspectRatio * 100}svh - ${portraitAspectRatio * portraitStageOffset}px)`;
   const imagePreloader = useViewerImagePreloader({
     comparisonAssetKey: activeComparisonAssetKey,
     currentFrameIndex,
@@ -158,10 +154,7 @@ export function GroupViewerWorkbench({
     }
   }, [mode, resetAbInspect]);
 
-  useViewerViewportMetrics({
-    setDevicePixelRatio,
-    setViewportSize,
-  });
+  useViewerDevicePixelRatio(setDevicePixelRatio);
 
   useEffect(() => {
     setShowGuideNudge(readViewerGuideState() === null);
@@ -296,14 +289,18 @@ export function GroupViewerWorkbench({
             >
               {mode === "heatmap" && !heatmapAsset ? <HeatmapNotice /> : null}
               <Box
-                ref={stageShell.stageSlotRef}
                 sx={{
                   position: "relative",
                   minWidth: 0,
-                  // The viewport budget is only an upper bound. The outer shell must collapse to
-                  // the fitted width-constrained stage height, or portrait mobile screens end up
-                  // with a short stage vertically centered inside an overly tall empty slot.
-                  height: `${stageShell.shellHeight}px`,
+                  // The old 140px server fallback expanded after hydration and caused a visible
+                  // layout shift. CSS now reserves the fitted stage geometry on the first paint.
+                  width: `min(100%, ${desktopStageMaxWidth})`,
+                  aspectRatio: contentAspectRatio,
+                  mx: "auto",
+                  "@media (max-width: 760px) and (orientation: portrait)": {
+                    width: `min(100%, ${portraitStageMaxWidth})`,
+                    aspectRatio: portraitAspectRatio,
+                  },
                 }}
               >
                 <ViewerStage
@@ -323,7 +320,6 @@ export function GroupViewerWorkbench({
                   setAbStageActive={setAbStageActive}
                   setPanZoomState={setAbPanZoomState}
                   setSwipePosition={setSwipePosition}
-                  stageAspectRatio={stageAspectRatio}
                   stageRef={stageShell.stageRef}
                   swipePosition={swipePosition}
                 />
