@@ -2,16 +2,24 @@ import type { Metadata, Viewport } from "next";
 import { resolveSiteBrandConfig } from "@magic-compare/shared-utils";
 import { MagicRootLayoutShell } from "@magic-compare/ui";
 import { loadWorkspaceEnv } from "@/lib/env/load-workspace-env";
+import { PUBLIC_SITE_DESCRIPTION, PUBLIC_SITE_NAME } from "@/lib/page-metadata";
+import { getPublicSiteBaseUrl } from "@/lib/runtime-config";
 import "./globals.css";
 
 // Static metadata is generated before RootLayout renders, so load the workspace environment here
 // or a configured public favicon would silently fall back to the checked-in asset during export.
 loadWorkspaceEnv();
 const brandConfig = resolveSiteBrandConfig(process.env, "public");
+const publicSiteBaseUrl = getPublicSiteBaseUrl();
 
 export const metadata: Metadata = {
-  title: "Magic Compare",
-  description: "Published compare galleries for encoding case studies.",
+  metadataBase: publicSiteBaseUrl ?? undefined,
+  applicationName: PUBLIC_SITE_NAME,
+  title: {
+    default: "Magic Compare 图像对比",
+    template: `%s | ${PUBLIC_SITE_NAME}`,
+  },
+  description: PUBLIC_SITE_DESCRIPTION,
   icons: {
     // Defaults live outside app/ because Next file-based icons would override this configurable
     // metadata object during static export before the public environment value can take effect.
@@ -38,6 +46,19 @@ export const metadata: Metadata = {
       noarchive: true,
       nosnippet: true,
     },
+  },
+  openGraph: {
+    type: "website",
+    locale: "zh_CN",
+    siteName: PUBLIC_SITE_NAME,
+    title: "Magic Compare 图像对比",
+    description: PUBLIC_SITE_DESCRIPTION,
+    ...(publicSiteBaseUrl ? { url: publicSiteBaseUrl } : {}),
+  },
+  twitter: {
+    card: "summary",
+    title: "Magic Compare 图像对比",
+    description: PUBLIC_SITE_DESCRIPTION,
   },
 };
 

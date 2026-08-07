@@ -9,6 +9,8 @@ import {
 import { resolveDefaultPublishedRoot } from "@magic-compare/shared-utils/workspace-env";
 import { loadWorkspaceEnv } from "./env/load-workspace-env";
 
+export const PUBLIC_SITE_BASE_URL_ENV_NAME = "MAGIC_COMPARE_PUBLIC_SITE_BASE_URL";
+
 function workspaceRoot(): string {
   const currentDir = path.dirname(fileURLToPath(import.meta.url));
   return path.resolve(currentDir, "../../..");
@@ -30,4 +32,19 @@ export function getPublishedGroupsRoot(): string {
     ? path.resolve(configured)
     : resolveDefaultPublishedRoot(workspaceRoot());
   return path.join(publishedRoot, "groups");
+}
+
+/** Resolves the public origin once so canonical and Open Graph URLs cannot disagree. */
+export function getPublicSiteBaseUrl(): URL | null {
+  loadWorkspaceEnv();
+  const configured = process.env[PUBLIC_SITE_BASE_URL_ENV_NAME]?.trim();
+  if (!configured) return null;
+
+  try {
+    const url = new URL(configured);
+    if (url.protocol !== "http:" && url.protocol !== "https:") throw new Error("invalid protocol");
+    return url;
+  } catch {
+    throw new Error(`${PUBLIC_SITE_BASE_URL_ENV_NAME} must be an absolute HTTP(S) URL.`);
+  }
 }
