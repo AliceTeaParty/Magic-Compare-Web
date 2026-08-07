@@ -282,7 +282,8 @@ export function CaseDirectoryCard({ item }: { item: CaseCatalogItem }) {
             />
             <MetadataItem
               icon={<PublicOutlined sx={{ fontSize: 18, color: "text.secondary" }} />}
-              label={`${item.publicGroupCount} 公开`}
+              // Keep the Case catalog metadata in the same English product terminology as Group.
+              label={`${item.publicGroupCount} Public`}
             />
             <MetadataItem
               icon={<ScheduleOutlined sx={{ fontSize: 18, color: "text.secondary" }} />}
