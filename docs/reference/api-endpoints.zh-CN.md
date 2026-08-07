@@ -291,8 +291,9 @@
 
 说明：
 
-- 按 `groupIds` 数组顺序直接写入 `order`。
-- 这个接口不检查 slug，只按数据库 `id` 和所属 `caseId` 更新。
+- `groupIds` 必须无重复，并且完整包含该 Case 当前全部 Group。
+- 缺失、重复或混入其他 Case 的 Group ID 时返回 `409`，且不会写入顺序或刷新 manifest。
+- 校验通过后按 `groupIds` 数组顺序写入 `order`。
 - Case 含公开 Group 时会同步刷新 published manifest。
 
 ## Frame 级上传事务端点

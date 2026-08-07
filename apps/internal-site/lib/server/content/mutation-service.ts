@@ -119,10 +119,24 @@ export async function createCase(metadata: { slug: string; title: string; summar
 }
 
 /**
- * Persists the exact ordering emitted by the drag-and-drop client, because the workspace already
- * resolved ordering semantics and the server should not second-guess that sequence.
+ * Rejects stale drag-and-drop state before writing because partial or foreign id lists would leave
+ * duplicate order values and publish a manifest that no longer matches the workspace.
  */
 export async function reorderGroups(caseId: string, groupIds: string[]): Promise<void> {
+  const currentGroups = await prisma.group.findMany({
+    where: { caseId },
+    select: { id: true },
+  });
+  const requestedGroupIds = new Set(groupIds);
+  if (
+    groupIds.length === 0 ||
+    requestedGroupIds.size !== groupIds.length ||
+    currentGroups.length !== groupIds.length ||
+    currentGroups.some((group) => !requestedGroupIds.has(group.id))
+  ) {
+    throw new ConflictError("Group order is stale. Refresh the Case and try again.");
+  }
+
   await prisma.$transaction(
     groupIds.map((groupId, order) =>
       prisma.group.updateMany({
