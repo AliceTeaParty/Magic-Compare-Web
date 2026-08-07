@@ -406,9 +406,9 @@ export const ViewerFilmstrip = memo(function ViewerFilmstrip({
               borderRadius: 999,
               background: viewerTokens.filmstrip.scrollbarThumb,
               transform: "translate3d(var(--filmstrip-thumb-offset, 0px), 0, 0)",
-              // Scroll position is written once per animation frame; another transform transition
-              // would lag behind the native viewport and make the thumb feel detached.
-              transition: prefersReducedMotion ? "none" : "width 180ms cubic-bezier(0.2, 0, 0, 1)",
+              // Width only changes after real container measurements. Animating that layout
+              // property added reflow work while the offset already provides smooth rAF motion.
+              transition: "none",
               boxShadow: viewerTokens.filmstrip.scrollbarThumbRing,
             }}
           />

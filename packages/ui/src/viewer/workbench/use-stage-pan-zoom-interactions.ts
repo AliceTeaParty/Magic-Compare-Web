@@ -113,7 +113,7 @@ export function useStagePanZoomInteractions({
         panZoomStateRef,
       });
     },
-    [applyPanZoom],
+    [applyPanZoom, panZoomStateRef],
   );
 
   /**
