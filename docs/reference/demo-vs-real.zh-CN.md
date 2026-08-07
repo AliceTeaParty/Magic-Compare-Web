@@ -176,15 +176,15 @@ pnpm dev:internal
 
 当前行为是：
 
-- 如果本地数据库已经有内容，`pnpm dev:internal` 只会直接启动 `next dev`
-- 如果本地数据库为空，`pnpm dev:internal` 会先自动执行首次 `db:push + db:seed`
+- `pnpm dev:internal` 每次启动都会同步 SQLite schema，但不会自动运行 demo seed
+- 需要创建或修复 demo 时使用 `pnpm dev:bootstrap`
+- `pnpm dev:bootstrap` 会先同步 schema，再在对象存储配置完整且未隐藏 demo 时执行 `db:seed`
 
-如果你想显式重建数据库，仍然可以手动运行：
+如果要单独执行数据库步骤，可以手动运行：
 
 ```bash
 pnpm db:push
 pnpm db:seed
-pnpm dev:internal
 ```
 
 这样能最快得到一组稳定可用的数据。

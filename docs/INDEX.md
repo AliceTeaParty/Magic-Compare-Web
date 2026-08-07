@@ -21,8 +21,6 @@
 
 ### 常青规范（高可信度，低变更频率）
 
-直接读、优先信。
-
 - [workflow-guide.md](workflow-guide.md) — 工作流、架构分工、数据存储、已知坑，当前最权威的单文档
 - [web-uploader.zh-CN.md](web-uploader.zh-CN.md) — 当前推荐的 Web 上传入口、能力边界和实现定位
 - [commit-guide.md](commit-guide.md) — 提交粒度、分支规则、message 格式
@@ -41,7 +39,7 @@
 
 ### 历史存档（仅供追溯）
 
-已解决的问题与过时的规划。**不要把 archive/ 的内容当作当前约束来遵守。**
+**不要把 archive/ 的内容当作当前约束来遵守。**已解决的问题与过时的规划。
 
 - [archive/2026-03-26-r2-frame-upload-rewrite-notes.zh-CN.md](archive/2026-03-26-r2-frame-upload-rewrite-notes.zh-CN.md)
 - [archive/2026-03-28-maintainability-cleanup-notes.zh-CN.md](archive/2026-03-28-maintainability-cleanup-notes.zh-CN.md)
