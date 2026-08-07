@@ -1,5 +1,6 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
+import { parsePublishedRouteAlias } from "../apps/public-site/lib/public-route-alias";
 import {
   loadWorkspaceEnvFromModule,
   resolveDefaultPublishedRoot,
@@ -11,12 +12,6 @@ const workspaceRoot = resolveWorkspaceRoot(import.meta.url, 1);
 const exportRoot = path.join(workspaceRoot, "apps", "public-site", "out");
 const aliasRoot = path.join(exportRoot, "cases");
 const emptyPlaceholderSlug = "__empty__";
-
-interface PublishedAlias {
-  caseSlug: string;
-  groupSlug: string;
-  publicSlug: string;
-}
 
 /**
  * Reads the published bundle root from env so the alias generator follows the same data source
@@ -34,7 +29,7 @@ function publishedGroupsDir(): string {
  * Reconstructs legacy case/group aliases from published manifests instead of hard-coding any
  * slug mapping, so compatibility keeps following the actual published output.
  */
-function readAliases(): PublishedAlias[] {
+function readAliases() {
   const groupsDir = publishedGroupsDir();
   if (!existsSync(groupsDir)) {
     return [];
@@ -48,21 +43,8 @@ function readAliases(): PublishedAlias[] {
         return [];
       }
 
-      const manifest = JSON.parse(readFileSync(manifestPath, "utf8")) as {
-        case?: { slug?: string };
-        group?: { slug?: string };
-        publicSlug?: string;
-      };
-
-      const caseSlug = manifest.case?.slug;
-      const groupSlug = manifest.group?.slug;
-      const publicSlug = manifest.publicSlug;
-
-      if (!caseSlug || !groupSlug || !publicSlug) {
-        return [];
-      }
-
-      return [{ caseSlug, groupSlug, publicSlug }];
+      const alias = parsePublishedRouteAlias(readFileSync(manifestPath, "utf8"));
+      return alias ? [alias] : [];
     });
 }
 

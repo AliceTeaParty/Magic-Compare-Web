@@ -105,9 +105,6 @@ export type UploadStreamSourceAssetDescriptor = z.infer<
   typeof UploadStreamSourceAssetDescriptorSchema
 >;
 
-export type UploadJobStatus = "active" | "completed" | "cancelled";
-export type UploadFrameStatus = "pending" | "prepared" | "committed" | "cancelled";
-
 export function isStreamUploadInput(
   input: GroupUploadStartInput,
 ): input is Extract<GroupUploadStartInput, { protocol: "stream-v2" }> {

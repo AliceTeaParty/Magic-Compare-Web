@@ -4,7 +4,6 @@ import { readFile } from "node:fs/promises";
 import {
   DeleteObjectsCommand,
   GetObjectCommand,
-  HeadObjectCommand,
   ListObjectsV2Command,
   PutObjectCommand,
   S3Client,
@@ -24,11 +23,6 @@ const MIME_TYPES: Record<string, string> = {
 let cachedClient: S3Client | null = null;
 let cachedSignature: string | null = null;
 
-export interface InternalAssetHeadState {
-  metadata: Record<string, string>;
-  size: number;
-}
-
 export interface PresignedInternalAssetUpload {
   key: string;
   logicalPath: string;
@@ -37,9 +31,7 @@ export interface PresignedInternalAssetUpload {
 }
 
 function hasTraversal(input: string): boolean {
-  return input
-    .split("/")
-    .some((segment) => segment === ".." || segment.length === 0);
+  return input.split("/").some((segment) => segment === ".." || segment.length === 0);
 }
 
 export function guessMimeType(fileName: string): string {
@@ -218,49 +210,6 @@ export async function createPresignedInternalAssetUpload(params: {
     uploadUrl,
     expiresInSeconds,
   };
-}
-
-/**
- * Head is shared by commit and cleanup flows because both need a cheap existence check that does
- * not download the full object body just to verify one prepared upload finished.
- */
-export async function headInternalAsset(logicalPath: string): Promise<InternalAssetHeadState | null> {
-  const client = buildS3Client();
-  const config = getInternalAssetStorageConfig();
-
-  try {
-    const response = await client.send(
-      new HeadObjectCommand({
-        Bucket: config.bucket,
-        Key: internalAssetObjectKey(logicalPath),
-      }),
-    );
-
-    return {
-      metadata: Object.fromEntries(
-        Object.entries(response.Metadata ?? {}).map(([key, value]) => [
-          key.toLowerCase(),
-          value ?? "",
-        ]),
-      ),
-      size: Number(response.ContentLength ?? 0),
-    };
-  } catch (error) {
-    const statusCode =
-      typeof error === "object" && error && "$metadata" in error
-        ? Number(
-            (error as { $metadata?: { httpStatusCode?: number } }).$metadata?.httpStatusCode ?? 0,
-          )
-        : 0;
-    const errorName =
-      typeof error === "object" && error && "name" in error ? String(error.name) : "";
-
-    if (statusCode === 404 || errorName === "NotFound" || errorName === "NoSuchKey") {
-      return null;
-    }
-
-    throw error;
-  }
 }
 
 /**

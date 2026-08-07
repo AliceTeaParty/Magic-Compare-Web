@@ -79,10 +79,6 @@ export function findAsset(frame: ViewerFrame, kind: AssetKind): ViewerAsset | un
   return frame.assets.find((asset) => asset.kind === kind);
 }
 
-export function getPrimaryAssets(frame: ViewerFrame): ViewerAsset[] {
-  return frame.assets.filter((asset) => asset.isPrimaryDisplay);
-}
-
 /**
  * Uses semantic column identity instead of row-specific database ids so a selected comparison
  * target can follow the reviewer while they move between frames in the same group.

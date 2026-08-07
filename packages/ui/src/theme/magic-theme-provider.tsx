@@ -375,8 +375,3 @@ export function MagicThemeProvider({ children, initialThemeSeed }: MagicThemePro
     </MagicWorkbenchThemeProvider>
   );
 }
-
-export const INTERNAL_THEME_STORAGE = {
-  mode: INTERNAL_MODE_STORAGE_KEY,
-  colorScheme: INTERNAL_SCHEME_STORAGE_KEY,
-} as const;
