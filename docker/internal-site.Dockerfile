@@ -81,6 +81,9 @@ COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/pnpm-lock.yaml ./pnpm-lock.yaml
 COPY --from=builder /app/pnpm-workspace.yaml ./pnpm-workspace.yaml
 COPY --from=builder /app/tsconfig.base.json ./tsconfig.base.json
+COPY docker/internal-site-init.sh /usr/local/bin/internal-site-init
+
+RUN chmod 755 /usr/local/bin/internal-site-init
 
 EXPOSE 3000
 

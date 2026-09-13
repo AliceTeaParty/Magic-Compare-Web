@@ -6,6 +6,10 @@ Entries before that date are summarized at release level instead of being recons
 
 ## Unreleased
 
+### Changed
+
+- Moved Docker runtime initialization out of Compose YAML into named scripts, including shared RustFS bucket setup through a one-shot AWS CLI container.
+
 ## v2.0.0-alpha - 2026-08-07
 
 Major workspace and deployment pre-release. This alpha rebuilds the internal Case workflow, advances the browser uploader and image inspection tools, and modernizes the runtime and public publishing pipeline around the current Web-first architecture.
