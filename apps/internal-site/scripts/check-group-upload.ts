@@ -130,16 +130,12 @@ async function verifyGroupUpload() {
   }
 
   const commitPayload = { groupUploadJobId: start.groupUploadJobId, frameOrder: frame.order };
-  const committed = await postJson<{ status: string }>(
-    "/api/ops/group-upload-frame-commit",
-    commitPayload,
-  );
-  const committedAgain = await postJson<{ status: string }>(
-    "/api/ops/group-upload-frame-commit",
-    commitPayload,
-  );
+  const [committed, committedAgain] = await Promise.all([
+    postJson<{ status: string }>("/api/ops/group-upload-frame-commit", commitPayload),
+    postJson<{ status: string }>("/api/ops/group-upload-frame-commit", commitPayload),
+  ]);
   if (committed.status !== "committed" || committedAgain.status !== "committed") {
-    throw new Error("Commit did not return the expected idempotent committed status.");
+    throw new Error("Overlapping commits did not return the expected committed status.");
   }
 
   const completed = await postJson<{ status: string; committedFrameCount: number }>(
@@ -152,4 +148,6 @@ async function verifyGroupUpload() {
 }
 
 await verifyGroupUpload();
-console.log("Group upload HTTP, presigned PUT, idempotent commit, and completion passed.");
+console.log(
+  "Group upload HTTP, presigned PUT, concurrent idempotent commit, and completion passed.",
+);

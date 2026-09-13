@@ -268,6 +268,18 @@ describe("upload-service", () => {
     frameCreate.mockReset();
     caseUpdate.mockReset();
     transaction.mockReset();
+    transaction.mockImplementation(async (operation) => {
+      if (typeof operation !== "function") {
+        return undefined;
+      }
+
+      return operation({
+        frameUploadJob: { updateMany: frameUploadJobUpdateMany },
+        frame: { deleteMany: frameDeleteMany, create: frameCreate },
+        case: { update: caseUpdate },
+        groupUploadJob: { update: groupUploadJobUpdate },
+      });
+    });
 
     Object.values(helperMocks).forEach((mockFn) => mockFn.mockReset());
     deleteInternalAssetPrefix.mockReset();
@@ -636,9 +648,8 @@ describe("upload-service", () => {
     frameDeleteMany.mockReturnValue("deleted-frames");
     frameCreate.mockReturnValue("created-frame");
     caseUpdate.mockReturnValue("updated-case");
-    frameUploadJobUpdate.mockReturnValue("updated-frame-job");
+    frameUploadJobUpdateMany.mockResolvedValue({ count: 1 });
     groupUploadJobUpdate.mockReturnValue("updated-group-job");
-    transaction.mockResolvedValue(undefined);
 
     const result = await commitGroupUploadFrame({
       groupUploadJobId: "job-1",
@@ -660,6 +671,17 @@ describe("upload-service", () => {
       [{ id: "frame-0", storagePrefix: "/groups/group-1/1/old" }],
       "/groups/group-1/1/revision-1",
     );
+    expect(frameUploadJobUpdateMany).toHaveBeenCalledWith({
+      where: {
+        id: "frame-job-1",
+        status: "prepared",
+        groupUploadJob: { status: "active" },
+      },
+      data: {
+        status: "committed",
+        committedAt: expect.any(Date),
+      },
+    });
     expect(result).toEqual({
       groupUploadJobId: "job-1",
       frameOrder: 0,
@@ -693,6 +715,53 @@ describe("upload-service", () => {
 
     expect(frameFindMany).not.toHaveBeenCalled();
     expect(transaction).not.toHaveBeenCalled();
+  });
+
+  it("does not replace rows or increment the count when another commit already claimed the frame", async () => {
+    const preparedFrameJob = {
+      id: "frame-job-1",
+      frameOrder: 0,
+      frameSnapshotJson: JSON.stringify({
+        order: 0,
+        title: "Frame 1",
+        caption: "",
+        assets: [],
+      }),
+      preparedAssetsJson: JSON.stringify([]),
+      pendingPrefix: "/groups/group-1/1/revision-1",
+      status: "prepared",
+      groupUploadJob: {
+        id: "job-1",
+        inputHash: "hash-1",
+        expectedFrameCount: 1,
+        committedFrameCount: 0,
+        status: "active",
+        expiresAt: null,
+        case: { id: "case-1", slug: "2026" },
+        group: { id: "group-1", slug: "test-group", storageRoot: "/groups/group-1" },
+      },
+    };
+    helperMocks.requireActiveFrameUploadJob
+      .mockResolvedValueOnce(preparedFrameJob)
+      .mockResolvedValueOnce({
+        ...preparedFrameJob,
+        status: "committed",
+        groupUploadJob: {
+          ...preparedFrameJob.groupUploadJob,
+          committedFrameCount: 1,
+        },
+      });
+    frameFindMany.mockResolvedValue([{ id: "frame-0", storagePrefix: "/groups/group-1/1/old" }]);
+    frameUploadJobUpdateMany.mockResolvedValue({ count: 0 });
+
+    await expect(
+      commitGroupUploadFrame({ groupUploadJobId: "job-1", frameOrder: 0 }),
+    ).resolves.toEqual({ groupUploadJobId: "job-1", frameOrder: 0, status: "committed" });
+
+    expect(frameDeleteMany).not.toHaveBeenCalled();
+    expect(frameCreate).not.toHaveBeenCalled();
+    expect(groupUploadJobUpdate).not.toHaveBeenCalled();
+    expect(helperMocks.deleteReplacedFramePrefixes).not.toHaveBeenCalled();
   });
 
   it("adds job and frame context to a failed commit storage validation", async () => {

@@ -338,7 +338,7 @@ export async function commitGroupUploadFrame(rawInput: unknown) {
       storagePrefix: true,
     },
   });
-  await replaceCommittedFrame({
+  const committed = await replaceCommittedFrame({
     existingFrames,
     frameJobId: frameJob.id,
     frameSnapshot,
@@ -348,6 +348,22 @@ export async function commitGroupUploadFrame(rawInput: unknown) {
     preparedAssets,
     caseId: job.case.id,
   });
+
+  if (!committed) {
+    const latestFrameJob = await requireActiveFrameUploadJob(
+      input.groupUploadJobId,
+      input.frameOrder,
+    );
+    if (latestFrameJob.status !== COMMITTED_FRAME_STATUS) {
+      throw new ConflictError("Frame commit did not complete.");
+    }
+
+    return {
+      groupUploadJobId: latestFrameJob.groupUploadJob.id,
+      frameOrder: latestFrameJob.frameOrder,
+      status: COMMITTED_FRAME_STATUS,
+    };
+  }
 
   await deleteReplacedFramePrefixes(existingFrames, pendingPrefix);
 
@@ -552,8 +568,9 @@ function loadPreparedFrameCommit(frameJob: ActiveFrameUploadJob) {
 }
 
 /**
- * Row replacement happens in one transaction so a frame never points at mixed old/new assets and
- * the group's committed-frame counter only advances if the replacement row landed successfully.
+ * Claiming the prepared row, replacing content, and incrementing the aggregate count happen in one
+ * transaction. A concurrent request that loses the conditional claim observes the committed row
+ * afterward instead of creating a second Frame or advancing the counter twice.
  */
 async function replaceCommittedFrame(params: {
   caseId: string;
@@ -564,45 +581,55 @@ async function replaceCommittedFrame(params: {
   jobId: string;
   pendingPrefix: string;
   preparedAssets: PreparedUploadAsset[];
-}) {
-  await prisma.$transaction([
-    prisma.frame.deleteMany({
+}): Promise<boolean> {
+  return prisma.$transaction(async (transaction) => {
+    const claim = await transaction.frameUploadJob.updateMany({
+      where: {
+        id: params.frameJobId,
+        status: PREPARED_FRAME_STATUS,
+        groupUploadJob: { status: ACTIVE_JOB_STATUS },
+      },
+      data: {
+        status: COMMITTED_FRAME_STATUS,
+        committedAt: new Date(),
+      },
+    });
+    if (claim.count === 0) {
+      return false;
+    }
+
+    await transaction.frame.deleteMany({
       where: {
         id: {
           in: params.existingFrames.map((frame) => frame.id),
         },
       },
-    }),
-    prisma.frame.create({
+    });
+    await transaction.frame.create({
       data: buildCommittedFrameCreateInput(
         params.groupId,
         params.frameSnapshot,
         params.pendingPrefix,
         params.preparedAssets,
       ),
-    }),
-    prisma.case.update({
+    });
+    await transaction.case.update({
       where: { id: params.caseId },
       data: {
         coverAssetId: null,
       },
-    }),
-    prisma.frameUploadJob.update({
-      where: { id: params.frameJobId },
-      data: {
-        status: COMMITTED_FRAME_STATUS,
-        committedAt: new Date(),
-      },
-    }),
-    prisma.groupUploadJob.update({
+    });
+    await transaction.groupUploadJob.update({
       where: { id: params.jobId },
       data: {
         committedFrameCount: {
           increment: 1,
         },
       },
-    }),
-  ]);
+    });
+
+    return true;
+  });
 }
 
 /**
