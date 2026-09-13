@@ -4,7 +4,7 @@ set -eu
 : "${RUSTFS_S3_ENDPOINT:?RUSTFS_S3_ENDPOINT is required}"
 : "${RUSTFS_S3_BUCKET:?RUSTFS_S3_BUCKET is required}"
 
-# RustFS CI and local development both use path-style S3 requests, matching the app configuration.
+# CI uses path-style requests so its client behavior matches the application under test.
 cat > /tmp/aws-config <<'EOF'
 [default]
 s3 =

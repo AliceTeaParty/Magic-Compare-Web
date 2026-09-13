@@ -218,8 +218,8 @@ compose 当前会做这些事：
 说明：
 
 - 基础 `docker-compose.yml` 默认通过 `MAGIC_COMPARE_INTERNAL_SITE_IMAGE` 拉取 GHCR 运行时镜像
-- `docker/dev.compose.override.yml` 会把 `internal-site` / `internal-site-init` 切换成本地 `build`，并启动持久化 RustFS 与一次性 AWS CLI 初始化器
-- 开发 RustFS 使用 `rustfs/rustfs:1.0.0-rc.6`、Docker named volumes 和 path-style 请求；`MAGIC_COMPARE_RUSTFS_*` 只影响该开发 override
+- `docker/dev.compose.override.yml` 会把 `internal-site` / `internal-site-init` 切换成本地 `build`
+- 开发环境和生产环境一样，通过 `.env` 提供实际 S3-compatible 存储配置
 - 数据目录现在统一通过 `.env` 控制；留空时走 Docker named volumes，填写宿主机路径时走 bind mount
 - `internal-site` 常驻进程直接由 Node 启动 Next，不保留 pnpm 包装进程：
 
@@ -272,9 +272,9 @@ Wrangler 本地缓存使用 `public-deploy-cache` named volume。构建前同步
 
 ### Docker 中最容易踩的坑
 
-#### 1. 基础 compose 不自带本地对象存储
+#### 1. Compose 不自带本地对象存储
 
-生产基础 compose 必须显式提供外部 S3-compatible 配置，例如 Cloudflare R2：
+生产和 Docker 开发都必须显式提供外部 S3-compatible 配置，例如 Cloudflare R2：
 
 - `MAGIC_COMPARE_S3_BUCKET`
 - `MAGIC_COMPARE_S3_ENDPOINT`
@@ -288,8 +288,6 @@ Wrangler 本地缓存使用 `public-deploy-cache` named volume。构建前同步
 - `MAGIC_COMPARE_S3_PUBLIC_BASE_URL` 只用于图片展示和写入公开 manifest，可使用 Cloudflare 代理的图片域名。
 - 不要让签名 S3 请求经过图片分发域名；代理可能改写 `Range` 等已签名请求头，导致 `SignatureDoesNotMatch`。
 - R2 CORS 必须允许 internal-site 的实际 origin 对原生 S3 API endpoint 发起 `PUT`，并至少允许 `content-type` 请求头。
-
-`pnpm docker:dev:up` 是例外：开发 override 会启动本地 RustFS，自动创建 `magic-compare-local` bucket，并把应用指向 `http://rustfs:9000` 和浏览器可访问的 `http://127.0.0.1:9000`。
 
 #### 2. Docker 数据库路径必须走 Docker 专用 env
 
