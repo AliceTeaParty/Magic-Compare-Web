@@ -6,6 +6,10 @@ Entries before that date are summarized at release level instead of being recons
 
 ## Unreleased
 
+### Fixed
+
+- Pinned vulnerable transitive dependencies to patched releases: `fast-uri` `3.1.6`, `sharp` `0.35.4`, `browserslist` `4.28.7`, and `@humanfs/node` `0.16.8`.
+
 ## v2.0.0-alpha.2 - 2026-09-13
 
 ### Changed

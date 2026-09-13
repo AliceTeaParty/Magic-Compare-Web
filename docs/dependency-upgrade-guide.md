@@ -69,7 +69,9 @@ Next 开发缓存固定为 `.next-dev`，生产构建缓存为 `.next`。应用�
 
 ## 传递依赖补丁
 
-根 `package.json` 的 `pnpm.overrides` 只固定已有安全修复的兼容版本。目前覆盖 Babel、brace-expansion、defu、esbuild、fast-uri、picomatch、Undici、Vite 和 YAML。
+根 `package.json` 的 `pnpm.overrides` 只固定已有安全修复的兼容版本。目前覆盖 Babel、HumanFS、Browserslist、brace-expansion、defu、esbuild、fast-uri、picomatch、Sharp、Undici、Vite 和 YAML。
+
+2026-09-13 的审计将 `fast-uri` 固定到 `3.1.6`、将 Wrangler 内 Miniflare 的 `sharp` 收敛到 `0.35.4`，并固定 `browserslist` `4.28.7` 与 `@humanfs/node` `0.16.8`。这些均为兼容范围内的补丁升级。`deepmerge-ts` 需要 `8.0.0`，但它由 Prisma `6.19.3` 的配置链引入；不要单独 major override，改由 Prisma 7 迁移验证后解决。
 
 维护规则：
 
