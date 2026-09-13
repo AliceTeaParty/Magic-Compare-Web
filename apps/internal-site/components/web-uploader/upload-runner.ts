@@ -13,6 +13,7 @@ import {
   type PreparedUploadFile,
   type UploadFrameState,
 } from "./upload-api";
+import { InternalApiError } from "@/lib/client/internal-api";
 import type {
   GeneratedUploadAsset,
   GeneratedUploadFile,
@@ -27,6 +28,9 @@ const SNAPSHOT_THROTTLE_MS = 140;
 const DEFAULT_UPLOAD_CONCURRENCY = 2;
 const DEFAULT_FILE_UPLOAD_CONCURRENCY = 3;
 const DEFAULT_GLOBAL_FILE_UPLOAD_CONCURRENCY = 6;
+const MAX_FRAME_UPLOAD_ATTEMPTS = 3;
+const RETRY_DELAY_MS = 1_000;
+const MAX_STORAGE_ERROR_BODY_LENGTH = 8_192;
 
 type UploadFileVariant = "original" | "thumbnail";
 type RunnerListener = (snapshot: UploadRunnerSnapshot) => void;
@@ -70,8 +74,63 @@ interface RunnerFrameState {
   error?: string;
 }
 
+class ObjectStorageUploadError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+    readonly code: string | null,
+  ) {
+    super(message);
+    this.name = "ObjectStorageUploadError";
+  }
+}
+
 function clampProgress(value: number) {
   return Math.max(0, Math.min(1, value));
+}
+
+function extractProviderErrorValue(body: string, name: "Code" | "RequestId") {
+  const xmlMatch = body.match(new RegExp(`<${name}>([^<]{1,128})</${name}>`, "i"));
+  if (xmlMatch?.[1]) return xmlMatch[1].trim();
+  const jsonMatch = body.match(new RegExp(`"${name}"\\s*:\\s*"([^"\\n]{1,128})"`, "i"));
+  return jsonMatch?.[1]?.trim() || null;
+}
+
+/** Keeps object-storage diagnostics useful without exposing presigned URLs or response bodies. */
+async function describeObjectStorageUploadFailure(response: Response): Promise<{
+  code: string | null;
+  requestId: string | null;
+}> {
+  if (typeof response.text !== "function") {
+    return { code: null, requestId: null };
+  }
+
+  try {
+    const body = (await response.text()).slice(0, MAX_STORAGE_ERROR_BODY_LENGTH);
+    return {
+      code: extractProviderErrorValue(body, "Code"),
+      requestId: extractProviderErrorValue(body, "RequestId"),
+    };
+  } catch {
+    return { code: null, requestId: null };
+  }
+}
+
+function isRetryableFrameUploadError(error: unknown): boolean {
+  if (error instanceof DOMException && error.name === "AbortError") return false;
+  if (error instanceof ObjectStorageUploadError) {
+    return (
+      error.code === "SignatureDoesNotMatch" ||
+      error.status === 408 ||
+      error.status === 429 ||
+      error.status >= 500
+    );
+  }
+  if (error instanceof InternalApiError) {
+    return error.status === 408 || error.status === 429 || error.status >= 500;
+  }
+  if (!(error instanceof Error)) return false;
+  return /SignatureDoesNotMatch|network|fetch|timeout/i.test(error.message);
 }
 
 function descriptorFromFile(file: GeneratedUploadFile) {
@@ -553,34 +612,47 @@ export class WebUploadRunner {
     try {
       generatedFrame = await this.resolveGeneratedFrame(frame);
       this.registerFrameFiles(generatedFrame);
-      frame.status = "preparing";
-      this.message = `正在准备 ${frame.title}。`;
-      this.emitSoon();
-      const prepared = await prepareGroupUploadFrame({
-        groupUploadJobId: this.requireJobId(),
-        frameOrder: frame.order,
-        ...(this.generateFrame ? { frame: frameDescriptor(generatedFrame) } : {}),
-      });
+      for (let attempt = 1; attempt <= MAX_FRAME_UPLOAD_ATTEMPTS; attempt += 1) {
+        try {
+          frame.status = "preparing";
+          this.message =
+            attempt === 1
+              ? `正在准备 ${frame.title}。`
+              : `正在重试 ${frame.title}（${attempt}/${MAX_FRAME_UPLOAD_ATTEMPTS}）。`;
+          this.emitSoon();
+          const prepared = await prepareGroupUploadFrame({
+            groupUploadJobId: this.requireJobId(),
+            frameOrder: frame.order,
+            ...(this.generateFrame ? { frame: frameDescriptor(generatedFrame) } : {}),
+          });
 
-      frame.status = "uploading";
-      this.message = `正在上传 ${frame.title}。`;
-      this.emitSoon();
+          frame.status = "uploading";
+          this.message = `正在上传 ${frame.title}。`;
+          this.emitSoon();
+          await this.uploadPreparedFiles(frame, prepared.files);
 
-      await this.uploadPreparedFiles(frame, prepared.files);
+          frame.status = "committing";
+          this.message = `正在提交 ${frame.title}。`;
+          this.emitSoon();
+          await this.commitFrame(frame);
+          return;
+        } catch (error) {
+          if (this.paused) return;
+          if (attempt < MAX_FRAME_UPLOAD_ATTEMPTS && isRetryableFrameUploadError(error)) {
+            this.resetFrameUploadProgress(frame);
+            this.retriedCount += 1;
+            await this.waitForRetry(attempt * RETRY_DELAY_MS);
+            continue;
+          }
 
-      frame.status = "committing";
-      this.message = `正在提交 ${frame.title}。`;
-      this.emitSoon();
-      await this.commitFrame(frame);
-    } catch (error) {
-      if (this.paused) {
-        return;
+          frame.status = "failed";
+          frame.error = error instanceof Error ? error.message : "Frame 上传失败。";
+          frame.progress = clampProgress(frame.uploadedFiles / frame.totalFiles);
+          this.failedCount += 1;
+          this.emitSoon();
+          return;
+        }
       }
-      frame.status = "failed";
-      frame.error = error instanceof Error ? error.message : "Frame 上传失败。";
-      frame.progress = clampProgress(frame.uploadedFiles / frame.totalFiles);
-      this.failedCount += 1;
-      this.emitSoon();
     } finally {
       if (this.generateFrame && generatedFrame) {
         this.releaseFrameFiles(generatedFrame);
@@ -657,7 +729,14 @@ export class WebUploadRunner {
         signal: controller.signal,
       });
       if (!response.ok) {
-        throw new Error(`${source.label} 上传失败：${response.status}`);
+        const details = await describeObjectStorageUploadFailure(response);
+        const reason = details.code ? `对象存储错误 ${details.code}` : `HTTP ${response.status}`;
+        const requestId = details.requestId ? `，请求 ID ${details.requestId}` : "";
+        throw new ObjectStorageUploadError(
+          `${source.label} 上传失败：${reason}${requestId}。`,
+          response.status,
+          details.code,
+        );
       }
       frame.uploadedFiles += 1;
       frame.progress = clampProgress(frame.uploadedFiles / frame.totalFiles);
@@ -701,6 +780,32 @@ export class WebUploadRunner {
     await Promise.all(workers);
     if (firstError) {
       throw firstError;
+    }
+  }
+
+  private resetFrameUploadProgress(frame: RunnerFrameState) {
+    this.uploadedFiles = Math.max(0, this.uploadedFiles - frame.uploadedFiles);
+    frame.uploadedFiles = 0;
+    frame.progress = 0;
+  }
+
+  private async waitForRetry(delayMs: number) {
+    const controller = new AbortController();
+    this.abortControllers.add(controller);
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const timer = setTimeout(resolve, delayMs);
+        controller.signal.addEventListener(
+          "abort",
+          () => {
+            clearTimeout(timer);
+            reject(new DOMException("Upload was paused.", "AbortError"));
+          },
+          { once: true },
+        );
+      });
+    } finally {
+      this.abortControllers.delete(controller);
     }
   }
 

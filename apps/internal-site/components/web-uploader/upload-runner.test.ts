@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { InternalApiError } from "@/lib/client/internal-api";
 import { WebUploadRunner } from "./upload-runner";
 import type { GeneratedUploadFrame, UploadRunnerSnapshot } from "./web-upload-types";
 
@@ -590,7 +591,7 @@ describe("WebUploadRunner", () => {
     const run = uploadRunner.start();
     await waitForMicrotasks(() => pendingRejects.length === 2);
 
-    pendingRejects[0](new Error("network failed"));
+    pendingRejects[0](new Error("找不到本地文件。"));
     await run;
     await drainTimers();
 
@@ -599,6 +600,108 @@ describe("WebUploadRunner", () => {
     expect(snapshots.at(-1)).toMatchObject({
       stage: "failed",
       failedCount: 1,
+    });
+  });
+
+  it("re-prepares a frame after a retryable storage validation failure", async () => {
+    apiMocks.startGroupUpload.mockResolvedValue({
+      groupUploadJobId: "job-retry",
+      inputHash: "hash-retry",
+      expectedFrameCount: 1,
+      committedFrameCount: 0,
+      canComplete: false,
+      frameStates: [{ frameOrder: 0, status: "pending" }],
+    });
+    apiMocks.prepareGroupUploadFrame.mockResolvedValue({
+      groupUploadJobId: "job-retry",
+      frameOrder: 0,
+      files: [
+        {
+          slot: "slot-001",
+          variant: "original",
+          logicalPath: "/pending/o1.png",
+          uploadUrl: "https://r2.example/o1",
+          expiresInSeconds: 900,
+          contentType: "image/png",
+        },
+      ],
+    });
+    apiMocks.commitGroupUploadFrame
+      .mockRejectedValueOnce(
+        new InternalApiError("对象存储校验失败（SignatureDoesNotMatch，HTTP 403）。", 502, null),
+      )
+      .mockResolvedValue({ status: "committed" });
+    apiMocks.completeGroupUpload.mockResolvedValue({
+      groupUploadJobId: "job-retry",
+      status: "completed",
+      committedFrameCount: 1,
+    });
+
+    const snapshots: UploadRunnerSnapshot[] = [];
+    const uploadRunner = runner([frame(0)]);
+    uploadRunner.subscribe((snapshot) => snapshots.push(snapshot));
+    const run = uploadRunner.start();
+    await waitForMicrotasks(() => apiMocks.commitGroupUploadFrame.mock.calls.length === 1);
+    await vi.advanceTimersByTimeAsync(1_000);
+    await run;
+    await drainTimers();
+
+    expect(apiMocks.prepareGroupUploadFrame).toHaveBeenCalledTimes(2);
+    expect(apiMocks.commitGroupUploadFrame).toHaveBeenCalledTimes(2);
+    expect(snapshots.at(-1)).toMatchObject({
+      stage: "completed",
+      retriedCount: 1,
+    });
+  });
+
+  it("continues with later frames after one frame has a permanent failure", async () => {
+    apiMocks.startGroupUpload.mockResolvedValue({
+      groupUploadJobId: "job-continue",
+      inputHash: "hash-continue",
+      expectedFrameCount: 2,
+      committedFrameCount: 0,
+      canComplete: false,
+      frameStates: [
+        { frameOrder: 0, status: "pending" },
+        { frameOrder: 1, status: "pending" },
+      ],
+    });
+    apiMocks.prepareGroupUploadFrame.mockImplementation(
+      async ({ frameOrder }: { frameOrder: number }) => {
+        if (frameOrder === 0) throw new Error("找不到 Frame 1 的本地文件。");
+        return {
+          groupUploadJobId: "job-continue",
+          frameOrder,
+          files: [
+            {
+              slot: "slot-001",
+              variant: "original",
+              logicalPath: "/pending/o1.png",
+              uploadUrl: "https://r2.example/o1",
+              expiresInSeconds: 900,
+              contentType: "image/png",
+            },
+          ],
+        };
+      },
+    );
+    apiMocks.commitGroupUploadFrame.mockResolvedValue({ status: "committed" });
+
+    const snapshots: UploadRunnerSnapshot[] = [];
+    const uploadRunner = runner([frame(0), frame(1)], { uploadConcurrency: 1 });
+    uploadRunner.subscribe((snapshot) => snapshots.push(snapshot));
+    await uploadRunner.start();
+    await drainTimers();
+
+    expect(apiMocks.prepareGroupUploadFrame).toHaveBeenCalledTimes(2);
+    expect(apiMocks.commitGroupUploadFrame).toHaveBeenCalledWith({
+      groupUploadJobId: "job-continue",
+      frameOrder: 1,
+    });
+    expect(snapshots.at(-1)).toMatchObject({
+      stage: "failed",
+      failedCount: 1,
+      completedFrames: 1,
     });
   });
 });

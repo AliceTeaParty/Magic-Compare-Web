@@ -1,5 +1,6 @@
 import { extname } from "node:path";
 import type { ImportManifest } from "@magic-compare/content-schema";
+import { StorageValidationError } from "@/lib/server/api/errors";
 import { mapWithConcurrency } from "@/lib/server/concurrency/map-with-concurrency";
 import { readInternalAssetPrefix } from "./internal-assets";
 
@@ -31,6 +32,28 @@ function looksLikeAvif(bytes: Uint8Array): boolean {
     decoder.decode(bytes.slice(4, 16)).includes("ftyp") &&
     decoder.decode(bytes.slice(8, 24)).includes("avif")
   );
+}
+
+function storageFailureDetail(assetUrl: string, error: unknown) {
+  const source = error as {
+    Code?: unknown;
+    code?: unknown;
+    name?: unknown;
+    $metadata?: { httpStatusCode?: unknown; requestId?: unknown };
+  };
+  const code = [source?.Code, source?.code, source?.name].find(
+    (value): value is string => typeof value === "string" && /^[A-Za-z0-9._-]{1,128}$/.test(value),
+  );
+  const upstreamStatus = source?.$metadata?.httpStatusCode;
+  const requestId = source?.$metadata?.requestId;
+
+  return {
+    logicalPath: assetUrl,
+    code: code ?? null,
+    requestId:
+      typeof requestId === "string" && /^[A-Za-z0-9._-]{1,256}$/.test(requestId) ? requestId : null,
+    upstreamStatus: typeof upstreamStatus === "number" ? upstreamStatus : null,
+  };
 }
 
 /**
@@ -71,7 +94,13 @@ function assertLikelyImageBytes(assetUrl: string, bytes: Uint8Array): void {
  * this is just a cheap guardrail against obviously broken or disguised files reaching import/publish.
  */
 export async function assertLikelyImageAssetUrl(assetUrl: string): Promise<void> {
-  const bytes = await readInternalAssetPrefix(assetUrl);
+  let bytes: Uint8Array;
+  try {
+    bytes = await readInternalAssetPrefix(assetUrl);
+  } catch (error) {
+    if (error instanceof StorageValidationError) throw error;
+    throw new StorageValidationError(storageFailureDetail(assetUrl, error));
+  }
   assertLikelyImageBytes(assetUrl, bytes);
 }
 

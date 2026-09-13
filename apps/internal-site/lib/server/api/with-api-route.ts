@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { ZodError } from "zod";
-import { ApiRouteError } from "./errors";
+import { ApiRouteError, StorageValidationError } from "./errors";
 
 type WrappedRouteHandler<TArgs extends unknown[]> = (...args: TArgs) => Promise<NextResponse>;
 type NextRouteHandler = (request: Request, context?: unknown) => Promise<NextResponse>;
@@ -26,6 +26,13 @@ export function withApiRoute<TArgs extends unknown[]>(
     } catch (error) {
       if (error instanceof ZodError) {
         return NextResponse.json({ error: error.flatten() }, { status: 400 });
+      }
+
+      if (error instanceof StorageValidationError) {
+        console.error(`[API] ${request?.url ?? "unknown"}: storage validation failed`, {
+          ...error.diagnostic,
+        });
+        return NextResponse.json({ error: error.message }, { status: error.status });
       }
 
       if (error instanceof ApiRouteError) {
