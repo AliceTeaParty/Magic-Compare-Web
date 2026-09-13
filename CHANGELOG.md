@@ -6,6 +6,8 @@ Entries before that date are summarized at release level instead of being recons
 
 ## Unreleased
 
+## v2.0.0-alpha.2 - 2026-09-13
+
 ### Changed
 
 - Moved Docker runtime initialization out of Compose YAML into named scripts; CI initializes its temporary RustFS bucket through a one-shot AWS CLI container.
