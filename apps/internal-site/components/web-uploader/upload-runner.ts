@@ -133,6 +133,14 @@ function isRetryableFrameUploadError(error: unknown): boolean {
   return /SignatureDoesNotMatch|network|fetch|timeout/i.test(error.message);
 }
 
+type UploadStage = "preparing" | "uploading" | "committing";
+
+function retryMessage(stage: UploadStage, frameTitle: string, attempt: number) {
+  const action =
+    stage === "preparing" ? "重新准备" : stage === "uploading" ? "重新上传" : "重新提交";
+  return `正在${action} ${frameTitle}（${attempt}/${MAX_FRAME_UPLOAD_ATTEMPTS}）。`;
+}
+
 function descriptorFromFile(file: GeneratedUploadFile) {
   return {
     extension: file.extension,
@@ -612,47 +620,101 @@ export class WebUploadRunner {
     try {
       generatedFrame = await this.resolveGeneratedFrame(frame);
       this.registerFrameFiles(generatedFrame);
-      for (let attempt = 1; attempt <= MAX_FRAME_UPLOAD_ATTEMPTS; attempt += 1) {
+      let preparedFiles: PreparedUploadFile[] | null = null;
+      let uploadCompleted = false;
+      let prepareAttempt = 0;
+      let uploadAttempt = 0;
+      let commitAttempt = 0;
+
+      while (!this.paused) {
+        if (!preparedFiles) {
+          try {
+            prepareAttempt += 1;
+            frame.status = "preparing";
+            this.message =
+              prepareAttempt === 1
+                ? `正在准备 ${frame.title}。`
+                : retryMessage("preparing", frame.title, prepareAttempt);
+            this.emitSoon();
+            const prepared = await prepareGroupUploadFrame({
+              groupUploadJobId: this.requireJobId(),
+              frameOrder: frame.order,
+              ...(this.generateFrame ? { frame: frameDescriptor(generatedFrame) } : {}),
+            });
+            preparedFiles = prepared.files;
+          } catch (error) {
+            if (
+              this.paused ||
+              prepareAttempt >= MAX_FRAME_UPLOAD_ATTEMPTS ||
+              !isRetryableFrameUploadError(error)
+            ) {
+              throw error;
+            }
+            this.retriedCount += 1;
+            await this.waitForRetry(prepareAttempt * RETRY_DELAY_MS);
+            continue;
+          }
+        }
+
+        if (!uploadCompleted) {
+          try {
+            uploadAttempt += 1;
+            frame.status = "uploading";
+            this.message =
+              uploadAttempt === 1
+                ? `正在上传 ${frame.title}。`
+                : retryMessage("uploading", frame.title, uploadAttempt);
+            this.emitSoon();
+            await this.uploadPreparedFiles(frame, preparedFiles);
+            uploadCompleted = true;
+          } catch (error) {
+            if (
+              this.paused ||
+              uploadAttempt >= MAX_FRAME_UPLOAD_ATTEMPTS ||
+              !isRetryableFrameUploadError(error)
+            ) {
+              throw error;
+            }
+            // A failed PUT may have expired credentials, but the object keys remain stable so a
+            // new prepare can safely refresh URLs without losing objects that already arrived.
+            this.resetFrameUploadProgress(frame);
+            preparedFiles = null;
+            this.retriedCount += 1;
+            await this.waitForRetry(uploadAttempt * RETRY_DELAY_MS);
+            continue;
+          }
+        }
+
         try {
-          frame.status = "preparing";
-          this.message =
-            attempt === 1
-              ? `正在准备 ${frame.title}。`
-              : `正在重试 ${frame.title}（${attempt}/${MAX_FRAME_UPLOAD_ATTEMPTS}）。`;
-          this.emitSoon();
-          const prepared = await prepareGroupUploadFrame({
-            groupUploadJobId: this.requireJobId(),
-            frameOrder: frame.order,
-            ...(this.generateFrame ? { frame: frameDescriptor(generatedFrame) } : {}),
-          });
-
-          frame.status = "uploading";
-          this.message = `正在上传 ${frame.title}。`;
-          this.emitSoon();
-          await this.uploadPreparedFiles(frame, prepared.files);
-
+          commitAttempt += 1;
           frame.status = "committing";
-          this.message = `正在提交 ${frame.title}。`;
+          this.message =
+            commitAttempt === 1
+              ? `正在提交 ${frame.title}。`
+              : retryMessage("committing", frame.title, commitAttempt);
           this.emitSoon();
           await this.commitFrame(frame);
           return;
         } catch (error) {
-          if (this.paused) return;
-          if (attempt < MAX_FRAME_UPLOAD_ATTEMPTS && isRetryableFrameUploadError(error)) {
-            this.resetFrameUploadProgress(frame);
+          if (
+            !this.paused &&
+            commitAttempt < MAX_FRAME_UPLOAD_ATTEMPTS &&
+            isRetryableFrameUploadError(error)
+          ) {
             this.retriedCount += 1;
-            await this.waitForRetry(attempt * RETRY_DELAY_MS);
+            await this.waitForRetry(commitAttempt * RETRY_DELAY_MS);
             continue;
           }
-
-          frame.status = "failed";
-          frame.error = error instanceof Error ? error.message : "Frame 上传失败。";
-          frame.progress = clampProgress(frame.uploadedFiles / frame.totalFiles);
-          this.failedCount += 1;
-          this.emitSoon();
-          return;
+          throw error;
         }
       }
+    } catch (error) {
+      if (this.paused) return;
+      frame.status = "failed";
+      frame.error = error instanceof Error ? error.message : "Frame 上传失败。";
+      frame.progress = clampProgress(frame.uploadedFiles / frame.totalFiles);
+      this.failedCount += 1;
+      this.emitSoon();
     } finally {
       if (this.generateFrame && generatedFrame) {
         this.releaseFrameFiles(generatedFrame);

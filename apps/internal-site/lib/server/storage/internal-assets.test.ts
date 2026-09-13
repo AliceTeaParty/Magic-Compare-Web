@@ -1,4 +1,5 @@
 import { S3Client } from "@aws-sdk/client-s3";
+import { Readable } from "node:stream";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   S3_BUCKET_ENV_NAME,
@@ -14,6 +15,7 @@ import {
   internalAssetObjectKey,
   internalAssetPublicGroupBaseUrl,
   readInternalAssetBytes,
+  readInternalAssetPrefix,
   resolvePublicInternalAssetUrl,
 } from "./internal-assets";
 
@@ -144,6 +146,34 @@ describe("internal asset storage helpers", () => {
       );
     } finally {
       send.mockRestore();
+    }
+  });
+
+  it("bounds a Range prefix response even when storage ignores the requested range", async () => {
+    process.env[S3_BUCKET_ENV_NAME] = "magic-compare-assets";
+    process.env[S3_ENDPOINT_ENV_NAME] = "http://localhost:9000";
+    process.env[S3_PUBLIC_BASE_URL_ENV_NAME] = "https://assets.example.com/bucket";
+    process.env[S3_ACCESS_KEY_ID_ENV_NAME] = "example-access-key";
+    process.env[S3_SECRET_ACCESS_KEY_ENV_NAME] = "example-secret-key";
+    const body = Readable.from([Buffer.alloc(513)]);
+    const destroy = vi.spyOn(body, "destroy");
+    const send = vi
+      .spyOn(S3Client.prototype, "send")
+      .mockResolvedValueOnce({ Body: body } as never);
+
+    try {
+      await expect(readInternalAssetPrefix("/groups/group-1/thumb.png", 512)).rejects.toThrow(
+        /512-byte read limit/,
+      );
+      expect(send).toHaveBeenCalledWith(
+        expect.objectContaining({
+          input: expect.objectContaining({ Range: "bytes=0-511" }),
+        }),
+      );
+      expect(destroy).toHaveBeenCalled();
+    } finally {
+      send.mockRestore();
+      destroy.mockRestore();
     }
   });
 });

@@ -519,7 +519,8 @@
 
 - `frameOrder` 使用 frame 的业务顺序值，不是数据库主键。
 - `pendingPrefix` 的中间层目录使用 `frameOrder + 1`，因此 `frameOrder=12` 时路径里会出现 `/13/`。
-- 如果这个 frame 在当前 job 下已经存在旧的 pending revision，服务端会先删掉旧 pending 前缀，再签发新 URL。
+- 已准备且描述未变化的 frame 会复用原有 `pendingPrefix` 与资产清单，只重新签发 URL；不会删除已上传对象或生成新 revision。
+- 已准备但描述变化时返回 `409`。删除 pending 前缀只发生在显式 cancel、强制重启或过期任务清理。
 - 如果该 frame 已经是 `committed`，这个接口会返回 `409`，避免重复 prepare。
 - presign 组装和对象路径命名都在服务端完成，客户端不自行决定最终 bucket key。
 - `stream-v2` 必须在 prepare 请求中附带该 frame 的完整生成描述；服务端会与 start 的源摘要、尺寸、slot 和 heatmap 计划逐项核对。
@@ -551,6 +552,7 @@
 说明：
 
 - commit 前，服务端会对该 frame 的所有 original / thumbnail 逻辑路径做对象存在性和图像合理性检查。
+- 对已 `committed` 的同一 frame 重复调用会直接返回既有 `committed` 结果，不重复读取对象存储或写入数据库。
 - commit 是 frame 级原子切换：会先删掉该 `order` 下旧 frame 记录，再创建新 frame 和新 asset 行。
 - 新写入的 frame 当前会带 `isPublic=true`，但 group 的公开与否仍由 group 自身 `isPublic` 决定。
 - commit 成功后，旧 committed revision 的桶前缀会被删除。

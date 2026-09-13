@@ -90,6 +90,44 @@ function buildS3Client(): S3Client {
   return cachedClient;
 }
 
+function abortBody(body: unknown): void {
+  if (body instanceof Readable) {
+    body.destroy();
+    return;
+  }
+  if (
+    typeof body === "object" &&
+    body !== null &&
+    "cancel" in body &&
+    typeof body.cancel === "function"
+  ) {
+    void body.cancel();
+  }
+}
+
+/**
+ * Reads an async byte source with a hard limit so a broken Range response cannot buffer a whole
+ * object before image sanity checks reject it.
+ */
+async function readBoundedChunks(
+  chunks: AsyncIterable<unknown>,
+  maxByteCount?: number,
+  abort?: () => void,
+): Promise<Uint8Array> {
+  const collected: Buffer[] = [];
+  let totalBytes = 0;
+  for await (const chunk of chunks) {
+    const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk as Uint8Array);
+    totalBytes += buffer.byteLength;
+    if (maxByteCount != null && totalBytes > maxByteCount) {
+      abort?.();
+      throw new Error(`Internal asset exceeds the ${maxByteCount}-byte read limit.`);
+    }
+    collected.push(buffer);
+  }
+  return new Uint8Array(Buffer.concat(collected));
+}
+
 /**
  * Normalize AWS SDK body variants into bytes once so the sanity-check layer stays independent from
  * Node stream/runtime differences.
@@ -110,28 +148,52 @@ async function bodyToUint8Array(body: unknown, maxByteCount?: number): Promise<U
     return assertWithinLimit(body);
   }
 
+  if (body instanceof Readable) {
+    return readBoundedChunks(body, maxByteCount, () => body.destroy());
+  }
+
+  if (
+    typeof body === "object" &&
+    body !== null &&
+    Symbol.asyncIterator in body &&
+    typeof body[Symbol.asyncIterator] === "function"
+  ) {
+    return readBoundedChunks(body as AsyncIterable<unknown>, maxByteCount, () => abortBody(body));
+  }
+
+  if (
+    typeof body === "object" &&
+    body !== null &&
+    "getReader" in body &&
+    typeof body.getReader === "function"
+  ) {
+    const reader = body.getReader() as ReadableStreamDefaultReader<Uint8Array>;
+    const chunks = {
+      async *[Symbol.asyncIterator]() {
+        try {
+          while (true) {
+            const next = await reader.read();
+            if (next.done) return;
+            yield next.value;
+          }
+        } finally {
+          reader.releaseLock();
+        }
+      },
+    };
+    return readBoundedChunks(chunks, maxByteCount, () => void reader.cancel());
+  }
+
   if (
     typeof body === "object" &&
     body !== null &&
     "transformToByteArray" in body &&
     typeof body.transformToByteArray === "function"
   ) {
-    return assertWithinLimit(await body.transformToByteArray());
-  }
-
-  if (body instanceof Readable) {
-    const chunks: Buffer[] = [];
-    let totalBytes = 0;
-    for await (const chunk of body) {
-      const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
-      totalBytes += buffer.byteLength;
-      if (maxByteCount != null && totalBytes > maxByteCount) {
-        body.destroy();
-        throw new Error(`Internal asset exceeds the ${maxByteCount}-byte read limit.`);
-      }
-      chunks.push(buffer);
+    if (maxByteCount != null) {
+      throw new Error("Unsupported bounded S3 response body type.");
     }
-    return new Uint8Array(Buffer.concat(chunks));
+    return assertWithinLimit(await body.transformToByteArray());
   }
 
   throw new Error("Unsupported S3 response body type.");
@@ -244,7 +306,12 @@ export async function readInternalAssetPrefix(
     }),
   );
 
-  return bodyToUint8Array(response.Body);
+  if (response.ContentLength != null && response.ContentLength > byteCount) {
+    abortBody(response.Body);
+    throw new Error(`Internal asset exceeds the ${byteCount}-byte read limit.`);
+  }
+
+  return bodyToUint8Array(response.Body, byteCount);
 }
 
 /**
@@ -269,9 +336,7 @@ export async function readInternalAssetBytes(
   );
 
   if (response.ContentLength != null && response.ContentLength > maxByteCount) {
-    if (response.Body instanceof Readable) {
-      response.Body.destroy();
-    }
+    abortBody(response.Body);
     throw new Error(`Internal asset exceeds the ${maxByteCount}-byte read limit.`);
   }
 

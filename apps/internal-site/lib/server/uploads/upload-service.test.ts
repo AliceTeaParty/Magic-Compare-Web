@@ -6,6 +6,7 @@ import {
   prepareGroupUploadFrame,
   startGroupUpload,
 } from "./upload-service";
+import { StorageValidationError } from "@/lib/server/api/errors";
 
 const {
   groupUploadJobCreate,
@@ -219,7 +220,7 @@ function streamPrepareFixture(afterSlot = "slot-002") {
       frameSnapshotJson: JSON.stringify(previousGeneratedFrame),
       preparedAssetsJson: "",
       pendingPrefix: null,
-      status: "prepared",
+      status: "pending",
       groupUploadJob: {
         id: "job-1",
         snapshotJson: JSON.stringify({
@@ -491,6 +492,78 @@ describe("upload-service", () => {
     });
   });
 
+  it("reuses a prepared revision when refreshing URLs for the same frame", async () => {
+    helperMocks.requireActiveFrameUploadJob.mockResolvedValue({
+      id: "frame-job-1",
+      frameOrder: 0,
+      frameSnapshotJson: JSON.stringify({
+        order: 0,
+        title: "Frame 1",
+        caption: "",
+        assets: [],
+      }),
+      preparedAssetsJson: JSON.stringify([{ slot: "before" }]),
+      pendingPrefix: "/groups/group-1/1/revision-1",
+      status: "prepared",
+      groupUploadJob: {
+        id: "job-1",
+        snapshotJson: "{}",
+        inputHash: "hash-1",
+        expectedFrameCount: 1,
+        committedFrameCount: 0,
+        status: "active",
+        expiresAt: null,
+        case: { id: "case-1", slug: "2026" },
+        group: { id: "group-1", slug: "test-group", storageRoot: "/groups/group-1" },
+      },
+    });
+    helperMocks.buildPresignedFiles.mockResolvedValue([]);
+
+    const result = await prepareGroupUploadFrame({
+      groupUploadJobId: "job-1",
+      frameOrder: 0,
+    });
+
+    expect(helperMocks.buildFramePendingPrefix).not.toHaveBeenCalled();
+    expect(helperMocks.buildPreparedUploadAssets).not.toHaveBeenCalled();
+    expect(frameUploadJobUpdate).not.toHaveBeenCalled();
+    expect(deleteInternalAssetPrefix).not.toHaveBeenCalled();
+    expect(result).toMatchObject({
+      pendingPrefix: "/groups/group-1/1/revision-1",
+      files: [],
+    });
+  });
+
+  it("rejects an attempt to replace an already prepared frame descriptor", async () => {
+    const { frameJob, generatedFrame } = streamPrepareFixture();
+    helperMocks.requireActiveFrameUploadJob.mockResolvedValue({
+      ...frameJob,
+      frameSnapshotJson: JSON.stringify(generatedFrame),
+      preparedAssetsJson: JSON.stringify([]),
+      pendingPrefix: "/groups/group-1/1/revision-1",
+      status: "prepared",
+    });
+    const changedFrame = {
+      ...generatedFrame,
+      assets: generatedFrame.assets.map((asset) =>
+        asset.slot === "slot-003"
+          ? { ...asset, original: { ...asset.original, sha256: "e".repeat(64) } }
+          : asset,
+      ),
+    };
+
+    await expect(
+      prepareGroupUploadFrame({
+        groupUploadJobId: "job-1",
+        frameOrder: 0,
+        frame: changedFrame,
+      }),
+    ).rejects.toThrow("Frame is already prepared with a different descriptor.");
+
+    expect(helperMocks.buildPresignedFiles).not.toHaveBeenCalled();
+    expect(frameUploadJobUpdate).not.toHaveBeenCalled();
+  });
+
   it("validates stream retries against the immutable source snapshot", async () => {
     const { frameJob, generatedFrame } = streamPrepareFixture();
     helperMocks.requireActiveFrameUploadJob.mockResolvedValue(frameJob);
@@ -594,6 +667,76 @@ describe("upload-service", () => {
     });
   });
 
+  it("treats a repeated committed-frame request as successful", async () => {
+    helperMocks.requireActiveFrameUploadJob.mockResolvedValue({
+      id: "frame-job-1",
+      frameOrder: 0,
+      frameSnapshotJson: JSON.stringify({ order: 0, title: "Frame 1", caption: "", assets: [] }),
+      preparedAssetsJson: JSON.stringify([]),
+      pendingPrefix: "/groups/group-1/1/revision-1",
+      status: "committed",
+      groupUploadJob: {
+        id: "job-1",
+        inputHash: "hash-1",
+        expectedFrameCount: 1,
+        committedFrameCount: 1,
+        status: "active",
+        expiresAt: null,
+        case: { id: "case-1", slug: "2026" },
+        group: { id: "group-1", slug: "test-group", storageRoot: "/groups/group-1" },
+      },
+    });
+
+    await expect(
+      commitGroupUploadFrame({ groupUploadJobId: "job-1", frameOrder: 0 }),
+    ).resolves.toEqual({ groupUploadJobId: "job-1", frameOrder: 0, status: "committed" });
+
+    expect(frameFindMany).not.toHaveBeenCalled();
+    expect(transaction).not.toHaveBeenCalled();
+  });
+
+  it("adds job and frame context to a failed commit storage validation", async () => {
+    helperMocks.requireActiveFrameUploadJob.mockResolvedValue({
+      id: "frame-job-1",
+      frameOrder: 2,
+      frameSnapshotJson: JSON.stringify({ order: 2, title: "Frame 3", caption: "", assets: [] }),
+      preparedAssetsJson: JSON.stringify([]),
+      pendingPrefix: "/groups/group-1/3/revision-1",
+      status: "prepared",
+      groupUploadJob: {
+        id: "job-1",
+        inputHash: "hash-1",
+        expectedFrameCount: 3,
+        committedFrameCount: 0,
+        status: "active",
+        expiresAt: null,
+        case: { id: "case-1", slug: "2026" },
+        group: { id: "group-1", slug: "test-group", storageRoot: "/groups/group-1" },
+      },
+    });
+    helperMocks.assertPreparedAssetsUploaded.mockRejectedValue(
+      new StorageValidationError({
+        logicalPath: "/groups/group-1/3/revision-1/o1.png",
+        code: "SignatureDoesNotMatch",
+        requestId: "request-1",
+        upstreamStatus: 403,
+      }),
+    );
+
+    await expect(
+      commitGroupUploadFrame({ groupUploadJobId: "job-1", frameOrder: 2 }),
+    ).rejects.toMatchObject({
+      diagnostic: {
+        groupUploadJobId: "job-1",
+        frameOrder: 2,
+        stage: "commit",
+        code: "SignatureDoesNotMatch",
+      },
+    });
+
+    expect(frameFindMany).not.toHaveBeenCalled();
+  });
+
   it("rejects complete when uncommitted frame rows still exist", async () => {
     helperMocks.requireActiveUploadJob.mockResolvedValue({
       id: "job-1",
@@ -614,6 +757,31 @@ describe("upload-service", () => {
     ).rejects.toThrow("Not every frame in the upload job has been committed.");
 
     expect(helperMocks.markUploadJobCompleted).not.toHaveBeenCalled();
+  });
+
+  it("returns the completed status declared by the upload API", async () => {
+    const job = {
+      id: "job-1",
+      inputHash: "hash-1",
+      expectedFrameCount: 1,
+      committedFrameCount: 1,
+      status: "active",
+      expiresAt: null,
+      case: { id: "case-1", slug: "2026" },
+      group: { id: "group-1", slug: "test-group", storageRoot: "/groups/group-1" },
+    };
+    helperMocks.requireActiveUploadJob.mockResolvedValue(job);
+    helperMocks.countUncommittedFrameJobs.mockResolvedValue(0);
+
+    await expect(completeGroupUpload({ groupUploadJobId: "job-1" })).resolves.toEqual({
+      groupUploadJobId: "job-1",
+      caseSlug: "2026",
+      groupSlug: "test-group",
+      status: "completed",
+      committedFrameCount: 1,
+    });
+
+    expect(helperMocks.markUploadJobCompleted).toHaveBeenCalledWith(job);
   });
 
   it("cancels an active upload job and removes pending prefixes", async () => {

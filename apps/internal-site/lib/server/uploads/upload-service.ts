@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/server/db/client";
-import { BadRequestError, ConflictError } from "@/lib/server/api/errors";
+import { BadRequestError, ConflictError, StorageValidationError } from "@/lib/server/api/errors";
 import { deleteInternalAssetPrefix } from "@/lib/server/storage/internal-assets";
 import {
   type GroupUploadStartInput,
@@ -20,6 +20,7 @@ import {
   JOB_TTL_MS,
   PENDING_FRAME_STATUS,
   PREPARED_FRAME_STATUS,
+  type ActiveFrameUploadJob,
   cancelExpiredActiveUploadJobs,
   countUncommittedFrameJobs,
   findActiveUploadJobByGroup,
@@ -92,8 +93,8 @@ export async function startGroupUpload(rawInput: unknown) {
 }
 
 /**
- * Prepare is per-frame so interrupted group uploads only need to discard the in-flight frame
- * revision instead of reissuing URLs for the whole group.
+ * Prepare is per-frame and idempotent for an unchanged descriptor. Reissuing PUT URLs must not
+ * discard the already-uploaded revision because a later commit retry may be its recovery path.
  */
 export async function prepareGroupUploadFrame(rawInput: unknown) {
   const input = GroupUploadFramePrepareInputSchema.parse(rawInput);
@@ -122,11 +123,28 @@ export async function prepareGroupUploadFrame(rawInput: unknown) {
         "frame upload snapshot",
       );
 
-  // Validate the replacement descriptor before deleting retryable objects from the previous
-  // prepare. A malformed retry must not destroy the last internally consistent pending revision.
-  if (frameJob.pendingPrefix) {
-    await deleteInternalAssetPrefix(frameJob.pendingPrefix);
+  if (frameJob.status === PREPARED_FRAME_STATUS) {
+    assertFrameCanCommit(frameJob);
+    const persistedSnapshot = parsePersistedJson<UploadFrameDescriptor>(
+      frameJob.frameSnapshotJson,
+      "prepared frame upload snapshot",
+    );
+    if (!sameFrameDescriptor(persistedSnapshot, frameSnapshot)) {
+      throw new ConflictError("Frame is already prepared with a different descriptor.");
+    }
+    const preparedAssets = parsePersistedJson<PreparedUploadAsset[]>(
+      frameJob.preparedAssetsJson,
+      "prepared upload assets",
+    );
+    const files = await buildPresignedFiles(preparedAssets);
+    return {
+      groupUploadJobId: frameJob.groupUploadJob.id,
+      frameOrder: frameSnapshot.order,
+      pendingPrefix: frameJob.pendingPrefix,
+      files,
+    };
   }
+
   const pendingPrefix = buildFramePendingPrefix(
     frameJob.groupUploadJob.group.storageRoot,
     frameSnapshot.order,
@@ -150,6 +168,34 @@ export async function prepareGroupUploadFrame(rawInput: unknown) {
     pendingPrefix,
     files,
   };
+}
+
+/** Compares only the validated frame payload, independent of client asset ordering. */
+function sameFrameDescriptor(left: UploadFrameDescriptor, right: UploadFrameDescriptor): boolean {
+  if (left.order !== right.order || left.title !== right.title || left.caption !== right.caption) {
+    return false;
+  }
+  if (left.assets.length !== right.assets.length) return false;
+
+  const bySlot = (frame: UploadFrameDescriptor) =>
+    [...frame.assets].sort((first, second) => first.slot.localeCompare(second.slot));
+  const leftAssets = bySlot(left);
+  const rightAssets = bySlot(right);
+  return leftAssets.every((asset, index) => {
+    const other = rightAssets[index];
+    if (!other) return false;
+    return (
+      asset.slot === other.slot &&
+      asset.kind === other.kind &&
+      asset.label === other.label &&
+      asset.note === other.note &&
+      asset.width === other.width &&
+      asset.height === other.height &&
+      asset.isPrimaryDisplay === other.isPrimaryDisplay &&
+      sameFileDescriptor(asset.original, other.original) &&
+      sameFileDescriptor(asset.thumbnail, other.thumbnail)
+    );
+  });
 }
 
 function sameFileDescriptor(
@@ -259,11 +305,29 @@ function resolveStreamFrameSnapshot(
  */
 export async function commitGroupUploadFrame(rawInput: unknown) {
   const input = GroupUploadFrameCommitInputSchema.parse(rawInput);
-  const { frameJob, frameSnapshot, job, preparedAssets } = await loadPreparedFrameCommit(
-    input.groupUploadJobId,
-    input.frameOrder,
-  );
-  await assertPreparedAssetsUploaded(preparedAssets);
+  const frameJob = await requireActiveFrameUploadJob(input.groupUploadJobId, input.frameOrder);
+  if (frameJob.status === COMMITTED_FRAME_STATUS) {
+    return {
+      groupUploadJobId: frameJob.groupUploadJob.id,
+      frameOrder: frameJob.frameOrder,
+      status: COMMITTED_FRAME_STATUS,
+    };
+  }
+
+  const { frameSnapshot, job, pendingPrefix, preparedAssets } = loadPreparedFrameCommit(frameJob);
+  try {
+    await assertPreparedAssetsUploaded(preparedAssets);
+  } catch (error) {
+    if (error instanceof StorageValidationError) {
+      throw new StorageValidationError({
+        ...error.diagnostic,
+        groupUploadJobId: frameJob.groupUploadJob.id,
+        frameOrder: frameJob.frameOrder,
+        stage: "commit",
+      });
+    }
+    throw error;
+  }
   const existingFrames = await prisma.frame.findMany({
     where: {
       groupId: job.group.id,
@@ -280,12 +344,12 @@ export async function commitGroupUploadFrame(rawInput: unknown) {
     frameSnapshot,
     groupId: job.group.id,
     jobId: job.id,
-    pendingPrefix: frameJob.pendingPrefix,
+    pendingPrefix,
     preparedAssets,
     caseId: job.case.id,
   });
 
-  await deleteReplacedFramePrefixes(existingFrames, frameJob.pendingPrefix);
+  await deleteReplacedFramePrefixes(existingFrames, pendingPrefix);
 
   return {
     groupUploadJobId: job.id,
@@ -315,6 +379,7 @@ export async function completeGroupUpload(rawInput: unknown) {
     groupUploadJobId: job.id,
     caseSlug: job.case.slug,
     groupSlug: job.group.slug,
+    status: "completed" as const,
     committedFrameCount: job.committedFrameCount,
   };
 }
@@ -469,13 +534,12 @@ async function resetGroupBeforeUploadStart(params: {
  * Commit loads one frame's persisted snapshot and prepared asset manifest from the active job so
  * later mutation code can stay focused on replacing rows instead of re-validating state.
  */
-async function loadPreparedFrameCommit(groupUploadJobId: string, frameOrder: number) {
-  const frameJob = await requireActiveFrameUploadJob(groupUploadJobId, frameOrder);
+function loadPreparedFrameCommit(frameJob: ActiveFrameUploadJob) {
   assertFrameCanCommit(frameJob);
 
   return {
     job: frameJob.groupUploadJob,
-    frameJob,
+    pendingPrefix: frameJob.pendingPrefix,
     frameSnapshot: parsePersistedJson<UploadFrameDescriptor>(
       frameJob.frameSnapshotJson,
       "frame upload snapshot",

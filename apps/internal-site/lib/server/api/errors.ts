@@ -31,6 +31,9 @@ export interface StorageFailureDiagnostic {
   code: string | null;
   requestId: string | null;
   upstreamStatus: number | null;
+  groupUploadJobId?: string;
+  frameOrder?: number;
+  stage?: "commit";
 }
 
 /** Carries safe storage metadata from a failed validation into the common API error boundary. */
