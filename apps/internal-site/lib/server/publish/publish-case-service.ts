@@ -5,10 +5,15 @@ import {
   isKeyCompareAssetKind,
 } from "@/lib/server/storage/internal-asset-sanity";
 import {
+  readPublishedManifest,
   resetPublishedGroup,
   writePublishedManifest,
 } from "@/lib/server/storage/published-content";
 import { buildPublishManifest } from "./build-publish-manifest";
+import {
+  enrichPublishManifestWithPlaceholders,
+  type PublishPlaceholderStats,
+} from "./publish-image-placeholders";
 import { ensurePublicSlug } from "./resolve-public-slug";
 
 /**
@@ -76,12 +81,12 @@ export async function publishCase(caseId: string) {
   });
 
   if (!caseRow) {
-    throw new Error("Case not found.");
+    throw new Error("项目不存在。");
   }
 
   const publishableGroups = caseRow.groups;
   if (publishableGroups.length === 0) {
-    throw new Error("No public groups are available for publishing.");
+    throw new Error("没有可发布的公开图组。");
   }
 
   const queryCompletedAt = performance.now();
@@ -109,6 +114,7 @@ export async function publishCase(caseId: string) {
   const validationCompletedAt = performance.now();
   const publishedAt = new Date();
   const results: Array<{ groupId: string; publicSlug: string }> = [];
+  const placeholderStats: PublishPlaceholderStats = { generated: 0, reused: 0, failed: 0 };
 
   for (const group of publishableGroups) {
     // Once a group is public we keep its slug stable; only first-time publishes mint one.
@@ -122,21 +128,40 @@ export async function publishCase(caseId: string) {
       });
     }
 
-    const manifest = buildPublishManifest({
+    const baseManifest = buildPublishManifest({
       caseRow,
       group,
       publicSlug,
       publishedAt,
     });
 
-    if (!manifest) {
+    if (!baseManifest) {
       continue;
+    }
+
+    const previousManifest = await readPublishedManifest(publicSlug);
+    const enriched = await enrichPublishManifestWithPlaceholders({
+      manifest: baseManifest,
+      previousManifest,
+      sourceAssets: group.frames.flatMap((frame) => frame.assets),
+    });
+    placeholderStats.generated += enriched.stats.generated;
+    placeholderStats.reused += enriched.stats.reused;
+    placeholderStats.failed += enriched.stats.failed;
+
+    if (enriched.stats.failed > 0) {
+      // Placeholders improve slow-network feedback but are not inspection assets. Publish valid
+      // originals and report only an aggregate so one damaged thumbnail cannot block the group.
+      console.warn(
+        "[case-publish-placeholders]",
+        JSON.stringify({ publicSlug, failedAssetCount: enriched.stats.failed }),
+      );
     }
 
     // Reset first so removed frames/assets disappear from the published bundle instead of lingering
     // after subsequent publishes.
     await resetPublishedGroup(publicSlug);
-    await writePublishedManifest(publicSlug, manifest);
+    await writePublishedManifest(publicSlug, enriched.manifest);
     results.push({ groupId: group.id, publicSlug });
   }
 
@@ -159,6 +184,9 @@ export async function publishCase(caseId: string) {
       groupCount: results.length,
       frameCount: publishableGroups.reduce((total, group) => total + group.frames.length, 0),
       newlyValidatedAssetCount: unvalidatedAssets.length,
+      placeholderGeneratedCount: placeholderStats.generated,
+      placeholderReusedCount: placeholderStats.reused,
+      placeholderFailedCount: placeholderStats.failed,
       trustedAssetCount:
         publishableGroups.reduce(
           (total, group) =>

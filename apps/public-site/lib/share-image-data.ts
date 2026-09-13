@@ -2,7 +2,7 @@ import type { PublishManifest } from "@magic-compare/content-schema";
 
 export const PUBLIC_SHARE_IMAGE_WIDTH = 1200;
 export const PUBLIC_SHARE_IMAGE_HEIGHT = 630;
-export const PUBLIC_SHARE_IMAGE_FILE_NAME = "share.webp";
+export const PUBLIC_SHARE_IMAGE_FILE_NAME = "share.jpg";
 
 type PublishAsset = PublishManifest["frames"][number]["assets"][number];
 
@@ -48,7 +48,7 @@ export function buildPublicShareImageData(manifest: PublishManifest): PublicShar
   const caseTitle = normalizeShareText(manifest.case.title);
   const description = normalizeShareText(manifest.group.description);
   const title = `${groupTitle} - ${caseTitle}`;
-  const countLabel = `${manifest.frames.length} Groups`;
+  const countLabel = `${manifest.frames.length} 图组`;
   const [leftAsset, rightAsset] = selectShareAssets(manifest);
 
   return {

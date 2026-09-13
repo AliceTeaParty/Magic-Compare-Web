@@ -8,18 +8,10 @@ import {
 } from "@/lib/public-deploy-job";
 import { notifyBrowserDeploySuccess } from "../case-workspace/browser-deploy-notifications";
 import { useAppNotifications } from "../notifications/use-app-notifications";
+import { readJsonResponse } from "@/lib/client/internal-api";
 
 interface PublicDeployJobResponse {
   job: PublicDeployJob;
-}
-
-/** Reads JSON errors consistently so failed start and polling requests remain actionable. */
-async function readResponseJson<T>(response: Response): Promise<T> {
-  const payload = await response.json().catch(() => null);
-  if (!response.ok) {
-    throw new Error(payload?.error || "无法读取部署任务。");
-  }
-  return payload as T;
 }
 
 /** Owns one shell-level deployment task across route changes and mobile drawer transitions. */
@@ -69,7 +61,9 @@ export function usePublicDeployJob() {
         cache: "no-store",
       });
       if (response.status === 404) return null;
-      const payload = await readResponseJson<PublicDeployJobResponse>(response);
+      const payload = await readJsonResponse<PublicDeployJobResponse>(response, {
+        fallbackMessage: "无法读取部署任务。",
+      });
       applyJob(payload.job, notifyCompletion);
       return payload.job;
     },
@@ -85,7 +79,9 @@ export function usePublicDeployJob() {
     setPanelOpen(true);
     try {
       const response = await fetch("/api/ops/public-deploy", { method: "POST" });
-      const payload = await readResponseJson<StartPublicDeployJobResult>(response);
+      const payload = await readJsonResponse<StartPublicDeployJobResult>(response, {
+        fallbackMessage: "无法开始部署公开站点。",
+      });
       applyJob(payload.job);
     } catch (error) {
       setPanelOpen(false);

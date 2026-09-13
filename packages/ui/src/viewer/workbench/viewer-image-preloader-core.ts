@@ -14,6 +14,8 @@ export interface ViewerPreloadImageHandle {
   onload: (() => void) | null;
   onerror: (() => void) | null;
   decoding?: "async" | "auto" | "sync";
+  cancel?: () => void;
+  decode?: () => Promise<void>;
 }
 
 export interface ViewerPreloadQueueOptions {
@@ -27,6 +29,12 @@ export interface ViewerPreloadQueueOptions {
 const DEFAULT_MAX_CACHE_ENTRIES = 96;
 const DEFAULT_MAX_QUEUED_ENTRIES = 8;
 type ViewerPreloadResultStatus = Extract<ViewerPreloadStatus, "loaded" | "error">;
+
+interface ViewerActivePreloadRequest {
+  handle: ViewerPreloadImageHandle;
+  item: ViewerPreloadQueueItem;
+  token: number;
+}
 
 function sortQueue(left: ViewerPreloadQueueItem, right: ViewerPreloadQueueItem): number {
   if (left.priority !== right.priority) {
@@ -43,15 +51,15 @@ function sortQueue(left: ViewerPreloadQueueItem, right: ViewerPreloadQueueItem):
 export class ViewerImagePreloadQueue {
   private readonly connectionLimit: () => number;
   private readonly createImage: () => ViewerPreloadImageHandle;
-  private readonly loadingUrls = new Set<string>();
+  private readonly activeRequests = new Map<string, ViewerActivePreloadRequest>();
   private readonly maxCacheEntries: number;
   private readonly maxQueuedEntries: number;
   private readonly onLoad?: (url: string) => void;
   private readonly queue: ViewerPreloadQueueItem[] = [];
   private readonly queuedUrls = new Set<string>();
   private readonly resultCache = new Map<string, ViewerPreloadResultStatus>();
-  private activeCount = 0;
   private order = 0;
+  private requestToken = 0;
 
   constructor(options: ViewerPreloadQueueOptions) {
     this.connectionLimit = options.connectionLimit;
@@ -62,7 +70,7 @@ export class ViewerImagePreloadQueue {
   }
 
   get activeRequestCount(): number {
-    return this.activeCount;
+    return this.activeRequests.size;
   }
 
   get queuedRequestCount(): number {
@@ -76,7 +84,7 @@ export class ViewerImagePreloadQueue {
       statuses.set(url, "queued");
     }
 
-    for (const url of this.loadingUrls) {
+    for (const url of this.activeRequests.keys()) {
       statuses.set(url, "loading");
     }
 
@@ -98,7 +106,20 @@ export class ViewerImagePreloadQueue {
       return;
     }
 
-    if (status === "loading" || status === "loaded") {
+    if (status === "loading") {
+      const activeRequest = this.activeRequests.get(url);
+      if (activeRequest) {
+        activeRequest.item.priority = Math.max(activeRequest.item.priority, priority);
+        // Explicit focus/click intent promotes an active speculative request so a later frame-window
+        // replacement cannot cancel the image the user has just chosen.
+        if (scope === undefined) {
+          activeRequest.item.scope = undefined;
+        }
+      }
+      return;
+    }
+
+    if (status === "loaded") {
       return;
     }
 
@@ -115,7 +136,25 @@ export class ViewerImagePreloadQueue {
     this.pump();
   }
 
-  /** Replaces stale speculative work while leaving active image requests and explicit intent alone. */
+  /** Promotes existing speculative work without creating a duplicate request for the live stage. */
+  promote(url: string | undefined | null, priority: number): void {
+    if (!url) {
+      return;
+    }
+
+    if (this.queuedUrls.has(url)) {
+      this.raiseQueuedPriority(url, priority, undefined);
+      return;
+    }
+
+    const activeRequest = this.activeRequests.get(url);
+    if (activeRequest) {
+      activeRequest.item.priority = Math.max(activeRequest.item.priority, priority);
+      activeRequest.item.scope = undefined;
+    }
+  }
+
+  /** Replaces stale speculative work, including active requests that still belong to the scope. */
   replaceScope(scope: string, entries: ViewerPreloadQueueEntry[]): void {
     for (let index = this.queue.length - 1; index >= 0; index -= 1) {
       const item = this.queue[index];
@@ -127,9 +166,17 @@ export class ViewerImagePreloadQueue {
       this.queuedUrls.delete(item.url);
     }
 
+    for (const [url, request] of this.activeRequests) {
+      if (request.item.scope === scope) {
+        this.cancelActiveRequest(url);
+      }
+    }
+
     for (const entry of entries) {
       this.enqueue(entry.url, entry.priority, scope);
     }
+
+    this.pump();
   }
 
   private raiseQueuedPriority(url: string, priority: number, scope?: string): void {
@@ -158,7 +205,7 @@ export class ViewerImagePreloadQueue {
   }
 
   private pump(): void {
-    while (this.activeCount < this.connectionLimit() && this.queue.length > 0) {
+    while (this.activeRequests.size < this.connectionLimit() && this.queue.length > 0) {
       this.queue.sort(sortQueue);
       const item = this.queue.shift();
       if (!item) {
@@ -172,13 +219,13 @@ export class ViewerImagePreloadQueue {
       }
 
       this.resultCache.delete(item.url);
-      this.loadingUrls.add(item.url);
-      this.activeCount += 1;
-
       const image = this.createImage();
+      const token = this.requestToken + 1;
+      this.requestToken = token;
+      this.activeRequests.set(item.url, { handle: image, item, token });
       image.decoding = "async";
-      image.onload = () => this.finish(item.url, "loaded");
-      image.onerror = () => this.finish(item.url, "error");
+      image.onload = () => this.finishLoadedImage(item.url, token, image);
+      image.onerror = () => this.finish(item.url, token, "error");
       image.src = item.url;
     }
   }
@@ -188,7 +235,7 @@ export class ViewerImagePreloadQueue {
       return "queued";
     }
 
-    if (this.loadingUrls.has(url)) {
+    if (this.activeRequests.has(url)) {
       return "loading";
     }
 
@@ -200,8 +247,28 @@ export class ViewerImagePreloadQueue {
     return undefined;
   }
 
-  private finish(url: string, status: ViewerPreloadResultStatus): void {
-    this.loadingUrls.delete(url);
+  /** Marks an image ready only after browser decode so preloader cache hits cannot reveal a blank. */
+  private finishLoadedImage(url: string, token: number, image: ViewerPreloadImageHandle): void {
+    if (!image.decode) {
+      this.finish(url, token, "loaded");
+      return;
+    }
+
+    void image
+      .decode()
+      .then(() => this.finish(url, token, "loaded"))
+      .catch(() => this.finish(url, token, "error"));
+  }
+
+  private finish(url: string, token: number, status: ViewerPreloadResultStatus): void {
+    const activeRequest = this.activeRequests.get(url);
+    if (!activeRequest || activeRequest.token !== token) {
+      return;
+    }
+
+    activeRequest.handle.onload = null;
+    activeRequest.handle.onerror = null;
+    this.activeRequests.delete(url);
 
     if (status === "loaded") {
       this.resultCache.delete(url);
@@ -213,8 +280,24 @@ export class ViewerImagePreloadQueue {
     }
 
     this.trimCache();
-    this.activeCount = Math.max(0, this.activeCount - 1);
     this.pump();
+  }
+
+  /** Clears callbacks before aborting so cancellation and late browser events cannot finish twice. */
+  private cancelActiveRequest(url: string): void {
+    const activeRequest = this.activeRequests.get(url);
+    if (!activeRequest) {
+      return;
+    }
+
+    activeRequest.handle.onload = null;
+    activeRequest.handle.onerror = null;
+    this.activeRequests.delete(url);
+    if (activeRequest.handle.cancel) {
+      activeRequest.handle.cancel();
+    } else {
+      activeRequest.handle.src = "";
+    }
   }
 
   private trimCache(): void {

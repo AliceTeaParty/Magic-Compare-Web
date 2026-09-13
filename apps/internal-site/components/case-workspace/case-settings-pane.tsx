@@ -26,6 +26,7 @@ import {
 import { useRootScrollLock } from "@magic-compare/ui";
 import { useRouter } from "next/navigation";
 import type { CaseWorkspaceData } from "@/lib/server/repositories/content-repository";
+import { postJson } from "@/lib/client/internal-api";
 import type { AppNotificationTone } from "../notifications/use-app-notifications";
 import { DestructiveConfirmationDialog } from "./destructive-confirmation-dialog";
 
@@ -121,25 +122,20 @@ export function CaseSettingsPane({
     if (!canSave) return;
     startTransition(async () => {
       try {
-        const response = await fetch("/api/ops/case-update", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ caseSlug: data.slug, title, summary, tags }),
-        });
-        if (!response.ok) {
-          const payload = await response.json().catch(() => null);
-          throw new Error(payload?.error || "保存 Case 失败。");
-        }
-        const result = (await response.json()) as {
+        const result = await postJson<{
           title: string;
           summary: string;
           tags: string[];
-        };
+        }>(
+          "/api/ops/case-update",
+          { caseSlug: data.slug, title, summary, tags },
+          { fallbackMessage: "保存项目失败。" },
+        );
         onMetadataSaved(result);
-        onNotify("Case 设置已保存。", "success");
+        onNotify("项目设置已保存。", "success");
         onOpenChange(false);
       } catch (error) {
-        onNotify(error instanceof Error ? error.message : "保存 Case 失败。", "error");
+        onNotify(error instanceof Error ? error.message : "保存项目失败。", "error");
       }
     });
   }
@@ -148,20 +144,16 @@ export function CaseSettingsPane({
   function deleteCase() {
     startTransition(async () => {
       try {
-        const response = await fetch("/api/ops/case-delete", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ caseSlug: data.slug }),
-        });
-        if (!response.ok) {
-          const payload = await response.json().catch(() => null);
-          throw new Error(payload?.error || "删除 Case 失败。");
-        }
+        await postJson(
+          "/api/ops/case-delete",
+          { caseSlug: data.slug },
+          { fallbackMessage: "删除项目失败。" },
+        );
         router.push("/");
         router.refresh();
       } catch (error) {
         setConfirmDelete(false);
-        onNotify(error instanceof Error ? error.message : "删除 Case 失败。", "error");
+        onNotify(error instanceof Error ? error.message : "删除项目失败。", "error");
       }
     });
   }
@@ -174,10 +166,10 @@ export function CaseSettingsPane({
       >
         <Stack direction="row" sx={{ alignItems: "center", gap: 1 }}>
           <SettingsOutlined color="primary" />
-          <Typography variant="h4">Case 设置</Typography>
+          <Typography variant="h4">项目设置</Typography>
         </Stack>
         <IconButton
-          aria-label="关闭 Case 设置"
+          aria-label="关闭项目设置"
           onClick={closeSettings}
           sx={{ display: { lg: "none" } }}
         >
@@ -216,7 +208,7 @@ export function CaseSettingsPane({
         <Stack spacing={0.25} sx={{ px: 0.25 }}>
           <SettingsMetadataRow
             icon={<CollectionsOutlined sx={{ fontSize: 18 }} />}
-            label="Group"
+            label="图组"
             value={String(data.groupCount)}
           />
           <SettingsMetadataRow
@@ -255,7 +247,7 @@ export function CaseSettingsPane({
             disabled={isPending || data.groupCount > 0}
             onClick={() => setConfirmDelete(true)}
           >
-            删除 Case
+            删除项目
           </Button>
           {data.groupCount > 0 ? (
             <Stack
@@ -263,7 +255,7 @@ export function CaseSettingsPane({
               sx={{ alignItems: "flex-start", gap: 0.75, px: 0.5, color: "text.secondary" }}
             >
               <InfoOutlined sx={{ mt: 0.05, fontSize: 16, flexShrink: 0 }} />
-              <Typography variant="caption">删除前需先清空全部 Group。</Typography>
+              <Typography variant="caption">删除前需先清空全部图组。</Typography>
             </Stack>
           ) : null}
         </Stack>
@@ -317,7 +309,7 @@ export function CaseSettingsPane({
         onCancel={() => setConfirmDelete(false)}
         onConfirm={deleteCase}
         open={confirmDelete}
-        title="删除 Case？"
+        title="删除项目？"
       />
     </>
   );

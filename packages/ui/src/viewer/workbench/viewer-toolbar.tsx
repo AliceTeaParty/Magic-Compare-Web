@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { keyframes } from "@emotion/react";
 import { FitScreen, HelpOutlined, Opacity, ViewSidebar } from "@mui/icons-material";
 import {
   Box,
@@ -15,13 +15,27 @@ import {
 import type { ViewerMode } from "@magic-compare/content-schema";
 import type { ViewerAsset } from "@magic-compare/compare-core/viewer-data";
 import { clampNumber } from "@magic-compare/shared-utils";
-import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { AbInspectControls } from "./ab-inspect-controls";
 import { ComparisonAssetControls } from "./comparison-asset-controls";
+import {
+  VIEWER_COMPACT_CONTROL_HEIGHT,
+  VIEWER_SEGMENTED_CONTROL_STYLES,
+} from "./viewer-control-styles";
+import { type ViewerInteractionStore, useViewerOverlayOpacity } from "./viewer-interaction-store";
 
-const compactControlHeight = { xs: 42, md: 40 } as const;
 const tripleControlWidth = 144;
-const MODE_ORDER: Record<ViewerMode, number> = { "before-after": 0, "a-b": 1, heatmap: 2 };
+const contextualControlsEnter = keyframes`
+  from {
+    opacity: 0;
+    transform: translateX(10px);
+    clip-path: inset(0 0 0 12% round 999px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+    clip-path: inset(0 0 0 0 round 999px);
+  }
+`;
 // Site variants describe capabilities, not locale. The previous variant branches made the same
 // Chinese viewer switch to English labels after public export, so both surfaces share one copy set.
 const VIEWER_CONTROL_COPY = {
@@ -43,37 +57,32 @@ interface ViewerUtilityControlsProps {
 }
 
 interface ViewerToolbarProps {
-  abScale: number;
   abSide: "before" | "after";
   beforeAsset: ViewerAsset | undefined;
   canUseHeatmap: boolean;
   comparisonAssetKey: string | undefined;
   comparisonAssets: ViewerAsset[];
+  frameId: string | undefined;
   guideOpen: boolean;
   hideStageScrollControl: boolean;
   mode: ViewerMode;
-  overlayOpacity: number;
+  interactionStore: ViewerInteractionStore;
   onAbSideChange: (side: "before" | "after") => void;
   onComparisonAssetChange: (assetKey: string) => void;
   onOpenGuide: () => void;
   onModeChange: (mode: ViewerMode) => void;
-  onOverlayOpacityChange: (value: number) => void;
-  onPixelRenderingToggle: () => void;
-  onScaleChange: (nextScale: number) => void;
   onScrollStageIntoView: () => void;
   onToggleSidebar: () => void;
-  pixelRenderingEnabled: boolean;
   sidebarOpen: boolean;
 }
 
 /** Keeps Heatmap intensity inside the stable toolbar slot instead of moving the filmstrip. */
 function HeatmapOpacityControls({
-  onChange,
-  value,
+  interactionStore,
 }: {
-  onChange: (value: number) => void;
-  value: number;
+  interactionStore: ViewerInteractionStore;
 }) {
+  const value = useViewerOverlayOpacity(interactionStore);
   return (
     <Stack
       direction="row"
@@ -81,8 +90,8 @@ function HeatmapOpacityControls({
         // Heatmap uses the same fixed-height tonal surface as the Viewer segmented controls, so
         // switching modes changes content without introducing a visually unrelated bare slider.
         width: "min(100%, 240px)",
-        height: compactControlHeight,
-        minHeight: compactControlHeight,
+        height: VIEWER_COMPACT_CONTROL_HEIGHT,
+        minHeight: VIEWER_COMPACT_CONTROL_HEIGHT,
         alignItems: "center",
         gap: 0.75,
         px: 1.25,
@@ -104,7 +113,9 @@ function HeatmapOpacityControls({
         size="small"
         value={value}
         onChange={(_, nextValue) =>
-          onChange(clampNumber(Array.isArray(nextValue) ? nextValue[0] : nextValue, 20, 95))
+          interactionStore.setOverlayOpacity(
+            clampNumber(Array.isArray(nextValue) ? nextValue[0] : nextValue, 20, 95),
+          )
         }
         sx={{ flex: 1, minWidth: 64 }}
       />
@@ -130,7 +141,7 @@ export function ViewerUtilityControls({
 }: ViewerUtilityControlsProps) {
   const stageControlHidden = compact || hideStageScrollControl;
   const controlWidth = compact ? 80 : stageControlHidden ? 96 : tripleControlWidth;
-  const controlHeight = compact ? 40 : compactControlHeight;
+  const controlHeight = compact ? 40 : VIEWER_COMPACT_CONTROL_HEIGHT;
   const utilityIconButtonSx = {
     width: "100%",
     height: "100%",
@@ -226,50 +237,30 @@ export function ViewerUtilityControls({
  * consistent between the internal and public shells.
  */
 export function ViewerToolbar({
-  abScale,
   abSide,
   beforeAsset,
   canUseHeatmap,
   comparisonAssetKey,
   comparisonAssets,
+  frameId,
   guideOpen,
   hideStageScrollControl,
   mode,
-  overlayOpacity,
+  interactionStore,
   onAbSideChange,
   onComparisonAssetChange,
   onOpenGuide,
   onModeChange,
-  onOverlayOpacityChange,
-  onPixelRenderingToggle,
-  onScaleChange,
   onScrollStageIntoView,
   onToggleSidebar,
-  pixelRenderingEnabled,
   sidebarOpen,
 }: ViewerToolbarProps) {
-  const prefersReducedMotion = useReducedMotion();
-  const previousModeRef = useRef(mode);
-  const modeDirection = MODE_ORDER[mode] >= MODE_ORDER[previousModeRef.current] ? 1 : -1;
-
-  useEffect(() => {
-    previousModeRef.current = mode;
-  }, [mode]);
-
   /**
    * Routes side selection through the parent controller so A/B state stays in sync with keyboard
    * shortcuts and stage tap cycling.
    */
   function handleAbSideChange(nextSide: "before" | "after") {
     onAbSideChange(nextSide);
-  }
-
-  /**
-   * Clamps preset changes through the shared controller entry point so toolbar buttons and keyboard
-   * shortcuts cannot diverge from stage zoom bounds.
-   */
-  function handleScaleChange(nextScale: number) {
-    onScaleChange(nextScale);
   }
 
   /**
@@ -320,45 +311,25 @@ export function ViewerToolbar({
           sx={{
             flexShrink: 0,
             width: { xs: "100%", sm: 216 },
-            height: compactControlHeight,
+            height: VIEWER_COMPACT_CONTROL_HEIGHT,
             display: "grid",
             gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
             gap: 0,
-            overflow: "hidden",
+            ...VIEWER_SEGMENTED_CONTROL_STYLES,
             alignItems: "stretch",
-            border: "1px solid",
-            borderColor: "divider",
-            borderRadius: 999,
-            backgroundColor: "surface.containerHigh",
             "& .MuiToggleButtonGroup-grouped": {
+              ...VIEWER_SEGMENTED_CONTROL_STYLES["& .MuiToggleButtonGroup-grouped"],
               // Fixed segment widths keep the utility controls stationary when the selected mode
               // or translated label changes. Mobile segments share the available row so icon
               // utilities never get clipped against the Viewer shell.
               width: "auto",
               minWidth: 0,
               flex: "none",
-              height: "100%",
               minHeight: 0,
               px: 1,
               fontSize: "0.86rem",
               fontWeight: 600,
               whiteSpace: "nowrap",
-              margin: "0 !important",
-              border: "0 !important",
-              borderRadius: "0 !important",
-              backgroundColor: "transparent",
-            },
-            "& .MuiToggleButtonGroup-grouped:not(:first-of-type)": {
-              borderLeft: "1px solid !important",
-              borderLeftColor: "var(--mui-palette-divider) !important",
-            },
-            "& .MuiToggleButton-root.Mui-selected": {
-              color: "primary.onContainer",
-              backgroundColor: "primary.light",
-            },
-            "& .MuiToggleButton-root.Mui-selected:hover": {
-              backgroundColor:
-                "color-mix(in srgb, currentColor 8%, var(--mui-palette-primary-light))",
             },
           }}
           onChange={handleModeChange}
@@ -376,8 +347,8 @@ export function ViewerToolbar({
           position: "relative",
           width: "100%",
           minWidth: 0,
-          height: compactControlHeight,
-          minHeight: compactControlHeight,
+          height: VIEWER_COMPACT_CONTROL_HEIGHT,
+          minHeight: VIEWER_COMPACT_CONTROL_HEIGHT,
           display: "flex",
           alignItems: "center",
           justifyContent: "flex-end",
@@ -386,78 +357,48 @@ export function ViewerToolbar({
           // and incoming mode tools transition without moving the header or stage.
         }}
       >
-        <AnimatePresence initial={false} mode="wait">
-          <Box
-            key={mode}
-            component={motion.div}
-            data-viewer-contextual-controls={mode}
-            initial={
-              prefersReducedMotion
-                ? false
-                : {
-                    opacity: 0,
-                    x: modeDirection * 10,
-                    clipPath:
-                      modeDirection > 0
-                        ? "inset(0 0 0 12% round 999px)"
-                        : "inset(0 12% 0 0 round 999px)",
-                  }
-            }
-            animate={{ opacity: 1, x: 0, clipPath: "inset(0 0 0 0 round 999px)" }}
-            exit={
-              prefersReducedMotion
-                ? { opacity: 1 }
-                : {
-                    opacity: 0,
-                    x: modeDirection * -6,
-                    clipPath:
-                      modeDirection > 0
-                        ? "inset(0 12% 0 0 round 999px)"
-                        : "inset(0 0 0 12% round 999px)",
-                    transition: { duration: 0.1, ease: [0.3, 0, 1, 1] },
-                  }
-            }
-            transition={
-              prefersReducedMotion ? { duration: 0 } : { duration: 0.18, ease: [0.2, 0, 0, 1] }
-            }
-            sx={{
-              position: "absolute",
-              inset: 0,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "flex-end",
-              minWidth: 0,
-            }}
-          >
-            {mode === "before-after" ? (
-              beforeAsset && comparisonAssetKey && comparisonAssets.length > 0 ? (
-                <ComparisonAssetControls
-                  baselineAsset={beforeAsset}
-                  comparisonAssetKey={comparisonAssetKey}
-                  comparisonAssets={comparisonAssets}
-                  onComparisonAssetChange={onComparisonAssetChange}
-                />
-              ) : null
-            ) : mode === "a-b" ? (
-              beforeAsset && comparisonAssetKey && comparisonAssets.length > 0 ? (
-                <AbInspectControls
-                  abScale={abScale}
-                  abSide={abSide}
-                  baselineAsset={beforeAsset}
-                  comparisonAssetKey={comparisonAssetKey}
-                  comparisonAssets={comparisonAssets}
-                  onAbSideChange={handleAbSideChange}
-                  onComparisonAssetChange={onComparisonAssetChange}
-                  onPixelRenderingToggle={onPixelRenderingToggle}
-                  onScaleChange={handleScaleChange}
-                  pixelRenderingEnabled={pixelRenderingEnabled}
-                />
-              ) : null
-            ) : (
-              <HeatmapOpacityControls onChange={onOverlayOpacityChange} value={overlayOpacity} />
-            )}
-          </Box>
-        </AnimatePresence>
+        <Box
+          key={mode}
+          data-viewer-contextual-controls={mode}
+          sx={{
+            position: "absolute",
+            inset: 0,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "flex-end",
+            minWidth: 0,
+            // This row only needs a short enter transition. CSS preserves that feedback without
+            // shipping a runtime animation engine in every viewer client bundle.
+            animation: `${contextualControlsEnter} 180ms cubic-bezier(0.2, 0, 0, 1)`,
+            "@media (prefers-reduced-motion: reduce)": { animation: "none" },
+          }}
+        >
+          {mode === "before-after" ? (
+            beforeAsset && comparisonAssetKey && comparisonAssets.length > 0 ? (
+              <ComparisonAssetControls
+                baselineAsset={beforeAsset}
+                comparisonAssetKey={comparisonAssetKey}
+                comparisonAssets={comparisonAssets}
+                onComparisonAssetChange={onComparisonAssetChange}
+              />
+            ) : null
+          ) : mode === "a-b" ? (
+            beforeAsset && comparisonAssetKey && comparisonAssets.length > 0 ? (
+              <AbInspectControls
+                abSide={abSide}
+                baselineAsset={beforeAsset}
+                comparisonAssetKey={comparisonAssetKey}
+                comparisonAssets={comparisonAssets}
+                frameId={frameId}
+                interactionStore={interactionStore}
+                onAbSideChange={handleAbSideChange}
+                onComparisonAssetChange={onComparisonAssetChange}
+              />
+            ) : null
+          ) : (
+            <HeatmapOpacityControls interactionStore={interactionStore} />
+          )}
+        </Box>
       </Box>
     </Stack>
   );

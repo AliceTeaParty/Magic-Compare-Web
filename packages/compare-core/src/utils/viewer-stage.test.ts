@@ -6,22 +6,12 @@ import {
   getViewerDisplayedScale,
   getViewerEffectiveScale,
   getFilmstripScrollbarMetrics,
-  getFittedStageSize,
   VIEWER_MAX_PRESET_SCALE,
   getViewerPresetTransformScale,
   VIEWER_MAX_FINE_SCALE,
   VIEWER_MIN_FINE_SCALE,
   normalizeViewerDisplayedScale,
 } from "./viewer-stage";
-
-describe("getFittedStageSize", () => {
-  it("fits a 16:9 stage inside the viewport padding budget", () => {
-    expect(getFittedStageSize({ width: 1440, height: 900 }, 16 / 9)).toEqual({
-      width: 1420,
-      height: 798.75,
-    });
-  });
-});
 
 describe("getContainedMediaRect", () => {
   it("keeps letterboxed media aligned inside the stage shell", () => {

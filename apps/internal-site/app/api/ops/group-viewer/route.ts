@@ -14,7 +14,7 @@ export const POST = withApiRoute(async (request: Request) => {
   const dataset = await getViewerDataset(payload.caseSlug, payload.groupSlug);
 
   if (!dataset) {
-    return NextResponse.json({ error: "Group not found." }, { status: 404 });
+    return NextResponse.json({ error: "图组不存在。" }, { status: 404 });
   }
 
   return NextResponse.json({ dataset });

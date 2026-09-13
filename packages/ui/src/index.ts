@@ -6,5 +6,6 @@ export * from "./layout/magic-site-footer";
 export * from "./layout/magic-root-layout-shell";
 export * from "./layout/magic-navigation-rail";
 export * from "./layout/magic-public-app-shell";
+export * from "./metadata/magic-site-metadata";
 export * from "./overlays/use-root-scroll-lock";
 export * from "./viewer/group-viewer-workbench";

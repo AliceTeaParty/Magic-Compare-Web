@@ -12,18 +12,22 @@ import {
   useViewerKeyboardShortcuts,
   useViewerMediaPreferences,
   useViewerPreferencePersistence,
-  useViewerViewportMetrics,
+  useViewerDevicePixelRatio,
 } from "./workbench/use-group-viewer-workbench-effects";
 import { ViewerSidebar } from "./workbench/viewer-sidebar";
-import { HeatmapNotice, ViewerStage } from "./workbench/viewer-stage";
+import { ViewerStage } from "./workbench/viewer-stage";
 import { useViewerImagePreloader } from "./workbench/viewer-image-preloader";
-import { useAbInspectState } from "./workbench/use-ab-inspect-state";
 import { useViewerStageShellState } from "./workbench/use-viewer-stage-shell-state";
 import { viewerTokens } from "./workbench/viewer-tokens";
 import { ViewerGuidePanel } from "./workbench/viewer-guide-panel";
 import { readViewerGuideState, writeViewerGuideState } from "./workbench/viewer-guide-storage";
 import { ViewerOnboardingNudge } from "./workbench/viewer-onboarding-nudge";
 import { PixelRenderingAutoDisableNudge } from "./workbench/pixel-rendering-auto-disable-nudge";
+import {
+  useViewerAbStageActive,
+  useViewerInteractionStore,
+  useViewerPixelRenderingPromptOpen,
+} from "./workbench/viewer-interaction-store";
 
 interface GroupViewerWorkbenchProps {
   dataset: ViewerDataset;
@@ -65,43 +69,26 @@ export function GroupViewerWorkbench({
     heatmapAsset,
     heatmapReferenceAsset,
     mode,
-    overlayOpacity,
     selectFrame,
     setAbSide,
     setComparisonAssetKey,
     setMode,
-    setOverlayOpacity,
     setSidebarOpen,
     sidebarOpen,
     stepFrame,
     toggleSidebar,
   } = controller;
-  // Start from a zero viewport on the server and first client paint so hydration never bakes in a
-  // stale desktop/mobile height budget before the real window metrics arrive.
-  const [viewportSize, setViewportSize] = useState(() => ({
-    width: 0,
-    height: 0,
-  }));
   const [devicePixelRatio, setDevicePixelRatio] = useState(1);
-  const [swipePosition, setSwipePosition] = useState(50);
   const [guideOpen, setGuideOpen] = useState(false);
   const [showGuideNudge, setShowGuideNudge] = useState(false);
-  const abInspect = useAbInspectState();
-  const {
-    displayedScale: abDisplayedScale,
-    disablePixelRenderingAutoEnable,
-    dismissPixelRenderingAutoPromptForSession,
-    keepPixelRenderingAutoEnable,
-    panZoomState: abPanZoomState,
-    pixelRenderingAutoDisablePromptOpen,
-    pixelRenderingEnabled,
-    reset: resetAbInspect,
-    setPanZoomState: setAbPanZoomState,
-    setScale: setAbScale,
-    setStageActive: setAbStageActive,
-    stageActive: abStageActive,
-    togglePixelRendering,
-  } = abInspect;
+  const currentFrameId = currentFrame?.id;
+  const interactionStore = useViewerInteractionStore(currentFrameId);
+  const abStageActive = useViewerAbStageActive(interactionStore, currentFrameId);
+  const pixelRenderingAutoDisablePromptOpen = useViewerPixelRenderingPromptOpen(interactionStore);
+  const setAbStageActive = useCallback(
+    (nextActive: boolean) => interactionStore.setStageActive(currentFrameId, nextActive),
+    [currentFrameId, interactionStore],
+  );
   const {
     mediaPreferencesReady,
     resolvedHideStageScrollControl,
@@ -117,12 +104,14 @@ export function GroupViewerWorkbench({
     : comparisonAssetKey;
   const referenceAsset = activeAfterAsset ?? beforeAsset;
   const contentAspectRatio = referenceAsset ? referenceAsset.width / referenceAsset.height : 16 / 9;
-  const stageAspectRatio = resolvedRotateStage ? 1 / contentAspectRatio : contentAspectRatio;
   const stageShell = useViewerStageShellState({
-    aspectRatio: stageAspectRatio,
     prefersReducedMotion: resolvedPrefersReducedMotion,
-    viewportSize,
   });
+  const desktopStageOffset = variant === "internal" ? 100 : 36;
+  const portraitStageOffset = variant === "internal" ? 88 : 80;
+  const desktopStageMaxWidth = `calc(${contentAspectRatio * 100}svh - ${contentAspectRatio * desktopStageOffset}px)`;
+  const portraitAspectRatio = 1 / contentAspectRatio;
+  const portraitStageMaxWidth = `calc(${portraitAspectRatio * 100}svh - ${portraitAspectRatio * portraitStageOffset}px)`;
   const imagePreloader = useViewerImagePreloader({
     comparisonAssetKey: activeComparisonAssetKey,
     currentFrameIndex,
@@ -145,23 +134,14 @@ export function GroupViewerWorkbench({
     }
   }, [closeSidebar, mediaPreferencesReady, resolvedShowDesktopSidebar]);
 
-  // Pan/swipe state belongs to a single frame; carrying it over to another frame feels broken.
-  useEffect(() => {
-    setSwipePosition(50);
-    resetAbInspect();
-  }, [currentFrame?.id, resetAbInspect]);
-
   // Leaving A/B mode should reset inspect state so returning to it starts from a predictable baseline.
   useEffect(() => {
     if (mode !== "a-b") {
-      resetAbInspect();
+      interactionStore.resetAb(currentFrameId);
     }
-  }, [mode, resetAbInspect]);
+  }, [currentFrameId, interactionStore, mode]);
 
-  useViewerViewportMetrics({
-    setDevicePixelRatio,
-    setViewportSize,
-  });
+  useViewerDevicePixelRatio(setDevicePixelRatio);
 
   useEffect(() => {
     setShowGuideNudge(readViewerGuideState() === null);
@@ -172,9 +152,21 @@ export function GroupViewerWorkbench({
    * switches share the same reset path after an accidental pan, zoom, or swipe move.
    */
   const resetViewerView = useCallback(() => {
-    setSwipePosition(50);
-    resetAbInspect();
-  }, [resetAbInspect]);
+    interactionStore.resetFrame(currentFrameId);
+  }, [currentFrameId, interactionStore]);
+
+  const disablePixelRenderingAutoEnable = useCallback(
+    () => interactionStore.disablePixelRenderingAutoEnable(),
+    [interactionStore],
+  );
+  const dismissPixelRenderingAutoPromptForSession = useCallback(
+    () => interactionStore.dismissPixelRenderingAutoPromptForSession(),
+    [interactionStore],
+  );
+  const keepPixelRenderingAutoEnable = useCallback(
+    () => interactionStore.keepPixelRenderingAutoEnable(),
+    [interactionStore],
+  );
 
   /**
    * Opens the guide from explicit user intent; it remains replayable after first-run state is saved.
@@ -252,28 +244,24 @@ export function GroupViewerWorkbench({
         }}
       >
         <ViewerHeader
-          abScale={abDisplayedScale}
           abSide={abSide}
           beforeAsset={beforeAsset}
           canUseHeatmap={availableModes.includes("heatmap")}
           caseTitle={dataset.caseMeta.title}
           comparisonAssetKey={activeComparisonAssetKey}
           comparisonAssets={comparisonAssets}
+          frameId={currentFrameId}
           guideOpen={guideOpen}
           groupTitle={dataset.group.title}
           hideStageScrollControl={resolvedHideStageScrollControl}
+          interactionStore={interactionStore}
           mode={mode}
-          overlayOpacity={overlayOpacity}
           onAbSideChange={setAbSide}
           onComparisonAssetChange={setComparisonAssetKey}
           onOpenGuide={openViewerGuide}
           onModeChange={setMode}
-          onOverlayOpacityChange={setOverlayOpacity}
-          onPixelRenderingToggle={togglePixelRendering}
-          onScaleChange={setAbScale}
           onScrollStageIntoView={stageShell.scrollStageIntoView}
           onToggleSidebar={toggleSidebar}
-          pixelRenderingEnabled={pixelRenderingEnabled}
           sidebarOpen={sidebarOpen}
         />
 
@@ -294,38 +282,34 @@ export function GroupViewerWorkbench({
                 minHeight: 0,
               }}
             >
-              {mode === "heatmap" && !heatmapAsset ? <HeatmapNotice /> : null}
               <Box
-                ref={stageShell.stageSlotRef}
                 sx={{
                   position: "relative",
                   minWidth: 0,
-                  // The viewport budget is only an upper bound. The outer shell must collapse to
-                  // the fitted width-constrained stage height, or portrait mobile screens end up
-                  // with a short stage vertically centered inside an overly tall empty slot.
-                  height: `${stageShell.shellHeight}px`,
+                  // The old 140px server fallback expanded after hydration and caused a visible
+                  // layout shift. CSS now reserves the fitted stage geometry on the first paint.
+                  width: `min(100%, ${desktopStageMaxWidth})`,
+                  aspectRatio: contentAspectRatio,
+                  mx: "auto",
+                  "@media (max-width: 760px) and (orientation: portrait)": {
+                    width: `min(100%, ${portraitStageMaxWidth})`,
+                    aspectRatio: portraitAspectRatio,
+                  },
                 }}
               >
                 <ViewerStage
                   abSide={abSide}
-                  abStageActive={abStageActive}
                   afterAsset={activeAfterAsset}
                   beforeAsset={beforeAsset}
                   devicePixelRatio={devicePixelRatio}
+                  frameId={currentFrameId}
                   heatmapAsset={heatmapAsset}
+                  interactionStore={interactionStore}
                   mode={mode}
                   onCycleAbSide={() => setAbSide(cycleAbSide(abSide))}
-                  overlayOpacity={overlayOpacity}
-                  panZoomState={abPanZoomState}
-                  pixelRenderingEnabled={pixelRenderingEnabled}
                   prefersReducedMotion={resolvedPrefersReducedMotion}
                   rotateStage={resolvedRotateStage}
-                  setAbStageActive={setAbStageActive}
-                  setPanZoomState={setAbPanZoomState}
-                  setSwipePosition={setSwipePosition}
-                  stageAspectRatio={stageAspectRatio}
                   stageRef={stageShell.stageRef}
-                  swipePosition={swipePosition}
                 />
                 {pixelRenderingAutoDisablePromptOpen ? (
                   <Box

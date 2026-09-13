@@ -8,20 +8,20 @@ import {
   VIEWER_MIN_PRESET_SCALE,
 } from "@magic-compare/compare-core";
 import type { ViewerAsset } from "@magic-compare/compare-core/viewer-data";
+import { VIEWER_COMPACT_CONTROL_HEIGHT } from "./viewer-control-styles";
+import { type ViewerInteractionStore, useViewerAbInteraction } from "./viewer-interaction-store";
 
 const BASELINE_ASSET_VALUE = "__baseline__";
 
 interface AbInspectControlsProps {
-  abScale: number;
   abSide: "before" | "after";
   baselineAsset: ViewerAsset;
   comparisonAssetKey: string;
   comparisonAssets: ViewerAsset[];
+  frameId: string | undefined;
+  interactionStore: ViewerInteractionStore;
   onAbSideChange: (side: "before" | "after") => void;
   onComparisonAssetChange: (assetKey: string) => void;
-  onPixelRenderingToggle: () => void;
-  onScaleChange: (nextScale: number) => void;
-  pixelRenderingEnabled: boolean;
 }
 
 /**
@@ -29,22 +29,21 @@ interface AbInspectControlsProps {
  * the mode where the side selector and zoom buttons are meaningful.
  */
 export function AbInspectControls({
-  abScale,
   abSide,
   baselineAsset,
   comparisonAssetKey,
   comparisonAssets,
+  frameId,
+  interactionStore,
   onAbSideChange,
   onComparisonAssetChange,
-  onPixelRenderingToggle,
-  onScaleChange,
-  pixelRenderingEnabled,
 }: AbInspectControlsProps) {
+  const { displayedScale: abScale, pixelRenderingEnabled } = useViewerAbInteraction(
+    interactionStore,
+    frameId,
+  );
   const isAtMinScale = abScale <= VIEWER_MIN_PRESET_SCALE;
   const isAtMaxScale = abScale >= VIEWER_MAX_PRESET_SCALE;
-  // Match the viewer toolbar target size so mode switching and zoom adjustment feel like one
-  // control family instead of mixing desktop-tight and touch-friendly hit areas.
-  const compactControlHeight = { xs: 42, md: 40 };
   const inspectControlWidth = 186;
   const selectedAssetValue = abSide === "before" ? BASELINE_ASSET_VALUE : comparisonAssetKey;
 
@@ -86,7 +85,7 @@ export function AbInspectControls({
         flexShrink: 0,
         width: "100%",
         minWidth: 0,
-        minHeight: compactControlHeight,
+        minHeight: VIEWER_COMPACT_CONTROL_HEIGHT,
       }}
     >
       <Box
@@ -94,8 +93,8 @@ export function AbInspectControls({
           width: { xs: "auto", sm: 128 },
           minWidth: 0,
           flex: { xs: "1 1 0", sm: "0 0 128px" },
-          height: compactControlHeight,
-          minHeight: compactControlHeight,
+          height: VIEWER_COMPACT_CONTROL_HEIGHT,
+          minHeight: VIEWER_COMPACT_CONTROL_HEIGHT,
         }}
       >
         <FormControl
@@ -103,8 +102,8 @@ export function AbInspectControls({
           fullWidth
           sx={{
             "& .MuiOutlinedInput-root": {
-              height: compactControlHeight,
-              minHeight: compactControlHeight,
+              height: VIEWER_COMPACT_CONTROL_HEIGHT,
+              minHeight: VIEWER_COMPACT_CONTROL_HEIGHT,
               boxSizing: "border-box",
               borderRadius: 999,
               backgroundColor: "surface.containerHigh",
@@ -150,8 +149,8 @@ export function AbInspectControls({
         sx={{
           width: inspectControlWidth,
           flex: `0 0 ${inspectControlWidth}px`,
-          height: compactControlHeight,
-          minHeight: compactControlHeight,
+          height: VIEWER_COMPACT_CONTROL_HEIGHT,
+          minHeight: VIEWER_COMPACT_CONTROL_HEIGHT,
         }}
       >
         <Box
@@ -176,7 +175,10 @@ export function AbInspectControls({
             aria-label="缩小 A/B 视图"
             disabled={isAtMinScale}
             onClick={() =>
-              onScaleChange(Math.max(VIEWER_MIN_PRESET_SCALE, Math.floor(abScale - 0.001)))
+              interactionStore.setScale(
+                frameId,
+                Math.max(VIEWER_MIN_PRESET_SCALE, Math.floor(abScale - 0.001)),
+              )
             }
             sx={{
               width: "100%",
@@ -212,7 +214,10 @@ export function AbInspectControls({
             aria-label="放大 A/B 视图"
             disabled={isAtMaxScale}
             onClick={() =>
-              onScaleChange(Math.min(VIEWER_MAX_PRESET_SCALE, Math.ceil(abScale + 0.001)))
+              interactionStore.setScale(
+                frameId,
+                Math.min(VIEWER_MAX_PRESET_SCALE, Math.ceil(abScale + 0.001)),
+              )
             }
             sx={{
               width: "100%",
@@ -226,12 +231,14 @@ export function AbInspectControls({
           >
             <Add sx={{ fontSize: 16 }} />
           </IconButton>
-          <Tooltip title={pixelRenderingEnabled ? "关闭像素渲染" : "开启像素渲染"}>
+          {/* The toggle changes the resize sampler, so "nearest-neighbor sampling" describes the
+              behavior more precisely than the broader "pixel rendering" label. */}
+          <Tooltip title={pixelRenderingEnabled ? "关闭最近邻采样" : "开启最近邻采样"}>
             <IconButton
               size="small"
-              aria-label={pixelRenderingEnabled ? "关闭 A/B 像素渲染" : "开启 A/B 像素渲染"}
+              aria-label={pixelRenderingEnabled ? "关闭 A/B 最近邻采样" : "开启 A/B 最近邻采样"}
               aria-pressed={pixelRenderingEnabled}
-              onClick={onPixelRenderingToggle}
+              onClick={() => interactionStore.togglePixelRendering(frameId)}
               sx={{
                 width: "100%",
                 height: "100%",

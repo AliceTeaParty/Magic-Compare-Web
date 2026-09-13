@@ -72,9 +72,7 @@ describe("POST /api/ops/group-reorder", () => {
   });
 
   it("returns 409 for a stale group list", async () => {
-    reorderGroups.mockRejectedValue(
-      new ConflictError("Group order is stale. Refresh the Case and try again."),
-    );
+    reorderGroups.mockRejectedValue(new ConflictError("图组顺序已过期，请刷新项目后重试。"));
 
     const response = await POST(
       new Request("http://localhost:3000/api/ops/group-reorder", {
@@ -91,7 +89,7 @@ describe("POST /api/ops/group-reorder", () => {
 
     expect(response.status).toBe(409);
     expect(await response.json()).toEqual({
-      error: "Group order is stale. Refresh the Case and try again.",
+      error: "图组顺序已过期，请刷新项目后重试。",
     });
   });
 

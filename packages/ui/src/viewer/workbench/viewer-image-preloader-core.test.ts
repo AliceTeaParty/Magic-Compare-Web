@@ -112,6 +112,45 @@ describe("ViewerImagePreloadQueue", () => {
     expect(queue.statusByUrl.get("/new.png")).toBe("queued");
   });
 
+  it("cancels stale active scope requests and ignores their late callbacks", () => {
+    const handles: ViewerPreloadImageHandle[] = [];
+    const cancel = vi.fn();
+    const queue = new ViewerImagePreloadQueue({
+      connectionLimit: () => 1,
+      createImage: () => {
+        const handle: ViewerPreloadImageHandle = {
+          src: "",
+          onload: null,
+          onerror: null,
+          cancel,
+        };
+        handles.push(handle);
+        return handle;
+      },
+    });
+
+    queue.replaceScope("frame-window", [{ url: "/old.png", priority: 20 }]);
+    const staleOnload = handles[0]?.onload;
+    queue.replaceScope("frame-window", [{ url: "/new.png", priority: 20 }]);
+
+    expect(cancel).toHaveBeenCalledTimes(1);
+    expect(handles[1]?.src).toBe("/new.png");
+    staleOnload?.();
+    expect(queue.statusByUrl.get("/new.png")).toBe("loading");
+  });
+
+  it("promotes active work so a scope replacement cannot cancel explicit intent", () => {
+    const { handles, queue } = createControllableQueue(() => 1);
+
+    queue.replaceScope("frame-window", [{ url: "/selected.png", priority: 20 }]);
+    queue.promote("/selected.png", 100);
+    queue.replaceScope("frame-window", [{ url: "/next.png", priority: 20 }]);
+
+    expect(handles).toHaveLength(1);
+    expect(queue.statusByUrl.get("/selected.png")).toBe("loading");
+    expect(queue.statusByUrl.get("/next.png")).toBe("queued");
+  });
+
   it("respects the active request limit and continues after load", () => {
     const { handles, queue } = createControllableQueue(() => 2);
 
@@ -201,6 +240,64 @@ describe("ViewerImagePreloadQueue", () => {
     handles[0]?.onload?.();
 
     expect(onLoad).toHaveBeenCalledWith("/loaded.png");
+  });
+
+  it("waits for decode before caching a successful preload", async () => {
+    const onLoad = vi.fn();
+    let resolveDecode!: () => void;
+    const decodePromise = new Promise<void>((resolve) => {
+      resolveDecode = resolve;
+    });
+    const handles: ViewerPreloadImageHandle[] = [];
+    const queue = new ViewerImagePreloadQueue({
+      connectionLimit: () => 1,
+      createImage: () => {
+        const handle: ViewerPreloadImageHandle = {
+          src: "",
+          onload: null,
+          onerror: null,
+          decode: () => decodePromise,
+        };
+        handles.push(handle);
+        return handle;
+      },
+      onLoad,
+    });
+
+    queue.enqueue("/decoded.png", 10);
+    handles[0]?.onload?.();
+    expect(onLoad).not.toHaveBeenCalled();
+
+    resolveDecode();
+    await decodePromise;
+    await Promise.resolve();
+    expect(onLoad).toHaveBeenCalledWith("/decoded.png");
+  });
+
+  it("keeps decode failures out of the loaded cache so they can retry", async () => {
+    const handles: ViewerPreloadImageHandle[] = [];
+    const failingQueue = new ViewerImagePreloadQueue({
+      connectionLimit: () => 1,
+      createImage: () => {
+        const handle: ViewerPreloadImageHandle = {
+          src: "",
+          onload: null,
+          onerror: null,
+          decode: () => Promise.reject(new Error("decode failed")),
+        };
+        handles.push(handle);
+        return handle;
+      },
+    });
+
+    failingQueue.enqueue("/broken.png", 10);
+    handles[0]?.onload?.();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(failingQueue.statusByUrl.get("/broken.png")).toBe("error");
+
+    failingQueue.enqueue("/broken.png", 10);
+    expect(handles).toHaveLength(2);
   });
 });
 

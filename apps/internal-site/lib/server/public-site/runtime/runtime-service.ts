@@ -1,5 +1,5 @@
 import { cp, mkdir, readdir, rm } from "node:fs/promises";
-import { dirname } from "node:path";
+import { dirname, join } from "node:path";
 import type { PublicDeployStage } from "../../../public-deploy-job";
 import {
   CF_PAGES_BRANCH_ENV_NAME,
@@ -47,6 +47,18 @@ export interface PublicDeployObserver {
 }
 
 /**
+ * Clears transient build artifacts without replacing the directory itself. Docker may mount the
+ * build directory as a volume, and removing that mount root fails with EBUSY on Linux.
+ */
+export async function clearDirectoryContents(directory: string): Promise<void> {
+  await mkdir(directory, { recursive: true });
+  const entries = await readdir(directory);
+  await Promise.all(
+    entries.map((entry) => rm(join(directory, entry), { recursive: true, force: true })),
+  );
+}
+
+/**
  * Mirrors the Next.js export into the configured publish directory so local exports and deploys can
  * target an arbitrary output root without teaching Next.js about that environment-specific path.
  */
@@ -78,9 +90,7 @@ async function ensurePublishedGroupsExist(): Promise<void> {
     // Fall through to the explicit error below.
   }
 
-  throw new Error(
-    `No published groups were found in ${publishedGroupsDirectory()}. Publish at least one case first.`,
-  );
+  throw new Error(`在 ${publishedGroupsDirectory()} 中找不到已发布图组，请先发布至少一个项目。`);
 }
 
 /**
@@ -92,7 +102,7 @@ async function performPublicExport(observer?: PublicDeployObserver): Promise<Pub
   const exportDir = resolvePublicExportDirectory();
 
   await ensurePublishedGroupsExist();
-  await rm(buildOutputDir, { recursive: true, force: true });
+  await clearDirectoryContents(buildOutputDir);
 
   observer?.onStage?.("building");
   const commandResult = await runCommand("pnpm", getPublicSiteBuildArgs(), getWorkspaceRoot(), {

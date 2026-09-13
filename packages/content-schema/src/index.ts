@@ -1,23 +1,13 @@
 import { z } from "zod";
 
-export const CASE_STATUSES = [
-  "draft",
-  "internal",
-  "published",
-  "archived",
-] as const;
+export const CASE_STATUSES = ["draft", "internal", "published", "archived"] as const;
 
 export const VIEWER_MODES = ["before-after", "a-b", "heatmap"] as const;
 
-export const ASSET_KINDS = [
-  "before",
-  "after",
-  "heatmap",
-  "crop",
-  "misc",
-] as const;
+export const ASSET_KINDS = ["before", "after", "heatmap", "crop", "misc"] as const;
 
-export const PUBLISH_SCHEMA_VERSION = 1;
+export const PUBLISH_SCHEMA_VERSION = 2;
+export const PUBLISH_PLACEHOLDER_DATA_URL_MAX_LENGTH = 512;
 
 export const CaseStatusSchema = z.enum(CASE_STATUSES);
 export const ViewerModeSchema = z.enum(VIEWER_MODES);
@@ -161,8 +151,7 @@ export const ImportManifestSchema = z
         }
 
         const invalidPrimary = frameEntry.assets.filter(
-          (asset) =>
-            asset.isPrimaryDisplay && asset.kind !== "before" && asset.kind !== "after",
+          (asset) => asset.isPrimaryDisplay && asset.kind !== "before" && asset.kind !== "after",
         );
 
         if (invalidPrimary.length > 0) {
@@ -186,6 +175,18 @@ export const PublishManifestAssetSchema = z.object({
   height: z.number().int().positive(),
   note: z.string().default(""),
   isPrimaryDisplay: z.boolean(),
+  placeholder: z
+    .object({
+      dataUrl: z
+        .string()
+        .max(PUBLISH_PLACEHOLDER_DATA_URL_MAX_LENGTH)
+        .regex(/^data:image\/webp;base64,[A-Za-z0-9+/]+={0,2}$/),
+      sourceColor: z
+        .string()
+        .regex(/^#[0-9A-Fa-f]{6}$/)
+        .transform((value) => value.toUpperCase()),
+    })
+    .optional(),
 });
 
 export const PublishManifestFrameSchema = z.object({
@@ -197,7 +198,7 @@ export const PublishManifestFrameSchema = z.object({
 });
 
 export const PublishManifestSchema = z.object({
-  schemaVersion: z.number().int().positive(),
+  schemaVersion: z.union([z.literal(1), z.literal(2)]),
   publicSlug: PublicSlugSchema,
   generatedAt: z.string().datetime(),
   assetBasePath: z.string().min(1),
@@ -232,6 +233,9 @@ export type AssetRecord = z.infer<typeof AssetSchema>;
 
 export type ImportManifest = z.infer<typeof ImportManifestSchema>;
 export type PublishManifest = z.infer<typeof PublishManifestSchema>;
+export type PublishImagePlaceholder = NonNullable<
+  PublishManifest["frames"][number]["assets"][number]["placeholder"]
+>;
 
 export function parseImportManifest(input: unknown): ImportManifest {
   return ImportManifestSchema.parse(input);

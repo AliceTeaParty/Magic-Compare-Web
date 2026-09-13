@@ -34,7 +34,7 @@ export function serializeViewerPixelRenderingAutoDisabledCookie(): string {
   return serializeCookieValue(VIEWER_PIXEL_RENDERING_AUTO_DISABLED_COOKIE_NAME, "1");
 }
 
-/** Reads whether this browser has opted out of automatic high-zoom pixel rendering. */
+/** Reads whether this browser has opted out of automatic high-zoom nearest-neighbor sampling. */
 export function readViewerPixelRenderingAutoDisabledCookie(): boolean {
   return readDocumentCookieValue(VIEWER_PIXEL_RENDERING_AUTO_DISABLED_COOKIE_NAME) === "1";
 }

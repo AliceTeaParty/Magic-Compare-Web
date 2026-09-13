@@ -25,13 +25,15 @@ import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import Link from "next/link";
 import type { MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from "react";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { CaseWorkspaceData } from "@/lib/server/repositories/content-repository";
 import { inlineEditTextSx } from "./inline-edit-text-sx";
+import {
+  GROUP_DESCRIPTION_MAX_LENGTH,
+  GROUP_TITLE_MAX_LENGTH,
+  useGroupMetadataEditor,
+} from "./use-group-metadata-editor";
 
 type GroupItem = CaseWorkspaceData["groups"][number];
-const GROUP_TITLE_MAX_LENGTH = 20;
-const GROUP_DESCRIPTION_MAX_LENGTH = 40;
 const metadataChipSx = {
   height: 30,
   border: 0,
@@ -40,14 +42,6 @@ const metadataChipSx = {
   "& .MuiChip-icon": { ml: 1, color: "inherit", fontSize: 17 },
   "& .MuiChip-label": { px: 1.15 },
 } as const;
-
-/**
- * Lets the editor show temporary overflow while keeping save validation strict, which is easier to
- * correct than silently rejecting keystrokes in a contentEditable field.
- */
-function isOverLimit(value: string, maxLength: number) {
-  return value.length > maxLength;
-}
 
 /**
  * Keeps each workspace row self-contained so drag handles, visibility controls, and the internal
@@ -103,57 +97,26 @@ export function SortableGroupRow({
       opacity: 1,
     },
   };
-  const [isEditing, setIsEditing] = useState(false);
-  // Existing metadata can predate current limits. Preserve it in the editor so opening and saving
-  // cannot silently truncate server data; the counters and save validation surface the overflow.
-  const [draftTitle, setDraftTitle] = useState(group.title);
-  const [draftDescription, setDraftDescription] = useState(group.description);
-  const titleEditorRef = useRef<HTMLElement | null>(null);
-  const descriptionEditorRef = useRef<HTMLElement | null>(null);
-  const editSeedRef = useRef({
-    title: group.title,
-    description: group.description,
-  });
-  const isTitleOverLimit = isOverLimit(draftTitle, GROUP_TITLE_MAX_LENGTH);
-  const isDescriptionOverLimit = isOverLimit(draftDescription, GROUP_DESCRIPTION_MAX_LENGTH);
-  const titleError = draftTitle.trim() ? null : "标题不能为空。";
-  const hasMetadataError = Boolean(titleError) || isTitleOverLimit || isDescriptionOverLimit;
+  const {
+    cancelMetadataEdit,
+    descriptionEditorRef,
+    draftDescription,
+    draftTitle,
+    hasMetadataError,
+    isDescriptionOverLimit,
+    isEditing,
+    isTitleOverLimit,
+    saveMetadataEdit,
+    startMetadataEdit,
+    syncDescription,
+    syncTitle,
+    titleEditorRef,
+  } = useGroupMetadataEditor({ group, onUpdateMetadata });
   const visibleExtraAssetLabels = group.extraAssetLabels.slice(0, 3);
   const hiddenExtraAssetLabelCount = group.extraAssetLabels.length - visibleExtraAssetLabels.length;
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({
     id: group.id,
   });
-
-  useEffect(() => {
-    if (!isEditing) {
-      setDraftTitle(group.title);
-      setDraftDescription(group.description);
-    }
-  }, [group.description, group.title, isEditing]);
-
-  useLayoutEffect(() => {
-    if (!isEditing) {
-      return;
-    }
-
-    const titleEditor = titleEditorRef.current;
-    const descriptionEditor = descriptionEditorRef.current;
-    if (!titleEditor || !descriptionEditor) {
-      return;
-    }
-
-    // Keep React out of the live contentEditable text path; otherwise every draft update can
-    // recreate text nodes and move the caret back to the start.
-    titleEditor.textContent = editSeedRef.current.title;
-    descriptionEditor.textContent = editSeedRef.current.description;
-    titleEditor.focus();
-    const selection = window.getSelection();
-    const range = document.createRange();
-    range.selectNodeContents(titleEditor);
-    range.collapse(false);
-    selection?.removeAllRanges();
-    selection?.addRange(range);
-  }, [isEditing]);
 
   /**
    * Ignores the ToggleButtonGroup "clear selection" null case because a group must always be either
@@ -185,53 +148,6 @@ export function SortableGroupRow({
     event.stopPropagation();
   }
 
-  /**
-   * Rehydrates drafts from the current row before editing so an earlier cancelled or failed save
-   * cannot leak stale text into the inline editor.
-   */
-  function startMetadataEdit() {
-    editSeedRef.current = {
-      title: group.title,
-      description: group.description,
-    };
-    setDraftTitle(group.title);
-    setDraftDescription(group.description);
-    setIsEditing(true);
-  }
-
-  /**
-   * Cancelling mirrors startMetadataEdit for the same reason: the row should return to the last
-   * committed metadata snapshot, not whatever contentEditable currently contains.
-   */
-  function cancelMetadataEdit() {
-    setDraftTitle(group.title);
-    setDraftDescription(group.description);
-    setIsEditing(false);
-  }
-
-  /**
-   * Group title is part of the row's primary identity, so client validation mirrors the API rule
-   * before scheduling an optimistic metadata save.
-   */
-  function saveMetadataEdit() {
-    const titleText = titleEditorRef.current?.textContent ?? draftTitle;
-    const descriptionText = descriptionEditorRef.current?.textContent ?? draftDescription;
-
-    if (
-      !titleText.trim() ||
-      isOverLimit(titleText, GROUP_TITLE_MAX_LENGTH) ||
-      isOverLimit(descriptionText, GROUP_DESCRIPTION_MAX_LENGTH)
-    ) {
-      return;
-    }
-
-    void onUpdateMetadata(group, {
-      title: titleText,
-      description: descriptionText,
-    });
-    setIsEditing(false);
-  }
-
   function handleOpenClick(event: ReactMouseEvent<HTMLElement>) {
     stopClickPropagation(event);
     if (isPending || isEditing) {
@@ -247,18 +163,6 @@ export function SortableGroupRow({
     }
 
     onDelete(group);
-  }
-
-  /**
-   * Keeps the visible editor text and React draft state in lockstep without trimming so the
-   * character counter can guide users back under the limit instead of blocking input.
-   */
-  function syncEditableText(editor: HTMLElement | null, updateDraft: (value: string) => void) {
-    if (!editor) {
-      return;
-    }
-
-    updateDraft(editor.textContent ?? "");
   }
 
   return (
@@ -289,7 +193,7 @@ export function SortableGroupRow({
             p: { xs: 1.5, md: 1.75 },
           }}
         >
-          <Tooltip title="拖动调整此 Case 内的顺序。">
+          <Tooltip title="拖动调整此项目内的顺序。">
             <IconButton
               {...attributes}
               {...listeners}
@@ -332,15 +236,11 @@ export function SortableGroupRow({
                   component="span"
                   variant="subtitle1"
                   role={isEditing ? "textbox" : undefined}
-                  aria-label={isEditing ? "Group 标题" : undefined}
+                  aria-label={isEditing ? "图组标题" : undefined}
                   contentEditable={isEditing && !isPending}
-                  data-placeholder="Group 标题"
+                  data-placeholder="图组标题"
                   suppressContentEditableWarning
-                  onInput={
-                    isEditing
-                      ? () => syncEditableText(titleEditorRef.current, setDraftTitle)
-                      : undefined
-                  }
+                  onInput={isEditing ? syncTitle : undefined}
                   sx={inlineEditTextSx({ active: isEditing, kind: "title" })}
                 >
                   {isEditing ? null : group.title}
@@ -376,15 +276,11 @@ export function SortableGroupRow({
                   component="span"
                   variant="body2"
                   role={isEditing ? "textbox" : undefined}
-                  aria-label={isEditing ? "Group 描述" : undefined}
+                  aria-label={isEditing ? "图组描述" : undefined}
                   contentEditable={isEditing && !isPending}
-                  data-placeholder="暂无 Group 描述。"
+                  data-placeholder="暂无图组描述。"
                   suppressContentEditableWarning
-                  onInput={
-                    isEditing
-                      ? () => syncEditableText(descriptionEditorRef.current, setDraftDescription)
-                      : undefined
-                  }
+                  onInput={isEditing ? syncDescription : undefined}
                   noWrap={!isEditing}
                   sx={[
                     {
@@ -396,7 +292,7 @@ export function SortableGroupRow({
                     }),
                   ]}
                 >
-                  {isEditing ? null : group.description || "暂无 Group 描述。"}
+                  {isEditing ? null : group.description || "暂无图组描述。"}
                 </Typography>
                 {isEditing ? (
                   <Typography
@@ -529,11 +425,11 @@ export function SortableGroupRow({
             >
               {isEditing ? (
                 <>
-                  <Tooltip title="保存 Group">
+                  <Tooltip title="保存图组">
                     <IconButton
                       size="small"
                       color="primary"
-                      aria-label="保存 Group 元数据"
+                      aria-label="保存图组元数据"
                       disabled={isPending || hasMetadataError}
                       onPointerDown={stopPointerPropagation}
                       onClick={(event) => {
@@ -548,7 +444,7 @@ export function SortableGroupRow({
                   <Tooltip title="取消编辑">
                     <IconButton
                       size="small"
-                      aria-label="取消编辑 Group 元数据"
+                      aria-label="取消编辑图组元数据"
                       disabled={isPending}
                       onPointerDown={stopPointerPropagation}
                       onClick={(event) => {
@@ -563,10 +459,10 @@ export function SortableGroupRow({
                 </>
               ) : (
                 <>
-                  <Tooltip title="编辑 Group">
+                  <Tooltip title="编辑图组">
                     <IconButton
                       size="small"
-                      aria-label="编辑 Group"
+                      aria-label="编辑图组"
                       disabled={isPending}
                       onPointerDown={stopPointerPropagation}
                       onClick={(event) => {
@@ -578,11 +474,11 @@ export function SortableGroupRow({
                       <EditOutlined fontSize="small" />
                     </IconButton>
                   </Tooltip>
-                  <Tooltip title="删除 Group">
+                  <Tooltip title="删除图组">
                     <IconButton
                       size="small"
                       color="error"
-                      aria-label="删除 Group"
+                      aria-label="删除图组"
                       disabled={isPending}
                       onPointerDown={stopPointerPropagation}
                       onClick={handleDeleteClick}

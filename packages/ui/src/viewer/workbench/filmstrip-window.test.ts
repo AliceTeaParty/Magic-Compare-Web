@@ -3,6 +3,7 @@ import {
   FILMSTRIP_CARD_WIDTH,
   FILMSTRIP_ITEM_STRIDE,
   getFilmstripRenderWindow,
+  shouldUpdateFilmstripRenderState,
 } from "./filmstrip-window";
 
 describe("filmstrip render window", () => {
@@ -48,5 +49,20 @@ describe("filmstrip render window", () => {
       boundaryGaps;
 
     expect(totalWidth).toBe(frameCount * FILMSTRIP_ITEM_STRIDE - 8);
+  });
+
+  it("skips React updates until scrolling crosses a virtual window boundary", () => {
+    const current = { clientWidth: 930, scrollLeft: 0, scrollWidth: 28_540 };
+
+    expect(shouldUpdateFilmstripRenderState(current, { ...current, scrollLeft: 40 }, 183)).toBe(
+      false,
+    );
+    expect(
+      shouldUpdateFilmstripRenderState(
+        current,
+        { ...current, scrollLeft: 12 * FILMSTRIP_ITEM_STRIDE },
+        183,
+      ),
+    ).toBe(true);
   });
 });

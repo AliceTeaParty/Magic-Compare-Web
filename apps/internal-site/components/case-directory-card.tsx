@@ -278,10 +278,11 @@ export function CaseDirectoryCard({ item }: { item: CaseCatalogItem }) {
           >
             <MetadataItem
               icon={<CollectionsOutlined sx={{ fontSize: 18, color: "text.secondary" }} />}
-              label={`${item.groupCount} Group`}
+              label={`${item.groupCount} 图组`}
             />
             <MetadataItem
               icon={<PublicOutlined sx={{ fontSize: 18, color: "text.secondary" }} />}
+              // Keep the catalog metadata concise so the image-group count stays easy to scan.
               label={`${item.publicGroupCount} 公开`}
             />
             <MetadataItem

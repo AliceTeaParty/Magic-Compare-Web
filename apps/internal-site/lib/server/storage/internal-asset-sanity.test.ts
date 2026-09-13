@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { assertLikelyPublicAssets } from "./internal-asset-sanity";
+import { StorageValidationError } from "@/lib/server/api/errors";
+import { assertLikelyImageAssetUrl, assertLikelyPublicAssets } from "./internal-asset-sanity";
 
 const mocks = vi.hoisted(() => ({
   readInternalAssetPrefix: vi.fn(),
@@ -37,5 +38,23 @@ describe("internal asset sanity concurrency", () => {
 
     expect(mocks.readInternalAssetPrefix).toHaveBeenCalledTimes(20);
     expect(maxActiveReads).toBe(8);
+  });
+
+  it("converts storage SDK errors into safe validation diagnostics", async () => {
+    mocks.readInternalAssetPrefix.mockRejectedValue({
+      Code: "SignatureDoesNotMatch",
+      $metadata: { httpStatusCode: 403, requestId: "request-123" },
+    });
+
+    await expect(assertLikelyImageAssetUrl("/groups/test/1/original.png")).rejects.toMatchObject({
+      name: StorageValidationError.name,
+      status: 502,
+      diagnostic: {
+        logicalPath: "/groups/test/1/original.png",
+        code: "SignatureDoesNotMatch",
+        requestId: "request-123",
+        upstreamStatus: 403,
+      },
+    });
   });
 });

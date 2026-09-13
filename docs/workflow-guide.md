@@ -58,8 +58,8 @@
 统一在 S3-compatible 存储：
 
 - bucket 由 `MAGIC_COMPARE_S3_BUCKET` 指定
-- endpoint 由 `MAGIC_COMPARE_S3_ENDPOINT` 指定
-- 浏览器访问图片时使用 `MAGIC_COMPARE_S3_PUBLIC_BASE_URL`
+- 服务端读写与浏览器预签名 PUT 使用 `MAGIC_COMPARE_S3_ENDPOINT`
+- 图片展示与 published manifest 使用 `MAGIC_COMPARE_S3_PUBLIC_BASE_URL`
 - 逻辑路径当前统一落在 `/groups/<group-storage-uuid>/<frame-order>/<frame-revision-uuid>/...`
 
 重要约束：
@@ -212,13 +212,14 @@ pnpm docker:dev:up
 compose 当前会做这些事：
 
 - 运行一次性的 `internal-site-init`，完成 `db:push`
-- 仅当 demo 可见且外部对象存储配置齐全时，继续 `db:seed`
+- 仅当 demo 可见且对象存储配置齐全时，继续 `db:seed`
 - 启动 `internal-site`
 
 说明：
 
 - 基础 `docker-compose.yml` 默认通过 `MAGIC_COMPARE_INTERNAL_SITE_IMAGE` 拉取 GHCR 运行时镜像
-- `docker/dev.compose.override.yml` 才会把 `internal-site` / `internal-site-init` 切换成本地 `build`
+- `docker/dev.compose.override.yml` 会把 `internal-site` / `internal-site-init` 切换成本地 `build`
+- 开发环境和生产环境一样，通过 `.env` 提供实际 S3-compatible 存储配置
 - 数据目录现在统一通过 `.env` 控制；留空时走 Docker named volumes，填写宿主机路径时走 bind mount
 - `internal-site` 常驻进程直接由 Node 启动 Next，不保留 pnpm 包装进程：
 
@@ -261,29 +262,32 @@ MAGIC_COMPARE_PUBLIC_FAVICON_URL=/branding/public-favicon.ico
 ```
 
 - 相对宿主机路径以 compose 项目目录为基准；留空时使用空的 `branding-assets` named volume。
+- Logo/Favicon 变量填写浏览器路径 `/branding/<文件名>`；`file:/...` 和宿主机绝对路径不是浏览器地址。
 - 同一目录会挂到 `apps/internal-site/public/branding` 与 `apps/public-site/public/branding`，无需重建镜像。
 - 公开导出会复制该目录的全部文件。目录中不能放密钥、内部素材或其他不应公开的内容。
 - 替换同名公开 Logo/Favicon 后再次执行部署即可；部署指纹包含挂载目录内容，不会因为 URL 没变而跳过。
 
-其他会重复写入的构建目录也使用 named volume：
-
-- `public-build-output`：Next 静态导出暂存目录
-- `public-build-published`：构建前同步的 published 静态资源
-- `public-deploy-cache`：Wrangler 本地缓存
-
-这些目录不能放在容器 writable diff layer。构建仍由部署动作按需启动，完成后进程退出；持久化的只有磁盘文件，不长期占用 CPU 或内存。
+Wrangler 本地缓存使用 `public-deploy-cache` named volume。构建前同步的
+`apps/public-site/public/published` 与 Next 静态导出的 `out` 都是单次部署暂存目录，每次构建都会清空，因此保留在容器 writable layer。构建仍由部署动作按需启动，完成后进程退出；持久化的缓存只占用磁盘，不长期占用 CPU 或内存。
 
 ### Docker 中最容易踩的坑
 
-#### 1. compose 不再自带本地对象存储
+#### 1. Compose 不自带本地对象存储
 
-现在必须显式提供外部 S3-compatible 配置，例如 Cloudflare R2：
+生产和 Docker 开发都必须显式提供外部 S3-compatible 配置，例如 Cloudflare R2：
 
 - `MAGIC_COMPARE_S3_BUCKET`
 - `MAGIC_COMPARE_S3_ENDPOINT`
 - `MAGIC_COMPARE_S3_PUBLIC_BASE_URL`
 - `MAGIC_COMPARE_S3_ACCESS_KEY_ID`
 - `MAGIC_COMPARE_S3_SECRET_ACCESS_KEY`
+
+生产 R2 要把两类地址分开配置：
+
+- `MAGIC_COMPARE_S3_ENDPOINT` 必须是 R2 原生 S3 API 地址 `https://<account-id>.r2.cloudflarestorage.com`。服务端 `GetObject`、`PutObject` 以及浏览器的 presigned PUT 都通过它签名和访问。
+- `MAGIC_COMPARE_S3_PUBLIC_BASE_URL` 只用于图片展示和写入公开 manifest，可使用 Cloudflare 代理的图片域名。
+- 不要让签名 S3 请求经过图片分发域名；代理可能改写 `Range` 等已签名请求头，导致 `SignatureDoesNotMatch`。
+- R2 CORS 必须允许 internal-site 的实际 origin 对原生 S3 API endpoint 发起 `PUT`，并至少允许 `content-type` 请求头。
 
 #### 2. Docker 数据库路径必须走 Docker 专用 env
 
@@ -309,9 +313,10 @@ Web 上传链路是：
 4. 预检通过后以 `stream-v2` 调用 `POST /api/ops/group-upload-start`
 5. 1 到 3 个 worker 逐帧生成缩略图和缺失 heatmap
 6. 一帧生成完成后立即调用 prepare，全局最多 6 路、单帧最多 3 路 PUT
-7. 该 frame 的 PUT 全部成功后串行 commit，并释放衍生 Blob
-8. 全部 frame 完成后调用 `POST /api/ops/group-upload-complete`
-9. 暂停会终止 worker 和 PUT；放弃还会调用 cancel 清理未提交 pending 前缀
+7. prepare 对相同描述复用已准备 revision，只重新签发 PUT URL；PUT 失败会重签同一路径并重传，commit 的可重试失败只重试同一 revision 的 commit
+8. 该 frame 的 PUT 全部成功后串行 commit，并释放衍生 Blob
+9. 全部 frame 完成后调用 `POST /api/ops/group-upload-complete`
+10. 暂停会终止 worker 和 PUT；放弃还会调用 cancel 清理未提交 pending 前缀
 
 关键约束：
 
@@ -324,7 +329,7 @@ Web 上传链路是：
 - 已存在的 case metadata 仍以数据库为准；Web 上传不会覆盖已有 case 的 title / summary / tags
 - group 默认内部草稿；公开开关不再来自 `case.yaml` / `group.yaml`
 - 浏览器实际访问图片时，会由 internal/public 站点将逻辑路径解析成 `MAGIC_COMPARE_S3_PUBLIC_BASE_URL` 下的公网绝对 URL
-- 生产环境里的 `MAGIC_COMPARE_S3_PUBLIC_BASE_URL` 应指向 Cloudflare 代理的图片域名，不应直接使用裸 `r2.dev` 或 `cloudflarestorage.com` 桶域名
+- 生产环境里的 `MAGIC_COMPARE_S3_ENDPOINT` 使用原生 `cloudflarestorage.com` S3 API 地址；`MAGIC_COMPARE_S3_PUBLIC_BASE_URL` 使用 Cloudflare 代理的图片域名
 - public-export/public-deploy 不再打包图片，Pages 只发布静态页面和 manifest
 - `public-site` 公开页默认不应被搜索引擎索引；页面层防爬通过 metadata / `robots.txt` 声明，真正的图片拦截和限流交给 Cloudflare
 
@@ -589,7 +594,7 @@ docker compose -f docker-compose.yml -f docker/ci.compose.override.yml up -d --b
 
 关键约束：
 
-- CI 不应假设 runner 上存在本地 S3/minio sidecar
+- CI 通过 `rustfs/rustfs:1.0.0-rc.6` 提供一次性的 S3-compatible sidecar；`rustfs-init` 使用固定版本 AWS CLI 初始化 bucket 后立即退出
 - compose smoke 默认不依赖 demo seed；只有显式提供外部对象存储配置时才应该验证 demo
 - 运行失败后最好保留 compose 日志，便于排错
 

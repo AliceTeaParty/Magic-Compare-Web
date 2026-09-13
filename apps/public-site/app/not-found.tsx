@@ -20,9 +20,9 @@ export default function NotFoundPage() {
           <LinkOffOutlined aria-hidden="true" sx={{ color: "primary.main", fontSize: 40 }} />
           {/* The public document is zh-CN; keeping its only standalone error page in English made
               navigation failures feel like a separate legacy surface. */}
-          <Typography variant="h2">未找到 Group</Typography>
+          <Typography variant="h2">未找到图组</Typography>
           <Typography variant="body1" sx={{ maxWidth: "62ch", color: "text.secondary" }}>
-            此地址没有对应的已发布对比 Group。请检查分享链接，或请发布者重新发布该 Group。
+            此地址没有对应的已发布对比图组。请检查分享链接，或请发布者重新发布该图组。
           </Typography>
         </Stack>
       </Box>

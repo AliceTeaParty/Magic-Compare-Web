@@ -8,6 +8,11 @@ import type {
 } from "./web-upload-types";
 import { cjkKebabCase } from "@magic-compare/shared-utils";
 import { parseUploadFilenameStem } from "./filename-parser";
+import {
+  getCommonHeatmapReferenceLabels,
+  getDefaultHeatmapReferenceLabel,
+  getFramesRequiringGeneratedHeatmap,
+} from "./heatmap-reference";
 
 const SUPPORTED_EXTENSIONS = new Set([".png", ".jpg", ".jpeg", ".webp", ".avif", ".svg"]);
 const SOURCE_VARIANTS = new Set(["src", "source", "ori", "origin", "before"]);
@@ -629,7 +634,7 @@ function deriveGroupIdentity(sourceRootName: string, candidates: SourceCandidate
   if (sourceSlug && sourceSlug !== "uploaded-group") {
     return {
       slug: sourceSlug,
-      title: titleCase(sourceRootName) || "Uploaded Group",
+      title: titleCase(sourceRootName) || "上传图组",
     };
   }
 
@@ -649,48 +654,14 @@ function deriveGroupIdentity(sourceRootName: string, candidates: SourceCandidate
   if (slug.length < 3) {
     return {
       slug: cjkKebabCase(sourceRootName, "uploaded-group"),
-      title: titleCase(sourceRootName) || "Uploaded Group",
+      title: titleCase(sourceRootName) || "上传图组",
     };
   }
-  return { slug, title: titleCase(commonPrefix) || titleCase(sourceRootName) || "Uploaded Group" };
-}
-
-function orderedComparisonLabels(frame: WebUploadFramePlan) {
-  return [frame.after.label, ...frame.misc.map((asset) => asset.label)].filter(
-    (label, index, labels) => labels.indexOf(label) === index,
-  );
-}
-
-function framesRequiringGeneratedHeatmap(frames: WebUploadFramePlan[]) {
-  return frames.filter((frame) => !frame.heatmap);
-}
-
-/**
- * Mirrors the preview selector rule so the generated default is safe for every frame instead of
- * only matching the first row's primary comparison column.
- */
-function commonHeatmapReferenceLabels(frames: WebUploadFramePlan[]) {
-  const generatedHeatmapFrames = framesRequiringGeneratedHeatmap(frames);
-  if (generatedHeatmapFrames.length === 0) {
-    return [];
-  }
-
-  const [firstFrame, ...remainingFrames] = generatedHeatmapFrames;
-  const commonLabels = new Set(orderedComparisonLabels(firstFrame));
-  for (const frame of remainingFrames) {
-    const labels = new Set(orderedComparisonLabels(frame));
-    for (const label of [...commonLabels]) {
-      if (!labels.has(label)) {
-        commonLabels.delete(label);
-      }
-    }
-  }
-
-  return orderedComparisonLabels(firstFrame).filter((label) => commonLabels.has(label));
+  return { slug, title: titleCase(commonPrefix) || titleCase(sourceRootName) || "上传图组" };
 }
 
 export function defaultHeatmapReferenceLabel(frames: WebUploadFramePlan[]) {
-  return commonHeatmapReferenceLabels(frames)[0] ?? "After";
+  return getDefaultHeatmapReferenceLabel(frames);
 }
 
 /**
@@ -698,10 +669,10 @@ export function defaultHeatmapReferenceLabel(frames: WebUploadFramePlan[]) {
  * fail later on the first row missing the stored reference label.
  */
 function heatmapReferenceIssues(frames: WebUploadFramePlan[]): WebUploadIssue[] {
-  const generatedHeatmapFrames = framesRequiringGeneratedHeatmap(frames);
+  const generatedHeatmapFrames = getFramesRequiringGeneratedHeatmap(frames);
   if (
     generatedHeatmapFrames.length === 0 ||
-    commonHeatmapReferenceLabels(generatedHeatmapFrames).length > 0
+    getCommonHeatmapReferenceLabels(generatedHeatmapFrames).length > 0
   ) {
     return [];
   }

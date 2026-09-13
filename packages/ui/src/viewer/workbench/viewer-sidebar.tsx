@@ -1,5 +1,6 @@
 "use client";
 
+import { keyframes } from "@emotion/react";
 import { CheckCircleOutlineRounded, CheckRounded, CollectionsOutlined } from "@mui/icons-material";
 import {
   Box,
@@ -16,9 +17,8 @@ import {
 } from "@mui/material";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { AnimatePresence, motion } from "motion/react";
 import { findAsset, getComparisonTargetAssets } from "@magic-compare/compare-core/viewer-data";
-import { useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
+import { memo, useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
 import type {
   ViewerAsset,
   ViewerDataset,
@@ -33,6 +33,18 @@ const internalStatusLabels = {
   internal: "内部",
   published: "公开",
 } as const;
+
+const currentGroupIconEnter = keyframes`
+  0% { transform: scale(1) rotate(0); }
+  35% { transform: scale(0.84) rotate(-7deg); }
+  70% { transform: scale(1.08) rotate(0); }
+  100% { transform: scale(1) rotate(0); }
+`;
+
+const desktopSidebarEnter = keyframes`
+  from { opacity: 0; transform: translateX(6px); }
+  to { opacity: 1; transform: translateX(0); }
+`;
 
 /** Formats server timestamps only after hydration so the browser's locale and time zone win. */
 function useLocalizedPublishDate(value: string | null | undefined) {
@@ -132,6 +144,9 @@ function GroupLinks({
     event: ReactMouseEvent<HTMLAnchorElement>,
     group: ViewerDataset["siblingGroups"][number],
   ) {
+    // Touch waits for a real click instead of prefetching on touchstart, which may only be the
+    // beginning of a vertical scroll through the sidebar.
+    handleImmediateGroupIntent(group);
     if (
       !onGroupNavigate ||
       event.defaultPrevented ||
@@ -175,7 +190,6 @@ function GroupLinks({
           onFocus={() => handleImmediateGroupIntent(group)}
           onMouseEnter={() => handleGroupHover(group)}
           onMouseLeave={cancelHoverIntent}
-          onTouchStart={() => handleImmediateGroupIntent(group)}
           sx={{
             minHeight: 44,
             px: 1.25,
@@ -200,15 +214,18 @@ function GroupLinks({
         >
           <ListItemIcon sx={{ minWidth: 32, color: "inherit" }}>
             <Box
-              component={motion.span}
-              initial={false}
-              animate={
-                group.isCurrent
-                  ? { scale: [1, 0.84, 1.08, 1], rotate: [0, -7, 0] }
-                  : { scale: 1, rotate: 0 }
-              }
-              transition={{ duration: 0.3, ease: [0.2, 0, 0, 1] }}
-              sx={{ display: "grid", placeItems: "center", transformOrigin: "center" }}
+              component="span"
+              sx={{
+                display: "grid",
+                placeItems: "center",
+                transformOrigin: "center",
+                // Current-group feedback is a fixed keyframe sequence, so CSS avoids retaining a
+                // general-purpose animation runtime for every sidebar row.
+                animation: group.isCurrent
+                  ? `${currentGroupIconEnter} 300ms cubic-bezier(0.2, 0, 0, 1)`
+                  : "none",
+                "@media (prefers-reduced-motion: reduce)": { animation: "none" },
+              }}
             >
               <CollectionsOutlined sx={{ fontSize: 19 }} />
             </Box>
@@ -455,7 +472,7 @@ interface ViewerSidebarProps {
  * Switches between inline and drawer sidebars without changing the metadata payload, which keeps
  * viewer state independent from the current responsive layout.
  */
-export function ViewerSidebar({
+export const ViewerSidebar = memo(function ViewerSidebar({
   currentFrame,
   currentGroup,
   groups,
@@ -487,32 +504,32 @@ export function ViewerSidebar({
 
   return (
     <>
-      <AnimatePresence initial={false}>
-        {sidebarOpen && showDesktopSidebar ? (
-          <Box
-            component={motion.aside}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.18, ease: "easeOut" }}
-            sx={{
-              borderLeft: "1px solid",
-              borderColor: "divider",
-              // Public details use the same supporting surface; variant only trims internal data.
-              backgroundColor: "surface.containerLow",
-            }}
-          >
-            <ViewerSidebarContent {...contentProps} />
-          </Box>
-        ) : null}
-      </AnimatePresence>
+      {sidebarOpen && showDesktopSidebar ? (
+        <Box
+          component="aside"
+          sx={{
+            borderLeft: "1px solid",
+            borderColor: "divider",
+            // The sidebar only fades into its final grid column. A CSS entry animation keeps the
+            // visual cue while allowing closed metadata content and Motion runtime code to unload.
+            animation: `${desktopSidebarEnter} 180ms ease-out`,
+            "@media (prefers-reduced-motion: reduce)": { animation: "none" },
+            // Public details use the same supporting surface; variant only trims internal data.
+            backgroundColor: "surface.containerLow",
+          }}
+        >
+          <ViewerSidebarContent {...contentProps} />
+        </Box>
+      ) : null}
 
       <Drawer
         anchor="right"
         open={mobileDrawerOpen}
         onClose={closeSidebar}
         // Viewer owns the root scroll lock so Modal must not add body padding and squeeze the sheet.
-        ModalProps={{ keepMounted: true, disableScrollLock: true }}
+        // Closed mobile details duplicated the full metadata tree beside the desktop pane. Let MUI
+        // unmount it while retaining the shell's explicit root-scroll handling.
+        ModalProps={{ disableScrollLock: true }}
         slotProps={{
           paper: {
             sx: {
@@ -531,4 +548,4 @@ export function ViewerSidebar({
       </Drawer>
     </>
   );
-}
+});

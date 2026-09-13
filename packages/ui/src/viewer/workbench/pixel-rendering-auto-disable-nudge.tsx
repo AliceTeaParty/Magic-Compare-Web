@@ -29,7 +29,7 @@ export function PixelRenderingAutoDisableNudge({
   return (
     <Paper
       role="region"
-      aria-label="像素渲染自动开启设置"
+      aria-label="最近邻采样自动开启设置"
       aria-live="polite"
       elevation={0}
       sx={{

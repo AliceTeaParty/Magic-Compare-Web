@@ -2,6 +2,7 @@ import type {
   AssetKind,
   AssetRecord,
   CaseStatus,
+  PublishImagePlaceholder,
   PublishManifest,
   ViewerMode,
 } from "@magic-compare/content-schema";
@@ -18,7 +19,9 @@ export type ViewerAsset = Pick<
   | "height"
   | "note"
   | "isPrimaryDisplay"
->;
+> & {
+  placeholder?: PublishImagePlaceholder;
+};
 
 export interface ViewerFrame {
   id: string;
@@ -77,10 +80,6 @@ export interface ViewerDataset {
 
 export function findAsset(frame: ViewerFrame, kind: AssetKind): ViewerAsset | undefined {
   return frame.assets.find((asset) => asset.kind === kind);
-}
-
-export function getPrimaryAssets(frame: ViewerFrame): ViewerAsset[] {
-  return frame.assets.filter((asset) => asset.isPrimaryDisplay);
 }
 
 /**
@@ -182,6 +181,7 @@ export function createViewerDatasetFromPublishManifest(manifest: PublishManifest
           height: asset.height,
           note: asset.note,
           isPrimaryDisplay: asset.isPrimaryDisplay,
+          placeholder: asset.placeholder,
         })),
       })),
     },

@@ -32,6 +32,7 @@ export function useStagePanZoomState({
   setPanZoomState: (nextState: ViewerPanZoomState) => void;
 }) {
   const panZoomStateRef = useRef(panZoomState);
+  panZoomStateRef.current = panZoomState;
 
   useEffect(() => {
     panZoomStateRef.current = panZoomState;
@@ -57,13 +58,7 @@ export function useStagePanZoomState({
       mediaRect,
       rotateStage,
     }),
-    [
-      activeAsset.height,
-      activeAsset.width,
-      devicePixelRatio,
-      mediaRect,
-      rotateStage,
-    ],
+    [activeAsset.height, activeAsset.width, devicePixelRatio, mediaRect, rotateStage],
   );
   const effectiveScale = useMemo(
     () => getViewerEffectiveScale(panZoomState, scaleOptions),
@@ -79,6 +74,7 @@ export function useStagePanZoomState({
     );
 
     if (!isSamePanZoomState(nextState)) {
+      panZoomStateRef.current = nextState;
       setPanZoomState(nextState);
     }
   }, [clampViewport, mediaRect, panZoomState, scaleOptions, setPanZoomState]);
@@ -99,6 +95,9 @@ export function useStagePanZoomState({
         return;
       }
 
+      // Store notifications are frame-coalesced, so update the gesture ref immediately to keep
+      // consecutive wheel events based on the latest scale before React renders again.
+      panZoomStateRef.current = clampedNextState;
       setPanZoomState(clampedNextState);
     },
     [clampViewport, mediaRect, scaleOptions, setPanZoomState],
@@ -107,5 +106,6 @@ export function useStagePanZoomState({
   return {
     effectiveScale,
     applyPanZoom,
+    panZoomStateRef,
   };
 }

@@ -334,8 +334,13 @@ export function finishFilmstripGesture({
     return;
   }
 
-  motionRefs.suppressClickRef.current = false;
   if (dragState.originFrameId) {
+    // Pointer-up performs the semantic selection for captured touch gestures. Suppress the native
+    // click emitted in the same task so one tap cannot select and preload the frame twice.
+    motionRefs.suppressClickRef.current = true;
     onSelectFrame(dragState.originFrameId);
+    resetFilmstripClickSuppression(motionRefs.suppressClickRef);
+  } else {
+    motionRefs.suppressClickRef.current = false;
   }
 }

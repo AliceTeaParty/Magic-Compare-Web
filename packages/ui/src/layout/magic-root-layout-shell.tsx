@@ -3,8 +3,6 @@ import { Box } from "@mui/material";
 import InitColorSchemeScript from "@mui/material/InitColorSchemeScript";
 import { AppRouterCacheProvider } from "@mui/material-nextjs/v16-appRouter";
 import "@fontsource-variable/ibm-plex-sans/wght.css";
-import "@fontsource-variable/noto-serif-jp/wght.css";
-import "@fontsource-variable/noto-serif-sc/wght.css";
 import { resolveBuildIdentityConfig, resolveFooterConfig } from "@magic-compare/shared-utils";
 import { MagicSiteFooter } from "./magic-site-footer";
 import { MagicPublicAppShell } from "./magic-public-app-shell";
@@ -13,8 +11,6 @@ import type { MagicThemeProfile } from "../theme/magic-theme-provider";
 
 // Local Fontsource assets keep container and CI builds independent of Google Fonts availability.
 const rootFontVariables = {
-  "--font-display-sc": '"Noto Serif SC Variable"',
-  "--font-display-jp": '"Noto Serif JP Variable"',
   "--font-body": '"IBM Plex Sans Variable"',
 } as CSSProperties;
 

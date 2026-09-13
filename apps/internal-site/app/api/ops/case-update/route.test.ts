@@ -66,7 +66,7 @@ describe("POST /api/ops/case-update", () => {
   });
 
   it("returns 404 when the case no longer exists", async () => {
-    updateCaseMetadata.mockRejectedValue(new NotFoundError("Case not found."));
+    updateCaseMetadata.mockRejectedValue(new NotFoundError("项目不存在。"));
 
     const response = await POST(
       new Request("http://localhost:3000/api/ops/case-update", {
@@ -82,6 +82,6 @@ describe("POST /api/ops/case-update", () => {
     );
 
     expect(response.status).toBe(404);
-    expect(await response.json()).toEqual({ error: "Case not found." });
+    expect(await response.json()).toEqual({ error: "项目不存在。" });
   });
 });

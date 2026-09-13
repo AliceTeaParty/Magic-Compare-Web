@@ -1,5 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { applyWheelZoom, moveTouchPinch } from "./stage-pan-zoom-gestures";
+import { activateInspectForWheel, applyWheelZoom, moveTouchPinch } from "./stage-pan-zoom-gestures";
+
+describe("activateInspectForWheel", () => {
+  it("activates inspection only for ctrl-wheel gestures", () => {
+    let activations = 0;
+
+    expect(activateInspectForWheel({ ctrlKey: false }, () => activations++)).toBe(false);
+    expect(activateInspectForWheel({ ctrlKey: true }, () => activations++)).toBe(true);
+    expect(activations).toBe(1);
+  });
+});
 
 describe("applyWheelZoom", () => {
   it("applies ctrl-wheel zoom even before the A/B stage is click-activated", () => {

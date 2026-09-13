@@ -9,6 +9,7 @@ import type {
   WebUploadAssetPlan,
   WebUploadFramePlan,
 } from "./web-upload-types";
+import { resolveFrameHeatmapReference } from "./heatmap-reference";
 
 interface WorkerUploadFile {
   extension: string;
@@ -198,10 +199,8 @@ function plannedAssets(frame: WebUploadFramePlan) {
 }
 
 function selectedHeatmapSource(frame: WebUploadFramePlan, referenceLabel: string) {
-  const selected = plannedAssets(frame).find(
-    ({ asset }) =>
-      asset !== frame.before && asset.kind !== "heatmap" && asset.label === referenceLabel,
-  );
+  const asset = resolveFrameHeatmapReference(frame, referenceLabel);
+  const selected = asset ? plannedAssets(frame).find((planned) => planned.asset === asset) : null;
   if (!selected) {
     throw new Error(`${frame.title} 不存在 heatmap 参考列 ${referenceLabel}。`);
   }

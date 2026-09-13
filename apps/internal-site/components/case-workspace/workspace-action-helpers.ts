@@ -1,6 +1,7 @@
 import type { MutableRefObject, TransitionStartFunction } from "react";
 import { arrayMove } from "@dnd-kit/sortable";
 import type { CaseWorkspaceData } from "@/lib/server/repositories/content-repository";
+import { postJson } from "@/lib/client/internal-api";
 import type { AppNotificationTone } from "../notifications/use-app-notifications";
 
 type GroupItem = CaseWorkspaceData["groups"][number];
@@ -31,27 +32,6 @@ export interface WorkspaceGroupMutationContext extends WorkspaceMutationContext 
 export interface WorkspaceCaseMetadataMutationContext extends WorkspaceMutationContext {
   setCaseSummary: (nextSummary: string) => void;
   summaryRef: MutableRefObject<string>;
-}
-
-/**
- * Normalizes JSON POST handling so workspace actions surface API errors with the same message
- * shape regardless of which operation triggered them.
- */
-export async function postJson(url: string, body: unknown) {
-  const response = await fetch(url, {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-    },
-    body: JSON.stringify(body),
-  });
-
-  if (!response.ok) {
-    const payload = await response.json().catch(() => null);
-    throw new Error(payload?.error || `Request failed: ${url}`);
-  }
-
-  return response.json().catch(() => null);
 }
 
 /**
@@ -215,7 +195,7 @@ export function updateWorkspaceCaseSummary(
 
   return (async () => {
     try {
-      const result = await postJson("/api/ops/case-update", {
+      const result = await postJson<{ summary?: string }>("/api/ops/case-update", {
         caseSlug: context.data.slug,
         summary: normalizedSummary,
       });
@@ -224,11 +204,11 @@ export function updateWorkspaceCaseSummary(
 
       context.summaryRef.current = savedSummary;
       context.setCaseSummary(savedSummary);
-      context.notifications.pushNotification("Case 描述已保存。", "success");
+      context.notifications.pushNotification("项目描述已保存。", "success");
     } catch (error) {
       context.summaryRef.current = previousSummary;
       context.setCaseSummary(previousSummary);
-      pushWorkspaceError(context.notifications, error, "保存 Case 描述失败。");
+      pushWorkspaceError(context.notifications, error, "保存项目描述失败。");
     } finally {
       context.notifications.dismissWorkspaceSavingNotification();
     }
@@ -248,7 +228,7 @@ export function updateWorkspaceGroupMetadata(
   const description = metadata.description.trim();
 
   if (!title) {
-    context.notifications.pushNotification("Group 标题不能为空。", "error");
+    context.notifications.pushNotification("图组标题不能为空。", "error");
     return Promise.resolve();
   }
 
@@ -268,12 +248,15 @@ export function updateWorkspaceGroupMetadata(
 
   return (async () => {
     try {
-      const result = await postJson("/api/ops/group-update", {
-        caseSlug: context.data.slug,
-        groupSlug: targetGroup.slug,
-        title,
-        description,
-      });
+      const result = await postJson<{ title?: string; description?: string }>(
+        "/api/ops/group-update",
+        {
+          caseSlug: context.data.slug,
+          groupSlug: targetGroup.slug,
+          title,
+          description,
+        },
+      );
       const savedTitle = result && typeof result.title === "string" ? result.title : title;
       const savedDescription =
         result && typeof result.description === "string" ? result.description : description;
@@ -288,10 +271,10 @@ export function updateWorkspaceGroupMetadata(
       );
 
       replaceWorkspaceGroups(context.groupsRef, context.setGroups, savedGroups);
-      context.notifications.pushNotification("Group 元数据已保存。", "success");
+      context.notifications.pushNotification("图组元数据已保存。", "success");
     } catch (error) {
       replaceWorkspaceGroups(context.groupsRef, context.setGroups, previousGroups);
-      pushWorkspaceError(context.notifications, error, "保存 Group 元数据失败。");
+      pushWorkspaceError(context.notifications, error, "保存图组元数据失败。");
     } finally {
       context.notifications.dismissWorkspaceSavingNotification();
     }
@@ -314,10 +297,10 @@ export function deleteWorkspaceGroup(
   }
 
   runOptimisticGroupMutation({
-    fallbackErrorMessage: "删除 Group 失败。",
+    fallbackErrorMessage: "删除图组失败。",
     nextGroups,
     onSuccess: () => {
-      context.notifications.pushNotification("Group 已删除。", "success");
+      context.notifications.pushNotification("图组已删除。", "success");
     },
     previousGroups,
     request: async () =>

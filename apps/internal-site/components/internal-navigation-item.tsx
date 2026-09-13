@@ -38,8 +38,8 @@ const uploadFeedback = keyframes`
 `;
 
 const createFeedback = keyframes`
-  0% { transform: rotate(-90deg); }
-  100% { transform: rotate(0deg); }
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 `;
 
 const navigationFeedbackAnimations = {
@@ -143,7 +143,9 @@ export function InternalNavigationItem({
           sx={{
             display: "grid",
             placeItems: "center",
-            transformOrigin: "50% 70%",
+            // The create glyph previously rotated around a low pivot, which made the whole icon
+            // drift toward the lower-left. Its feedback needs a centered full turn instead.
+            transformOrigin: iconFeedback === "create" ? "50% 50%" : "50% 70%",
             animation:
               feedbackSequence > 0 && iconFeedback
                 ? navigationFeedbackAnimations[iconFeedback]

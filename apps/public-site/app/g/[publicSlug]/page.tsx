@@ -6,6 +6,7 @@ import { GroupViewerWorkbench } from "@magic-compare/ui";
 import { getPublishedManifest, listPublishedGroupSlugs } from "@/lib/content";
 import { buildPublicGroupMetadata } from "@/lib/page-metadata";
 import { getPublicSiteBaseUrl } from "@/lib/runtime-config";
+import { PublicImageResourceHints } from "./public-image-resource-hints";
 
 const EMPTY_PUBLIC_GROUP_PLACEHOLDER = "__empty__";
 export const dynamicParams = false;
@@ -46,5 +47,10 @@ export default async function PublicGroupPage({ params }: PublicGroupPageProps) 
 
   const dataset = createViewerDatasetFromPublishManifest(manifest);
 
-  return <GroupViewerWorkbench dataset={dataset} variant="public" />;
+  return (
+    <>
+      <PublicImageResourceHints assetBasePath={manifest.assetBasePath} />
+      <GroupViewerWorkbench dataset={dataset} variant="public" />
+    </>
+  );
 }

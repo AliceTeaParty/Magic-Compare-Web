@@ -18,7 +18,7 @@ export async function generateMetadata({ params }: InternalGroupPageProps): Prom
   const { caseSlug, groupSlug } = await params;
   const dataset = await getCachedViewerDataset(caseSlug, groupSlug);
   return {
-    title: dataset ? `${dataset.group.title} - ${dataset.caseMeta.title}` : "Group 未找到",
+    title: dataset ? `${dataset.group.title} - ${dataset.caseMeta.title}` : "图组未找到",
   };
 }
 

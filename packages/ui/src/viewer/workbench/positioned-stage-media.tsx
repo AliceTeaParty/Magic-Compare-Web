@@ -83,15 +83,11 @@ export function PositionedStageMedia({
   );
 
   const resolvedClipRect = clipRect ?? mediaRect;
-
-  if (
-    mediaRect.width <= 0 ||
-    mediaRect.height <= 0 ||
-    resolvedClipRect.width <= 0 ||
-    resolvedClipRect.height <= 0
-  ) {
-    return null;
-  }
+  const hasMeasuredGeometry =
+    mediaRect.width > 0 &&
+    mediaRect.height > 0 &&
+    resolvedClipRect.width > 0 &&
+    resolvedClipRect.height > 0;
 
   const mediaWidth = rotateStage ? mediaRect.height : mediaRect.width;
   const mediaHeight = rotateStage ? mediaRect.width : mediaRect.height;
@@ -102,10 +98,14 @@ export function PositionedStageMedia({
     <Box
       sx={{
         position: "absolute",
-        left: `${resolvedClipRect.x}px`,
-        top: `${resolvedClipRect.y}px`,
-        width: `${resolvedClipRect.width}px`,
-        height: `${resolvedClipRect.height}px`,
+        ...(hasMeasuredGeometry
+          ? {
+              left: `${resolvedClipRect.x}px`,
+              top: `${resolvedClipRect.y}px`,
+              width: `${resolvedClipRect.width}px`,
+              height: `${resolvedClipRect.height}px`,
+            }
+          : { inset: 0 }),
         overflow: "hidden",
         clipPath,
         pointerEvents: "none",
@@ -114,24 +114,32 @@ export function PositionedStageMedia({
       <Box
         sx={{
           position: "absolute",
-          left: `${mediaCenterX}px`,
-          top: `${mediaCenterY}px`,
-          width: `${mediaWidth}px`,
-          height: `${mediaHeight}px`,
-          transform: buildMediaTransform(rotateStage, panZoomState, effectiveScale),
+          ...(hasMeasuredGeometry
+            ? {
+                left: `${mediaCenterX}px`,
+                top: `${mediaCenterY}px`,
+                width: `${mediaWidth}px`,
+                height: `${mediaHeight}px`,
+                transform: buildMediaTransform(rotateStage, panZoomState, effectiveScale),
+              }
+            : { inset: 0 }),
           transformOrigin: "center center",
           // Persistent promotion kept every full-size image in its own compositor layer. Only the
           // visible A/B asset needs that hint while inspect transforms can change interactively.
           willChange: willChangeTransform ? "transform" : "auto",
         }}
       >
-        {!showImage && showFallback ? (
+        {showFallback ? (
           <StageImageFallback
+            animateOpacity={animateOpacity}
             contentPosition={fallbackContentPosition}
             counterRotate={rotateStage}
             errorMessage={fallbackErrorMessage}
             errored={hasError}
+            imageReady={showImage}
+            loadingLabel={asset.label}
             opacity={opacity}
+            placeholder={asset.placeholder}
             prefersReducedMotion={prefersReducedMotion}
           />
         ) : null}
@@ -140,6 +148,9 @@ export function PositionedStageMedia({
           ref={imageRef}
           src={asset.imageUrl}
           alt={alt}
+          width={asset.width}
+          height={asset.height}
+          data-viewer-stage-image=""
           draggable={false}
           loading={loading}
           decoding={decoding}
@@ -149,7 +160,9 @@ export function PositionedStageMedia({
           sx={{
             width: "100%",
             height: "100%",
-            objectFit: "fill",
+            // Before ResizeObserver runs, keeping the real image in a contained box lets SSR start
+            // the LCP request without guessing a crop or replacing the inspection source.
+            objectFit: hasMeasuredGeometry ? "fill" : "contain",
             imageRendering,
             display: "block",
             opacity: showImage ? opacity : 0,
@@ -159,7 +172,7 @@ export function PositionedStageMedia({
             transition:
               prefersReducedMotion || !animateOpacity
                 ? "none"
-                : "opacity 160ms cubic-bezier(0.2, 0, 0, 1)",
+                : "opacity 220ms cubic-bezier(0.2, 0, 0, 1)",
           }}
         />
       </Box>

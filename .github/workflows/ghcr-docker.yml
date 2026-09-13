@@ -43,8 +43,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
-      # Rustfs (minio-compatible) is wired in via ci.compose.override.yml as a CI-only sidecar.
-      # FORCE_PATH_STYLE is required for minio; production R2 uses false instead.
+      # RustFS is wired in via ci.compose.override.yml as a CI-only S3-compatible sidecar.
+      # FORCE_PATH_STYLE is required for RustFS; production R2 uses false instead.
       MAGIC_COMPARE_HIDE_DEMO: "false"
       MAGIC_COMPARE_S3_BUCKET: magic-compare-ci
       MAGIC_COMPARE_S3_REGION: us-east-1
@@ -162,7 +162,7 @@ jobs:
             echo
             echo "- Compose files: \`docker-compose.yml\` + \`docker/ci.compose.override.yml\`"
             echo "- Runtime image target: \`${IMAGE_NAME}\`"
-            echo "- Object storage: rustfs (minio-compatible) CI sidecar on port 9000"
+            echo "- Object storage: RustFS CI sidecar on port 9000"
             echo "- Readiness probe: \`http://127.0.0.1:3000/api/healthz\`"
             echo "- Demo seed: enabled (\`MAGIC_COMPARE_HIDE_DEMO=false\` plus CI S3 env)"
           } >> "$GITHUB_STEP_SUMMARY"

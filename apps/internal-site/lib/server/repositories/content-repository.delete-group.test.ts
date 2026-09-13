@@ -145,9 +145,7 @@ describe("deleteCase", () => {
       groups: [{ id: "group-1" }],
     });
 
-    await expect(deleteCase("2026")).rejects.toThrow(
-      "Case must be empty before deletion.",
-    );
+    await expect(deleteCase("2026")).rejects.toThrow("删除项目前必须先清空全部图组。");
     expect(caseDelete).not.toHaveBeenCalled();
   });
 });

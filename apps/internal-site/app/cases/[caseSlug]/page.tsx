@@ -18,7 +18,7 @@ interface CaseWorkspacePageProps {
 export async function generateMetadata({ params }: CaseWorkspacePageProps): Promise<Metadata> {
   const { caseSlug } = await params;
   const data = await getCachedCaseWorkspace(caseSlug);
-  return { title: data ? `${data.title} - Case` : "Case 未找到" };
+  return { title: data ? `${data.title} - 项目` : "项目未找到" };
 }
 
 export default async function CaseWorkspacePage({ params }: CaseWorkspacePageProps) {

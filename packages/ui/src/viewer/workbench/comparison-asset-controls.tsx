@@ -4,6 +4,10 @@ import { CompareArrows, ImageOutlined } from "@mui/icons-material";
 import { Box, Chip, Stack, ToggleButton, ToggleButtonGroup, Tooltip } from "@mui/material";
 import { getComparisonAssetKey } from "@magic-compare/compare-core";
 import type { ViewerAsset } from "@magic-compare/compare-core/viewer-data";
+import {
+  VIEWER_COMPACT_CONTROL_HEIGHT,
+  VIEWER_SEGMENTED_CONTROL_STYLES,
+} from "./viewer-control-styles";
 
 interface ComparisonAssetControlsProps {
   baselineAsset: ViewerAsset;
@@ -52,7 +56,7 @@ export function ComparisonAssetControls({
           variant="outlined"
           sx={{
             flex: "0 0 auto",
-            height: { xs: 42, md: 40 },
+            height: VIEWER_COMPACT_CONTROL_HEIGHT,
             maxWidth: 144,
             borderRadius: 999,
             borderColor: "divider",
@@ -83,41 +87,19 @@ export function ComparisonAssetControls({
           aria-label="选择对比变量"
           onChange={handleComparisonAssetChange}
           sx={{
-            height: { xs: 42, md: 40 },
-            overflow: "hidden",
-            border: "1px solid",
-            borderColor: "divider",
-            borderRadius: 999,
-            backgroundColor: "surface.containerHigh",
+            height: VIEWER_COMPACT_CONTROL_HEIGHT,
+            ...VIEWER_SEGMENTED_CONTROL_STYLES,
             "& .MuiToggleButtonGroup-grouped": {
+              ...VIEWER_SEGMENTED_CONTROL_STYLES["& .MuiToggleButtonGroup-grouped"],
               // One outer pill and flat equal segments match the Viewer mode control.
               minWidth: 72,
               maxWidth: 144,
-              height: "100%",
               px: 1.25,
               overflow: "hidden",
               textOverflow: "ellipsis",
               whiteSpace: "nowrap",
               fontSize: "0.86rem",
               fontWeight: 600,
-              margin: "0 !important",
-              border: "0 !important",
-              borderRadius: "0 !important",
-              backgroundColor: "transparent",
-            },
-            "& .MuiToggleButtonGroup-grouped:not(:first-of-type)": {
-              borderLeft: "1px solid !important",
-              borderLeftColor: "var(--mui-palette-divider) !important",
-            },
-            // Viewer segmented controls use the same theme-seed container pair as the active rail
-            // destination instead of falling back to the old dark secondary fill.
-            "& .MuiToggleButton-root.Mui-selected": {
-              color: "primary.onContainer",
-              backgroundColor: "primary.light",
-            },
-            "& .MuiToggleButton-root.Mui-selected:hover": {
-              backgroundColor:
-                "color-mix(in srgb, currentColor 8%, var(--mui-palette-primary-light))",
             },
           }}
         >

@@ -18,7 +18,7 @@ export function CaseDirectoryEmptyState() {
       spacing={1.5}
     >
       <FluentFolderEmoji size={72} />
-      <Typography variant="h3">还没有 Case</Typography>
+      <Typography variant="h3">还没有项目</Typography>
       <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 420 }}>
         先建立一个内部工作区，再上传需要检查的对比素材。
       </Typography>

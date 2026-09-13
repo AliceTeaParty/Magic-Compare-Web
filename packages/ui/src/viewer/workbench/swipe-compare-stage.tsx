@@ -9,6 +9,7 @@ import { PositionedStageMedia } from "./positioned-stage-media";
 import { getSwipeCompareGeometry, getSwipeCssValues } from "./swipe-compare-geometry";
 import { useSwipeCompareDrag } from "./use-swipe-compare-drag";
 import { viewerTokens } from "./viewer-tokens";
+import { type ViewerInteractionStore, useViewerSwipePosition } from "./viewer-interaction-store";
 
 /** Draws the visible compare boundary using transform-only movement during drag. */
 function SwipeDivider({
@@ -112,20 +113,21 @@ function SwipeHandle({
 export function SwipeCompareStage({
   beforeAsset,
   afterAsset,
+  frameId,
+  interactionStore,
   mediaRect,
   prefersReducedMotion,
   rotateStage,
-  setSwipePosition,
-  swipePosition,
 }: {
   beforeAsset: ViewerAsset;
   afterAsset: ViewerAsset;
+  frameId: string | undefined;
+  interactionStore: ViewerInteractionStore;
   mediaRect: ViewerMediaRect;
   prefersReducedMotion: boolean;
   rotateStage: boolean;
-  setSwipePosition: (value: number) => void;
-  swipePosition: number;
 }) {
+  const swipePosition = useViewerSwipePosition(interactionStore, frameId);
   const clampedSwipePosition = clampNumber(swipePosition, 0, 100);
   const { axisLength, isVertical } = getSwipeCompareGeometry({
     mediaRect,
@@ -145,7 +147,7 @@ export function SwipeCompareStage({
       axisLength,
       mediaRect,
       rotateStage,
-      setSwipePosition,
+      setSwipePosition: (value) => interactionStore.setSwipePosition(frameId, value),
       swipePosition: clampedSwipePosition,
     });
 
@@ -179,7 +181,7 @@ export function SwipeCompareStage({
         decoding="async"
         fetchPriority="high"
         fallbackContentPosition={{ left: "75%", top: "50%" }}
-        fallbackErrorMessage={`${beforeAsset.label} 素材加载失败`}
+        fallbackErrorMessage={`${beforeAsset.label} 加载失败，请刷新重试。`}
         prefersReducedMotion={prefersReducedMotion}
       />
       <PositionedStageMedia
@@ -189,9 +191,11 @@ export function SwipeCompareStage({
         rotateStage={rotateStage}
         loading="eager"
         decoding="async"
-        fetchPriority="high"
+        // Both originals remain discoverable in SSR, but only the base image should compete at high
+        // priority. Slow connections can then show one truthful half before the second completes.
+        fetchPriority="low"
         fallbackContentPosition={{ left: "25%", top: "50%" }}
-        fallbackErrorMessage={`${afterAsset.label} 素材加载失败`}
+        fallbackErrorMessage={`${afterAsset.label} 加载失败，请刷新重试。`}
         prefersReducedMotion={prefersReducedMotion}
         clipPath={
           isVertical

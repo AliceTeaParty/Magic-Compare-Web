@@ -22,14 +22,12 @@ export interface ViewerController {
   currentFrameIndex: number;
   mode: ViewerMode;
   availableModes: ViewerMode[];
-  overlayOpacity: number;
   abSide: "before" | "after";
   sidebarOpen: boolean;
   setSidebarOpen: (open: boolean) => void;
   selectFrame: (frameId: string) => void;
   stepFrame: (delta: number) => void;
   setMode: (nextMode: ViewerMode) => void;
-  setOverlayOpacity: (value: number) => void;
   setAbSide: (side: "before" | "after") => void;
   setComparisonAssetKey: (assetKey: string) => void;
   toggleSidebar: () => void;
@@ -50,7 +48,6 @@ export function useViewerController(group: ViewerGroup): ViewerController {
   const frames = useMemo(() => getOrderedFrames(group), [group]);
   const [currentFrameId, setCurrentFrameId] = useState<string | undefined>(frames[0]?.id);
   const [mode, setModeState] = useState<ViewerMode>(group.defaultMode);
-  const [overlayOpacity, setOverlayOpacityState] = useState<number>(58);
   const [abSide, setAbSideState] = useState<"before" | "after">("after");
   const [comparisonAssetPreferenceKey, setComparisonAssetPreferenceKey] = useState<
     string | undefined
@@ -76,6 +73,7 @@ export function useViewerController(group: ViewerGroup): ViewerController {
       [comparisonAssetPreferenceKey, currentFrame],
     );
   const comparisonAssetKey = afterAsset ? getComparisonAssetKey(afterAsset) : undefined;
+  const resolvedMode = resolveViewerMode(mode, currentFrame, group.defaultMode);
   const framesRef = useRef(frames);
   const currentFrameRef = useRef(currentFrame);
   const currentFrameIndexRef = useRef(currentFrameIndex);
@@ -91,10 +89,12 @@ export function useViewerController(group: ViewerGroup): ViewerController {
   // The saved mode is advisory only; it must be revalidated whenever the active frame changes
   // because not every frame exposes heatmap or A/B assets.
   useEffect(() => {
-    setModeState((previousMode) =>
-      resolveViewerMode(previousMode, currentFrame, group.defaultMode),
-    );
-  }, [currentFrame, group.defaultMode]);
+    if (resolvedMode !== mode) {
+      // Resolving before render prevents one invalid heatmap paint; this effect only repairs the
+      // advisory stored value so later frames start from the same valid mode.
+      setModeState(resolvedMode);
+    }
+  }, [mode, resolvedMode]);
 
   /**
    * Keeps frame selection callback identity stable so viewer effects can subscribe once and still
@@ -126,14 +126,6 @@ export function useViewerController(group: ViewerGroup): ViewerController {
    */
   const setMode = useCallback((nextMode: ViewerMode): void => {
     setModeState(resolveViewerMode(nextMode, currentFrameRef.current, defaultModeRef.current));
-  }, []);
-
-  /**
-   * Exposes overlay updates as a stable callback so slider interactions do not force unrelated
-   * listener effects in the workbench to resubscribe.
-   */
-  const setOverlayOpacity = useCallback((value: number): void => {
-    setOverlayOpacityState(value);
   }, []);
 
   /**
@@ -180,16 +172,14 @@ export function useViewerController(group: ViewerGroup): ViewerController {
       frames,
       currentFrame,
       currentFrameIndex,
-      mode,
+      mode: resolvedMode,
       availableModes,
-      overlayOpacity,
       abSide,
       sidebarOpen,
       setSidebarOpen,
       selectFrame,
       stepFrame,
       setMode,
-      setOverlayOpacity,
       setAbSide,
       setComparisonAssetKey,
       toggleSidebar,
@@ -214,13 +204,11 @@ export function useViewerController(group: ViewerGroup): ViewerController {
       frames,
       heatmapAsset,
       heatmapReferenceAsset,
-      mode,
-      overlayOpacity,
+      resolvedMode,
       selectFrame,
       setAbSide,
       setComparisonAssetKey,
       setMode,
-      setOverlayOpacity,
       setSidebarOpen,
       sidebarOpen,
       stepFrame,

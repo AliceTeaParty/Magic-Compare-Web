@@ -28,6 +28,7 @@ export function useFilmstripDrag({
 }) {
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const stripRef = useRef<HTMLDivElement | null>(null);
+  const scrollbarRef = useRef<HTMLDivElement | null>(null);
   const scrollbarDragRef = useRef<{
     pointerId: number;
     startClientX: number;
@@ -35,6 +36,7 @@ export function useFilmstripDrag({
   } | null>(null);
   const filmstripScrollState: FilmstripScrollState = useFilmstripScrollState({
     frameCount,
+    scrollbarRef,
     viewportRef,
   });
   const { isDragging, handleFrameSelection, viewportHandlers } = useFilmstripGestureSession({
@@ -69,7 +71,8 @@ export function useFilmstripDrag({
    * scrollbar state model that could drift from the viewport.
    */
   function handleScrollbarPointerDown(event: ReactPointerEvent<HTMLDivElement>) {
-    if (!scrollbarMetrics.visible) {
+    const viewport = viewportRef.current;
+    if (!viewport || viewport.scrollWidth <= viewport.clientWidth) {
       return;
     }
 
@@ -96,10 +99,20 @@ export function useFilmstripDrag({
       return;
     }
 
+    const viewport = viewportRef.current;
+    if (!viewport) {
+      return;
+    }
+
+    const liveMetrics = getFilmstripScrollbarMetrics(
+      viewport.clientWidth,
+      viewport.scrollWidth,
+      viewport.scrollLeft,
+    );
     const trackWidth = event.currentTarget.clientWidth;
-    const maxThumbOffset = Math.max(1, trackWidth - scrollbarMetrics.thumbWidth);
+    const maxThumbOffset = Math.max(1, trackWidth - liveMetrics.thumbWidth);
     const scrollDelta =
-      ((event.clientX - dragState.startClientX) / maxThumbOffset) * scrollbarMetrics.maxScrollLeft;
+      ((event.clientX - dragState.startClientX) / maxThumbOffset) * liveMetrics.maxScrollLeft;
 
     scrollTo(dragState.startScrollLeft + scrollDelta);
     event.preventDefault();
@@ -123,9 +136,10 @@ export function useFilmstripDrag({
    */
   function handleScrollbarKeyDown(event: ReactKeyboardEvent<HTMLDivElement>) {
     const viewport = viewportRef.current;
-    if (!viewport || !scrollbarMetrics.visible) {
+    if (!viewport || viewport.scrollWidth <= viewport.clientWidth) {
       return;
     }
+    const maxScrollLeft = Math.max(0, viewport.scrollWidth - viewport.clientWidth);
 
     const smallStep = Math.max(48, viewport.clientWidth * 0.12);
     const largeStep = Math.max(160, viewport.clientWidth * 0.82);
@@ -142,7 +156,7 @@ export function useFilmstripDrag({
     } else if (event.key === "Home") {
       nextScrollLeft = 0;
     } else if (event.key === "End") {
-      nextScrollLeft = scrollbarMetrics.maxScrollLeft;
+      nextScrollLeft = maxScrollLeft;
     }
 
     if (nextScrollLeft === null) {
@@ -165,6 +179,7 @@ export function useFilmstripDrag({
       onPointerMove: handleScrollbarPointerMove,
       onPointerUp: finishScrollbarPointerDrag,
     },
+    scrollbarRef,
     stripRef,
     viewportRef,
     handleFrameSelection,

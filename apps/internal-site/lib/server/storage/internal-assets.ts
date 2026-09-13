@@ -4,7 +4,6 @@ import { readFile } from "node:fs/promises";
 import {
   DeleteObjectsCommand,
   GetObjectCommand,
-  HeadObjectCommand,
   ListObjectsV2Command,
   PutObjectCommand,
   S3Client,
@@ -24,11 +23,6 @@ const MIME_TYPES: Record<string, string> = {
 let cachedClient: S3Client | null = null;
 let cachedSignature: string | null = null;
 
-export interface InternalAssetHeadState {
-  metadata: Record<string, string>;
-  size: number;
-}
-
 export interface PresignedInternalAssetUpload {
   key: string;
   logicalPath: string;
@@ -37,9 +31,7 @@ export interface PresignedInternalAssetUpload {
 }
 
 function hasTraversal(input: string): boolean {
-  return input
-    .split("/")
-    .some((segment) => segment === ".." || segment.length === 0);
+  return input.split("/").some((segment) => segment === ".." || segment.length === 0);
 }
 
 export function guessMimeType(fileName: string): string {
@@ -98,17 +90,98 @@ function buildS3Client(): S3Client {
   return cachedClient;
 }
 
+function abortBody(body: unknown): void {
+  if (body instanceof Readable) {
+    body.destroy();
+    return;
+  }
+  if (
+    typeof body === "object" &&
+    body !== null &&
+    "cancel" in body &&
+    typeof body.cancel === "function"
+  ) {
+    void body.cancel();
+  }
+}
+
+/**
+ * Reads an async byte source with a hard limit so a broken Range response cannot buffer a whole
+ * object before image sanity checks reject it.
+ */
+async function readBoundedChunks(
+  chunks: AsyncIterable<unknown>,
+  maxByteCount?: number,
+  abort?: () => void,
+): Promise<Uint8Array> {
+  const collected: Buffer[] = [];
+  let totalBytes = 0;
+  for await (const chunk of chunks) {
+    const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk as Uint8Array);
+    totalBytes += buffer.byteLength;
+    if (maxByteCount != null && totalBytes > maxByteCount) {
+      abort?.();
+      throw new Error(`Internal asset exceeds the ${maxByteCount}-byte read limit.`);
+    }
+    collected.push(buffer);
+  }
+  return new Uint8Array(Buffer.concat(collected));
+}
+
 /**
  * Normalize AWS SDK body variants into bytes once so the sanity-check layer stays independent from
  * Node stream/runtime differences.
  */
-async function bodyToUint8Array(body: unknown): Promise<Uint8Array> {
+async function bodyToUint8Array(body: unknown, maxByteCount?: number): Promise<Uint8Array> {
+  const assertWithinLimit = (bytes: Uint8Array) => {
+    if (maxByteCount != null && bytes.byteLength > maxByteCount) {
+      throw new Error(`Internal asset exceeds the ${maxByteCount}-byte read limit.`);
+    }
+    return bytes;
+  };
+
   if (!body) {
     return new Uint8Array();
   }
 
   if (body instanceof Uint8Array) {
-    return body;
+    return assertWithinLimit(body);
+  }
+
+  if (body instanceof Readable) {
+    return readBoundedChunks(body, maxByteCount, () => body.destroy());
+  }
+
+  if (
+    typeof body === "object" &&
+    body !== null &&
+    Symbol.asyncIterator in body &&
+    typeof body[Symbol.asyncIterator] === "function"
+  ) {
+    return readBoundedChunks(body as AsyncIterable<unknown>, maxByteCount, () => abortBody(body));
+  }
+
+  if (
+    typeof body === "object" &&
+    body !== null &&
+    "getReader" in body &&
+    typeof body.getReader === "function"
+  ) {
+    const reader = body.getReader() as ReadableStreamDefaultReader<Uint8Array>;
+    const chunks = {
+      async *[Symbol.asyncIterator]() {
+        try {
+          while (true) {
+            const next = await reader.read();
+            if (next.done) return;
+            yield next.value;
+          }
+        } finally {
+          reader.releaseLock();
+        }
+      },
+    };
+    return readBoundedChunks(chunks, maxByteCount, () => void reader.cancel());
   }
 
   if (
@@ -117,15 +190,10 @@ async function bodyToUint8Array(body: unknown): Promise<Uint8Array> {
     "transformToByteArray" in body &&
     typeof body.transformToByteArray === "function"
   ) {
-    return body.transformToByteArray();
-  }
-
-  if (body instanceof Readable) {
-    const chunks: Buffer[] = [];
-    for await (const chunk of body) {
-      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+    if (maxByteCount != null) {
+      throw new Error("Unsupported bounded S3 response body type.");
     }
-    return new Uint8Array(Buffer.concat(chunks));
+    return assertWithinLimit(await body.transformToByteArray());
   }
 
   throw new Error("Unsupported S3 response body type.");
@@ -221,49 +289,6 @@ export async function createPresignedInternalAssetUpload(params: {
 }
 
 /**
- * Head is shared by commit and cleanup flows because both need a cheap existence check that does
- * not download the full object body just to verify one prepared upload finished.
- */
-export async function headInternalAsset(logicalPath: string): Promise<InternalAssetHeadState | null> {
-  const client = buildS3Client();
-  const config = getInternalAssetStorageConfig();
-
-  try {
-    const response = await client.send(
-      new HeadObjectCommand({
-        Bucket: config.bucket,
-        Key: internalAssetObjectKey(logicalPath),
-      }),
-    );
-
-    return {
-      metadata: Object.fromEntries(
-        Object.entries(response.Metadata ?? {}).map(([key, value]) => [
-          key.toLowerCase(),
-          value ?? "",
-        ]),
-      ),
-      size: Number(response.ContentLength ?? 0),
-    };
-  } catch (error) {
-    const statusCode =
-      typeof error === "object" && error && "$metadata" in error
-        ? Number(
-            (error as { $metadata?: { httpStatusCode?: number } }).$metadata?.httpStatusCode ?? 0,
-          )
-        : 0;
-    const errorName =
-      typeof error === "object" && error && "name" in error ? String(error.name) : "";
-
-    if (statusCode === 404 || errorName === "NotFound" || errorName === "NoSuchKey") {
-      return null;
-    }
-
-    throw error;
-  }
-}
-
-/**
  * Read only a small prefix from object storage so import/publish can cheaply reject obviously
  * broken or masqueraded image objects without turning the server into a full scanner.
  */
@@ -281,7 +306,41 @@ export async function readInternalAssetPrefix(
     }),
   );
 
-  return bodyToUint8Array(response.Body);
+  if (response.ContentLength != null && response.ContentLength > byteCount) {
+    abortBody(response.Body);
+    throw new Error(`Internal asset exceeds the ${byteCount}-byte read limit.`);
+  }
+
+  return bodyToUint8Array(response.Body, byteCount);
+}
+
+/**
+ * Reads one bounded object for server-side image derivation. Checking both the declared and actual
+ * size prevents a malformed thumbnail from turning a publish into an unbounded memory allocation.
+ */
+export async function readInternalAssetBytes(
+  logicalPath: string,
+  maxByteCount: number,
+): Promise<Uint8Array> {
+  if (!Number.isInteger(maxByteCount) || maxByteCount <= 0) {
+    throw new RangeError("Asset byte limit must be a positive integer.");
+  }
+
+  const client = buildS3Client();
+  const config = getInternalAssetStorageConfig();
+  const response = await client.send(
+    new GetObjectCommand({
+      Bucket: config.bucket,
+      Key: internalAssetObjectKey(logicalPath),
+    }),
+  );
+
+  if (response.ContentLength != null && response.ContentLength > maxByteCount) {
+    abortBody(response.Body);
+    throw new Error(`Internal asset exceeds the ${maxByteCount}-byte read limit.`);
+  }
+
+  return bodyToUint8Array(response.Body, maxByteCount);
 }
 
 /**

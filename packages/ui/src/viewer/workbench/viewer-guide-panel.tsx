@@ -67,7 +67,9 @@ export function ViewerGuidePanel({ open, onClose, onComplete }: ViewerGuidePanel
       open={open}
       onClose={onClose}
       // Viewer owns the root scroll lock so Modal must not add body padding and squeeze the sheet.
-      ModalProps={{ keepMounted: true, disableScrollLock: true }}
+      // The guide is replayable but usually closed; unmounting it avoids carrying a hidden second
+      // instructional surface through every viewer interaction.
+      ModalProps={{ disableScrollLock: true }}
       slotProps={{
         paper: {
           sx: {

@@ -41,35 +41,6 @@ function normalizeClampedPanOffset(value: number): number {
   return Object.is(value, -0) ? 0 : value;
 }
 
-export function getFittedStageSize(
-  viewport: ViewerStageSize,
-  aspectRatio: number,
-): ViewerStageSize | null {
-  if (viewport.width <= 0 || viewport.height <= 0 || aspectRatio <= 0) {
-    return null;
-  }
-
-  // Keep a small breathing room around the stage chrome, but avoid wasting too much of the viewer
-  // shell when the surrounding layout already contributes its own padding.
-  const horizontalPadding = viewport.width < 760 ? 4 : 10;
-  const verticalPadding = viewport.height < 760 ? 6 : 12;
-  const maxWidth = Math.max(viewport.width - horizontalPadding * 2, 220);
-  const maxHeight = Math.max(viewport.height - verticalPadding * 2, 140);
-
-  let width = Math.min(maxWidth, maxHeight * aspectRatio);
-  let height = width / aspectRatio;
-
-  if (height > maxHeight) {
-    height = maxHeight;
-    width = height * aspectRatio;
-  }
-
-  return {
-    width,
-    height,
-  };
-}
-
 export function getContainedMediaRect(
   container: ViewerStageSize,
   media: ViewerStageSize,
@@ -194,18 +165,14 @@ export function normalizeViewerDisplayedScale(
   ) {
     const fineScale = clampedDisplayedScale / presetScale;
 
-    if (
-      fineScale < VIEWER_MIN_FINE_SCALE ||
-      fineScale > VIEWER_MAX_FINE_SCALE
-    ) {
+    if (fineScale < VIEWER_MIN_FINE_SCALE || fineScale > VIEWER_MAX_FINE_SCALE) {
       continue;
     }
 
     const distanceFromWholeStep = Math.abs(presetScale - clampedDisplayedScale);
     if (
       distanceFromWholeStep < smallestDistance ||
-      (distanceFromWholeStep === smallestDistance &&
-        presetScale > bestPresetScale)
+      (distanceFromWholeStep === smallestDistance && presetScale > bestPresetScale)
     ) {
       bestPresetScale = presetScale as ViewerPresetScale;
       smallestDistance = distanceFromWholeStep;

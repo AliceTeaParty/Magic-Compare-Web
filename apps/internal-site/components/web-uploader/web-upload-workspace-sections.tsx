@@ -312,21 +312,21 @@ export function UploadIntakePanel({
             上传到
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            {cases.find((item) => item.slug === selectedCaseSlug)?.title ?? "尚无 Case"}
+            {cases.find((item) => item.slug === selectedCaseSlug)?.title ?? "尚无项目"}
           </Typography>
         </Stack>
 
         {cases.length === 0 ? (
           <Stack spacing={1.25}>
-            <Alert severity="warning">上传前需要创建 Case。</Alert>
+            <Alert severity="warning">上传前需要创建项目。</Alert>
             <CaseCreateButton />
           </Stack>
         ) : (
           <FormControl fullWidth size="small">
-            <InputLabel id="web-upload-intake-case-label">目标 Case</InputLabel>
+            <InputLabel id="web-upload-intake-case-label">目标项目</InputLabel>
             <Select
               labelId="web-upload-intake-case-label"
-              label="目标 Case"
+              label="目标项目"
               value={selectedCaseSlug}
               onChange={(event) => onCaseChange(event.target.value)}
             >
@@ -437,13 +437,13 @@ export function UploadConfigurationPanel({
 
         <Stack spacing={1.5}>
           <Typography component="h2" variant="h4">
-            Group 信息
+            图组信息
           </Typography>
           <FormControl fullWidth size="small" disabled={isLocked}>
-            <InputLabel id="web-upload-config-case-label">目标 Case</InputLabel>
+            <InputLabel id="web-upload-config-case-label">目标项目</InputLabel>
             <Select
               labelId="web-upload-config-case-label"
-              label="目标 Case"
+              label="目标项目"
               value={selectedCaseSlug}
               onChange={(event) => onCaseChange(event.target.value)}
             >

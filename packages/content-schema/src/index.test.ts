@@ -119,12 +119,74 @@ describe("ImportManifestSchema", () => {
 });
 
 describe("PublishManifestSchema", () => {
+  it("keeps version 1 manifests compatible without image placeholders", () => {
+    const parsed = PublishManifestSchema.parse({
+      schemaVersion: 1,
+      publicSlug: "demo-case--banding-check",
+      generatedAt: "2026-03-18T04:00:00.000Z",
+      assetBasePath: "https://assets.example.com/groups/demo",
+      case: {
+        slug: "demo-case",
+        title: "Demo Case",
+        subtitle: "",
+        summary: "",
+        tags: [],
+        publishedAt: null,
+      },
+      group: {
+        id: "group-1",
+        slug: "banding-check",
+        publicSlug: "demo-case--banding-check",
+        title: "Banding Check",
+        description: "",
+        defaultMode: "before-after",
+        tags: [],
+      },
+      frames: [
+        {
+          id: "frame-1",
+          title: "Frame A",
+          caption: "",
+          order: 0,
+          assets: [
+            {
+              id: "asset-1",
+              kind: "before",
+              label: "Before",
+              imageUrl: "https://assets.example.com/before.png",
+              thumbUrl: "https://assets.example.com/before-thumb.png",
+              width: 1280,
+              height: 720,
+              note: "",
+              isPrimaryDisplay: true,
+            },
+            {
+              id: "asset-2",
+              kind: "after",
+              label: "After",
+              imageUrl: "https://assets.example.com/after.png",
+              thumbUrl: "https://assets.example.com/after-thumb.png",
+              width: 1280,
+              height: 720,
+              note: "",
+              isPrimaryDisplay: true,
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(parsed.schemaVersion).toBe(1);
+    expect(parsed.frames[0]?.assets[0]?.placeholder).toBeUndefined();
+  });
+
   it("requires a schemaVersion from the first public artifact", () => {
     const parsed = PublishManifestSchema.parse({
       schemaVersion: PUBLISH_SCHEMA_VERSION,
       publicSlug: "demo-case--banding-check",
       generatedAt: "2026-03-18T04:00:00.000Z",
-      assetBasePath: "https://assets.example.com/magic-compare-assets/internal-assets/demo-case/banding-check",
+      assetBasePath:
+        "https://assets.example.com/magic-compare-assets/internal-assets/demo-case/banding-check",
       case: {
         slug: "demo-case",
         title: "Demo Case",
@@ -153,19 +215,27 @@ describe("PublishManifestSchema", () => {
               id: "asset-1",
               kind: "before",
               label: "Before",
-              imageUrl: "https://assets.example.com/magic-compare-assets/internal-assets/demo-case/banding-check/001/before.png",
-              thumbUrl: "https://assets.example.com/magic-compare-assets/internal-assets/demo-case/banding-check/001/thumb-before.png",
+              imageUrl:
+                "https://assets.example.com/magic-compare-assets/internal-assets/demo-case/banding-check/001/before.png",
+              thumbUrl:
+                "https://assets.example.com/magic-compare-assets/internal-assets/demo-case/banding-check/001/thumb-before.png",
               width: 1280,
               height: 720,
               note: "",
               isPrimaryDisplay: true,
+              placeholder: {
+                dataUrl: "data:image/webp;base64,UklGRg==",
+                sourceColor: "#aabbcc",
+              },
             },
             {
               id: "asset-2",
               kind: "after",
               label: "After",
-              imageUrl: "https://assets.example.com/magic-compare-assets/internal-assets/demo-case/banding-check/001/after.png",
-              thumbUrl: "https://assets.example.com/magic-compare-assets/internal-assets/demo-case/banding-check/001/thumb-after.png",
+              imageUrl:
+                "https://assets.example.com/magic-compare-assets/internal-assets/demo-case/banding-check/001/after.png",
+              thumbUrl:
+                "https://assets.example.com/magic-compare-assets/internal-assets/demo-case/banding-check/001/thumb-after.png",
               width: 1280,
               height: 720,
               note: "",
@@ -177,5 +247,26 @@ describe("PublishManifestSchema", () => {
     });
 
     expect(parsed.schemaVersion).toBe(PUBLISH_SCHEMA_VERSION);
+    expect(parsed.frames[0]?.assets[0]?.placeholder?.sourceColor).toBe("#AABBCC");
+  });
+
+  it("rejects malformed inline image placeholders", () => {
+    expect(() =>
+      PublishManifestSchema.shape.frames.element.shape.assets.element.parse({
+        id: "asset-1",
+        kind: "before",
+        label: "Before",
+        imageUrl: "https://assets.example.com/before.png",
+        thumbUrl: "https://assets.example.com/before-thumb.png",
+        width: 1280,
+        height: 720,
+        note: "",
+        isPrimaryDisplay: true,
+        placeholder: {
+          dataUrl: "https://assets.example.com/preview.webp",
+          sourceColor: "red",
+        },
+      }),
+    ).toThrow();
   });
 });

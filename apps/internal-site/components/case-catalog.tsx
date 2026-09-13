@@ -90,7 +90,7 @@ export function CaseCatalog({ items }: { items: CaseCatalogItem[] }) {
                 </InputAdornment>
               ),
             },
-            htmlInput: { "aria-label": "搜索 Case" },
+            htmlInput: { "aria-label": "搜索项目" },
           }}
         />
         <Tooltip title="筛选状态">
@@ -99,7 +99,7 @@ export function CaseCatalog({ items }: { items: CaseCatalogItem[] }) {
               value={status}
               disableUnderline
               startAdornment={<FilterListOutlined sx={{ mr: 1, fontSize: 20 }} />}
-              inputProps={{ "aria-label": "筛选 Case 状态" }}
+              inputProps={{ "aria-label": "筛选项目状态" }}
               onChange={(event) => setStatus(event.target.value as StatusFilter)}
             >
               <MenuItem value="all">全部状态</MenuItem>
@@ -116,7 +116,7 @@ export function CaseCatalog({ items }: { items: CaseCatalogItem[] }) {
               value={sortOrder}
               disableUnderline
               startAdornment={<Sort sx={{ mr: 1, fontSize: 20 }} />}
-              inputProps={{ "aria-label": "Case 排序" }}
+              inputProps={{ "aria-label": "项目排序" }}
               onChange={(event) => setSortOrder(event.target.value as SortOrder)}
             >
               <MenuItem value="updated-desc">最近更新</MenuItem>
@@ -132,7 +132,7 @@ export function CaseCatalog({ items }: { items: CaseCatalogItem[] }) {
       ) : (
         <Stack sx={{ alignItems: "center", py: 8, textAlign: "center" }} spacing={1.25}>
           <FluentFolderEmoji size={56} />
-          <Typography variant="h4">没有匹配的 Case</Typography>
+          <Typography variant="h4">没有匹配的项目</Typography>
           <Typography variant="body2" color="text.secondary">
             调整搜索词或筛选条件。
           </Typography>
@@ -158,8 +158,8 @@ export function CaseCatalog({ items }: { items: CaseCatalogItem[] }) {
       >
         <Typography variant="caption" color="text.secondary">
           {visibleItems.length === items.length
-            ? `${items.length} Case`
-            : `${visibleItems.length} / ${items.length} Case`}
+            ? `${items.length} 项目`
+            : `${visibleItems.length} / ${items.length} 项目`}
         </Typography>
       </Box>
     </Stack>

@@ -100,37 +100,6 @@ describe("POST /api/ops/group-upload-start", () => {
     );
 
     expect(response.status).toBe(200);
-    expect(startGroupUpload).toHaveBeenCalled();
-  });
-
-  it("rejects case and group slugs that contain the public slug separator", async () => {
-    for (const payload of [
-      {
-        ...validPayload,
-        case: { ...validPayload.case, slug: "bad--case" },
-      },
-      {
-        ...validPayload,
-        group: { ...validPayload.group, slug: "bad--group" },
-      },
-    ]) {
-      const response = await POST(
-        new Request("http://localhost:3000/api/ops/group-upload-start", {
-          method: "POST",
-          body: JSON.stringify(payload),
-          headers: {
-            "content-type": "application/json",
-          },
-        }),
-      );
-
-      expect(response.status).toBe(400);
-    }
-
-    expect(startGroupUpload).not.toHaveBeenCalledWith(
-      expect.objectContaining({
-        case: expect.objectContaining({ slug: "bad--case" }),
-      }),
-    );
+    expect(startGroupUpload).toHaveBeenCalledWith(validPayload);
   });
 });

@@ -1,18 +1,8 @@
 "use client";
 
-import {
-  useCallback,
-  useEffect,
-  useRef,
-  type PointerEvent as ReactPointerEvent,
-} from "react";
+import { useCallback, useEffect, useRef, type PointerEvent as ReactPointerEvent } from "react";
 import type { ViewerMediaRect } from "@magic-compare/compare-core";
-import {
-  getSwipeCssValues,
-  resolveSwipePositionFromPointer,
-} from "./swipe-compare-geometry";
-
-export type SwipeCssVariableWriter = (nextPosition: number) => void;
+import { getSwipeCssValues, resolveSwipePositionFromPointer } from "./swipe-compare-geometry";
 
 /** Pointer capture release is defensive because cancel/up can arrive after capture was lost. */
 function releasePointerCapture(event: ReactPointerEvent<HTMLDivElement>) {

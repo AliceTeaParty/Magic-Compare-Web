@@ -11,7 +11,7 @@ import {
   writeViewerDetailsCookie,
   writeViewerModeCookie,
 } from "./viewer-cookies";
-import { getViewerDevicePixelRatio, getViewportSize } from "./viewer-stage";
+import { getViewerDevicePixelRatio } from "./viewer-stage";
 
 /**
  * Delays media-query-driven layout changes until after hydration so the server-rendered viewer and
@@ -104,24 +104,18 @@ export function useViewerPreferencePersistence(params: {
 }
 
 /**
- * Fit calculations depend on live viewport geometry and device pixel ratio, not just CSS
- * breakpoints, so resize handling must refresh both values together.
+ * Physical-pixel zoom semantics depend on live device pixel ratio, including browser zoom changes.
  */
-export function useViewerViewportMetrics(params: {
-  setDevicePixelRatio: (nextValue: number) => void;
-  setViewportSize: (nextValue: ReturnType<typeof getViewportSize>) => void;
-}) {
-  const { setDevicePixelRatio, setViewportSize } = params;
+export function useViewerDevicePixelRatio(setDevicePixelRatio: (nextValue: number) => void) {
   useEffect(() => {
-    function syncViewportMetrics() {
-      setViewportSize(getViewportSize());
+    function syncDevicePixelRatio() {
       setDevicePixelRatio(getViewerDevicePixelRatio());
     }
 
-    syncViewportMetrics();
-    window.addEventListener("resize", syncViewportMetrics);
-    return () => window.removeEventListener("resize", syncViewportMetrics);
-  }, [setDevicePixelRatio, setViewportSize]);
+    syncDevicePixelRatio();
+    window.addEventListener("resize", syncDevicePixelRatio);
+    return () => window.removeEventListener("resize", syncDevicePixelRatio);
+  }, [setDevicePixelRatio]);
 }
 
 /**

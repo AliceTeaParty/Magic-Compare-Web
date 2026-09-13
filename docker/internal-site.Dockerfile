@@ -26,6 +26,7 @@ COPY packages/compare-core/package.json ./packages/compare-core/package.json
 COPY packages/content-schema/package.json ./packages/content-schema/package.json
 COPY packages/shared-utils/package.json ./packages/shared-utils/package.json
 COPY packages/ui/package.json ./packages/ui/package.json
+COPY patches ./patches
 RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
   pnpm fetch --frozen-lockfile
 
@@ -45,6 +46,7 @@ COPY packages/compare-core/package.json ./packages/compare-core/package.json
 COPY packages/content-schema/package.json ./packages/content-schema/package.json
 COPY packages/shared-utils/package.json ./packages/shared-utils/package.json
 COPY packages/ui/package.json ./packages/ui/package.json
+COPY patches ./patches
 RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
   pnpm fetch --prod --frozen-lockfile
 RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
@@ -79,6 +81,9 @@ COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/pnpm-lock.yaml ./pnpm-lock.yaml
 COPY --from=builder /app/pnpm-workspace.yaml ./pnpm-workspace.yaml
 COPY --from=builder /app/tsconfig.base.json ./tsconfig.base.json
+COPY docker/internal-site-init.sh /usr/local/bin/internal-site-init
+
+RUN chmod 755 /usr/local/bin/internal-site-init
 
 EXPOSE 3000
 

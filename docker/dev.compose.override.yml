@@ -1,12 +1,12 @@
+x-local-internal-site: &local-internal-site
+  image: magic-compare/internal-site:local
+  build:
+    context: .
+    dockerfile: docker/internal-site.Dockerfile
+
 services:
   internal-site-init:
-    image: magic-compare/internal-site:local
-    build:
-      context: .
-      dockerfile: docker/internal-site.Dockerfile
+    <<: *local-internal-site
 
   internal-site:
-    image: magic-compare/internal-site:local
-    build:
-      context: .
-      dockerfile: docker/internal-site.Dockerfile
+    <<: *local-internal-site

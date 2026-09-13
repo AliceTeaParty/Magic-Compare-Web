@@ -1,4 +1,5 @@
 import { parseUploadFilenameStem } from "./filename-parser";
+import { getCommonHeatmapReferenceLabels } from "./heatmap-reference";
 import type { WebUploadFramePlan, WebUploadIssue, WebUploadPlan } from "./web-upload-types";
 
 export interface FramePreviewRow {
@@ -112,33 +113,8 @@ function frameIssueState(frame: WebUploadFramePlan, issues: WebUploadIssue[]) {
   };
 }
 
-function orderedComparisonLabels(frame: WebUploadFramePlan) {
-  const labels = [frame.after.label, ...frame.misc.map((asset) => asset.label)];
-  return [...new Set(labels)];
-}
-
 export function getUploadPlanHeatmapReferenceOptions(plan: WebUploadPlan) {
-  // A supplied heatmap has no generated reference. Excluding those rows keeps the table-level
-  // selector aligned with the subset that will actually consume it during preflight.
-  const generatedHeatmapFrames = plan.frames.filter((frame) => !frame.heatmap);
-  if (generatedHeatmapFrames.length === 0) {
-    return [];
-  }
-
-  const [firstFrame, ...remainingFrames] = generatedHeatmapFrames;
-  const commonLabels = new Set(orderedComparisonLabels(firstFrame));
-  for (const frame of remainingFrames) {
-    const labels = new Set(orderedComparisonLabels(frame));
-    for (const label of [...commonLabels]) {
-      if (!labels.has(label)) {
-        commonLabels.delete(label);
-      }
-    }
-  }
-
-  // The global heatmap selector must only show columns that every frame can actually use. That
-  // prevents a table-level setting from silently falling back on rows where the column is missing.
-  return orderedComparisonLabels(firstFrame).filter((label) => commonLabels.has(label));
+  return getCommonHeatmapReferenceLabels(plan.frames);
 }
 
 export function buildPlanView(plan: WebUploadPlan): PlanView {
