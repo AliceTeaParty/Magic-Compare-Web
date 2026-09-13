@@ -1,38 +1,63 @@
 services:
   rustfs:
-    image: quay.io/minio/minio:RELEASE.2025-04-22T22-12-26Z
+    image: rustfs/rustfs:1.0.0-rc.6
     init: true
     ports:
       - "9000:9000"
     environment:
-      MINIO_ROOT_USER: rustfsadmin
-      MINIO_ROOT_PASSWORD: rustfsadmin
+      RUSTFS_ADDRESS: 0.0.0.0:9000
+      RUSTFS_ACCESS_KEY: rustfsadmin
+      RUSTFS_SECRET_KEY: rustfsadmin
+      RUSTFS_CONSOLE_ENABLE: "false"
+      RUSTFS_LOG_LEVEL: warn
       MALLOC_ARENA_MAX: "2"
-    command: ["server", "/data", "--address", ":9000"]
+    command: ["/data"]
     # Use tmpfs in CI — no persistence needed; keeps the runner clean.
     tmpfs:
       - /tmp:size=64m
-      - /data:size=512m
+      # RustFS rc.6 runs as UID/GID 10001; preserve writable ephemeral storage.
+      - /data:size=512m,uid=10001,gid=10001,mode=0750
     healthcheck:
-      test: ["CMD", "sh", "-c", "curl -fsS http://127.0.0.1:9000/minio/health/live >/dev/null"]
+      test: ["CMD", "sh", "-c", "curl -fsS http://127.0.0.1:9000/health >/dev/null"]
       interval: 15s
       timeout: 5s
       retries: 5
       start_period: 15s
 
   rustfs-init:
-    image: minio/mc:RELEASE.2025-08-13T08-35-41Z
+    image: amazon/aws-cli:2.36.44
+    environment:
+      AWS_ACCESS_KEY_ID: rustfsadmin
+      AWS_SECRET_ACCESS_KEY: rustfsadmin
+      AWS_DEFAULT_REGION: us-east-1
+      AWS_EC2_METADATA_DISABLED: "true"
+      AWS_PAGER: ""
+      RUSTFS_S3_ENDPOINT: http://rustfs:9000
+      RUSTFS_S3_BUCKET: magic-compare-ci
     entrypoint:
       - /bin/sh
       - -ec
       - |
-        until mc alias set local http://rustfs:9000 rustfsadmin rustfsadmin --api S3v4 --path on >/dev/null 2>&1 && \
-          mc ls local >/dev/null 2>&1; do
+        # The initializer is a short-lived client. Pin path-style so its requests match the app.
+        cat > /tmp/aws-config <<'EOF'
+        [default]
+        s3 =
+            addressing_style = path
+        EOF
+        export AWS_CONFIG_FILE=/tmp/aws-config
+
+        until aws --endpoint-url "$${RUSTFS_S3_ENDPOINT}" s3api list-buckets >/dev/null 2>&1; do
           sleep 2
         done
-        mc mb local/magic-compare-ci --ignore-existing >/dev/null
-        mc anonymous set download local/magic-compare-ci >/dev/null
-        echo "CI storage bucket ready."
+        if ! aws --endpoint-url "$${RUSTFS_S3_ENDPOINT}" s3api head-bucket \
+          --bucket "$${RUSTFS_S3_BUCKET}" >/dev/null 2>&1; then
+          aws --endpoint-url "$${RUSTFS_S3_ENDPOINT}" s3api create-bucket \
+            --bucket "$${RUSTFS_S3_BUCKET}"
+        fi
+        aws --endpoint-url "$${RUSTFS_S3_ENDPOINT}" s3api put-bucket-policy \
+          --bucket "$${RUSTFS_S3_BUCKET}" \
+          --policy "$(printf '{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":\"*\",\"Action\":[\"s3:GetObject\"],\"Resource\":[\"arn:aws:s3:::%s/*\"]}]}' "$${RUSTFS_S3_BUCKET}")"
+        echo "RustFS CI storage bucket ready."
     depends_on:
       rustfs:
         condition: service_healthy
