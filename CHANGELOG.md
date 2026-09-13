@@ -9,6 +9,14 @@ Entries before that date are summarized at release level instead of being recons
 ### Changed
 
 - Moved Docker runtime initialization out of Compose YAML into named scripts; CI initializes its temporary RustFS bucket through a one-shot AWS CLI container.
+- Updated verified patch dependencies: Next.js `16.3.5`, Sharp `0.35.4`, tsx `4.23.13`, Vitest `4.1.11`, and `@types/react-dom` `19.2.5`.
+
+### Fixed
+
+- Split Frame upload recovery by stage: PUT retries renew URLs for the existing revision, commit retries retain uploaded objects, and exhausted failures no longer stop unrelated frames.
+- Made prepared revisions and frame commits idempotent, including an atomic commit claim that prevents concurrent retries from creating duplicate frames.
+- Kept storage signature checks on bounded Range reads and added RustFS CI coverage for a first signed Range request, upload lifecycle, and temporary bucket initialization.
+- Replaced empty viewer loading surfaces with truthful image-specific placeholders and delayed the loaded state until image pixels can decode.
 
 ## v2.0.0-alpha - 2026-08-07
 

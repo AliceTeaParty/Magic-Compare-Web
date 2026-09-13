@@ -2,22 +2,24 @@
 
 本文记录 workspace 的依赖升级批次、当前基线和迁移检查项。更新依赖时先确认实际安装版本与官方迁移文档，再按责任边界拆分提交。
 
-最后更新：2026-08-06。
+最后更新：2026-09-13。
 
 ## 当前基线
 
 | 范围                           | 版本                           |
 | ------------------------------ | ------------------------------ |
-| Next.js / React / React DOM    | `16.3.0` / `19.2.8` / `19.2.8` |
+| Next.js / React / React DOM    | `16.3.5` / `19.2.8` / `19.2.8` |
 | Prisma / Prisma Client         | `6.19.3`                       |
 | Zod                            | `4.4.3`                        |
 | TypeScript / typescript-eslint | `6.0.3` / `8.66.0`             |
-| Vitest                         | `4.1.10`                       |
+| Vitest                         | `4.1.11`                       |
 | Playwright                     | `1.62.1`                       |
 | ESLint / React Hooks plugin    | `10.8.0` / `7.1.1`             |
-| Prettier / tsx                 | `3.9.6` / `4.23.8`             |
+| Prettier / tsx                 | `3.9.6` / `4.23.13`            |
 | Wrangler / Motion              | `4.119.0` / `12.43.0`          |
 | AWS S3 client / presigner      | `3.1104.0`                     |
+
+最近一次已验证的补丁批次更新了 Next.js `16.3.5`、Sharp `0.35.4`、tsx `4.23.13`、Vitest `4.1.11` 与 `@types/react-dom` `19.2.5`。Prisma、TypeScript Node 26 和 GitHub Actions major 仍保留为独立迁移项。
 
 本地、CI 与 Docker 统一使用 Node `24.13.x`，pnpm 固定为 `10.32.1`，`@types/node` 保持 Node 24 版本线。TypeScript 7、Prisma 7 和 pnpm 11 属于后续独立迁移，不进入常规补丁更新。
 

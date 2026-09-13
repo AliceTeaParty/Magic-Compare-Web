@@ -356,11 +356,13 @@ Web 上传链路是：
 
 - `app/api/ops/group-upload-*`：只做 route 入口和错误转义，不写事务编排
 - `lib/server/uploads/upload-service.ts`：只保留 start / prepare / commit / complete / cancel 主流程
-- `lib/server/uploads/upload-service-helpers.ts`：承接作业装载、group 重置、presign 组装、frame 状态 guard、complete 收尾
+- `lib/server/uploads/upload-group-lifecycle.ts`：承接 Case / Group 建立、可见性降级和重新开始前的清理
+- `lib/server/uploads/upload-job-repository.ts`：承接作业查询、过期、摘要和完成状态维护
+- `lib/server/uploads/upload-storage-operations.ts`：承接 pending 路径、presign、frame 状态 guard、对象校验和旧 revision 清理
 - `lib/server/storage/internal-assets.ts`：只负责 S3-compatible 读写、presign、按前缀删除，不负责业务状态切换
 - `components/web-uploader/`：只负责浏览器目录扫描、预览、生成、上传 runner 和轻量状态展示
 
-新增上传逻辑时，优先把“副作用顺序”塞进 helper，而不是继续往 route 或单个主流程函数里追加分支。
+新增上传逻辑时，保持 route 只做入口，生命周期、作业状态和对象存储操作各自留在当前模块；不要重新合并成一个泛用 helper 文件。
 
 ### 近期维护约束
 
@@ -582,7 +584,7 @@ internal-site 即使运行在开发模式，也会让 public-site 子构建显�
 
 ```bash
 pnpm install --frozen-lockfile
-pnpm test
+pnpm check
 pnpm build
 ```
 
@@ -595,7 +597,7 @@ docker compose -f docker-compose.yml -f docker/ci.compose.override.yml up -d --b
 关键约束：
 
 - CI 通过 `rustfs/rustfs:1.0.0-rc.6` 提供一次性的 S3-compatible sidecar；`rustfs-init` 使用固定版本 AWS CLI 初始化 bucket 后立即退出
-- compose smoke 默认不依赖 demo seed；只有显式提供外部对象存储配置时才应该验证 demo
+- compose smoke 显式注入临时 RustFS 配置并启用 demo seed，验证桶初始化、首次签名 Range GET、Frame 上传生命周期和 demo 路由
 - 运行失败后最好保留 compose 日志，便于排错
 
 ### Docker 镜像构建与发布入口

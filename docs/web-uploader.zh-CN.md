@@ -25,6 +25,8 @@
 - Heatmap 参考是全局设置，只检查需要自动生成 heatmap 的 frame，并只显示这些 frame 都存在的列。
 - 首次 PUT 前会完成全部文件的配对、变量确认、图片解码、尺寸检查、SHA-256、heatmap 配置和 frame 数检查。
 - 预检通过后使用 `stream-v2`：一帧生成完成就立即走 `prepare -> presigned PUT -> commit`，不等待整个 Group 的缩略图和 heatmap 全部生成。
+- 上传恢复按失败阶段处理：prepare 失败只重试 prepare；PUT 失败会对同一 prepared revision 重新签发 URL 后重传；commit 的可重试失败只重试 commit，不重新 prepare 或重传文件。
+- 单个 frame 在重试耗尽后会保留失败原因并让其余队列继续完成；点击“继续上传”时只恢复尚未 committed 的 frame。
 - 上传中可以暂停；放弃上传会取消浏览器请求、取消 active job，并清理未提交的 pending 对象前缀。
 
 ## 数据与性能边界
@@ -36,6 +38,7 @@
 - 重排序、Frame 标题模式、列名修改、Heatmap 参考变化都会使预检结果失效，保证远端 job 的输入哈希与当前计划一致。
 - 上传 commit 仍串行收口，减少 SQLite 写入冲突。
 - 浏览器生成的缩略图和 heatmap 只保留到对应 frame 提交或失败；提交后立即释放 Blob。暂停会终止 worker 和 PUT，继续时跳过服务端已提交 frame。
+- 服务端返回的对象存储校验错误只包含安全的错误码与 HTTP 状态，例如 `对象存储校验失败（SignatureDoesNotMatch，HTTP 403）。`；更完整的诊断字段只保留在服务端日志。
 - 未声明 `stream-v2` 的调用继续发送完整 frame 快照，原有 API 合约保持不变。
 
 ## 命名与 slug

@@ -14,6 +14,7 @@
 
 - Zod 参数校验失败返回 `400`；其他明确的无效输入也返回 `400`。
 - 目标 Case、Group 或上传作业不存在时返回 `404`；重复创建、陈旧状态或未满足前置条件时返回 `409`。
+- Frame commit 的对象存储校验失败返回 `502`，响应只包含存储错误码和上游 HTTP 状态；服务端日志额外记录 job、frame、阶段和对象存储 request ID。
 - 未分类的数据库、对象存储、部署配置或程序异常会记录服务端日志并返回 `500`。
 
 ## 端点总览
@@ -470,9 +471,9 @@
 - 如果 case 已存在，当前代码不会用上传端 metadata 覆盖 case 标题、摘要、标签；已有 case 仍以数据库为准。
 - 如果 group 已存在，title / description / order / defaultMode / tags 会按本次输入更新。
 - 同一 group 在输入哈希未变化、且存在活动 job 时会直接恢复现有 job。
-- 只要检测到输入变化、存在活动 job，或显式传入 `forceRestart=true`，服务端就会清空整个 group 当前数据并重建上传 job。
+- 输入变化或显式传入 `forceRestart=true` 时，服务端会清空整个 group 当前数据并重建上传 job；输入哈希相同的活动 job 会直接恢复。
 - 如果目标 group 之前是公开状态，启动上传时会立刻降回 `isPublic=false`，并删除对应已发布 bundle，避免公开站点看到半替换内容。
-- 当前实现里，route 只负责 schema 校验和错误包装；具体 resume / reset / visibility downgrade 在 `lib/server/uploads/upload-service.ts` 与 `upload-service-helpers.ts` 内部分层完成。
+- 当前实现里，route 只负责 schema 校验和错误包装；具体 resume / reset / visibility downgrade 由 `lib/server/uploads/upload-service.ts` 和 `upload-group-lifecycle.ts` 分层完成。
 
 ### `POST /api/ops/group-upload-frame-prepare`
 
@@ -553,10 +554,10 @@
 
 - commit 前，服务端会对该 frame 的所有 original / thumbnail 逻辑路径做对象存在性和图像合理性检查。
 - 对已 `committed` 的同一 frame 重复调用会直接返回既有 `committed` 结果，不重复读取对象存储或写入数据库。
-- commit 是 frame 级原子切换：会先删掉该 `order` 下旧 frame 记录，再创建新 frame 和新 asset 行。
+- commit 会以条件状态更新声明该 frame；声明、替换旧 frame、创建新 asset 行和递增 `committedFrameCount` 在同一事务中完成，并发重复请求只会有一个请求写入。
 - 新写入的 frame 当前会带 `isPublic=true`，但 group 的公开与否仍由 group 自身 `isPublic` 决定。
 - commit 成功后，旧 committed revision 的桶前缀会被删除。
-- 当前实现已经把“作业装载 / frame guard / 事务替换 / 旧前缀清理”拆成 helper，后续不要再把这些步骤重新揉回 route 层。
+- 可重试的 commit 失败不会重建 prepared revision；客户端应先重试同一 commit，再在 PUT 失败时重新申请同一路径的 presigned URL。
 
 ### `POST /api/ops/group-upload-complete`
 
@@ -659,7 +660,9 @@
 - 路由入口：`apps/internal-site/app/api/ops/*`
 - 上传契约：`apps/internal-site/lib/server/uploads/contracts.ts`
 - 上传事务实现：`apps/internal-site/lib/server/uploads/upload-service.ts`
-- 上传事务 helper：`apps/internal-site/lib/server/uploads/upload-service-helpers.ts`
+- 上传生命周期：`apps/internal-site/lib/server/uploads/upload-group-lifecycle.ts`
+- 上传作业状态：`apps/internal-site/lib/server/uploads/upload-job-repository.ts`
+- 上传对象操作：`apps/internal-site/lib/server/uploads/upload-storage-operations.ts`
 - case / group 变更实现：`apps/internal-site/lib/server/content/mutation-service.ts`
 - 发布实现：`apps/internal-site/lib/server/publish/publish-case-service.ts`
 - public export / deploy 实现：`apps/internal-site/lib/server/public-site/runtime/runtime-service.ts`

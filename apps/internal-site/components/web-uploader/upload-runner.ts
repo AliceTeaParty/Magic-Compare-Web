@@ -610,6 +610,11 @@ export class WebUploadRunner {
     await Promise.all(workers);
   }
 
+  /**
+   * Recovers each failure at its own boundary: commit retries retain uploaded objects, while PUT
+   * retries only renew URLs for the same prepared revision. A terminal frame error is local so the
+   * pool can finish unaffected frames and the operator can resume only the failed work.
+   */
   private async processFrame(frame: RunnerFrameState) {
     let generatedFrame: GeneratedUploadFrame | null = null;
     frame.status = this.generateFrame ? "generating" : "preparing";
