@@ -133,16 +133,16 @@ pnpm public:export
 
 - `docker/ci.compose.override.yml`
 
-### 7. `rustfs-init` 脚本要尽量显式
+### 7. `rustfs-init` 要保持一次性且配置明确
 
-在 CI 和 Docker 里，把一整段对象存储初始化逻辑直接塞进 compose 的单行命令，不利于排错，也容易让本地和 CI 出现两套行为。
+CI 的 RustFS 初始化只创建 bucket 并设置测试所需的公开读取策略。它使用固定版本 AWS CLI，初始化完成即退出，不进入应用镜像或长期运行的服务。
 
 经验教训：
 
-- `rustfs-init` 更适合收敛到仓库内的独立脚本
-- compose 只负责把 endpoint、bucket、credentials 接进去
-- CI override 应尽量只覆盖 volume，而不是重复覆盖初始化逻辑
-- 对 S3-compatible bucket 初始化这类场景，轻量 `minio/mc` 比通用 `aws-cli` 更贴近用途
+- RustFS endpoint、bucket 和临时凭证只在 CI override 中定义
+- AWS CLI 必须显式使用 path-style，与应用的 S3 请求保持一致
+- 初始化命令保持短小、可从 compose 日志直接诊断
+- 不要重新引入 `minio/mc`
 
 ### 8. GitHub Actions JavaScript actions 版本也会成为噪音源
 
