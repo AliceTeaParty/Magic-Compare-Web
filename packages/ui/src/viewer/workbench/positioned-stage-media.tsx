@@ -129,13 +129,17 @@ export function PositionedStageMedia({
           willChange: willChangeTransform ? "transform" : "auto",
         }}
       >
-        {!showImage && showFallback ? (
+        {showFallback ? (
           <StageImageFallback
+            animateOpacity={animateOpacity}
             contentPosition={fallbackContentPosition}
             counterRotate={rotateStage}
             errorMessage={fallbackErrorMessage}
             errored={hasError}
+            imageReady={showImage}
+            loadingLabel={asset.label}
             opacity={opacity}
+            placeholder={asset.placeholder}
             prefersReducedMotion={prefersReducedMotion}
           />
         ) : null}
@@ -168,7 +172,7 @@ export function PositionedStageMedia({
             transition:
               prefersReducedMotion || !animateOpacity
                 ? "none"
-                : "opacity 160ms cubic-bezier(0.2, 0, 0, 1)",
+                : "opacity 220ms cubic-bezier(0.2, 0, 0, 1)",
           }}
         />
       </Box>

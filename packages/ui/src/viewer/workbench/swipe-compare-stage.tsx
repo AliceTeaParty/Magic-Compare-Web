@@ -181,7 +181,7 @@ export function SwipeCompareStage({
         decoding="async"
         fetchPriority="high"
         fallbackContentPosition={{ left: "75%", top: "50%" }}
-        fallbackErrorMessage={`${beforeAsset.label} 素材加载失败`}
+        fallbackErrorMessage={`${beforeAsset.label} 加载失败，请刷新重试。`}
         prefersReducedMotion={prefersReducedMotion}
       />
       <PositionedStageMedia
@@ -191,9 +191,11 @@ export function SwipeCompareStage({
         rotateStage={rotateStage}
         loading="eager"
         decoding="async"
-        fetchPriority="high"
+        // Both originals remain discoverable in SSR, but only the base image should compete at high
+        // priority. Slow connections can then show one truthful half before the second completes.
+        fetchPriority="low"
         fallbackContentPosition={{ left: "25%", top: "50%" }}
-        fallbackErrorMessage={`${afterAsset.label} 素材加载失败`}
+        fallbackErrorMessage={`${afterAsset.label} 加载失败，请刷新重试。`}
         prefersReducedMotion={prefersReducedMotion}
         clipPath={
           isVertical

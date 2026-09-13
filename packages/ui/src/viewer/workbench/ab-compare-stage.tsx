@@ -185,7 +185,9 @@ export function ABCompareStage({
             imageRendering={pixelRenderingEnabled ? "pixelated" : "auto"}
             loading="eager"
             decoding="async"
-            fetchPriority={isVisibleLayer ? "high" : "auto"}
+            // The hidden side remains discoverable but must not compete with the selected original
+            // on a constrained connection; changing sides raises its browser priority in place.
+            fetchPriority={isVisibleLayer ? "high" : "low"}
             opacity={isVisibleLayer ? 1 : 0}
             prefersReducedMotion={prefersReducedMotion}
             showFallback={isVisibleLayer}

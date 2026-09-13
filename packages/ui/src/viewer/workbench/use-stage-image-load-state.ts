@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { type SyntheticEvent, useCallback, useEffect, useRef, useState } from "react";
 import { isViewerStageImageLoaded, markViewerStageImageLoaded } from "./stage-image-load-cache";
+import { waitForStageImageDecode } from "./stage-image-decode";
 
 /**
  * Bridges browser image load events, preloader hits, and React rendering into one visible state.
@@ -23,6 +24,18 @@ export function useStageImageLoadState(imageUrl: string) {
         },
   );
 
+  /** Keeps the truthful loading surface visible until pixels can be painted, not just downloaded. */
+  const revealDecodedImage = useCallback((image: HTMLImageElement, expectedImageUrl: string) => {
+    void waitForStageImageDecode(image).then((decoded) => {
+      if (!decoded || imageRef.current !== image) {
+        return;
+      }
+
+      markViewerStageImageLoaded(expectedImageUrl);
+      setLoadState({ imageUrl: expectedImageUrl, status: "loaded" });
+    });
+  }, []);
+
   useEffect(() => {
     const image = imageRef.current;
     if (!image) {
@@ -35,14 +48,12 @@ export function useStageImageLoadState(imageUrl: string) {
     }
 
     if (image.complete && image.naturalWidth > 0) {
-      markViewerStageImageLoaded(imageUrl);
-      setLoadState({ imageUrl, status: "loaded" });
+      revealDecodedImage(image, imageUrl);
     }
-  }, [imageUrl]);
+  }, [imageUrl, revealDecodedImage]);
 
-  function markLoaded() {
-    markViewerStageImageLoaded(imageUrl);
-    setLoadState({ imageUrl, status: "loaded" });
+  function markLoaded(event: SyntheticEvent<HTMLImageElement>) {
+    revealDecodedImage(event.currentTarget, imageUrl);
   }
 
   function markErrored() {

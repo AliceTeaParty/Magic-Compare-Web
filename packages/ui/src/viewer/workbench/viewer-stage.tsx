@@ -247,7 +247,9 @@ function ViewerStageContent({
           rotateStage={rotateStage}
           loading="eager"
           decoding="async"
-          fetchPriority="auto"
+          // The base image establishes useful pixels first; the overlay remains eager but low
+          // priority so a multi-megabyte heatmap cannot delay the initial inspection surface.
+          fetchPriority="low"
           opacity={overlayOpacity / 100}
           prefersReducedMotion={prefersReducedMotion}
         />

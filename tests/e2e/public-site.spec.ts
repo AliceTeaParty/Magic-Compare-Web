@@ -6,8 +6,13 @@ test("public viewer exposes and loads both original stage images", async ({ page
   const initialHtml = await response.text();
   // Raw HTML proves original discovery happens before hydration; thumbnail requests cannot satisfy
   // this contract or make the browser test pass accidentally.
-  expect(initialHtml.match(/data-viewer-stage-image/g)).toHaveLength(2);
-  expect(initialHtml.match(/fetchpriority="high"/gi)).toHaveLength(3);
+  const stageImageTags = initialHtml.match(/<img[^>]+data-viewer-stage-image[^>]*>/gi) ?? [];
+  expect(stageImageTags).toHaveLength(2);
+  // Only the base original is high priority. The comparison original remains discoverable without
+  // competing for the first useful full-size image on constrained connections.
+  expect(stageImageTags.filter((tag) => /fetchpriority="high"/i.test(tag))).toHaveLength(1);
+  expect(stageImageTags.filter((tag) => /fetchpriority="low"/i.test(tag))).toHaveLength(1);
+  expect(initialHtml.match(/data-viewer-stage-placeholder/g)).toHaveLength(2);
   expect(initialHtml).toContain('width="640"');
   expect(initialHtml).toContain('height="360"');
 

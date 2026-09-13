@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "publicSlug": "e2e-sample--viewer",
   "generatedAt": "2026-08-05T00:00:00.000Z",
   "assetBasePath": "data:image/svg+xml",
@@ -36,7 +36,11 @@
           "width": 640,
           "height": 360,
           "note": "Before fixture",
-          "isPrimaryDisplay": true
+          "isPrimaryDisplay": true,
+          "placeholder": {
+            "dataUrl": "data:image/webp;base64,UklGRioAAABXRUJQVlA4IB4AAABwAQCdASoIAAUAA8BgJZQCdAFAAAD+8FFM7WYUAAA=",
+            "sourceColor": "#202B38"
+          }
         },
         {
           "id": "e2e-after",
@@ -47,7 +51,11 @@
           "width": 640,
           "height": 360,
           "note": "After fixture",
-          "isPrimaryDisplay": true
+          "isPrimaryDisplay": true,
+          "placeholder": {
+            "dataUrl": "data:image/webp;base64,UklGRiwAAABXRUJQVlA4ICAAAABwAQCdASoIAAUAA8BgJYwCdAFAAAD+76w5N2Hbk/CoAA==",
+            "sourceColor": "#C7D8EB"
+          }
         }
       ]
     }

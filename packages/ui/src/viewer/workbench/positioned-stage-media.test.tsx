@@ -1,7 +1,11 @@
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { beforeAll, describe, expect, it, vi } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { PositionedStageMedia } from "./positioned-stage-media";
+import {
+  clearViewerStageImageLoadCacheForTest,
+  markViewerStageImageLoaded,
+} from "./stage-image-load-cache";
 
 const asset = {
   id: "before-1",
@@ -17,6 +21,10 @@ const asset = {
 
 beforeAll(() => {
   vi.stubGlobal("React", React);
+});
+
+beforeEach(() => {
+  clearViewerStageImageLoadCacheForTest();
 });
 
 describe("PositionedStageMedia SSR", () => {
@@ -36,5 +44,66 @@ describe("PositionedStageMedia SSR", () => {
     expect(html).toContain('width="1920"');
     expect(html).toContain('height="1080"');
     expect(html).toContain('data-viewer-stage-image=""');
+    expect(html).toContain("Before · 加载中");
+    expect(html).toContain("网络较慢，继续加载");
+  });
+
+  it("keeps the reduced-motion placeholder divider centered and still", () => {
+    const html = renderToStaticMarkup(
+      <PositionedStageMedia
+        asset={asset}
+        alt="Before image"
+        mediaRect={{ x: 0, y: 0, width: 0, height: 0 }}
+        rotateStage={false}
+        prefersReducedMotion
+      />,
+    );
+
+    expect(html).toContain("translateX(-50%)");
+    expect(html).not.toContain("infinite alternate");
+  });
+
+  it("inlines a pixelated content placeholder without replacing the original image", () => {
+    const html = renderToStaticMarkup(
+      <PositionedStageMedia
+        asset={{
+          ...asset,
+          placeholder: {
+            dataUrl: "data:image/webp;base64,UklGRg==",
+            sourceColor: "#AABBCC",
+          },
+        }}
+        alt="Before image"
+        mediaRect={{ x: 0, y: 0, width: 1920, height: 1080 }}
+        rotateStage={false}
+      />,
+    );
+
+    expect(html).toContain('data-viewer-stage-placeholder=""');
+    expect(html).toContain('src="data:image/webp;base64,UklGRg=="');
+    expect(html).toContain("image-rendering:pixelated");
+    expect(html).toContain('src="/published/original.jpg"');
+  });
+
+  it("keeps the placeholder mounted for the decoded-image crossfade", () => {
+    markViewerStageImageLoaded(asset.imageUrl);
+    const html = renderToStaticMarkup(
+      <PositionedStageMedia
+        asset={{
+          ...asset,
+          placeholder: {
+            dataUrl: "data:image/webp;base64,UklGRg==",
+            sourceColor: "#AABBCC",
+          },
+        }}
+        alt="Before image"
+        mediaRect={{ x: 0, y: 0, width: 1920, height: 1080 }}
+        rotateStage={false}
+      />,
+    );
+
+    expect(html).toContain('data-viewer-stage-placeholder=""');
+    expect(html).toContain("opacity:0");
+    expect(html).toContain("opacity 220ms");
   });
 });
