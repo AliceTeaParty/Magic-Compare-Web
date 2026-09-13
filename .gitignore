@@ -62,6 +62,7 @@ venv/
 # Local scratch artifacts
 tmp/
 Magic-Compare-Web-public-deploy-speed.zip
+Magic-Compare-Web-public-deploy-speed.zip.tmp
 
 # Local MCP and Claude Code configuration (machine-specific paths)
 .mcp.json
