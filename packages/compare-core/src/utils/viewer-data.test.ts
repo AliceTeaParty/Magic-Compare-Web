@@ -41,10 +41,11 @@ describe("resolveViewerMode", () => {
 describe("createViewerDatasetFromPublishManifest", () => {
   it("maps a publish manifest into the published viewer dataset shape", () => {
     const dataset = createViewerDatasetFromPublishManifest({
-      schemaVersion: 1,
+      schemaVersion: 2,
       publicSlug: "demo-case--banding-check",
       generatedAt: "2026-03-18T04:00:00.000Z",
-      assetBasePath: "https://assets.example.com/magic-compare-assets/internal-assets/demo-case/banding-check",
+      assetBasePath:
+        "https://assets.example.com/magic-compare-assets/internal-assets/demo-case/banding-check",
       case: {
         slug: "demo-case",
         title: "Demo Case",
@@ -79,6 +80,10 @@ describe("createViewerDatasetFromPublishManifest", () => {
               height: 720,
               note: "",
               isPrimaryDisplay: true,
+              placeholder: {
+                dataUrl: "data:image/webp;base64,UklGRg==",
+                sourceColor: "#AABBCC",
+              },
             },
             {
               id: "after-1",
@@ -99,5 +104,9 @@ describe("createViewerDatasetFromPublishManifest", () => {
     expect(dataset.group.publicSlug).toBe("demo-case--banding-check");
     expect(dataset.publishStatus?.status).toBe("published");
     expect(dataset.group.frames).toHaveLength(1);
+    expect(dataset.group.frames[0]?.assets[0]?.placeholder).toEqual({
+      dataUrl: "data:image/webp;base64,UklGRg==",
+      sourceColor: "#AABBCC",
+    });
   });
 });

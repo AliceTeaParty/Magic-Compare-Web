@@ -27,6 +27,7 @@
     "@magic-compare/content-schema": "workspace:*",
     "@magic-compare/shared-utils": "workspace:*",
     "@magic-compare/ui": "workspace:*",
+    "@material/material-color-utilities": "^0.4.0",
     "@mui/icons-material": "^9.3.0",
     "@mui/material": "^9.3.0",
     "@prisma/client": "^6.19.3",
@@ -34,6 +35,7 @@
     "prisma": "^6.19.3",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
+    "sharp": "^0.35.3",
     "zod": "^4.4.3"
   },
   "devDependencies": {

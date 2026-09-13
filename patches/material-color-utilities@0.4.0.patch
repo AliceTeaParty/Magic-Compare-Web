@@ -1,0 +1,60 @@
+diff --git a/dynamiccolor/color_spec_2025.js b/dynamiccolor/color_spec_2025.js
+--- a/dynamiccolor/color_spec_2025.js
++++ b/dynamiccolor/color_spec_2025.js
+@@ -21 +21 @@
+-import { DynamicColor, extendSpecVersion } from './dynamic_color';
++import { DynamicColor, extendSpecVersion } from './dynamic_color.js';
+diff --git a/scheme/scheme_content.js b/scheme/scheme_content.js
+--- a/scheme/scheme_content.js
++++ b/scheme/scheme_content.js
+@@ -17 +17 @@
+-import { DynamicScheme } from '../dynamiccolor/dynamic_scheme';
++import { DynamicScheme } from '../dynamiccolor/dynamic_scheme.js';
+diff --git a/scheme/scheme_expressive.js b/scheme/scheme_expressive.js
+--- a/scheme/scheme_expressive.js
++++ b/scheme/scheme_expressive.js
+@@ -17 +17 @@
+-import { DynamicScheme } from '../dynamiccolor/dynamic_scheme';
++import { DynamicScheme } from '../dynamiccolor/dynamic_scheme.js';
+diff --git a/scheme/scheme_fidelity.js b/scheme/scheme_fidelity.js
+--- a/scheme/scheme_fidelity.js
++++ b/scheme/scheme_fidelity.js
+@@ -17 +17 @@
+-import { DynamicScheme } from '../dynamiccolor/dynamic_scheme';
++import { DynamicScheme } from '../dynamiccolor/dynamic_scheme.js';
+diff --git a/scheme/scheme_fruit_salad.js b/scheme/scheme_fruit_salad.js
+--- a/scheme/scheme_fruit_salad.js
++++ b/scheme/scheme_fruit_salad.js
+@@ -17 +17 @@
+-import { DynamicScheme } from '../dynamiccolor/dynamic_scheme';
++import { DynamicScheme } from '../dynamiccolor/dynamic_scheme.js';
+diff --git a/scheme/scheme_monochrome.js b/scheme/scheme_monochrome.js
+--- a/scheme/scheme_monochrome.js
++++ b/scheme/scheme_monochrome.js
+@@ -17 +17 @@
+-import { DynamicScheme } from '../dynamiccolor/dynamic_scheme';
++import { DynamicScheme } from '../dynamiccolor/dynamic_scheme.js';
+diff --git a/scheme/scheme_neutral.js b/scheme/scheme_neutral.js
+--- a/scheme/scheme_neutral.js
++++ b/scheme/scheme_neutral.js
+@@ -17 +17 @@
+-import { DynamicScheme } from '../dynamiccolor/dynamic_scheme';
++import { DynamicScheme } from '../dynamiccolor/dynamic_scheme.js';
+diff --git a/scheme/scheme_rainbow.js b/scheme/scheme_rainbow.js
+--- a/scheme/scheme_rainbow.js
++++ b/scheme/scheme_rainbow.js
+@@ -17 +17 @@
+-import { DynamicScheme } from '../dynamiccolor/dynamic_scheme';
++import { DynamicScheme } from '../dynamiccolor/dynamic_scheme.js';
+diff --git a/scheme/scheme_tonal_spot.js b/scheme/scheme_tonal_spot.js
+--- a/scheme/scheme_tonal_spot.js
++++ b/scheme/scheme_tonal_spot.js
+@@ -17 +17 @@
+-import { DynamicScheme } from '../dynamiccolor/dynamic_scheme';
++import { DynamicScheme } from '../dynamiccolor/dynamic_scheme.js';
+diff --git a/scheme/scheme_vibrant.js b/scheme/scheme_vibrant.js
+--- a/scheme/scheme_vibrant.js
++++ b/scheme/scheme_vibrant.js
+@@ -17 +17 @@
+-import { DynamicScheme } from '../dynamiccolor/dynamic_scheme';
++import { DynamicScheme } from '../dynamiccolor/dynamic_scheme.js';

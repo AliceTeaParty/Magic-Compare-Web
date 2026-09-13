@@ -26,6 +26,7 @@ COPY packages/compare-core/package.json ./packages/compare-core/package.json
 COPY packages/content-schema/package.json ./packages/content-schema/package.json
 COPY packages/shared-utils/package.json ./packages/shared-utils/package.json
 COPY packages/ui/package.json ./packages/ui/package.json
+COPY patches ./patches
 RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
   pnpm fetch --frozen-lockfile
 
@@ -45,6 +46,7 @@ COPY packages/compare-core/package.json ./packages/compare-core/package.json
 COPY packages/content-schema/package.json ./packages/content-schema/package.json
 COPY packages/shared-utils/package.json ./packages/shared-utils/package.json
 COPY packages/ui/package.json ./packages/ui/package.json
+COPY patches ./patches
 RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
   pnpm fetch --prod --frozen-lockfile
 RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \

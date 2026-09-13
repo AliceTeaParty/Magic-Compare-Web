@@ -1,4 +1,4 @@
-import type { PublishManifest } from "@magic-compare/content-schema";
+import { PUBLISH_SCHEMA_VERSION, type PublishManifest } from "@magic-compare/content-schema";
 
 interface PublishManifestFixtureOptions {
   caseSlug?: string;
@@ -16,7 +16,7 @@ export function buildPublishManifestFixture(
   const assetRoot = `https://assets.example.com/internal-assets/${caseSlug}/${groupSlug}/001`;
 
   return {
-    schemaVersion: 1,
+    schemaVersion: PUBLISH_SCHEMA_VERSION,
     publicSlug,
     generatedAt: "2026-03-20T00:00:00.000Z",
     assetBasePath: `https://assets.example.com/internal-assets/${caseSlug}/${groupSlug}`,
@@ -54,6 +54,11 @@ export function buildPublishManifestFixture(
             height: 720,
             note: "",
             isPrimaryDisplay: true,
+            placeholder: {
+              dataUrl:
+                "data:image/webp;base64,UklGRioAAABXRUJQVlA4IB4AAABwAQCdASoIAAUAA8BgJZQCdAFAAAD+8FFM7WYUAAA=",
+              sourceColor: "#202B38",
+            },
           },
           {
             id: "asset-after",
@@ -65,6 +70,11 @@ export function buildPublishManifestFixture(
             height: 720,
             note: "",
             isPrimaryDisplay: true,
+            placeholder: {
+              dataUrl:
+                "data:image/webp;base64,UklGRiwAAABXRUJQVlA4ICAAAABwAQCdASoIAAUAA8BgJYwCdAFAAAD+76w5N2Hbk/CoAA==",
+              sourceColor: "#C7D8EB",
+            },
           },
         ],
       },

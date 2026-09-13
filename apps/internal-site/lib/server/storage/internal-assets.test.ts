@@ -1,4 +1,5 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { S3Client } from "@aws-sdk/client-s3";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   S3_BUCKET_ENV_NAME,
   S3_ENDPOINT_ENV_NAME,
@@ -12,6 +13,7 @@ import {
   createPresignedInternalAssetUpload,
   internalAssetObjectKey,
   internalAssetPublicGroupBaseUrl,
+  readInternalAssetBytes,
   resolvePublicInternalAssetUrl,
 } from "./internal-assets";
 
@@ -52,9 +54,9 @@ describe("internal asset storage helpers", () => {
     process.env[S3_SECRET_ACCESS_KEY_ENV_NAME] = "rustfsadmin";
     process.env[S3_PUBLIC_BASE_URL_ENV_NAME] = "https://assets.example.com/bucket";
 
-    expect(() => internalAssetObjectKey("/internal-assets/2026/test-example/../before.png")).toThrow(
-      /Invalid internal asset path/,
-    );
+    expect(() =>
+      internalAssetObjectKey("/internal-assets/2026/test-example/../before.png"),
+    ).toThrow(/Invalid internal asset path/);
   });
 
   it("resolves logical internal asset urls into public absolute urls", () => {
@@ -107,5 +109,41 @@ describe("internal asset storage helpers", () => {
     expect(url.searchParams.get("X-Amz-SignedHeaders")).toBe("host");
     expect(url.searchParams.get("x-amz-checksum-crc32")).toBeNull();
     expect(url.searchParams.get("x-amz-sdk-checksum-algorithm")).toBeNull();
+  });
+
+  it("rejects a declared object size before buffering an oversized thumbnail", async () => {
+    process.env[S3_BUCKET_ENV_NAME] = "magic-compare-assets";
+    process.env[S3_PUBLIC_BASE_URL_ENV_NAME] = "https://assets.example.com/bucket";
+    process.env[S3_ACCESS_KEY_ID_ENV_NAME] = "example-access-key";
+    process.env[S3_SECRET_ACCESS_KEY_ENV_NAME] = "example-secret-key";
+    const send = vi
+      .spyOn(S3Client.prototype, "send")
+      .mockResolvedValueOnce({ ContentLength: 9, Body: new Uint8Array([1]) } as never);
+
+    try {
+      await expect(readInternalAssetBytes("/groups/group-1/thumb.png", 8)).rejects.toThrow(
+        /8-byte read limit/,
+      );
+    } finally {
+      send.mockRestore();
+    }
+  });
+
+  it("checks actual bytes when object storage omits content length", async () => {
+    process.env[S3_BUCKET_ENV_NAME] = "magic-compare-assets";
+    process.env[S3_PUBLIC_BASE_URL_ENV_NAME] = "https://assets.example.com/bucket";
+    process.env[S3_ACCESS_KEY_ID_ENV_NAME] = "example-access-key";
+    process.env[S3_SECRET_ACCESS_KEY_ENV_NAME] = "example-secret-key";
+    const send = vi
+      .spyOn(S3Client.prototype, "send")
+      .mockResolvedValueOnce({ Body: new Uint8Array(9) } as never);
+
+    try {
+      await expect(readInternalAssetBytes("/groups/group-1/thumb.png", 8)).rejects.toThrow(
+        /8-byte read limit/,
+      );
+    } finally {
+      send.mockRestore();
+    }
   });
 });

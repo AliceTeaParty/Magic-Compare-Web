@@ -7,18 +7,22 @@ const {
   groupUpdate,
   groupFindFirst,
   assetUpdateMany,
+  readPublishedManifest,
   writePublishedManifest,
   resetPublishedGroup,
   assertLikelyPublicAssets,
+  enrichPublishManifestWithPlaceholders,
 } = vi.hoisted(() => ({
   caseFindUnique: vi.fn(),
   caseUpdate: vi.fn(),
   groupUpdate: vi.fn(),
   groupFindFirst: vi.fn(),
   assetUpdateMany: vi.fn(),
+  readPublishedManifest: vi.fn(),
   writePublishedManifest: vi.fn(),
   resetPublishedGroup: vi.fn(),
   assertLikelyPublicAssets: vi.fn(),
+  enrichPublishManifestWithPlaceholders: vi.fn(),
 }));
 
 vi.mock("@/lib/server/db/client", () => ({
@@ -38,8 +42,13 @@ vi.mock("@/lib/server/db/client", () => ({
 }));
 
 vi.mock("@/lib/server/storage/published-content", () => ({
+  readPublishedManifest,
   resetPublishedGroup,
   writePublishedManifest,
+}));
+
+vi.mock("./publish-image-placeholders", () => ({
+  enrichPublishManifestWithPlaceholders,
 }));
 
 vi.mock("@/lib/server/storage/internal-asset-sanity", () => ({
@@ -61,9 +70,18 @@ describe("publishCase", () => {
     groupUpdate.mockReset();
     groupFindFirst.mockReset();
     assetUpdateMany.mockReset();
+    readPublishedManifest.mockReset();
     writePublishedManifest.mockReset();
     resetPublishedGroup.mockReset();
     assertLikelyPublicAssets.mockReset();
+    enrichPublishManifestWithPlaceholders.mockReset();
+    readPublishedManifest.mockResolvedValue(null);
+    enrichPublishManifestWithPlaceholders.mockImplementation(
+      async ({ manifest }: { manifest: unknown }) => ({
+        manifest,
+        stats: { generated: 2, reused: 0, failed: 0 },
+      }),
+    );
   });
 
   it("writes manifest-only published bundles with public asset urls", async () => {
@@ -138,7 +156,7 @@ describe("publishCase", () => {
     expect(writePublishedManifest).toHaveBeenCalledWith(
       "2026--test-example",
       expect.objectContaining({
-        schemaVersion: 1,
+        schemaVersion: 2,
         publicSlug: "2026--test-example",
         assetBasePath: "https://assets.example.com/bucket/groups/group-1",
         frames: [
@@ -159,6 +177,16 @@ describe("publishCase", () => {
             ],
           }),
         ],
+      }),
+    );
+    expect(readPublishedManifest).toHaveBeenCalledWith("2026--test-example");
+    expect(enrichPublishManifestWithPlaceholders).toHaveBeenCalledWith(
+      expect.objectContaining({
+        previousManifest: null,
+        sourceAssets: expect.arrayContaining([
+          expect.objectContaining({ id: "asset-before" }),
+          expect.objectContaining({ id: "asset-after" }),
+        ]),
       }),
     );
   });

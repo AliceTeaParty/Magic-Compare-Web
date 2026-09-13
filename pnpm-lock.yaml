@@ -15,6 +15,11 @@ overrides:
   vite@>=7.0.0 <7.3.5: 7.3.5
   yaml@>=1.0.0 <1.10.3: 1.10.3
 
+patchedDependencies:
+  '@material/material-color-utilities@0.4.0':
+    hash: 50f4836149f30d7e6cf136cf6749916d819f7b2b41fde11d2d0fe100873e50f2
+    path: patches/material-color-utilities@0.4.0.patch
+
 importers:
 
   .:
@@ -92,6 +97,9 @@ importers:
       '@magic-compare/ui':
         specifier: workspace:*
         version: link:../../packages/ui
+      '@material/material-color-utilities':
+        specifier: ^0.4.0
+        version: 0.4.0(patch_hash=50f4836149f30d7e6cf136cf6749916d819f7b2b41fde11d2d0fe100873e50f2)
       '@mui/icons-material':
         specifier: ^9.3.0
         version: 9.3.0(@mui/material@9.3.0(@emotion/react@11.14.0(@types/react@19.2.18)(react@19.2.8))(@emotion/styled@11.14.1(@emotion/react@11.14.0(@types/react@19.2.18)(react@19.2.8))(@types/react@19.2.18)(react@19.2.8))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@types/react@19.2.18)(react@19.2.8)
@@ -113,6 +121,9 @@ importers:
       react-dom:
         specifier: ^19.2.8
         version: 19.2.8(react@19.2.8)
+      sharp:
+        specifier: ^0.35.3
+        version: 0.35.3(@types/node@24.13.3)
       zod:
         specifier: ^4.4.3
         version: 4.4.3
@@ -215,7 +226,7 @@ importers:
         version: link:../shared-utils
       '@material/material-color-utilities':
         specifier: ^0.4.0
-        version: 0.4.0
+        version: 0.4.0(patch_hash=50f4836149f30d7e6cf136cf6749916d819f7b2b41fde11d2d0fe100873e50f2)
       '@mui/icons-material':
         specifier: ^9.3.0
         version: 9.3.0(@mui/material@9.3.0(@emotion/react@11.14.0(@types/react@19.2.18)(react@19.2.8))(@emotion/styled@11.14.1(@emotion/react@11.14.0(@types/react@19.2.18)(react@19.2.8))(@types/react@19.2.18)(react@19.2.8))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@types/react@19.2.18)(react@19.2.8)
@@ -3579,7 +3590,7 @@ snapshots:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.5.5
 
-  '@material/material-color-utilities@0.4.0': {}
+  '@material/material-color-utilities@0.4.0(patch_hash=50f4836149f30d7e6cf136cf6749916d819f7b2b41fde11d2d0fe100873e50f2)': {}
 
   '@mui/core-downloads-tracker@9.3.0': {}
 

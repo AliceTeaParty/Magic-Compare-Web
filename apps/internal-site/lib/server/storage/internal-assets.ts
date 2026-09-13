@@ -94,13 +94,20 @@ function buildS3Client(): S3Client {
  * Normalize AWS SDK body variants into bytes once so the sanity-check layer stays independent from
  * Node stream/runtime differences.
  */
-async function bodyToUint8Array(body: unknown): Promise<Uint8Array> {
+async function bodyToUint8Array(body: unknown, maxByteCount?: number): Promise<Uint8Array> {
+  const assertWithinLimit = (bytes: Uint8Array) => {
+    if (maxByteCount != null && bytes.byteLength > maxByteCount) {
+      throw new Error(`Internal asset exceeds the ${maxByteCount}-byte read limit.`);
+    }
+    return bytes;
+  };
+
   if (!body) {
     return new Uint8Array();
   }
 
   if (body instanceof Uint8Array) {
-    return body;
+    return assertWithinLimit(body);
   }
 
   if (
@@ -109,13 +116,20 @@ async function bodyToUint8Array(body: unknown): Promise<Uint8Array> {
     "transformToByteArray" in body &&
     typeof body.transformToByteArray === "function"
   ) {
-    return body.transformToByteArray();
+    return assertWithinLimit(await body.transformToByteArray());
   }
 
   if (body instanceof Readable) {
     const chunks: Buffer[] = [];
+    let totalBytes = 0;
     for await (const chunk of body) {
-      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+      const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+      totalBytes += buffer.byteLength;
+      if (maxByteCount != null && totalBytes > maxByteCount) {
+        body.destroy();
+        throw new Error(`Internal asset exceeds the ${maxByteCount}-byte read limit.`);
+      }
+      chunks.push(buffer);
     }
     return new Uint8Array(Buffer.concat(chunks));
   }
@@ -231,6 +245,37 @@ export async function readInternalAssetPrefix(
   );
 
   return bodyToUint8Array(response.Body);
+}
+
+/**
+ * Reads one bounded object for server-side image derivation. Checking both the declared and actual
+ * size prevents a malformed thumbnail from turning a publish into an unbounded memory allocation.
+ */
+export async function readInternalAssetBytes(
+  logicalPath: string,
+  maxByteCount: number,
+): Promise<Uint8Array> {
+  if (!Number.isInteger(maxByteCount) || maxByteCount <= 0) {
+    throw new RangeError("Asset byte limit must be a positive integer.");
+  }
+
+  const client = buildS3Client();
+  const config = getInternalAssetStorageConfig();
+  const response = await client.send(
+    new GetObjectCommand({
+      Bucket: config.bucket,
+      Key: internalAssetObjectKey(logicalPath),
+    }),
+  );
+
+  if (response.ContentLength != null && response.ContentLength > maxByteCount) {
+    if (response.Body instanceof Readable) {
+      response.Body.destroy();
+    }
+    throw new Error(`Internal asset exceeds the ${maxByteCount}-byte read limit.`);
+  }
+
+  return bodyToUint8Array(response.Body, maxByteCount);
 }
 
 /**

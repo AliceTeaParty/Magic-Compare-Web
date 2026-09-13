@@ -2,6 +2,7 @@ import type {
   AssetKind,
   AssetRecord,
   CaseStatus,
+  PublishImagePlaceholder,
   PublishManifest,
   ViewerMode,
 } from "@magic-compare/content-schema";
@@ -18,7 +19,9 @@ export type ViewerAsset = Pick<
   | "height"
   | "note"
   | "isPrimaryDisplay"
->;
+> & {
+  placeholder?: PublishImagePlaceholder;
+};
 
 export interface ViewerFrame {
   id: string;
@@ -178,6 +181,7 @@ export function createViewerDatasetFromPublishManifest(manifest: PublishManifest
           height: asset.height,
           note: asset.note,
           isPrimaryDisplay: asset.isPrimaryDisplay,
+          placeholder: asset.placeholder,
         })),
       })),
     },
