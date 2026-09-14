@@ -112,6 +112,46 @@ export function getComparisonTargetAssets(frame: ViewerFrame): ViewerAsset[] {
   });
 }
 
+export interface AbAssetSelection {
+  comparisonAssetKey?: string;
+  side: "before" | "after";
+}
+
+/**
+ * Advances A/B inspection through the baseline and every visible comparison column. Keeping this
+ * in core prevents stage clicks and keyboard controls from reducing multi-variable groups to a
+ * binary before/after toggle.
+ */
+export function getNextAbAssetSelection(
+  current: AbAssetSelection,
+  comparisonAssets: ViewerAsset[],
+): AbAssetSelection {
+  if (comparisonAssets.length === 0) {
+    return { side: "before" };
+  }
+
+  if (current.side === "before") {
+    return {
+      comparisonAssetKey: getComparisonAssetKey(comparisonAssets[0]),
+      side: "after",
+    };
+  }
+
+  const currentIndex = comparisonAssets.findIndex(
+    (asset) => getComparisonAssetKey(asset) === current.comparisonAssetKey,
+  );
+  const nextIndex = currentIndex + 1;
+
+  if (currentIndex === -1 || nextIndex < comparisonAssets.length) {
+    return {
+      comparisonAssetKey: getComparisonAssetKey(comparisonAssets[Math.max(0, nextIndex)]),
+      side: "after",
+    };
+  }
+
+  return { side: "before" };
+}
+
 export function hasHeatmap(frame: ViewerFrame): boolean {
   return Boolean(findAsset(frame, "heatmap"));
 }

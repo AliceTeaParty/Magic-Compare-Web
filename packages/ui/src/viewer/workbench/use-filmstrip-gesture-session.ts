@@ -59,6 +59,17 @@ export function useFilmstripGestureSession({
     [stripRef],
   );
 
+  /** Explicit scrollbar input replaces release inertia rather than racing the next animation frame. */
+  const stopMotion = useCallback(() => {
+    cancelFilmstripMotion(motionRefs);
+    if (edgeOffsetFrameRef.current !== null)
+      window.cancelAnimationFrame(edgeOffsetFrameRef.current);
+    edgeOffsetFrameRef.current = null;
+    edgeOffsetRef.current = 0;
+    pendingEdgeOffsetRef.current = 0;
+    writeEdgeOffset(0);
+  }, [motionRefs, writeEdgeOffset]);
+
   /**
    * Gesture and rebound frames can outlive the render that created them, so all browser animation
    * work is cancelled explicitly during unmount.
@@ -94,7 +105,10 @@ export function useFilmstripGestureSession({
    * Records the gesture origin so click-to-select and drag-to-scroll can share one surface.
    */
   function handlePointerDown(event: ReactPointerEvent<HTMLDivElement>) {
-    if (frameCount <= 1) {
+    // Mobile browsers arbitrate scrolling before delivering the full pointer stream. Capturing
+    // touch here made thumbnails depend on custom physics while the lower thumb still worked.
+    // Let native scrolling own touch; mouse and pen retain drag-to-scroll and click suppression.
+    if (event.pointerType === "touch" || frameCount <= 1) {
       return;
     }
 
@@ -210,6 +224,7 @@ export function useFilmstripGestureSession({
   }
 
   return {
+    stopMotion,
     isDragging,
     handleFrameSelection,
     viewportHandlers: {

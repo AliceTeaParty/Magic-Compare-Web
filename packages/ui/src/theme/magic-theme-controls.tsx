@@ -16,6 +16,10 @@ import { useColorScheme } from "@mui/material/styles";
 import { INTERNAL_THEME_PRESETS } from "./magic-color-tokens";
 import { useInternalTheme } from "./magic-theme-provider";
 
+// Firefox restores dynamic disabled/checked state before hydration on reload. These controls
+// restore from the theme store, so native form-state restoration would conflict with the SSR DOM.
+const themeControlPersistenceProps = { autoComplete: "off" } as const;
+
 /** Keeps theme controls stable during hydration while preserving the system-mode first visit. */
 export function MagicThemeControls({ compact = false }: { compact?: boolean }) {
   const { mode, setMode, systemMode } = useColorScheme();
@@ -38,6 +42,7 @@ export function MagicThemeControls({ compact = false }: { compact?: boolean }) {
   const modeControl = compact ? (
     <Tooltip title={isDark ? "切换为浅色" : "切换为深色"} placement="right">
       <IconButton
+        {...themeControlPersistenceProps}
         aria-label={isDark ? "切换为浅色" : "切换为深色"}
         disabled={!mounted}
         onClick={() => setMode(isDark ? "light" : "dark")}
@@ -54,7 +59,7 @@ export function MagicThemeControls({ compact = false }: { compact?: boolean }) {
           checked={mounted && isDark}
           disabled={!mounted}
           onChange={() => setMode(isDark ? "light" : "dark")}
-          slotProps={{ input: { "aria-label": "切换明暗模式" } }}
+          slotProps={{ input: { ...themeControlPersistenceProps, "aria-label": "切换明暗模式" } }}
           sx={{ mx: 0.25 }}
         />
         <DarkModeOutlined sx={{ fontSize: 18, color: "text.secondary" }} />

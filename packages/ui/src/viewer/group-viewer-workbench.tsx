@@ -1,7 +1,7 @@
 "use client";
 
-import { Box, Paper, Stack } from "@mui/material";
-import { cycleAbSide, getComparisonAssetKey } from "@magic-compare/compare-core";
+import { Box, Paper } from "@mui/material";
+import { getComparisonAssetKey, getNextAbAssetSelection } from "@magic-compare/compare-core";
 import { useViewerController } from "@magic-compare/compare-core/use-viewer-controller";
 import type { ViewerDataset } from "@magic-compare/compare-core/viewer-data";
 import { useCallback, useEffect, useState } from "react";
@@ -196,13 +196,30 @@ export function GroupViewerWorkbench({
     setGuideOpen((currentOpen) => !currentOpen);
   }, []);
 
+  // A/B used to change only the before/after side, so Src/Rip/Flt groups never reached Flt from
+  // a stage click. Advance the selected comparison column together with the visible side instead.
+  const cycleCurrentAbAsset = useCallback(() => {
+    const nextSelection = getNextAbAssetSelection(
+      { comparisonAssetKey, side: abSide },
+      comparisonAssets,
+    );
+
+    if (
+      nextSelection.comparisonAssetKey &&
+      nextSelection.comparisonAssetKey !== comparisonAssetKey
+    ) {
+      setComparisonAssetKey(nextSelection.comparisonAssetKey);
+    }
+
+    setAbSide(nextSelection.side);
+  }, [abSide, comparisonAssetKey, comparisonAssets, setAbSide, setComparisonAssetKey]);
+
   useViewerKeyboardShortcuts({
-    abSide,
     abStageActive,
+    cycleAbAsset: cycleCurrentAbAsset,
     mode,
     onResetView: resetViewerView,
     onToggleGuide: toggleViewerGuide,
-    setAbSide,
     setAbStageActive,
     setMode,
     stepFrame,
@@ -273,80 +290,73 @@ export function GroupViewerWorkbench({
             flexDirection: "column",
           }}
         >
-          <Box sx={{ minWidth: 0, p: { xs: 1, md: 1.5 } }}>
-            <Stack
-              spacing={1.5}
+          <Box data-testid="viewer-stage-area" sx={{ minWidth: 0, p: { xs: 1, md: 1.5 } }}>
+            {/* Stack spacing reset the stage's auto margins, leaving fitted images left-aligned.
+                One stage needs no spacing wrapper; its containing block owns centering. */}
+            <Box
               sx={{
-                width: "100%",
+                position: "relative",
                 minWidth: 0,
-                minHeight: 0,
+                // The old 140px server fallback expanded after hydration and caused a visible
+                // layout shift. CSS now reserves the fitted stage geometry on the first paint.
+                width: `min(100%, ${desktopStageMaxWidth})`,
+                aspectRatio: contentAspectRatio,
+                mx: "auto",
+                "@media (max-width: 760px) and (orientation: portrait)": {
+                  width: `min(100%, ${portraitStageMaxWidth})`,
+                  aspectRatio: portraitAspectRatio,
+                },
               }}
             >
-              <Box
-                sx={{
-                  position: "relative",
-                  minWidth: 0,
-                  // The old 140px server fallback expanded after hydration and caused a visible
-                  // layout shift. CSS now reserves the fitted stage geometry on the first paint.
-                  width: `min(100%, ${desktopStageMaxWidth})`,
-                  aspectRatio: contentAspectRatio,
-                  mx: "auto",
-                  "@media (max-width: 760px) and (orientation: portrait)": {
-                    width: `min(100%, ${portraitStageMaxWidth})`,
-                    aspectRatio: portraitAspectRatio,
-                  },
-                }}
-              >
-                <ViewerStage
-                  abSide={abSide}
-                  afterAsset={activeAfterAsset}
-                  beforeAsset={beforeAsset}
-                  devicePixelRatio={devicePixelRatio}
-                  frameId={currentFrameId}
-                  heatmapAsset={heatmapAsset}
-                  interactionStore={interactionStore}
-                  mode={mode}
-                  onCycleAbSide={() => setAbSide(cycleAbSide(abSide))}
-                  prefersReducedMotion={resolvedPrefersReducedMotion}
-                  rotateStage={resolvedRotateStage}
-                  stageRef={stageShell.stageRef}
-                />
-                {pixelRenderingAutoDisablePromptOpen ? (
-                  <Box
-                    sx={{
-                      position: "absolute",
-                      zIndex: 2,
-                      top: { xs: 8, md: 12 },
-                      right: { xs: 8, md: 12 },
-                    }}
-                  >
-                    {/* This lightweight choice shares the guide nudge anchor so it cannot lock the
+              <ViewerStage
+                abSide={abSide}
+                afterAsset={activeAfterAsset}
+                beforeAsset={beforeAsset}
+                devicePixelRatio={devicePixelRatio}
+                frameId={currentFrameId}
+                heatmapAsset={heatmapAsset}
+                interactionStore={interactionStore}
+                mode={mode}
+                onCycleAbSide={cycleCurrentAbAsset}
+                prefersReducedMotion={resolvedPrefersReducedMotion}
+                rotateStage={resolvedRotateStage}
+                stageRef={stageShell.stageRef}
+              />
+              {pixelRenderingAutoDisablePromptOpen ? (
+                <Box
+                  sx={{
+                    position: "absolute",
+                    zIndex: 2,
+                    top: { xs: 8, md: 12 },
+                    right: { xs: 8, md: 12 },
+                  }}
+                >
+                  {/* This lightweight choice shares the guide nudge anchor so it cannot lock the
                         document scroll or shift the page when the browser scrollbar disappears. */}
-                    <PixelRenderingAutoDisableNudge
-                      onAutoClose={dismissPixelRenderingAutoPromptForSession}
-                      onDisableAutoEnable={disablePixelRenderingAutoEnable}
-                      onKeepAutoEnable={keepPixelRenderingAutoEnable}
-                    />
-                  </Box>
-                ) : showGuideNudge ? (
-                  <Box
-                    sx={{
-                      position: "absolute",
-                      zIndex: 2,
-                      top: { xs: 8, md: 12 },
-                      right: { xs: 8, md: 12 },
-                    }}
-                  >
-                    {/* First-run guidance floats above the stage so appearing once cannot move the
+                  <PixelRenderingAutoDisableNudge
+                    onAutoClose={dismissPixelRenderingAutoPromptForSession}
+                    onDisableAutoEnable={disablePixelRenderingAutoEnable}
+                    onKeepAutoEnable={keepPixelRenderingAutoEnable}
+                  />
+                </Box>
+              ) : showGuideNudge ? (
+                <Box
+                  sx={{
+                    position: "absolute",
+                    zIndex: 2,
+                    top: { xs: 8, md: 12 },
+                    right: { xs: 8, md: 12 },
+                  }}
+                >
+                  {/* First-run guidance floats above the stage so appearing once cannot move the
                         image or filmstrip that operators use for repeated frame inspection. */}
-                    <ViewerOnboardingNudge
-                      onDismiss={dismissViewerGuideNudge}
-                      onOpenGuide={openViewerGuide}
-                    />
-                  </Box>
-                ) : null}
-              </Box>
-            </Stack>
+                  <ViewerOnboardingNudge
+                    onDismiss={dismissViewerGuideNudge}
+                    onOpenGuide={openViewerGuide}
+                  />
+                </Box>
+              ) : null}
+            </Box>
           </Box>
 
           <ViewerFilmstrip

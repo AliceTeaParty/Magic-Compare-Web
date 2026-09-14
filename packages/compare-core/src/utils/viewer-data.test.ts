@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { createViewerDatasetFromPublishManifest, resolveViewerMode } from "./viewer-data";
+import {
+  createViewerDatasetFromPublishManifest,
+  getNextAbAssetSelection,
+  resolveViewerMode,
+} from "./viewer-data";
 
 describe("resolveViewerMode", () => {
   const frameWithoutHeatmap = {
@@ -35,6 +39,52 @@ describe("resolveViewerMode", () => {
 
   it("falls back from heatmap to before-after when the frame has no heatmap asset", () => {
     expect(resolveViewerMode("heatmap", frameWithoutHeatmap, "heatmap")).toBe("before-after");
+  });
+});
+
+describe("getNextAbAssetSelection", () => {
+  const comparisonAssets = [
+    {
+      id: "rip",
+      kind: "after" as const,
+      label: "Rip",
+      imageUrl: "/rip.png",
+      thumbUrl: "/rip-thumb.png",
+      width: 1920,
+      height: 1080,
+      note: "",
+      isPrimaryDisplay: true,
+    },
+    {
+      id: "flt",
+      kind: "misc" as const,
+      label: "Flt",
+      imageUrl: "/flt.png",
+      thumbUrl: "/flt-thumb.png",
+      width: 1920,
+      height: 1080,
+      note: "",
+      isPrimaryDisplay: false,
+    },
+  ];
+
+  it("cycles the baseline through every comparison target before returning", () => {
+    const rip = getNextAbAssetSelection({ side: "before" }, comparisonAssets);
+    const flt = getNextAbAssetSelection(rip, comparisonAssets);
+    const baseline = getNextAbAssetSelection(flt, comparisonAssets);
+
+    expect(rip).toEqual({ comparisonAssetKey: "after:rip", side: "after" });
+    expect(flt).toEqual({ comparisonAssetKey: "misc:flt", side: "after" });
+    expect(baseline).toEqual({ side: "before" });
+  });
+
+  it("restores the first comparison target when the selected column disappeared", () => {
+    expect(
+      getNextAbAssetSelection(
+        { comparisonAssetKey: "misc:missing", side: "after" },
+        comparisonAssets,
+      ),
+    ).toEqual({ comparisonAssetKey: "after:rip", side: "after" });
   });
 });
 

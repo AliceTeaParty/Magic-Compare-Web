@@ -221,7 +221,3 @@ export function getFilmstripScrollbarMetrics(
     thumbOffset,
   };
 }
-
-export function cycleAbSide(currentSide: "before" | "after"): "before" | "after" {
-  return currentSide === "before" ? "after" : "before";
-}

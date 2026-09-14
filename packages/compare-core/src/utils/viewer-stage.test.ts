@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
   clampViewerPanZoom,
-  cycleAbSide,
   getContainedMediaRect,
   getViewerDisplayedScale,
   getViewerEffectiveScale,
@@ -193,12 +192,5 @@ describe("getFilmstripScrollbarMetrics", () => {
       thumbWidth: 140,
       thumbOffset: 70,
     });
-  });
-});
-
-describe("cycleAbSide", () => {
-  it("toggles between before and after", () => {
-    expect(cycleAbSide("before")).toBe("after");
-    expect(cycleAbSide("after")).toBe("before");
   });
 });

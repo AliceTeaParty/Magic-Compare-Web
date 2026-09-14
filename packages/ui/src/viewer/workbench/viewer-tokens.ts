@@ -18,19 +18,19 @@ export const viewerTokens = {
   },
   stage: {
     activeBorder: "var(--mc-primary, rgba(232, 198, 246, 0.42))",
-    surface:
-      "radial-gradient(circle at top, rgba(232, 198, 246, 0.1), transparent 28%), rgba(13, 24, 54, 0.94)",
+    // A neutral inspection surround avoids the old blue cast in light and custom themes.
+    surface: "var(--mc-viewer-surface, #eeeeee)",
     activeShadow: "var(--mc-viewer-shadow, 0 18px 44px rgba(8, 15, 35, 0.28))",
     measuredShadow: "var(--mc-viewer-shadow, 0 24px 52px rgba(8, 15, 35, 0.28))",
   },
   swipe: {
-    dividerSurface: "rgba(248, 245, 255, 0.88)",
-    dividerShadow: "0 0 14px rgba(228, 194, 242, 0.24), 0 0 36px rgba(242, 235, 201, 0.12)",
-    handleBorder: "1px solid rgba(248, 245, 255, 0.22)",
-    handleSurface: "rgba(22, 37, 76, 0.34)",
-    handleShadow: "0 10px 24px rgba(10, 18, 42, 0.18), 0 0 18px rgba(228, 194, 242, 0.18)",
-    handleChevronBorder: "2px solid rgba(248, 245, 255, 0.72)",
-    handleChevronShadow: "drop-shadow(0 0 5px rgba(10, 18, 42, 0.2))",
+    dividerSurface: "var(--mui-palette-text-primary)",
+    dividerShadow: "0 0 0 1px var(--mui-palette-background-paper)",
+    handleBorder: "1px solid var(--mui-palette-divider)",
+    handleSurface: "var(--mui-palette-surface-containerHigh)",
+    handleShadow: "var(--mc-viewer-shadow, none)",
+    handleChevronBorder: "2px solid var(--mui-palette-text-primary)",
+    handleChevronShadow: "none",
   },
   workbench: {
     pageWash: "var(--mui-palette-background-default, transparent)",

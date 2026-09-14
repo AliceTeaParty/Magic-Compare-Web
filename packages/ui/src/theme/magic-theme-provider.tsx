@@ -358,7 +358,11 @@ function MagicWorkbenchThemeProvider({ children, initialThemeSeed }: MagicThemeP
               "--mc-text-primary": "var(--mui-palette-text-primary)",
               "--mc-text-secondary": "var(--mui-palette-text-secondary)",
               "--mc-viewer-shadow": "none",
+              // Inspection surrounds stay neutral across custom accent colors.
+              "--mc-viewer-surface": "#eeeeee",
             },
+            // The color-scheme attribute is on the root itself; a descendant selector misses it.
+            ":root[data-dark]": { "--mc-viewer-surface": "#202020" },
           }}
         />
         {children}

@@ -1,6 +1,5 @@
 "use client";
 
-import { cycleAbSide } from "@magic-compare/compare-core";
 import type { ViewerMode } from "@magic-compare/content-schema";
 import { useTheme } from "@mui/material/styles";
 import useMediaQuery from "@mui/material/useMediaQuery";
@@ -123,35 +122,33 @@ export function useViewerDevicePixelRatio(setDevicePixelRatio: (nextValue: numbe
  * handler, avoiding duplicate subscriptions during rapid viewer updates.
  */
 export function useViewerKeyboardShortcuts(params: {
-  abSide: "before" | "after";
   abStageActive: boolean;
+  cycleAbAsset: () => void;
   mode: ViewerMode;
   onResetView: () => void;
   onToggleGuide: () => void;
-  setAbSide: (side: "before" | "after") => void;
   setAbStageActive: (nextActive: boolean) => void;
   setMode: (mode: ViewerMode) => void;
   stepFrame: (offset: number) => void;
   toggleSidebar: () => void;
 }) {
   const {
-    abSide,
     abStageActive,
+    cycleAbAsset,
     mode,
     onResetView,
     onToggleGuide,
-    setAbSide,
     setAbStageActive,
     setMode,
     stepFrame,
     toggleSidebar,
   } = params;
-  const abSideRef = useRef(abSide);
   const abStageActiveRef = useRef(abStageActive);
+  const cycleAbAssetRef = useRef(cycleAbAsset);
   const modeRef = useRef(mode);
 
-  abSideRef.current = abSide;
   abStageActiveRef.current = abStageActive;
+  cycleAbAssetRef.current = cycleAbAsset;
   modeRef.current = mode;
 
   useEffect(() => {
@@ -206,7 +203,7 @@ export function useViewerKeyboardShortcuts(params: {
         abStageActiveRef.current
       ) {
         event.preventDefault();
-        setAbSide(cycleAbSide(abSideRef.current));
+        cycleAbAssetRef.current();
       }
 
       if (event.key.toLowerCase() === "i") {
@@ -226,7 +223,7 @@ export function useViewerKeyboardShortcuts(params: {
 
     window.addEventListener("keydown", handleKeydown);
     return () => window.removeEventListener("keydown", handleKeydown);
-  }, [onResetView, onToggleGuide, setAbSide, setAbStageActive, setMode, stepFrame, toggleSidebar]);
+  }, [onResetView, onToggleGuide, setAbStageActive, setMode, stepFrame, toggleSidebar]);
 }
 
 /**

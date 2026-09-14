@@ -292,7 +292,8 @@ export const ViewerFilmstrip = memo(function ViewerFilmstrip({
           overscrollBehaviorX: "contain",
           WebkitOverflowScrolling: "touch",
           scrollbarWidth: "none",
-          touchAction: "pan-y",
+          // Native touch scrolling supports both the filmstrip and the surrounding page.
+          touchAction: "pan-x pan-y pinch-zoom",
           cursor: frames.length > 1 ? "grab" : "default",
           "&:active": {
             cursor: frames.length > 1 ? "grabbing" : "default",

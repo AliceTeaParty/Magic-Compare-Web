@@ -39,12 +39,13 @@ export function useFilmstripDrag({
     scrollbarRef,
     viewportRef,
   });
-  const { isDragging, handleFrameSelection, viewportHandlers } = useFilmstripGestureSession({
-    frameCount,
-    onSelectFrame,
-    prefersReducedMotion,
-    stripRef,
-  });
+  const { isDragging, handleFrameSelection, viewportHandlers, stopMotion } =
+    useFilmstripGestureSession({
+      frameCount,
+      onSelectFrame,
+      prefersReducedMotion,
+      stripRef,
+    });
 
   const scrollbarMetrics = useMemo(
     () =>
@@ -56,15 +57,20 @@ export function useFilmstripDrag({
     [filmstripScrollState],
   );
 
-  const scrollTo = useCallback((nextScrollLeft: number) => {
-    const viewport = viewportRef.current;
-    if (!viewport) {
-      return;
-    }
+  const scrollTo = useCallback(
+    (nextScrollLeft: number) => {
+      const viewport = viewportRef.current;
+      if (!viewport) {
+        return;
+      }
 
-    const maxScrollLeft = Math.max(0, viewport.scrollWidth - viewport.clientWidth);
-    viewport.scrollLeft = clampNumber(nextScrollLeft, 0, maxScrollLeft);
-  }, []);
+      // Home/End and thumb movement must win over the previous drag's pending inertia.
+      stopMotion();
+      const maxScrollLeft = Math.max(0, viewport.scrollWidth - viewport.clientWidth);
+      viewport.scrollLeft = clampNumber(nextScrollLeft, 0, maxScrollLeft);
+    },
+    [stopMotion],
+  );
 
   /**
    * Converts thumb dragging back into the native scroll position instead of maintaining a second
@@ -80,6 +86,7 @@ export function useFilmstripDrag({
       return;
     }
 
+    stopMotion();
     scrollbarDragRef.current = {
       pointerId: event.pointerId,
       startClientX: event.clientX,

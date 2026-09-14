@@ -78,8 +78,9 @@ function useElementSize(targetRef: RefObject<HTMLElement | null>): StageSize {
         return;
       }
 
-      const nextWidth = element.clientWidth;
-      const nextHeight = element.clientHeight;
+      // clientWidth/clientHeight round fractional CSS sizes, leaving a visible strip around
+      // rotated images at mobile DPR. Measure the same fractional box the browser paints.
+      const { width: nextWidth, height: nextHeight } = element.getBoundingClientRect();
       // ResizeObserver may repeat an unchanged measurement; retaining the same object prevents
       // redundant stage and full-size media renders without skipping real transition frames.
       setSize((currentSize) =>
@@ -124,7 +125,9 @@ function StagePresentationShell({
         // A real border reserved a dark one-pixel strip around every image and only changed color
         // while A/B was active. The inset ring now overlays the image without changing stage size,
         // keeping inactive edges identical across A/B, Swipe, and Heatmap.
-        borderRadius: 1.5,
+        // Rotated images and rounded nested clips can expose antialiased seams on mobile WebKit.
+        // An inspection surface uses square edges and one outer clip to preserve image corners.
+        borderRadius: 0,
         overflow: "hidden",
         border: 0,
         background: viewerTokens.stage.surface,
@@ -308,6 +311,7 @@ export function ViewerStage({
   const abStageActive = useViewerAbStageActive(interactionStore, frameId);
   return (
     <Box
+      data-testid="viewer-stage"
       ref={stageRef}
       sx={{
         width: "100%",
