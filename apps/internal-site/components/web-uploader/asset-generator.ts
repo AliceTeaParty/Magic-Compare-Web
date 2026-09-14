@@ -1,3 +1,4 @@
+import { THERMAL_HEATMAP_ALGORITHM_ID } from "@magic-compare/compare-core/heatmap";
 import type {
   UploadStreamFrameDescriptor,
   UploadStreamSourceAssetDescriptor,
@@ -378,7 +379,7 @@ export async function generateUploadFrame(
           slot: frame.descriptor.generatedHeatmap!.slot,
           kind: "heatmap",
           label: "Heatmap",
-          note: `Auto-generated from ${frame.plan.before.source.relativePath} vs ${reference!.asset.source.relativePath}`,
+          note: `Auto-generated (${THERMAL_HEATMAP_ALGORITHM_ID}) from ${frame.plan.before.source.relativePath} vs ${reference!.asset.source.relativePath}`,
           width: result.width,
           height: result.height,
           isPrimaryDisplay: false,

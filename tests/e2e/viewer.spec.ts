@@ -116,6 +116,7 @@ test("A/B cycles Src, Rip and Flt; zoom and reset keep the selected original", a
 
 test("heatmap changes opacity and mode survives reload", async ({ page }) => {
   await page.getByRole("button", { name: "热图", exact: true }).click();
+  await page.getByRole("button", { name: "叠加", exact: true }).click();
   const opacity = page.getByRole("slider", { name: "热图透明度" });
   await expect(opacity).toBeVisible();
   const initial = await opacity.getAttribute("aria-valuenow");
@@ -127,6 +128,7 @@ test("heatmap changes opacity and mode survives reload", async ({ page }) => {
     "aria-pressed",
     "true",
   );
+  await page.getByRole("button", { name: "叠加", exact: true }).click();
   await expect(page.getByRole("slider", { name: "热图透明度" })).toBeVisible();
 });
 

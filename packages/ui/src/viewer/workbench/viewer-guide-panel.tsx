@@ -33,7 +33,11 @@ const guideSections = [
   },
   {
     title: "操作",
-    items: ["Swipe：拖动分割线。", "A/B：选中主图后缩放或拖动。", "Heatmap：调整叠加强度。"],
+    items: [
+      "Swipe：拖动分割线。",
+      "A/B：选中主图后缩放或拖动。",
+      "Heatmap：选择对比列、调整灵敏度，点击热点放大原图核对。",
+    ],
   },
   {
     title: "快捷键",

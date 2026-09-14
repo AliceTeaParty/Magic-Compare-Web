@@ -154,6 +154,7 @@ function ViewerStageContent({
   devicePixelRatio,
   frameId,
   heatmapAsset,
+  heatmapDisplay,
   interactionStore,
   mode,
   onCycleAbSide,
@@ -166,6 +167,7 @@ function ViewerStageContent({
   devicePixelRatio: number;
   frameId: string | undefined;
   heatmapAsset: ViewerAsset | undefined;
+  heatmapDisplay?: "map" | "overlay" | "original";
   interactionStore: ViewerInteractionStore;
   mode: ViewerMode;
   onCycleAbSide: () => void;
@@ -227,7 +229,7 @@ function ViewerStageContent({
     );
   }
 
-  if (mode === "heatmap" && heatmapAsset) {
+  if (mode === "heatmap") {
     return (
       <Box
         ref={stageViewportRef}
@@ -243,19 +245,21 @@ function ViewerStageContent({
           fetchPriority="high"
           prefersReducedMotion={prefersReducedMotion}
         />
-        <PositionedStageMedia
-          asset={heatmapAsset}
-          alt={heatmapAsset.label}
-          mediaRect={mediaRect}
-          rotateStage={rotateStage}
-          loading="eager"
-          decoding="async"
-          // The base image establishes useful pixels first; the overlay remains eager but low
-          // priority so a multi-megabyte heatmap cannot delay the initial inspection surface.
-          fetchPriority="low"
-          opacity={overlayOpacity / 100}
-          prefersReducedMotion={prefersReducedMotion}
-        />
+        {heatmapAsset && heatmapDisplay !== "original" && (
+          <PositionedStageMedia
+            asset={heatmapAsset}
+            alt={heatmapAsset.label}
+            mediaRect={mediaRect}
+            rotateStage={rotateStage}
+            loading="eager"
+            decoding="async"
+            // The base image establishes useful pixels first; the overlay remains eager but low
+            // priority so a multi-megabyte heatmap cannot delay the initial inspection surface.
+            fetchPriority="low"
+            opacity={heatmapDisplay === "map" ? 1 : overlayOpacity / 100}
+            prefersReducedMotion={prefersReducedMotion}
+          />
+        )}
       </Box>
     );
   }
@@ -282,6 +286,7 @@ interface ViewerStageProps {
   devicePixelRatio: number;
   frameId: string | undefined;
   heatmapAsset: ViewerAsset | undefined;
+  heatmapDisplay?: "map" | "overlay" | "original";
   interactionStore: ViewerInteractionStore;
   mode: ViewerMode;
   onCycleAbSide: () => void;
@@ -301,6 +306,7 @@ export function ViewerStage({
   devicePixelRatio,
   frameId,
   heatmapAsset,
+  heatmapDisplay,
   interactionStore,
   mode,
   onCycleAbSide,
@@ -329,6 +335,7 @@ export function ViewerStage({
           devicePixelRatio={devicePixelRatio}
           frameId={frameId}
           heatmapAsset={heatmapAsset}
+          heatmapDisplay={heatmapDisplay}
           interactionStore={interactionStore}
           mode={mode}
           onCycleAbSide={onCycleAbSide}

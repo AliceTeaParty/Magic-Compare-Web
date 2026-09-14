@@ -98,15 +98,15 @@ pnpm test:e2e:visual:docker --update-snapshots
 
 新增页面、弹窗或操作时同步维护此表。复用的图标、排版和装饰组件由所在页面的视觉截图验证；状态计算与手势边界同时保留 Vitest 用例。
 
-| UI 入口/组件                                                                                                      | 功能用例                                                                                                       | 视觉用例                     |
-| ----------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- | ---------------------------- |
-| 内部 `/`：Catalog、卡片、筛选/排序、新建弹窗                                                                      | `catalog.spec.ts`、`workspace.spec.ts`、`empty.spec.ts`                                                        | `internal.visual.spec.ts`    |
-| 内部 `/cases/[caseSlug]`：工作区、设置、inline edit、排序、公开状态、删除弹窗                                     | `workspace.spec.ts`、`workspace-actions.spec.ts`                                                               | `internal.visual.spec.ts`    |
-| 内部 `/upload`：入口、配置、配对、预览、列编辑、进度、操作菜单                                                    | `upload-controls.spec.ts`、`upload.spec.ts`、`empty.spec.ts`                                                   | `internal.visual.spec.ts`    |
-| 全局导航、主题、抽屉、断点切换、404                                                                               | `navigation.spec.ts`、`internal-site.spec.ts`                                                                  | 两套 visual spec 的页面壳    |
-| 全局部署面板与通知                                                                                                | `deploy.spec.ts`；保存/上传错误用例也验证通知                                                                  | 功能用例保留失败截图与 trace |
-| 内部 group viewer、公开 `/g/[publicSlug]`：三种模式、工具栏、缩放、采样提示、详情、引导、胶卷、图片 loading/error | `viewer.spec.ts`、`viewer-controls.spec.ts`、`public-site.spec.ts`；内部详情切组见 `workspace-actions.spec.ts` | `viewer.visual.spec.ts`      |
-| 公开 `/` 与不存在的图组                                                                                           | `navigation.spec.ts`；静态导出复跑同一套公开用例                                                               | 功能用例保留失败截图与 trace |
+| UI 入口/组件                                                                                                      | 功能用例                                                                                                                          | 视觉用例                     |
+| ----------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- | ---------------------------- |
+| 内部 `/`：Catalog、卡片、筛选/排序、新建弹窗                                                                      | `catalog.spec.ts`、`workspace.spec.ts`、`empty.spec.ts`                                                                           | `internal.visual.spec.ts`    |
+| 内部 `/cases/[caseSlug]`：工作区、设置、inline edit、排序、公开状态、删除弹窗                                     | `workspace.spec.ts`、`workspace-actions.spec.ts`                                                                                  | `internal.visual.spec.ts`    |
+| 内部 `/upload`：入口、配置、配对、预览、列编辑、进度、操作菜单                                                    | `upload-controls.spec.ts`、`upload.spec.ts`、`empty.spec.ts`                                                                      | `internal.visual.spec.ts`    |
+| 全局导航、主题、抽屉、断点切换、404                                                                               | `navigation.spec.ts`、`internal-site.spec.ts`                                                                                     | 两套 visual spec 的页面壳    |
+| 全局部署面板与通知                                                                                                | `deploy.spec.ts`；保存/上传错误用例也验证通知                                                                                     | 功能用例保留失败截图与 trace |
+| 内部 group viewer、公开 `/g/[publicSlug]`：三种模式、工具栏、缩放、采样提示、详情、引导、胶卷、图片 loading/error | `viewer.spec.ts`、`viewer-controls.spec.ts`、`heatmap.spec.ts`、`public-site.spec.ts`；内部详情切组见 `workspace-actions.spec.ts` | `viewer.visual.spec.ts`      |
+| 公开 `/` 与不存在的图组                                                                                           | `navigation.spec.ts`；静态导出复跑同一套公开用例                                                                                  | 功能用例保留失败截图与 trace |
 
 这张表记录 UI 入口的实际覆盖，不把访问过页面等同于所有状态组合均已验证。实机连续手势、系统原生文件/颜色选择器、外部部署服务和所有可能的数据组合仍有独立验收边界。
 
@@ -117,3 +117,7 @@ pnpm test:e2e:visual:docker --update-snapshots
 共享 viewer 位于 `packages/ui`，通过 dataset 接收数据；模式与几何计算位于 `packages/compare-core`，数据契约位于 `packages/content-schema`。优化舞台、胶卷、主题和交互可以集中在这些共享包，同时用 internal/public 两套浏览器测试验收。将来确实需要独立后端时，优先把服务端页面的数据读取替换成明确的 API 适配层，保留 viewer 的 dataset 边界。
 
 滑动对比已经由自有 React/CSS 组件实现，原图定位、裁切、分界线和手势都有独立模块。本次保留这条渲染路径，修正居中、原生触摸滚动、主题底色、方形边缘和小数尺寸测量。没有证据表明这些问题需要整套 Canvas 重写；若未来引入新的渲染器，应先通过同一套布局、交互、原图加载和视觉回归，再比较性能与图像显示效果。
+
+## 实时热图回归
+
+`heatmap.spec.ts` 在同一五组浏览器和 fresh export 中运行真实 Web Worker，覆盖 Rip/Flt 重算、离开后返回、纯热图/叠加/原图、灵敏度、区域分数保持、热点跳转 A/B 放大、读取失败后的匹配预生成回退与重试，以及旧请求晚到不能覆盖新帧。合成微差像素仅替换分析请求，计算链路保持真实。Vitest 另外验证暗渐变/文字、动画线条、色度变化、透明度、正负交替误差、单点异常值、噪声阈值和区域排序。算法与使用边界见 [热图检查](heatmap-inspection.zh-CN.md)。

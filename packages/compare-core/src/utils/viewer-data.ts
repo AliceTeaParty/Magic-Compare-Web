@@ -159,7 +159,11 @@ export function hasHeatmap(frame: ViewerFrame): boolean {
 export function getAvailableModes(frame: ViewerFrame): ViewerMode[] {
   const modes: ViewerMode[] = ["before-after", "a-b"];
 
-  if (hasHeatmap(frame)) {
+  // Live analysis works for old groups without a precomputed heatmap.
+  if (
+    hasHeatmap(frame) ||
+    (findAsset(frame, "before") && getComparisonTargetAssets(frame).length > 0)
+  ) {
     modes.push("heatmap");
   }
 

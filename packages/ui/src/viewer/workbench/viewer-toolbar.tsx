@@ -76,8 +76,8 @@ interface ViewerToolbarProps {
   sidebarOpen: boolean;
 }
 
-/** Keeps Heatmap intensity inside the stable toolbar slot instead of moving the filmstrip. */
-function HeatmapOpacityControls({
+/** Subscribe only the overlay control to opacity changes, keeping expensive analysis independent. */
+export function HeatmapOpacityControls({
   interactionStore,
 }: {
   interactionStore: ViewerInteractionStore;
@@ -395,9 +395,14 @@ export function ViewerToolbar({
                 onComparisonAssetChange={onComparisonAssetChange}
               />
             ) : null
-          ) : (
-            <HeatmapOpacityControls interactionStore={interactionStore} />
-          )}
+          ) : beforeAsset && comparisonAssetKey && comparisonAssets.length > 0 ? (
+            <ComparisonAssetControls
+              baselineAsset={beforeAsset}
+              comparisonAssetKey={comparisonAssetKey}
+              comparisonAssets={comparisonAssets}
+              onComparisonAssetChange={onComparisonAssetChange}
+            />
+          ) : null}
         </Box>
       </Box>
     </Stack>

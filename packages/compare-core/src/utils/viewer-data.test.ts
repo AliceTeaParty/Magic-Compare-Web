@@ -37,8 +37,8 @@ describe("resolveViewerMode", () => {
     ],
   };
 
-  it("falls back from heatmap to before-after when the frame has no heatmap asset", () => {
-    expect(resolveViewerMode("heatmap", frameWithoutHeatmap, "heatmap")).toBe("before-after");
+  it("allows live heatmaps when originals exist without a pre-generated heatmap", () => {
+    expect(resolveViewerMode("heatmap", frameWithoutHeatmap, "heatmap")).toBe("heatmap");
   });
 });
 

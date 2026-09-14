@@ -377,7 +377,7 @@ function ViewerSidebarContent({
               disappear from the metadata summary after a three-way upload. */}
           可用变量：{getAvailableVariableLabels(currentFrame).join(", ") || "无"}
         </Typography>
-        <Typography variant="body2">热图：{heatmapAsset ? "可用" : "不可用"}</Typography>
+        <Typography variant="body2">预生成热图：{heatmapAsset ? "可用" : "无"}</Typography>
       </Stack>
 
       {variant === "internal" && publishStatus ? (

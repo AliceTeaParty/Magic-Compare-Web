@@ -1,7 +1,13 @@
 "use client";
 
 import { Box, Paper } from "@mui/material";
-import { getComparisonAssetKey, getNextAbAssetSelection } from "@magic-compare/compare-core";
+import {
+  getComparisonAssetKey,
+  getNextAbAssetSelection,
+  getContainedMediaRect,
+  getViewerPresetTransformScale,
+  clampViewerPanZoom,
+} from "@magic-compare/compare-core";
 import { useViewerController } from "@magic-compare/compare-core/use-viewer-controller";
 import type { ViewerDataset } from "@magic-compare/compare-core/viewer-data";
 import { useCallback, useEffect, useState } from "react";
@@ -28,6 +34,14 @@ import {
   useViewerInteractionStore,
   useViewerPixelRenderingPromptOpen,
 } from "./workbench/viewer-interaction-store";
+
+import { useLiveHeatmap } from "./workbench/use-live-heatmap";
+import {
+  HeatmapInspectionPanel,
+  HeatmapRegionMarkers,
+  type HeatmapDisplay,
+} from "./workbench/heatmap-inspection-panel";
+import type { HeatmapRegion } from "@magic-compare/compare-core/heatmap";
 
 interface GroupViewerWorkbenchProps {
   dataset: ViewerDataset;
@@ -98,7 +112,24 @@ export function GroupViewerWorkbench({
   } = useViewerMediaPreferences();
   // Derive stage aspect ratio from the actual content dimensions so the stage frame matches the
   // image without pillarboxing or letterboxing.  Falls back to 16:9 while assets are loading.
-  const activeAfterAsset = mode === "heatmap" ? heatmapReferenceAsset : afterAsset;
+  // Heatmap now follows the selected originals; a stored map is used only by explicit fallback.
+  const activeAfterAsset = afterAsset;
+  const [heatmapGain, setHeatmapGain] = useState(1);
+  const [heatmapDisplay, setHeatmapDisplay] = useState<HeatmapDisplay>("map");
+  const [heatmapRetry, setHeatmapRetry] = useState(0);
+  const [storedHeatmapKey, setStoredHeatmapKey] = useState<string | null>(null);
+  const heatmapPairKey = `${beforeAsset?.imageUrl}\n${afterAsset?.imageUrl}`;
+  const useStoredHeatmap = storedHeatmapKey === heatmapPairKey;
+  const liveHeatmap = useLiveHeatmap(
+    mode === "heatmap" && !useStoredHeatmap,
+    beforeAsset,
+    afterAsset,
+    heatmapGain,
+    heatmapRetry,
+  );
+  const matchingStoredHeatmap =
+    heatmapReferenceAsset?.id === afterAsset?.id ? heatmapAsset : undefined;
+  const displayedHeatmap = useStoredHeatmap ? matchingStoredHeatmap : liveHeatmap.asset;
   const activeComparisonAssetKey = activeAfterAsset
     ? getComparisonAssetKey(activeAfterAsset)
     : comparisonAssetKey;
@@ -107,6 +138,46 @@ export function GroupViewerWorkbench({
   const stageShell = useViewerStageShellState({
     prefersReducedMotion: resolvedPrefersReducedMotion,
   });
+  /** Jump from a ranked patch to the same original pixels in A/B, using the existing physical-pixel zoom model. */
+  function inspectHeatmapRegion(region: HeatmapRegion) {
+    const element = stageShell.stageRef.current;
+    if (!element || !afterAsset) return;
+    const viewport = element.getBoundingClientRect();
+    const media = resolvedRotateStage
+      ? { width: afterAsset.height, height: afterAsset.width }
+      : afterAsset;
+    const mediaRect = getContainedMediaRect(viewport, media);
+    const scale = getViewerPresetTransformScale(3, {
+      devicePixelRatio,
+      media: afterAsset,
+      mediaRect,
+      rotateStage: resolvedRotateStage,
+    });
+    const sourceX = region.x + region.width / 2;
+    const sourceY = region.y + region.height / 2;
+    const centerX = resolvedRotateStage ? 1 - sourceY : sourceX;
+    const centerY = resolvedRotateStage ? sourceX : sourceY;
+    setMode("a-b");
+    setAbSide("after");
+    interactionStore.setPanZoomState(
+      currentFrameId,
+      clampViewerPanZoom(
+        {
+          presetScale: 3,
+          fineScale: 1,
+          x: (0.5 - centerX) * mediaRect.width * scale,
+          y: (0.5 - centerY) * mediaRect.height * scale,
+        },
+        mediaRect,
+        scale,
+        viewport,
+      ),
+    );
+    interactionStore.setStageActive(currentFrameId, true);
+    // Removing the analysis panel moves the stage; measure its scroll target after that commit.
+    requestAnimationFrame(() => stageShell.scrollStageIntoView());
+  }
+
   const desktopStageOffset = variant === "internal" ? 100 : 36;
   const portraitStageOffset = variant === "internal" ? 88 : 80;
   const desktopStageMaxWidth = `calc(${contentAspectRatio * 100}svh - ${contentAspectRatio * desktopStageOffset}px)`;
@@ -290,6 +361,25 @@ export function GroupViewerWorkbench({
             flexDirection: "column",
           }}
         >
+          {mode === "heatmap" && (
+            <HeatmapInspectionPanel
+              state={liveHeatmap}
+              gain={heatmapGain}
+              onGainChange={setHeatmapGain}
+              display={heatmapDisplay}
+              onDisplayChange={setHeatmapDisplay}
+              interactionStore={interactionStore}
+              onInspect={inspectHeatmapRegion}
+              stored={useStoredHeatmap}
+              onRetry={() => {
+                setStoredHeatmapKey(null);
+                setHeatmapRetry((value) => value + 1);
+              }}
+              onUseStored={
+                matchingStoredHeatmap ? () => setStoredHeatmapKey(heatmapPairKey) : undefined
+              }
+            />
+          )}
           <Box data-testid="viewer-stage-area" sx={{ minWidth: 0, p: { xs: 1, md: 1.5 } }}>
             {/* Stack spacing reset the stage's auto margins, leaving fitted images left-aligned.
                 One stage needs no spacing wrapper; its containing block owns centering. */}
@@ -314,7 +404,8 @@ export function GroupViewerWorkbench({
                 beforeAsset={beforeAsset}
                 devicePixelRatio={devicePixelRatio}
                 frameId={currentFrameId}
-                heatmapAsset={heatmapAsset}
+                heatmapAsset={displayedHeatmap}
+                heatmapDisplay={heatmapDisplay}
                 interactionStore={interactionStore}
                 mode={mode}
                 onCycleAbSide={cycleCurrentAbAsset}
@@ -322,6 +413,16 @@ export function GroupViewerWorkbench({
                 rotateStage={resolvedRotateStage}
                 stageRef={stageShell.stageRef}
               />
+              {mode === "heatmap" &&
+                !useStoredHeatmap &&
+                heatmapDisplay !== "original" &&
+                liveHeatmap.summary && (
+                  <HeatmapRegionMarkers
+                    regions={liveHeatmap.summary.regions}
+                    rotate={resolvedRotateStage}
+                    onInspect={inspectHeatmapRegion}
+                  />
+                )}
               {pixelRenderingAutoDisablePromptOpen ? (
                 <Box
                   sx={{

@@ -14,7 +14,12 @@ const playwrightOutputRoot = path.join(workspaceRoot, "output", "playwright");
 const runId = `${process.pid}-${randomUUID()}`;
 const e2eDatabasePath = path.join(playwrightOutputRoot, "e2e", `internal-site-${runId}.db`);
 const e2ePublishedRoot = path.join(workspaceRoot, "output", "playwright", "e2e", "published");
-const viewerTests = ["viewer.spec.ts", "viewer-controls.spec.ts", "navigation.spec.ts"];
+const viewerTests = [
+  "viewer.spec.ts",
+  "viewer-controls.spec.ts",
+  "heatmap.spec.ts",
+  "navigation.spec.ts",
+];
 const publicTests = ["public-site.spec.ts", ...viewerTests];
 const internalTests = [
   "internal-site.spec.ts",
