@@ -1,0 +1,10 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "incremental": false,
+    "paths": {
+      "@magic-compare/content-schema": ["../packages/content-schema/src/index.ts"]
+    }
+  },
+  "include": ["e2e/**/*.ts", "../playwright*.config.ts"]
+}

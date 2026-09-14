@@ -57,7 +57,7 @@ docs/                  Workflow, API, deployment, and UI notes
 | Repair demo and start      | `pnpm dev:bootstrap` |
 | Build both apps            | `pnpm build`         |
 | Run checks and tests       | `pnpm check`         |
-| Run browser smoke tests    | `pnpm test:e2e`      |
+| Run browser UI tests       | `pnpm test:e2e`      |
 | Initialize SQLite          | `pnpm db:push`       |
 | Seed demo content          | `pnpm db:seed`       |
 | Export public site         | `pnpm public:export` |

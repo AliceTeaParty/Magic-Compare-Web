@@ -15,11 +15,13 @@
     "dev:public": "pnpm dev:doctor public && pnpm --filter @magic-compare/public-site dev",
     "dev:all": "pnpm dev:doctor all && MAGIC_COMPARE_PUBLIC_SITE_BASE_URL=http://localhost:3001 pnpm --parallel --stream --filter @magic-compare/internal-site --filter @magic-compare/public-site dev:all",
     "debug:viewer-demo": "./scripts/debug-viewer-demo.sh",
-    "typecheck": "pnpm --recursive --if-present typecheck",
-    "lint": "eslint apps packages scripts tests playwright.config.ts --config eslint.config.mjs",
+    "typecheck": "pnpm --recursive --if-present typecheck && tsc -p tests/tsconfig.json",
+    "lint": "eslint apps packages scripts tests playwright*.config.ts --config eslint.config.mjs",
     "lint:fix": "pnpm lint --fix",
     "test": "vitest run scripts/dev-doctor.test.ts && pnpm --recursive --if-present test",
     "test:e2e": "playwright test",
+    "test:e2e:ci": "playwright test --config=playwright.ci.config.ts",
+    "test:e2e:empty": "playwright test --config=playwright.empty.config.ts",
     "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test",
     "format": "prettier --write .",
     "format:check": "node scripts/check-format.mjs",
@@ -40,7 +42,10 @@
     "db:generate": "pnpm --filter @magic-compare/internal-site db:generate",
     "db:push": "pnpm --filter @magic-compare/internal-site db:push",
     "db:seed": "pnpm --filter @magic-compare/internal-site db:seed",
-    "postinstall": "pnpm db:generate"
+    "postinstall": "pnpm db:generate",
+    "test:e2e:visual": "playwright test --config=playwright.visual.config.ts",
+    "test:e2e:visual:docker": "node scripts/test-ui-visual.mjs",
+    "test:e2e:export": "playwright test --config=playwright.export.config.ts"
   },
   "pnpm": {
     "patchedDependencies": {

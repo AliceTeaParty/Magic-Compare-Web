@@ -1,0 +1,90 @@
+name: Browser Compatibility
+
+on:
+  workflow_call:
+  workflow_dispatch:
+  schedule:
+    - cron: "23 2 * * 1"
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  browsers:
+    name: ${{ matrix.label }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      # Preserve every engine's evidence even when one engine fails.
+      fail-fast: false
+      matrix:
+        include:
+          - suite: desktop-chrome
+            label: Desktop Chrome Stable
+            os: ubuntu-24.04
+            browser: chrome
+          - suite: desktop-firefox
+            label: Desktop Firefox
+            os: ubuntu-24.04
+            browser: firefox
+          - suite: desktop-webkit
+            label: Desktop WebKit (macOS)
+            os: macos-15
+            browser: webkit
+          - suite: android-chrome
+            label: Android Chrome (Pixel 7 emulation)
+            os: ubuntu-24.04
+            browser: chrome
+          - suite: ios-webkit
+            label: iOS WebKit (iPhone 13 emulation on macOS)
+            os: macos-15
+            browser: webkit
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Install selected browser and system dependencies
+        id: browser_install
+        run: pnpm exec playwright install --with-deps ${{ matrix.browser }}
+      - name: Check internal and public behavior
+        run: pnpm test:e2e:ci --project=internal-${{ matrix.suite }} --project=public-${{ matrix.suite }}
+      - name: Check empty catalog and upload intake
+        if: ${{ !cancelled() && steps.browser_install.outcome == 'success' }}
+        run: pnpm test:e2e:empty --project=internal-${{ matrix.suite }}
+      - name: Summarize browser results
+        if: always()
+        env:
+          BROWSER_SUITE: ${{ matrix.label }}
+        run: |
+          node --input-type=module <<'JS'
+          import { appendFileSync, existsSync, readFileSync } from 'node:fs';
+          appendFileSync(process.env.GITHUB_STEP_SUMMARY, `### ${process.env.BROWSER_SUITE}\n\n`);
+          for (const file of ['results.json', 'empty-results.json']) {
+            const report = `output/playwright/${file}`;
+            const stats = existsSync(report) ? JSON.parse(readFileSync(report, 'utf8')).stats : null;
+            const result = stats
+              ? `Passed: ${stats.expected}; failed: ${stats.unexpected}; flaky: ${stats.flaky}; skipped: ${stats.skipped}.`
+              : 'No test report was produced; inspect setup and browser logs.';
+            appendFileSync(process.env.GITHUB_STEP_SUMMARY, `- ${file}: ${result}\n`);
+          }
+          JS
+      - name: Upload report, screenshots and traces
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-${{ matrix.suite }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            output/playwright/playwright-report
+            output/playwright/test-results
+            output/playwright/results.json
+            output/playwright/empty-report
+            output/playwright/empty-test-results
+            output/playwright/empty-results.json
+          retention-days: 14

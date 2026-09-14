@@ -24,7 +24,7 @@ on:
       - "docker-compose.yml"
       - "eslint.config.mjs"
       - "package.json"
-      - "playwright.config.ts"
+      - "playwright*.config.ts"
       - "pnpm-lock.yaml"
       - "pnpm-workspace.yaml"
       - "tsconfig*.json"
@@ -48,7 +48,7 @@ on:
       - "docker-compose.yml"
       - "eslint.config.mjs"
       - "package.json"
-      - "playwright.config.ts"
+      - "playwright*.config.ts"
       - "pnpm-lock.yaml"
       - "pnpm-workspace.yaml"
       - "tsconfig*.json"
@@ -237,3 +237,61 @@ jobs:
       - name: Stop compose stack
         if: always()
         run: docker compose $CI_COMPOSE_ARGS down --volumes --remove-orphans
+
+  browser-ui:
+    name: Browser UI
+    needs: verify
+    uses: ./.github/workflows/browser-ui.yml
+
+  static-ui:
+    name: Static Export UI
+    needs: verify
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium webkit
+      - name: Check fresh static export
+        run: pnpm test:e2e:export
+      - name: Upload static export evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-export-${{ github.run_id }}
+          path: |
+            output/playwright/playwright-report
+            output/playwright/test-results
+          retention-days: 7
+
+  visual-ui:
+    name: UI Visual Regression
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # Baselines are reviewed in this same image; browser upgrades require explicit snapshot review.
+    container: mcr.microsoft.com/playwright:v1.62.1-noble
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Compare reviewed UI screenshots
+        run: pnpm test:e2e:visual
+      - name: Upload visual differences and traces
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-visual-${{ github.run_id }}
+          path: |
+            output/playwright/playwright-report
+            output/playwright/test-results
+          retention-days: 7

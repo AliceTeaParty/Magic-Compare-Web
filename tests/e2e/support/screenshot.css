@@ -1,0 +1,4 @@
+/* Development diagnostics are outside the product UI and absent from static production builds. */
+nextjs-portal {
+  display: none !important;
+}

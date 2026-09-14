@@ -18,6 +18,8 @@ export default function createNextConfig(phase) {
 
   return {
     agentRules: false,
+    // The development badge overlaps bottom rail controls; E2E must exercise product hit targets.
+    ...(developmentDistDir === ".next-e2e" ? { devIndicators: false } : {}),
     distDir: phase === PHASE_DEVELOPMENT_SERVER ? developmentDistDir : ".next",
     env: resolveMagicCompareBuildEnv(repoRoot),
     outputFileTracingRoot: repoRoot,

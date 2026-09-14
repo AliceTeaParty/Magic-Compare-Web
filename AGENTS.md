@@ -29,7 +29,7 @@ pnpm public:deploy  # 导出并部署 public-site
 
 # 验证
 pnpm check          # format、lint、typecheck、Vitest
-pnpm test:e2e       # 本地 Chromium 冒烟
+pnpm test:e2e       # 本地 Chromium/WebKit UI 回归
 ```
 
 单站调试使用 `pnpm dev:internal`（internal-site）或 `pnpm dev:public`（public-site 源码开发）。`pnpm dev:all` 的 3001 直接服务 `output/public-site`，用于监看内部站部署完成后的静态产物。单包验证使用 `pnpm --filter <package> <script>`，其中 `<script>` 为 `lint`、`typecheck` 或 `test`。需要分项检查时运行 `pnpm lint`、`pnpm typecheck` 或 `pnpm test`。
@@ -78,6 +78,7 @@ Next 开发服务器使用各应用的 `.next-dev`，Playwright 使用 `.next-e2
 - 提交规范：`docs/commit-guide.md`
 - MCP 工具顺序：`docs/mcp-usage-guide.md`
 - UI/UX 待办与经验：`docs/uiux-todo.md`
+- UI 覆盖清单与浏览器矩阵：`docs/ui-testing.zh-CN.md`
 - Web 上传文档：`docs/web-uploader.zh-CN.md`
 
 阅读 `docs/` 时，先看标题和前 10 行判断相关性；真正修改或调试该主题时再读完整文档。

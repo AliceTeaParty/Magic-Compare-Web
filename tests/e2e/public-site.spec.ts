@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./support/browser-test";
 
 test("public viewer exposes and loads both original stage images", async ({ page, request }) => {
   const response = await request.get("/g/e2e-sample--viewer");
@@ -27,7 +27,11 @@ test("public viewer exposes and loads both original stage images", async ({ page
     .poll(() =>
       stageImages.evaluateAll((images) =>
         images.every(
-          (image) => image.complete && image.naturalWidth > 0 && image.naturalHeight > 0,
+          (image) =>
+            image instanceof HTMLImageElement &&
+            image.complete &&
+            image.naturalWidth > 0 &&
+            image.naturalHeight > 0,
         ),
       ),
     )
