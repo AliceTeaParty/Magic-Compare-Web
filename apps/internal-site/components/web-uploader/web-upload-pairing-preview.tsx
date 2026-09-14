@@ -221,7 +221,13 @@ export function PairingPreviewPanel({
               sx={{ minWidth: 184, flex: "1 1 184px", maxWidth: 260 }}
             >
               <Select
-                value={planView.heatmapReferenceLabel ?? ""}
+                // Incomplete pairs have no valid reference option yet; avoid an out-of-range selection.
+                value={
+                  planView.heatmapReferenceOptions.includes(planView.heatmapReferenceLabel ?? "")
+                    ? planView.heatmapReferenceLabel
+                    : ""
+                }
+                inputProps={{ "aria-label": "热图参考变量" }}
                 onChange={(event) => onHeatmapReferenceChange(event.target.value)}
                 disabled={!canReorder || planView.heatmapReferenceOptions.length <= 1}
                 displayEmpty

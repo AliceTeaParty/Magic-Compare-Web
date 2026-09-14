@@ -93,7 +93,8 @@ export function CaseCatalog({ items }: { items: CaseCatalogItem[] }) {
             htmlInput: { "aria-label": "搜索项目" },
           }}
         />
-        <Tooltip title="筛选状态">
+        {/* Interactive tooltip hit areas can cover the first option after reopening a Select. */}
+        <Tooltip title="筛选状态" disableInteractive>
           <FormControl hiddenLabel variant="filled" sx={controlSx}>
             <Select
               value={status}
@@ -110,7 +111,7 @@ export function CaseCatalog({ items }: { items: CaseCatalogItem[] }) {
             </Select>
           </FormControl>
         </Tooltip>
-        <Tooltip title="调整排序">
+        <Tooltip title="调整排序" disableInteractive>
           <FormControl hiddenLabel variant="filled" sx={controlSx}>
             <Select
               value={sortOrder}

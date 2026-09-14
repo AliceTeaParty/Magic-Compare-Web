@@ -246,6 +246,9 @@ export function SortablePairingRow({
     >
       <Box
         role="button"
+        // A stable name exposes the preview toggle separately from its nested reorder handle.
+        aria-label={`预览 ${row.title}`}
+        aria-expanded={expanded}
         tabIndex={0}
         onClick={onToggleExpanded}
         onKeyDown={(event) => {

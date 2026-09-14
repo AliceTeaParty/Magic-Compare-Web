@@ -146,7 +146,13 @@ async function buildThumbnail(
   context.drawImage(bitmap, 0, 0, size.width, size.height);
   bitmap.close();
   const blob = await canvasToBlob(canvas);
-  return uploadFileDescriptor(blob, ".webp", blob.type || "image/webp");
+  // WebKit may return PNG when its canvas cannot encode WebP. The extension must describe the
+  // actual bytes, otherwise upload commit rejects an otherwise valid Safari-generated thumbnail.
+  return uploadFileDescriptor(
+    blob,
+    blob.type === "image/webp" ? ".webp" : ".png",
+    blob.type || "image/png",
+  );
 }
 
 async function bitmapToImageData(file: File) {
