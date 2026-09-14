@@ -92,6 +92,16 @@ export function MagicMobileNavigationBar({
   );
 }
 
+const DISPLAY_PRERELEASE_LABELS = { alpha: "α", beta: "β" } as const;
+
+/** Keeps semver-compatible release identifiers in metadata while fitting prerelease labels in the UI. */
+export function formatDisplayedAppVersion(appVersion: string) {
+  return appVersion.replace(
+    /-(alpha|beta)(?=\.|$)/,
+    (_, label: keyof typeof DISPLAY_PRERELEASE_LABELS) => `-${DISPLAY_PRERELEASE_LABELS[label]}`,
+  );
+}
+
 /** Keeps build identity in the navigation utility area without turning it into page content. */
 export function MagicBuildVersionLabel({
   appVersion,
@@ -104,7 +114,8 @@ export function MagicBuildVersionLabel({
 }) {
   if (!appVersion) return null;
 
-  const shortLabel = `v${appVersion}`;
+  const displayedVersion = formatDisplayedAppVersion(appVersion);
+  const shortLabel = `v${displayedVersion}`;
   const fullLabel = commitHash
     ? `Magic Compare ${shortLabel} (${commitHash})`
     : `Magic Compare ${shortLabel}`;
