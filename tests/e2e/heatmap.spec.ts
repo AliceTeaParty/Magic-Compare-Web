@@ -26,8 +26,9 @@ test("live analysis follows Rip/Flt and survives leaving and re-entering heatmap
   await panel.getByRole("button", { name: "原图", exact: true }).click();
   await expect(heatmap).toHaveCount(0);
   await expect(
-    page.getByTestId("viewer-stage").getByRole("img", { name: "Flt", exact: true }),
+    page.getByTestId("viewer-stage").getByRole("img", { name: "Flt base", exact: true }),
   ).toBeVisible();
+  await waitForStage(page);
   await panel.getByRole("button", { name: "仅热图", exact: true }).click();
   await waitForStage(page);
   await expect(heatmap).toHaveCSS("opacity", "1");
@@ -87,6 +88,7 @@ test("failed analysis offers a matching stored map and retry recovers", async ({
   await expect(
     page.getByTestId("viewer-stage").getByRole("img", { name: "Heatmap", exact: true }),
   ).toBeVisible();
+  await waitForStage(page);
   await page.getByRole("button", { name: "使用 Flt 作为对比变量", exact: true }).click();
   await expect(panel.getByRole("button", { name: "重试分析", exact: true })).toBeVisible();
   await expect(panel.getByRole("button", { name: "使用预生成热图", exact: true })).toHaveCount(0);
