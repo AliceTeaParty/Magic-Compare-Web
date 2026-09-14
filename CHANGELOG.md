@@ -6,6 +6,22 @@ Entries before that date are summarized at release level instead of being recons
 
 ## Unreleased
 
+## v2.0.0-alpha.4 - 2026-09-14
+
+### Added
+
+- Added focused heatmap and original-image hotspot inspection in the viewer, with live calculation and truthful fallback handling.
+- Added full-site UI regression coverage across desktop and mobile browser targets, including fresh public export and empty-catalog flows.
+
+### Changed
+
+- Refined compare-stage sizing, filmstrip interaction, and viewer workbench layout for more reliable image inspection.
+- Improved upload and catalog browser compatibility across the supported browser matrix.
+
+### Fixed
+
+- Corrected heatmap/original-image accessibility assertions and image-decode readiness checks in the end-to-end suite.
+
 ## v2.0.0-alpha.3 - 2026-09-13
 
 ### Fixed
