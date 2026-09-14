@@ -1,11 +1,7 @@
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 import { PositionedStageMedia } from "./positioned-stage-media";
-import {
-  clearViewerStageImageLoadCacheForTest,
-  markViewerStageImageLoaded,
-} from "./stage-image-load-cache";
 
 const asset = {
   id: "before-1",
@@ -21,10 +17,6 @@ const asset = {
 
 beforeAll(() => {
   vi.stubGlobal("React", React);
-});
-
-beforeEach(() => {
-  clearViewerStageImageLoadCacheForTest();
 });
 
 describe("PositionedStageMedia SSR", () => {
@@ -85,8 +77,7 @@ describe("PositionedStageMedia SSR", () => {
     expect(html).toContain('src="/published/original.jpg"');
   });
 
-  it("keeps the placeholder mounted for the decoded-image crossfade", () => {
-    markViewerStageImageLoaded(asset.imageUrl);
+  it("keeps the placeholder until this image node decodes", () => {
     const html = renderToStaticMarkup(
       <PositionedStageMedia
         asset={{

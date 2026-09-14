@@ -4,6 +4,17 @@ import config from "./playwright.config";
 
 export default defineConfig({
   ...config,
+  // Release labels are fixture data here; format changes still alter pixels, version bumps do not.
+  webServer: (Array.isArray(config.webServer) ? config.webServer : [config.webServer!]).map(
+    (server) => ({
+      ...server,
+      env: {
+        ...server.env,
+        MAGIC_COMPARE_APP_VERSION: "2.0.0-alpha.4",
+        MAGIC_COMPARE_COMMIT_SHA: "visual-fixture",
+      },
+    }),
+  ),
   // Reviewed in the pinned Playwright Linux image; ordinary E2E never updates visual baselines.
   snapshotPathTemplate: "{testDir}/screenshots/{projectName}/{arg}{ext}",
   expect: {

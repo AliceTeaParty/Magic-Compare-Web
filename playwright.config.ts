@@ -18,6 +18,7 @@ const viewerTests = [
   "viewer.spec.ts",
   "viewer-controls.spec.ts",
   "heatmap.spec.ts",
+  "runtime-recovery.spec.ts",
   "navigation.spec.ts",
 ];
 const publicTests = ["public-site.spec.ts", ...viewerTests];

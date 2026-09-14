@@ -1,76 +1,63 @@
 "use client";
 
 import { type SyntheticEvent, useCallback, useEffect, useRef, useState } from "react";
-import { isViewerStageImageLoaded, markViewerStageImageLoaded } from "./stage-image-load-cache";
 import { waitForStageImageDecode } from "./stage-image-decode";
 
-/**
- * Bridges browser image load events, preloader hits, and React rendering into one visible state.
- */
+/** Compare the DOM source as well as node identity; a URL can be revisited after another request. */
+export function isCurrentStageImage(
+  image: HTMLImageElement,
+  current: HTMLImageElement | null,
+  imageUrl: string,
+  requireDecodedSource = false,
+) {
+  if (image !== current) return false;
+  try {
+    const expected = new URL(imageUrl, image.baseURI).href;
+    return image.src === expected && (!requireDecodedSource || image.currentSrc === expected);
+  } catch {
+    return false;
+  }
+}
+
+/** Each source owns a keyed image node; only that node's successful decode may reveal pixels. */
 export function useStageImageLoadState(imageUrl: string) {
   const imageRef = useRef<HTMLImageElement | null>(null);
-  const [loadState, setLoadState] = useState<{
-    imageUrl: string | null;
+  const [state, setState] = useState<{
+    image: HTMLImageElement;
+    imageUrl: string;
     status: "loaded" | "error";
-  }>(() =>
-    isViewerStageImageLoaded(imageUrl)
-      ? {
-          imageUrl,
-          status: "loaded",
-        }
-      : {
-          imageUrl: null,
-          status: "error",
-        },
-  );
+  } | null>(null);
 
-  /** Keeps the truthful loading surface visible until pixels can be painted, not just downloaded. */
-  const revealDecodedImage = useCallback((image: HTMLImageElement, expectedImageUrl: string) => {
-    void waitForStageImageDecode(image).then((decoded) => {
-      if (!decoded || imageRef.current !== image) {
-        return;
-      }
-
-      markViewerStageImageLoaded(expectedImageUrl);
-      setLoadState({ imageUrl: expectedImageUrl, status: "loaded" });
-    });
+  /** Recheck after decode because navigation can detach the image while its promise is pending. */
+  const revealDecodedImage = useCallback(async (image: HTMLImageElement, expectedUrl: string) => {
+    if (!isCurrentStageImage(image, imageRef.current, expectedUrl, true)) return;
+    const decoded = await waitForStageImageDecode(image);
+    if (!decoded || !isCurrentStageImage(image, imageRef.current, expectedUrl, true)) return;
+    setState({ image, imageUrl: expectedUrl, status: "loaded" });
   }, []);
 
   useEffect(() => {
     const image = imageRef.current;
-    if (!image) {
-      return;
-    }
-
-    if (isViewerStageImageLoaded(imageUrl)) {
-      setLoadState({ imageUrl, status: "loaded" });
-      return;
-    }
-
-    if (image.complete && image.naturalWidth > 0) {
-      revealDecodedImage(image, imageUrl);
-    }
+    // A historical URL cache cannot prove a newly mounted node decoded successfully (or even loaded).
+    if (image?.complete && image.naturalWidth > 0) void revealDecodedImage(image, imageUrl);
   }, [imageUrl, revealDecodedImage]);
 
   function markLoaded(event: SyntheticEvent<HTMLImageElement>) {
-    revealDecodedImage(event.currentTarget, imageUrl);
+    void revealDecodedImage(event.currentTarget, imageUrl);
   }
 
-  function markErrored() {
-    setLoadState({ imageUrl, status: "error" });
+  function markErrored(event: SyntheticEvent<HTMLImageElement>) {
+    const image = event.currentTarget;
+    if (!isCurrentStageImage(image, imageRef.current, imageUrl)) return;
+    setState({ image, imageUrl, status: "error" });
   }
 
-  const currentImageErrored = loadState.imageUrl === imageUrl && loadState.status === "error";
-  const showImage =
-    !currentImageErrored &&
-    (isViewerStageImageLoaded(imageUrl) ||
-      (loadState.imageUrl === imageUrl && loadState.status === "loaded"));
-
+  const current = state?.image === imageRef.current && state?.imageUrl === imageUrl;
   return {
-    hasError: currentImageErrored,
+    hasError: current && state?.status === "error",
     imageRef,
     markErrored,
     markLoaded,
-    showImage,
+    showImage: current && state?.status === "loaded",
   };
 }

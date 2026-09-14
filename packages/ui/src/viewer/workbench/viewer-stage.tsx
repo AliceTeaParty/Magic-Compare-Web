@@ -329,6 +329,9 @@ export function ViewerStage({
     >
       <StagePresentationShell inspectActive={mode === "a-b" && abStageActive}>
         <ViewerStageContent
+          // A frame change is a new image-loading session. Remounting the mode content prevents a
+          // late event from a previous frame from sharing the next frame's DOM image state.
+          key={`${frameId ?? "empty"}:${mode}`}
           abSide={abSide}
           afterAsset={afterAsset}
           beforeAsset={beforeAsset}

@@ -6,6 +6,7 @@ import "@fontsource-variable/ibm-plex-sans/wght.css";
 import { resolveBuildIdentityConfig, resolveFooterConfig } from "@magic-compare/shared-utils";
 import { MagicSiteFooter } from "./magic-site-footer";
 import { MagicPublicAppShell } from "./magic-public-app-shell";
+import { MagicBuildRuntimeGuard } from "./magic-build-runtime-guard";
 import { MagicThemeProvider } from "../theme/magic-theme-provider";
 import type { MagicThemeProfile } from "../theme/magic-theme-provider";
 
@@ -53,6 +54,10 @@ export function MagicRootLayoutShell({
             colorSchemeStorageKey="mc-internal-color-scheme"
           />
           <MagicThemeProvider initialThemeSeed={initialThemeSeed}>
+            <MagicBuildRuntimeGuard
+              appVersion={buildIdentity.appVersion}
+              commitHash={buildIdentity.commitHash}
+            />
             {profile === "public" ? (
               <MagicPublicAppShell
                 appVersion={buildIdentity.appVersion}

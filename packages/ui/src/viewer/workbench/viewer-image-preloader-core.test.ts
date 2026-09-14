@@ -1,11 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
 import {
-  clearViewerStageImageLoadCacheForTest,
-  getViewerStageImageLoadCacheSizeForTest,
-  isViewerStageImageLoaded,
-  markViewerStageImageLoaded,
-} from "./stage-image-load-cache";
-import {
   ViewerImagePreloadQueue,
   type ViewerPreloadImageHandle,
 } from "./viewer-image-preloader-core";
@@ -298,19 +292,5 @@ describe("ViewerImagePreloadQueue", () => {
 
     failingQueue.enqueue("/broken.png", 10);
     expect(handles).toHaveLength(2);
-  });
-});
-
-describe("stage image load cache", () => {
-  it("keeps the most recent loaded image URLs bounded", () => {
-    clearViewerStageImageLoadCacheForTest();
-
-    for (let index = 0; index < 140; index += 1) {
-      markViewerStageImageLoaded(`/frame-${index}.png`);
-    }
-
-    expect(getViewerStageImageLoadCacheSizeForTest()).toBe(128);
-    expect(isViewerStageImageLoaded("/frame-0.png")).toBe(false);
-    expect(isViewerStageImageLoaded("/frame-139.png")).toBe(true);
   });
 });

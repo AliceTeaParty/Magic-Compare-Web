@@ -13,7 +13,6 @@ import {
   ViewerImagePreloadQueue,
   type ViewerPreloadImageHandle,
 } from "./viewer-image-preloader-core";
-import { markViewerStageImageLoaded } from "./stage-image-load-cache";
 
 const FRAME_PRELOAD_SCOPE = "active-frame-window";
 
@@ -159,7 +158,6 @@ export function useViewerImagePreloader({
     queueRef.current = new ViewerImagePreloadQueue({
       connectionLimit: getConnectionLimit,
       createImage: createBrowserImage,
-      onLoad: markViewerStageImageLoaded,
     });
   }
 

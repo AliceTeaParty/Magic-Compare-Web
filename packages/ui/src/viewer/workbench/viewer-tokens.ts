@@ -18,8 +18,9 @@ export const viewerTokens = {
   },
   stage: {
     activeBorder: "var(--mc-primary, rgba(232, 198, 246, 0.42))",
-    // A neutral inspection surround avoids the old blue cast in light and custom themes.
-    surface: "var(--mc-viewer-surface, #eeeeee)",
+    // Keep the compare stage on the same workbench layer as the title so the image surround does
+    // not become a separate gray block in light or custom themes.
+    surface: "var(--mui-palette-surface-container)",
     activeShadow: "var(--mc-viewer-shadow, 0 18px 44px rgba(8, 15, 35, 0.28))",
     measuredShadow: "var(--mc-viewer-shadow, 0 24px 52px rgba(8, 15, 35, 0.28))",
   },

@@ -17,10 +17,24 @@ for (const mode of ["light", "dark"] as const) {
     await stage.scrollIntoViewIfNeeded();
     const shell = stage.locator(":scope > div");
     await expect(shell).toHaveCSS("border-radius", "0px");
-    await expect(shell).toHaveCSS(
-      "background-color",
-      mode === "light" ? "rgb(238, 238, 238)" : "rgb(32, 32, 32)",
-    );
+    // The inspection surround now shares the title surface in every theme, rather than fixed gray.
+    await expect
+      .poll(async () => {
+        const surface = await shell.evaluate((node) => getComputedStyle(node).backgroundColor);
+        const title = await page
+          .getByRole("heading", { name: "E2E Viewer", exact: true })
+          .evaluate((node) => {
+            let parent: Element | null = node;
+            while (parent) {
+              const color = getComputedStyle(parent).backgroundColor;
+              if (color !== "rgba(0, 0, 0, 0)" && color !== "transparent") return color;
+              parent = parent.parentElement;
+            }
+            return "transparent";
+          });
+        return surface === title;
+      })
+      .toBe(true);
     await expect(stage).toHaveScreenshot(`stage-${mode}.png`, { animations: "disabled" });
     // An odd-size portrait frame exercises fractional scale, rotation and all four clipping edges.
     await page.getByRole("button", { name: "Frame 2", exact: true }).click();

@@ -145,6 +145,8 @@ export function PositionedStageMedia({
         ) : null}
         <Box
           component="img"
+          // Frame/mode keys miss same-frame Rip/Flt and heatmap replacements; isolate each source.
+          key={asset.imageUrl}
           ref={imageRef}
           src={asset.imageUrl}
           alt={alt}
