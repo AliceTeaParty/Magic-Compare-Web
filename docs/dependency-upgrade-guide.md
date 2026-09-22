@@ -2,14 +2,14 @@
 
 本文记录 workspace 的依赖升级批次、当前基线和迁移检查项。更新依赖时先确认实际安装版本与官方迁移文档，再按责任边界拆分提交。
 
-最后更新：2026-09-13。
+最后更新：2026-09-22。
 
 ## 当前基线
 
 | 范围                           | 版本                           |
 | ------------------------------ | ------------------------------ |
 | Next.js / React / React DOM    | `16.3.5` / `19.2.8` / `19.2.8` |
-| Prisma / Prisma Client         | `6.19.3`                       |
+| Prisma / Prisma Client         | `7.10.0`                       |
 | Zod                            | `4.4.3`                        |
 | TypeScript / typescript-eslint | `6.0.3` / `8.66.0`             |
 | Vitest                         | `4.1.11`                       |
@@ -19,9 +19,9 @@
 | Wrangler / Motion              | `4.119.0` / `12.43.0`          |
 | AWS S3 client / presigner      | `3.1104.0`                     |
 
-最近一次已验证的补丁批次更新了 Next.js `16.3.5`、Sharp `0.35.4`、tsx `4.23.13`、Vitest `4.1.11` 与 `@types/react-dom` `19.2.5`。Prisma、TypeScript Node 26 和 GitHub Actions major 仍保留为独立迁移项。
+最近一次已验证的批次更新了 Next.js `16.3.5`、Prisma `7.10.0`、Sharp `0.35.4`、tsx `4.23.13`、Vitest `4.1.11` 与 `@types/react-dom` `19.2.5`。TypeScript、Node 26 和 GitHub Actions major 仍保留为独立迁移项。
 
-本地、CI 与 Docker 统一使用 Node `24.13.x`，pnpm 固定为 `10.32.1`，`@types/node` 保持 Node 24 版本线。TypeScript 7、Prisma 7 和 pnpm 11 属于后续独立迁移，不进入常规补丁更新。
+本地、CI 与 Docker 统一使用 Node `24.13.x`，pnpm 固定为 `10.32.1`，`@types/node` 保持 Node 24 版本线。根目录的 `@types/node`、`@types/react`、`@types/react-dom` 固定到已验证版本，避免工具升级附带未验证的类型变化。下一代 TypeScript、Prisma 和 pnpm 属于后续独立迁移，不进入常规补丁更新。
 
 Next 开发缓存固定为 `.next-dev`，生产构建缓存为 `.next`。应用类型检查使用 `next typegen + tsc`；依赖升级验证时不需要为了类型检查停止开发服务器。
 
@@ -54,24 +54,24 @@ Next 开发缓存固定为 `.next-dev`，生产构建缓存为 `.next`。应用�
 - Vitest 升级后运行全仓测试，覆盖 fake timers、mock、snapshot 和并发测试配置。当前仓库不需要 Vitest 4 兼容 shim。
 - typescript-eslint 的 TypeScript 支持范围以[官方依赖版本说明](https://typescript-eslint.io/users/dependency-versions/)为准。升级 TypeScript 前先确认上限。
 
-## Prisma 7 决策
+## Prisma 7 基线
 
-本轮保留 Prisma `6.19.3`。当前实现仍使用 `prisma-client-js`、schema 内的 datasource URL、`@prisma/client` 导入和运行时 datasource override。Prisma 7 会同时改变这些边界，适合在 `codex/prisma-7` 独立处理。
+迁移按 [Prisma 7 升级指南](https://www.prisma.io/docs/guides/upgrade-prisma-orm/v7) 和 [SQLite adapter 文档](https://www.prisma.io/docs/orm/v7/core-concepts/supported-databases/sqlite) 完成：
 
-迁移时按 [Prisma 7 升级指南](https://www.prisma.io/docs/guides/upgrade-prisma-orm/v7) 完成以下检查：
-
-1. 将 client generator 改为 `prisma-client`，设置明确输出目录并更新全部导入。
-2. 把 datasource 配置移入 `prisma.config.ts`，确认本地、Docker 和测试数据库 URL 的来源。
-3. 为 SQLite 选择并接入支持的 driver adapter，重新验证 singleton、初始化脚本和 shutdown 行为。
-4. 运行 schema generate、数据库初始化、seed、repository、上传 commit、publish 和 Docker smoke。
-
-当前 Prisma 配置链里的 `defu` 已通过兼容补丁固定到安全版本，Prisma 7 迁移无需承担紧急漏洞修复职责。
+- `prisma`、`@prisma/client` 和 `@prisma/adapter-better-sqlite3` 固定为同一稳定版本 `7.10.0`。Prisma CLI 是开发依赖，运行环境只安装 client、adapter 和 SQLite native addon。
+- schema 使用 `prisma-client` generator，并将生成源码放在 `apps/internal-site/generated/prisma/`。该目录不提交，由 `postinstall` 和 `db:generate` 重建；应用和 E2E fixture 都通过明确生成路径导入。
+- datasource URL 位于 `apps/internal-site/prisma.config.ts`。CLI、`node:sqlite` 初始化器和运行时 adapter 共用 SQLite URL 解析规则，相对路径继续指向应用的 `prisma/` 目录。
+- adapter 固定使用 `timestampFormat: "unixepoch-ms"`，保持与 Prisma 6 原生 SQLite 驱动写入的整数毫秒日期兼容。状态与模式字段继续使用既有字符串存储，不引入数据库 enum。
+- `node:sqlite` 的 additive schema 初始化和 active upload job partial unique index保持不变。仓库没有引入第二套 migration ledger 或后台恢复进程。
+- Docker builder 生成 client；runtime 从 builder 复制生成源码，并只重建 `better-sqlite3`、Sharp、esbuild 和 workerd 所需的安装脚本。镜像验证需要同时覆盖 client 加载和 native addon 查询。
 
 ## 传递依赖补丁
 
 根 `package.json` 的 `pnpm.overrides` 只固定已有安全修复的兼容版本。目前覆盖 Babel、HumanFS、Browserslist、brace-expansion、defu、esbuild、fast-uri、picomatch、Sharp、Undici、Vite 和 YAML。
 
-2026-09-13 的审计将 `fast-uri` 固定到 `3.1.6`、将 Wrangler 内 Miniflare 的 `sharp` 收敛到 `0.35.4`，并固定 `browserslist` `4.28.7` 与 `@humanfs/node` `0.16.8`。这些均为兼容范围内的补丁升级。`deepmerge-ts` 需要 `8.0.0`，但它由 Prisma `6.19.3` 的配置链引入；不要单独 major override，改由 Prisma 7 迁移验证后解决。
+2026-09-13 的审计将 `fast-uri` 固定到 `3.1.6`、将 Wrangler 内 Miniflare 的 `sharp` 收敛到 `0.35.4`，并固定 `browserslist` `4.28.7` 与 `@humanfs/node` `0.16.8`。这些均为兼容范围内的补丁升级。
+
+Prisma `7.10.0` 的 CLI 仍固定依赖 `deepmerge-ts@7.1.5` 和 `mysql2@3.15.3`，因此 `pnpm audit` 会报告对应公告。当前 schema 只允许 SQLite，应用不加载 Prisma CLI 的配置合并或 MySQL 驱动路径；不要用未经上游验证的 major override 改写 CLI 依赖。升级 Prisma 稳定版时重新检查，上游发布兼容修复后再移除这项已知结果。
 
 维护规则：
 

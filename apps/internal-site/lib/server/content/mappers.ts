@@ -1,4 +1,4 @@
-import type { Asset } from "@prisma/client";
+import type { Asset } from "@/generated/prisma/client";
 import type { ViewerDataset } from "@magic-compare/compare-core/viewer-data";
 import type { CaseStatus, ViewerMode } from "@magic-compare/content-schema";
 import { resolvePublishedGroupUrl } from "@/lib/server/public-site/url";

@@ -1,4 +1,4 @@
-import { Prisma } from "@prisma/client";
+import { Prisma } from "@/generated/prisma/client";
 import type { ViewerDataset } from "@magic-compare/compare-core/viewer-data";
 import { DEMO_CASE_SLUG } from "@magic-compare/shared-utils";
 import { prisma } from "@/lib/server/db/client";

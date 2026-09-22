@@ -1,20 +1,11 @@
-import { PrismaClient } from "@prisma/client";
-import { getDatabaseUrl } from "@/lib/server/db/database-url";
+import { PrismaClient } from "@/generated/prisma/client";
+import { createPrismaClient } from "@/lib/server/db/create-client";
 
 declare global {
   var magicComparePrisma: PrismaClient | undefined;
 }
 
-export const prisma =
-  globalThis.magicComparePrisma ??
-  new PrismaClient({
-    datasources: {
-      db: {
-        url: getDatabaseUrl(),
-      },
-    },
-    log: process.env.NODE_ENV === "development" ? ["error", "warn"] : ["error"],
-  });
+export const prisma = globalThis.magicComparePrisma ?? createPrismaClient();
 
 if (process.env.NODE_ENV !== "production") {
   globalThis.magicComparePrisma = prisma;
