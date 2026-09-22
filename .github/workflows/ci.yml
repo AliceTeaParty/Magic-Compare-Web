@@ -34,7 +34,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
-      FORMAT_BASE_REF: ${{ github.event.pull_request.base.sha || github.event.before }}
+      FORMAT_BASE_REF: ${{ github.event.pull_request.base.sha || (github.ref_type != 'tag' && github.event.before) || '' }}
 
     steps:
       - name: Checkout repository

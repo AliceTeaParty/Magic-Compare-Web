@@ -43,9 +43,19 @@ GitHub 规则依据：[Workflow syntax — paths](https://docs.github.com/en/act
 
 ## 本次代码范围与验证
 
-本次只删除表中确认多余的锁/阶段防御与无效配置，未执行其他维护批次。
+已按独立提交完成冗余防御删除、manifest 原子写入、Compose 版本修正、CI/发布门禁、导出恢复与指纹补齐，以及 Prisma 7 迁移。保存后的同步警告和按 Case slug 修复命令也已实现。
 保留文件缺失、非法外部输入、失败解锁、重复部署点击、进程中断和日志输出上限等有实际用途的处理。
 
 - 锁验证覆盖重叠调用被拒绝、成功与失败后可以再次操作；部署运行时的 18 个定向测试通过。
 - 全仓 `pnpm check` 和文档变更后的 `pnpm format:check` 通过。
 - fresh export 在测试临时副本中构建，Chromium 与移动 WebKit 的两张原图加载验证均通过（2/2）。首次因本机缺少浏览器未能启动，安装匹配版本后重跑通过。
+
+### 执行验证
+
+- `pnpm check`：format、lint、全仓类型检查和单元测试通过；新增故障路径后的 internal-site 定向复验为 52 文件、232 测试通过。
+- 工作区浏览器回归：12/12 通过，覆盖桌面 Chromium、移动 Chromium、移动 WebKit 的保存、取消、失败回滚和已保存但同步失败的警告；警告后的值刷新后仍然存在。
+- Prisma 7 用临时 SQLite 验证旧整数毫秒日期、新写入日期以及 active upload partial unique index；没有修改真实数据库。
+- actionlint 语法检查通过。ShellCheck 的 SC2086 对应固定 Compose 参数的有意拆词，SC2016 对应 Markdown 反引号字面值；这两项没有真实错误，不为消除提示改变逻辑。
+- Prisma CLI 仍带来 deepmerge-ts/mysql2 的 3 项审计公告。当前 SQLite 业务调用链不加载这些 CLI/MySQL 路径，记录为不可达，没有追加未经验证的 major override。
+
+完整浏览器矩阵、fresh export、Docker 和远端 CI 结果在维护任务完成时另行记录。
