@@ -1,4 +1,4 @@
-import { cp, mkdir, readdir, rm } from "node:fs/promises";
+import { cp, mkdir, readdir, rename, rm, stat } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import type { PublicDeployStage } from "../../../public-deploy-job";
 import {
@@ -58,6 +58,38 @@ export async function clearDirectoryContents(directory: string): Promise<void> {
   );
 }
 
+function previousExportDirectory(targetDir: string): string {
+  return `${targetDir}.previous`;
+}
+
+function temporaryExportDirectory(targetDir: string): string {
+  return `${targetDir}.next`;
+}
+
+async function pathExists(target: string): Promise<boolean> {
+  try {
+    await stat(target);
+    return true;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+      return false;
+    }
+    throw error;
+  }
+}
+
+/** Restores the last complete export after an interrupted directory promotion. */
+export async function recoverPreviousExportDirectory(targetDir: string): Promise<void> {
+  if (await pathExists(targetDir)) {
+    return;
+  }
+
+  const previousDir = previousExportDirectory(targetDir);
+  if (await pathExists(previousDir)) {
+    await rename(previousDir, targetDir);
+  }
+}
+
 /**
  * Mirrors the Next.js export into the configured publish directory so local exports and deploys can
  * target an arbitrary output root without teaching Next.js about that environment-specific path.
@@ -67,11 +99,43 @@ export async function mirrorExportDirectory(sourceDir: string, targetDir: string
     return;
   }
 
-  await rm(targetDir, { recursive: true, force: true });
   // Create the parent explicitly because deploy targets may point outside the app tree and `cp`
   // will not materialize missing ancestors for us.
   await mkdir(dirname(targetDir), { recursive: true });
-  await cp(sourceDir, targetDir, { recursive: true });
+  await recoverPreviousExportDirectory(targetDir);
+
+  const nextDir = temporaryExportDirectory(targetDir);
+  const previousDir = previousExportDirectory(targetDir);
+  await rm(nextDir, { recursive: true, force: true });
+
+  try {
+    await cp(sourceDir, nextDir, { recursive: true });
+  } catch (error) {
+    await rm(nextDir, { recursive: true, force: true });
+    throw error;
+  }
+
+  if (!(await pathExists(targetDir))) {
+    try {
+      await rename(nextDir, targetDir);
+    } finally {
+      await rm(nextDir, { recursive: true, force: true });
+    }
+    return;
+  }
+
+  try {
+    await rm(previousDir, { recursive: true, force: true });
+    await rename(targetDir, previousDir);
+    try {
+      await rename(nextDir, targetDir);
+    } catch (error) {
+      await rename(previousDir, targetDir);
+      throw error;
+    }
+  } finally {
+    await rm(nextDir, { recursive: true, force: true });
+  }
 }
 
 /**
@@ -101,6 +165,7 @@ async function performPublicExport(observer?: PublicDeployObserver): Promise<Pub
   const buildOutputDir = publicBuildOutputDirectory();
   const exportDir = resolvePublicExportDirectory();
 
+  await recoverPreviousExportDirectory(exportDir);
   await ensurePublishedGroupsExist();
   await clearDirectoryContents(buildOutputDir);
 
@@ -154,6 +219,8 @@ export async function deployPublicSite(
 
   return withPublicSiteOperationLock("deploy", async () => {
     observer?.onStage?.("checking");
+    const exportDir = resolvePublicExportDirectory();
+    await recoverPreviousExportDirectory(exportDir);
     await ensurePublishedGroupsExist();
     const projectName = process.env[CF_PAGES_PROJECT_NAME_ENV_NAME]?.trim() || "";
     const branch = process.env[CF_PAGES_BRANCH_ENV_NAME]?.trim() || null;
@@ -164,7 +231,7 @@ export async function deployPublicSite(
         stdout: "Public site is already up to date.",
         stderr: "",
         buildOutputDir: publicBuildOutputDirectory(),
-        exportDir: resolvePublicExportDirectory(),
+        exportDir,
         projectName,
         branch,
         fingerprint,

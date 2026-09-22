@@ -12,21 +12,51 @@ import { readPublicDeployState, writePublicDeployState } from "./state-store";
 
 const LAST_SUCCESS_FILENAME = "last-success.json";
 const PUBLIC_SOURCE_PATHS = [
+  "apps/build-metadata.mjs",
   "apps/public-site/app",
   "apps/public-site/lib",
+  "apps/public-site/scripts",
   // Mounted branding bypasses source control, so its bytes must still invalidate the deployment
   // shortcut when an operator replaces a logo or favicon without changing its URL.
   "apps/public-site/public/branding",
+  // These are the public fallback assets referenced by shared metadata when no branding override
+  // is configured. Exclude `public/published` because it is rebuilt from the published tree below.
+  "apps/public-site/public/default-apple-icon.png",
+  "apps/public-site/public/default-favicon.ico",
+  "apps/public-site/public/default-icon.png",
   "apps/public-site/next.config.mjs",
   "apps/public-site/package.json",
+  "apps/public-site/tsconfig.json",
+  "apps/internal-site/tsconfig.json",
   "packages/compare-core/src",
+  "packages/compare-core/package.json",
   "packages/content-schema/src",
+  "packages/content-schema/package.json",
   "packages/shared-utils/src",
+  "packages/shared-utils/package.json",
   "packages/ui/src",
+  "packages/ui/package.json",
+  "package.json",
   "pnpm-lock.yaml",
+  "pnpm-workspace.yaml",
+  "patches",
   "scripts/sync-published.ts",
   "scripts/write-public-route-aliases.ts",
+  "tsconfig.base.json",
 ];
+
+/** Match export URL normalization so equivalent settings do not trigger another deployment. */
+function getPublishedAssetRewriteConfig() {
+  const publicBaseUrl = process.env.MAGIC_COMPARE_S3_PUBLIC_BASE_URL?.trim().replace(/\/+$/, "");
+  const objectPrefix = process.env.MAGIC_COMPARE_S3_INTERNAL_PREFIX?.trim().replace(
+    /^\/+|\/+$/g,
+    "",
+  );
+  return {
+    publicBaseUrl: publicBaseUrl || null,
+    objectPrefix: objectPrefix || null,
+  };
+}
 
 interface LastSuccessfulDeployment {
   fingerprint: string;
@@ -89,11 +119,15 @@ async function hashPublishedTree(hash: ReturnType<typeof createHash>) {
 export async function computePublicDeploymentFingerprint(): Promise<string> {
   const hash = createHash("sha256");
   const publicBrand = resolveSiteBrandConfig(process.env, "public");
+  const publishedAssetRewrite = getPublishedAssetRewriteConfig();
   hash.update(
     JSON.stringify({
       projectName: getCfPagesProjectName(),
       branch: getCfPagesBranch(),
       publicSiteBaseUrl: process.env[PUBLIC_SITE_BASE_URL_ENV_NAME]?.trim() || null,
+      // `sync-published` rewrites exported manifest URLs with these two non-secret values.
+      publishedAssetPublicBaseUrl: publishedAssetRewrite.publicBaseUrl,
+      publishedAssetObjectPrefix: publishedAssetRewrite.objectPrefix,
       footerAuthor: process.env.MAGIC_COMPARE_FOOTER_AUTHOR?.trim() || null,
       footerJoinLabel: process.env.MAGIC_COMPARE_FOOTER_JOIN_US_LABEL?.trim() || null,
       footerJoinUrl: process.env.MAGIC_COMPARE_FOOTER_JOIN_US_URL?.trim() || null,

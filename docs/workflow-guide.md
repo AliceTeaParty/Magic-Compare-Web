@@ -692,3 +692,11 @@ docker build --platform linux/amd64 -f docker/internal-site.Dockerfile -t magic-
 3. `public-site` 只负责静态消费已发布 bundle
 
 只要不把这三段重新揉成一团，就不容易回到之前那些 404、空导出、并发部署和 viewer 布局失控的问题里。
+
+### 公开导出失败后的恢复
+
+导出先完整复制到目标目录旁的 `<exportDir>.next`，再把当前目录移到 `<exportDir>.previous` 并提升新目录。复制失败保留当前目录，提升失败恢复上一份目录；若进程恰在两次 rename 之间退出，下次 export/deploy 会先恢复缺失的目标目录。只保留最近一份 previous，下一次成功替换时覆盖。
+
+这些旁路目录属于导出流程，应与目标位于同一文件系统。单实例服务共用 publish/export/deploy 进程内锁；运维 CLI 仍需顺序执行，不能与服务中的发布操作并发运行。
+
+部署跳过判断现在覆盖素材公开域名、对象前缀、分享图片脚本、默认图标、构建配置和补丁内容。更改这些输入后会重新导出；凭据不进入指纹。
