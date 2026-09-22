@@ -1,6 +1,6 @@
 "use client";
 
-import { Box, Paper } from "@mui/material";
+import { Box, Collapse, Paper } from "@mui/material";
 import {
   getComparisonAssetKey,
   getNextAbAssetSelection,
@@ -205,13 +205,6 @@ export function GroupViewerWorkbench({
     }
   }, [closeSidebar, mediaPreferencesReady, resolvedShowDesktopSidebar]);
 
-  // Leaving A/B mode should reset inspect state so returning to it starts from a predictable baseline.
-  useEffect(() => {
-    if (mode !== "a-b") {
-      interactionStore.resetAb(currentFrameId);
-    }
-  }, [currentFrameId, interactionStore, mode]);
-
   useViewerDevicePixelRatio(setDevicePixelRatio);
 
   useEffect(() => {
@@ -323,7 +316,14 @@ export function GroupViewerWorkbench({
           maxWidth: "100%",
           display: "grid",
           gridTemplateColumns:
-            sidebarOpen && resolvedShowDesktopSidebar ? "minmax(0, 1fr) 320px" : "minmax(0, 1fr)",
+            sidebarOpen && resolvedShowDesktopSidebar
+              ? "minmax(0, 1fr) 320px"
+              : "minmax(0, 1fr) 0px",
+          // Keep both tracks so details can open and close continuously. The existing stage
+          // ResizeObserver follows the interpolated width without remounting or reloading images.
+          transition:
+            "grid-template-columns 240ms cubic-bezier(0.2, 0, 0, 1), background-color 250ms cubic-bezier(0.2, 0, 0, 1)",
+          "@media (prefers-reduced-motion: reduce)": { transition: "none" },
           gridTemplateRows: "auto minmax(0, auto)",
           // A min-height grid stretches auto tracks by default, which made the viewer header absorb
           // the unused viewport height and pushed the stage far below its controls.
@@ -365,7 +365,14 @@ export function GroupViewerWorkbench({
             flexDirection: "column",
           }}
         >
-          {mode === "heatmap" && (
+          {/* Analysis controls change the stage's vertical position; collapse the reserved space
+              along with the mode fade instead of jumping the image down and back up. */}
+          <Collapse
+            in={mode === "heatmap"}
+            mountOnEnter
+            unmountOnExit
+            timeout={resolvedPrefersReducedMotion ? 0 : 240}
+          >
             <HeatmapInspectionPanel
               state={liveHeatmap}
               gain={heatmapGain}
@@ -383,7 +390,7 @@ export function GroupViewerWorkbench({
                 matchingStoredHeatmap ? () => setStoredHeatmapKey(heatmapPairKey) : undefined
               }
             />
-          )}
+          </Collapse>
           <Box data-testid="viewer-stage-area" sx={{ minWidth: 0, p: { xs: 1, md: 1.5 } }}>
             {/* Stack spacing reset the stage's auto margins, leaving fitted images left-aligned.
                 One stage needs no spacing wrapper; its containing block owns centering. */}
@@ -482,6 +489,7 @@ export function GroupViewerWorkbench({
           showDesktopSidebar={resolvedShowDesktopSidebar}
           sidebarOpen={sidebarOpen}
           closeSidebar={closeSidebar}
+          prefersReducedMotion={resolvedPrefersReducedMotion}
           variant={variant}
           onGroupIntent={imagePreloader.preloadGroupHint}
           onGroupNavigate={onGroupNavigate}

@@ -149,6 +149,93 @@ test("heatmap changes opacity and mode survives reload", async ({ page }) => {
   await expect(page.getByRole("slider", { name: "热图透明度" })).toBeVisible();
 });
 
+test("mode transitions retain decoded pixels and release inactive surfaces", async ({ page }) => {
+  for (const label of ["A / B", "热图", "滑动"]) {
+    // Observe from the click itself; waiting through an automation round trip can miss a short fade.
+    const observations = await page.evaluate(async (name) => {
+      const button = [...document.querySelectorAll("button")].find(
+        (node) => node.textContent?.trim() === name,
+      )!;
+      button.click();
+      const samples: { outgoing: boolean; decoded: boolean; faded: boolean }[] = [];
+      const start = performance.now();
+      while (performance.now() - start < 350) {
+        await new Promise(requestAnimationFrame);
+        const outgoing = document.querySelector<HTMLElement>(
+          '[data-viewer-mode-layer][aria-hidden="true"]',
+        );
+        if (!outgoing) continue;
+        const opacity = Number(getComputedStyle(outgoing).opacity);
+        samples.push({
+          outgoing: outgoing.inert,
+          decoded: [
+            ...outgoing.querySelectorAll<HTMLImageElement>("[data-viewer-stage-image]"),
+          ].some(
+            (image) =>
+              image.complete &&
+              image.naturalWidth > 0 &&
+              Number(getComputedStyle(image).opacity) > 0,
+          ),
+          faded: opacity > 0 && opacity < 1,
+        });
+      }
+      return samples;
+    }, label);
+    expect(observations.some((sample) => sample.outgoing && sample.decoded && sample.faded)).toBe(
+      true,
+    );
+    await expect(page.locator("[data-viewer-mode-layer]")).toHaveCount(1);
+  }
+
+  // Reverse direction before an exit completes; the last selected mode must own interaction.
+  await page.evaluate(async () => {
+    for (const label of ["A / B", "热图", "A / B", "滑动"]) {
+      [...document.querySelectorAll("button")]
+        .find((button) => button.textContent?.trim() === label)!
+        .click();
+      await new Promise(requestAnimationFrame);
+    }
+  });
+  await expect(page.locator("[data-viewer-mode-layer]")).toHaveCount(1);
+  await expect(page.locator("[data-viewer-mode-layer]")).toHaveAttribute(
+    "data-viewer-mode-layer",
+    "before-after",
+  );
+
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.getByRole("button", { name: "A / B", exact: true }).click();
+  await expect(page.locator("[data-viewer-mode-layer]")).toHaveCount(1);
+  await expect(page.getByRole("button", { name: /A\/B inspect stage/ })).toBeVisible();
+});
+
+test("desktop details resize continuously without replacing stage images", async ({
+  page,
+  isMobile,
+}) => {
+  test.skip(isMobile, "Mobile details use the existing overlay drawer.");
+  for (const name of ["打开详情", "关闭详情"]) {
+    const result = await page.evaluate(async (label) => {
+      const stage = document.querySelector<HTMLElement>('[data-testid="viewer-stage"]')!;
+      const image = stage.querySelector("img[data-viewer-stage-image]");
+      const button = document.querySelector<HTMLButtonElement>(`button[aria-label="${label}"]`)!;
+      const widths = [stage.getBoundingClientRect().width];
+      button.click();
+      const start = performance.now();
+      while (performance.now() - start < 400) {
+        await new Promise(requestAnimationFrame);
+        widths.push(stage.getBoundingClientRect().width);
+      }
+      return { widths, sameImage: image === stage.querySelector("img[data-viewer-stage-image]") };
+    }, name);
+    expect(result.sameImage).toBe(true);
+    const min = Math.min(...result.widths);
+    const max = Math.max(...result.widths);
+    expect(max - min).toBeGreaterThan(20);
+    expect(result.widths.some((width) => width > min + 1 && width < max - 1)).toBe(true);
+  }
+  await expect(page.locator("aside")).toHaveCount(0);
+});
+
 test("long filmstrip supports keyboard scrolling, end selection and returning home", async ({
   page,
 }) => {
