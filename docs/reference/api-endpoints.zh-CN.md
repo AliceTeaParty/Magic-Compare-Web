@@ -15,7 +15,9 @@
 - Zod 参数校验失败返回 `400`；其他明确的无效输入也返回 `400`。
 - 目标 Case、Group 或上传作业不存在时返回 `404`；重复创建、陈旧状态或未满足前置条件时返回 `409`。
 - Frame commit 的对象存储校验失败返回 `502`，响应只包含存储错误码和上游 HTTP 状态；服务端日志额外记录 job、frame、阶段和对象存储 request ID。
-- 未分类的数据库、对象存储、部署配置或程序异常会记录服务端日志并返回 `500`。
+- 数据库提交前的未分类异常会记录服务端日志并返回 `500`。
+- `case-update`、`group-update`、`group-visibility`、`group-reorder`、`group-delete` 若数据库已提交而后续公开内容同步、素材清理或派生状态更新失败，仍返回 `200` 和原有结果字段，并附带 `warnings: string[]`。客户端保留已保存的数据并显示警告；无警告时省略该字段。
+- `group-delete.removedPublishedBundle` 仅在公开目录成功删除后为 `true`。S3 清理失败会记录原 storageRoot，仍继续公开目录和项目状态清理。
 
 ## 端点总览
 

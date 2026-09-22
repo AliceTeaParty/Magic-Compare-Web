@@ -196,4 +196,48 @@ describe("workspace metadata actions", () => {
     );
     expect(refresh).toHaveBeenCalledTimes(1);
   });
+  it("keeps committed metadata and displays a persistent warning when publication fails", async () => {
+    const notifications = createNotificationApi();
+    const context = {
+      data: baseCase,
+      notifications,
+      refresh: vi.fn(),
+      startTransition: vi.fn(),
+      setCaseSummary: vi.fn(),
+      summaryRef: { current: "Original summary" },
+    } satisfies WorkspaceCaseMetadataMutationContext;
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      Response.json({
+        summary: "Saved summary",
+        warnings: ["更改已保存，公开内容同步失败。"],
+      }),
+    );
+    await updateWorkspaceCaseSummary("Saved summary", context);
+    expect(context.summaryRef.current).toBe("Saved summary");
+    expect(context.setCaseSummary).not.toHaveBeenCalledWith("Original summary");
+    expect(context.refresh).toHaveBeenCalledOnce();
+    expect(notifications.pushNotification).toHaveBeenCalledExactlyOnceWith(
+      "更改已保存，公开内容同步失败。",
+      "warning",
+      { sticky: true },
+    );
+  });
+
+  it("restores the previous summary when the database mutation is rejected", async () => {
+    const notifications = createNotificationApi();
+    const context = {
+      data: baseCase,
+      notifications,
+      refresh: vi.fn(),
+      startTransition: vi.fn(),
+      setCaseSummary: vi.fn(),
+      summaryRef: { current: "Original summary" },
+    } satisfies WorkspaceCaseMetadataMutationContext;
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      Response.json({ error: "write failed" }, { status: 500 }),
+    );
+    await updateWorkspaceCaseSummary("Unsaved summary", context);
+    expect(context.summaryRef.current).toBe("Original summary");
+    expect(notifications.pushNotification).toHaveBeenCalledWith("write failed", "error");
+  });
 });

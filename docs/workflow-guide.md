@@ -700,3 +700,9 @@ docker build --platform linux/amd64 -f docker/internal-site.Dockerfile -t magic-
 这些旁路目录属于导出流程，应与目标位于同一文件系统。单实例服务共用 publish/export/deploy 进程内锁；运维 CLI 仍需顺序执行，不能与服务中的发布操作并发运行。
 
 部署跳过判断现在覆盖素材公开域名、对象前缀、分享图片脚本、默认图标、构建配置和补丁内容。更改这些输入后会重新导出；凭据不进入指纹。
+
+### 保存成功但公开内容同步失败
+
+元数据、顺序、可见性和删除操作在 SQLite 提交后，若公开文件或素材清理失败，API 返回已保存的数据及 `warnings`。工作区保留已提交的值并显示持续警告；真正的数据库写入失败仍会回滚界面。
+
+管理员可按[公开内容修复](reference/publication-repair.zh-CN.md)对指定 Case slug 重建 manifest、清理已隐藏或删除图组的残留 bundle，并更新封面与项目状态。对象存储清理失败的 storageRoot 记录在服务端日志中，需按该精确前缀处理；修复命令不扫描或删除桶内其他素材。

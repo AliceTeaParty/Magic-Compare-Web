@@ -15,6 +15,6 @@ const schema = z.object({
 
 export const POST = withApiRoute(async (request: Request) => {
   const payload = schema.parse(await request.json());
-  await reorderGroups(payload.caseId, payload.groupIds);
-  return NextResponse.json({ ok: true });
+  const result = await reorderGroups(payload.caseId, payload.groupIds);
+  return NextResponse.json({ ok: true, ...result });
 });

@@ -5,6 +5,19 @@ import { deletePublishedGroup } from "@/lib/server/storage/published-content";
 import { deleteInternalAssetPrefix } from "@/lib/server/storage/internal-assets";
 import { recomputeCaseCoverAsset, syncCasePublicationState } from "./case-maintenance";
 
+/** The database commit is final; report failed derived work without telling clients to roll it back. */
+async function afterCommit(context: string, warning: string, action: () => Promise<unknown>) {
+  try {
+    await action();
+    return {};
+  } catch (error) {
+    console.error(`[content-mutation] ${context}`, error);
+    return { warnings: [warning] };
+  }
+}
+
+const PUBLICATION_WARNING = "更改已保存，公开内容同步失败。请联系管理员修复公开内容。";
+
 /** Refreshes existing public content while leaving draft-only cases untouched. */
 async function refreshPublishedCase(caseId: string): Promise<boolean> {
   const publicGroupCount = await prisma.group.count({
@@ -122,7 +135,7 @@ export async function createCase(metadata: { slug: string; title: string; summar
  * Rejects stale drag-and-drop state before writing because partial or foreign id lists would leave
  * duplicate order values and publish a manifest that no longer matches the workspace.
  */
-export async function reorderGroups(caseId: string, groupIds: string[]): Promise<void> {
+export async function reorderGroups(caseId: string, groupIds: string[]) {
   const currentGroups = await prisma.group.findMany({
     where: { caseId },
     select: { id: true },
@@ -148,7 +161,7 @@ export async function reorderGroups(caseId: string, groupIds: string[]): Promise
       }),
     ),
   );
-  await refreshPublishedCase(caseId);
+  return afterCommit(`reorder ${caseId}`, PUBLICATION_WARNING, () => refreshPublishedCase(caseId));
 }
 
 /**
@@ -171,17 +184,32 @@ export async function setGroupVisibility(caseSlug: string, groupSlug: string, is
     },
   });
 
+  const warnings: string[] = [];
   if (!isPublic && targetGroup.publicSlug) {
-    await deletePublishedGroup(targetGroup.publicSlug);
+    const cleanup = await afterCommit(
+      `hide published ${targetGroup.publicSlug}`,
+      "可见性已保存，但公开内容清理失败。请联系管理员修复公开内容。",
+      () => deletePublishedGroup(targetGroup.publicSlug!),
+    );
+    warnings.push(...(cleanup.warnings ?? []));
   }
-  if (!(await refreshPublishedCase(caseRow.id))) {
-    await syncCasePublicationState(caseRow.id);
-  }
+  // A failed filesystem cleanup must not skip the database's derived publication state.
+  const synchronization = await afterCommit(
+    `visibility ${caseSlug}/${groupSlug}`,
+    PUBLICATION_WARNING,
+    async () => {
+      if (!(await refreshPublishedCase(caseRow.id))) {
+        await syncCasePublicationState(caseRow.id);
+      }
+    },
+  );
+  warnings.push(...(synchronization.warnings ?? []));
 
   return {
     caseSlug: caseRow.slug,
     groupSlug: targetGroup.slug,
     isPublic,
+    ...(warnings.length ? { warnings } : {}),
   };
 }
 
@@ -199,11 +227,14 @@ export async function updateCaseSummary(caseSlug: string, summary: string) {
       summary: true,
     },
   });
-  await refreshPublishedCase(caseRow.id);
+  const synchronization = await afterCommit(`metadata ${caseSlug}`, PUBLICATION_WARNING, () =>
+    refreshPublishedCase(caseRow.id),
+  );
 
   return {
     caseSlug: caseRow.slug,
     summary: caseRow.summary,
+    ...synchronization,
   };
 }
 
@@ -241,7 +272,9 @@ export async function updateCaseMetadata(
     data,
     select: { id: true, slug: true, title: true, summary: true, tagsJson: true, status: true },
   });
-  await refreshPublishedCase(caseRow.id);
+  const synchronization = await afterCommit(`metadata ${caseSlug}`, PUBLICATION_WARNING, () =>
+    refreshPublishedCase(caseRow.id),
+  );
 
   return {
     caseSlug: caseRow.slug,
@@ -249,6 +282,7 @@ export async function updateCaseMetadata(
     summary: caseRow.summary,
     tags: JSON.parse(caseRow.tagsJson) as string[],
     status: caseRow.status,
+    ...synchronization,
   };
 }
 
@@ -287,15 +321,20 @@ export async function updateGroupMetadata(
     },
   });
 
-  if (targetGroup.isPublic) {
-    await publishCase(caseRow.id);
-  }
+  const synchronization = await afterCommit(
+    `metadata ${caseSlug}/${groupSlug}`,
+    PUBLICATION_WARNING,
+    async () => {
+      if (targetGroup.isPublic) await publishCase(caseRow.id);
+    },
+  );
 
   return {
     caseSlug: caseRow.slug,
     groupSlug: groupRow.slug,
     title: groupRow.title,
     description: groupRow.description,
+    ...synchronization,
   };
 }
 
@@ -330,22 +369,45 @@ export async function deleteGroup(caseSlug: string, groupSlug: string) {
     where: { id: targetGroup.id },
   });
 
+  const warnings: string[] = [];
   if (targetGroup.storageRoot) {
-    await deleteInternalAssetPrefix(targetGroup.storageRoot);
+    const cleanup = await afterCommit(
+      `delete assets ${targetGroup.storageRoot}`,
+      "图组已删除，但素材清理失败。请联系管理员清理残留素材。",
+      () => deleteInternalAssetPrefix(targetGroup.storageRoot!),
+    );
+    warnings.push(...(cleanup.warnings ?? []));
   }
 
+  let removedPublishedBundle = false;
   if (targetGroup.publicSlug) {
-    await deletePublishedGroup(targetGroup.publicSlug);
+    const cleanup = await afterCommit(
+      `delete published ${targetGroup.publicSlug}`,
+      "图组已删除，但公开内容清理失败。请联系管理员修复公开内容。",
+      async () => {
+        await deletePublishedGroup(targetGroup.publicSlug!);
+        removedPublishedBundle = true;
+      },
+    );
+    warnings.push(...(cleanup.warnings ?? []));
   }
 
-  await recomputeCaseCoverAsset(caseRow.id);
-  await syncCasePublicationState(caseRow.id);
+  const maintenance = await afterCommit(
+    `delete metadata ${caseSlug}/${groupSlug}`,
+    "图组已删除，但项目状态更新失败。请联系管理员修复项目状态。",
+    async () => {
+      await recomputeCaseCoverAsset(caseRow.id);
+      await syncCasePublicationState(caseRow.id);
+    },
+  );
+  warnings.push(...(maintenance.warnings ?? []));
 
   return {
     caseSlug: caseRow.slug,
     groupSlug: targetGroup.slug,
     groupTitle: targetGroup.title,
-    removedPublishedBundle: Boolean(targetGroup.publicSlug),
+    removedPublishedBundle,
+    ...(warnings.length ? { warnings } : {}),
     publicSlug: targetGroup.publicSlug,
   };
 }
