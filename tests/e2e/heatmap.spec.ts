@@ -47,8 +47,9 @@ test("live analysis follows Rip/Flt and survives leaving and re-entering heatmap
   await page.getByRole("button", { name: "滑动", exact: true }).click();
   await expect(page.locator('[data-viewer-mode-layer="heatmap"]')).toHaveCount(0);
   await page.getByRole("button", { name: "热图", exact: true }).click();
-  await expect(heatmap).not.toHaveAttribute("src", decodedHeatmapUrl!);
   await expect(panel.getByText(/全图差异 RMS/)).toHaveText(flt);
+  await expect(heatmap).toHaveAttribute("src", /^blob:/);
+  expect(await heatmap.getAttribute("src")).not.toBe(decodedHeatmapUrl);
   await waitForStage(page);
   await expectPageFits(page);
 });

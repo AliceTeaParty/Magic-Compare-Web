@@ -375,8 +375,7 @@ export function ViewerStage({
               <ViewerStageContent
                 // Frame changes reset image nodes without canceling the mode's exit cleanup.
                 key={frameId ?? "empty"}
-                // Freeze outgoing props, including a heatmap whose worker has just been stopped.
-                // Its decoded image remains visible until Fade releases this surface.
+                // Freeze outgoing props so decoded pixels remain stable until Fade releases them.
                 active={mode === stageMode}
                 abSide={abSide}
                 afterAsset={afterAsset}
