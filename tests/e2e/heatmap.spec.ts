@@ -32,8 +32,22 @@ test("live analysis follows Rip/Flt and survives leaving and re-entering heatmap
   await panel.getByRole("button", { name: "仅热图", exact: true }).click();
   await waitForStage(page);
   await expect(heatmap).toHaveCSS("opacity", "1");
+  const decodedHeatmapUrl = await heatmap.getAttribute("src");
+  // A real reversed transition must reuse the decoded map rather than expose the original while
+  // starting a second fetch/worker cycle. Two animation frames commit exit before re-entry.
+  await page.evaluate(async () => {
+    const buttons = [...document.querySelectorAll("button")];
+    buttons.find((button) => button.textContent?.trim() === "A / B")!.click();
+    await new Promise(requestAnimationFrame);
+    await new Promise(requestAnimationFrame);
+    buttons.find((button) => button.textContent?.trim() === "热图")!.click();
+  });
+  await expect(heatmap).toHaveAttribute("src", decodedHeatmapUrl!);
+  await expect(heatmap).toHaveCSS("opacity", "1");
   await page.getByRole("button", { name: "滑动", exact: true }).click();
+  await expect(page.locator('[data-viewer-mode-layer="heatmap"]')).toHaveCount(0);
   await page.getByRole("button", { name: "热图", exact: true }).click();
+  await expect(heatmap).not.toHaveAttribute("src", decodedHeatmapUrl!);
   await expect(panel.getByText(/全图差异 RMS/)).toHaveText(flt);
   await waitForStage(page);
   await expectPageFits(page);

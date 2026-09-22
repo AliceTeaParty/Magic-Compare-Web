@@ -302,6 +302,7 @@ interface ViewerStageProps {
   interactionStore: ViewerInteractionStore;
   mode: ViewerMode;
   onCycleAbSide: () => void;
+  onHeatmapPresenceChange: (mounted: boolean) => void;
   prefersReducedMotion: boolean;
   rotateStage: boolean;
   stageRef: RefObject<HTMLDivElement | null>;
@@ -322,6 +323,7 @@ export function ViewerStage({
   interactionStore,
   mode,
   onCycleAbSide,
+  onHeatmapPresenceChange,
   prefersReducedMotion,
   rotateStage,
   stageRef,
@@ -345,14 +347,18 @@ export function ViewerStage({
             not enter this transition, so pixel comparisons remain immediate. */}
         {(["before-after", "a-b", "heatmap"] as const).map((stageMode) => (
           <Fade
-            key={`${frameId ?? "empty"}:${stageMode}`}
+            key={stageMode}
             in={mode === stageMode}
             appear={false}
             mountOnEnter
             unmountOnExit
             timeout={prefersReducedMotion ? 0 : 220}
             easing="cubic-bezier(0.2, 0, 0, 1)"
-            onExited={stageMode === "a-b" ? () => interactionStore.resetAb(frameId) : undefined}
+            onEnter={stageMode === "heatmap" ? () => onHeatmapPresenceChange(true) : undefined}
+            onExited={() => {
+              if (stageMode === "a-b") interactionStore.resetAb(frameId);
+              if (stageMode === "heatmap") onHeatmapPresenceChange(false);
+            }}
           >
             <Box
               data-viewer-mode-layer={stageMode}
@@ -367,6 +373,8 @@ export function ViewerStage({
               }}
             >
               <ViewerStageContent
+                // Frame changes reset image nodes without canceling the mode's exit cleanup.
+                key={frameId ?? "empty"}
                 // Freeze outgoing props, including a heatmap whose worker has just been stopped.
                 // Its decoded image remains visible until Fade releases this surface.
                 active={mode === stageMode}

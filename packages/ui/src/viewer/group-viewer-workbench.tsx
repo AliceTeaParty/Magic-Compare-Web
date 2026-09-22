@@ -118,10 +118,12 @@ export function GroupViewerWorkbench({
   const [heatmapDisplay, setHeatmapDisplay] = useState<HeatmapDisplay>("map");
   const [heatmapRetry, setHeatmapRetry] = useState(0);
   const [storedHeatmapKey, setStoredHeatmapKey] = useState<string | null>(null);
+  const [heatmapSurfaceMounted, setHeatmapSurfaceMounted] = useState(mode === "heatmap");
   const heatmapPairKey = `${beforeAsset?.imageUrl}\n${afterAsset?.imageUrl}`;
   const useStoredHeatmap = storedHeatmapKey === heatmapPairKey;
   const liveHeatmap = useLiveHeatmap(
-    mode === "heatmap" && !useStoredHeatmap,
+    // A reversed fade still owns the decoded heatmap; release its worker/blob only after exit.
+    (mode === "heatmap" || heatmapSurfaceMounted) && !useStoredHeatmap,
     beforeAsset,
     afterAsset,
     heatmapGain,
@@ -420,6 +422,7 @@ export function GroupViewerWorkbench({
                 interactionStore={interactionStore}
                 mode={mode}
                 onCycleAbSide={cycleCurrentAbAsset}
+                onHeatmapPresenceChange={setHeatmapSurfaceMounted}
                 prefersReducedMotion={resolvedPrefersReducedMotion}
                 rotateStage={resolvedRotateStage}
                 stageRef={stageShell.stageRef}
