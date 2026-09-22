@@ -217,8 +217,10 @@ export function updateWorkspaceCaseSummary(
 
       context.summaryRef.current = savedSummary;
       context.setCaseSummary(savedSummary);
-      if (showMutationWarnings(result, context.notifications)) context.refresh();
-      else context.notifications.pushNotification("项目描述已保存。", "success");
+      // The response already carries the committed value, including when publication failed.
+      if (!showMutationWarnings(result, context.notifications)) {
+        context.notifications.pushNotification("项目描述已保存。", "success");
+      }
     } catch (error) {
       context.summaryRef.current = previousSummary;
       context.setCaseSummary(previousSummary);
@@ -283,8 +285,10 @@ export function updateWorkspaceGroupMetadata(
       );
 
       replaceWorkspaceGroups(context.groupsRef, context.setGroups, savedGroups);
-      if (showMutationWarnings(result, context.notifications)) context.refresh();
-      else context.notifications.pushNotification("图组元数据已保存。", "success");
+      // Publication warnings do not require a route refresh after applying the saved metadata.
+      if (!showMutationWarnings(result, context.notifications)) {
+        context.notifications.pushNotification("图组元数据已保存。", "success");
+      }
     } catch (error) {
       replaceWorkspaceGroups(context.groupsRef, context.setGroups, previousGroups);
       pushWorkspaceError(context.notifications, error, "保存图组元数据失败。");

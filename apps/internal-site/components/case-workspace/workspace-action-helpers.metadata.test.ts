@@ -215,7 +215,7 @@ describe("workspace metadata actions", () => {
     await updateWorkspaceCaseSummary("Saved summary", context);
     expect(context.summaryRef.current).toBe("Saved summary");
     expect(context.setCaseSummary).not.toHaveBeenCalledWith("Original summary");
-    expect(context.refresh).toHaveBeenCalledOnce();
+    expect(context.refresh).not.toHaveBeenCalled();
     expect(notifications.pushNotification).toHaveBeenCalledExactlyOnceWith(
       "更改已保存，公开内容同步失败。",
       "warning",

@@ -136,7 +136,6 @@ export function CaseSettingsPane({
         // Publication failure occurs after saving; keep the committed metadata visible.
         if (result.warnings?.length) {
           onNotify(result.warnings.join("\n"), "warning", { sticky: true });
-          router.refresh();
         } else onNotify("项目设置已保存。", "success");
         onOpenChange(false);
       } catch (error) {

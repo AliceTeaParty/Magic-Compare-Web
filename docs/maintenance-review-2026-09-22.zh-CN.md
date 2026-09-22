@@ -65,3 +65,7 @@ GitHub 规则依据：[Workflow syntax — paths](https://docs.github.com/en/act
 ### 追加的方向键修复
 
 三变量 A/B 的上、下方向键原先都调用无方向参数的正向轮询函数，因此 ↑ 也走 Src→Rip→Flt。现在键盘层传入明确方向：↓ 正向、↑ 反向；点击和 Enter 保持正向。两变量仍在两张图之间切换。单元测试验证状态顺序，浏览器回归检查实际显示标签及 Src/Flt 往返，并以 fresh export 验证公开站行为。
+
+### 保存警告后的多余刷新
+
+Firefox CI trace 发现：警告返回后额外触发 `router.refresh()`，紧接着 reload 会取消尚在进行的 RSC 请求，Next 随后回退到 document 导航，与 reload 相互中断。元数据响应已经包含已提交的值，因此删除只在 warning 时触发的刷新。保留原有删除、顺序和可见性操作所需的派生状态刷新。
