@@ -5,9 +5,6 @@ on:
   workflow_dispatch:
   schedule:
     - cron: "23 2 * * 1"
-  push:
-    tags:
-      - "v*"
 
 permissions:
   contents: read

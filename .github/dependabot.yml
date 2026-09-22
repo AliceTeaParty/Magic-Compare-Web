@@ -12,9 +12,34 @@ updates:
     schedule:
       interval: "weekly"
     groups:
+      react-and-types:
+        patterns:
+          - "react"
+          - "react-dom"
+          - "@types/react"
+          - "@types/react-dom"
+        update-types:
+          - "major"
+          - "minor"
+          - "patch"
+      prisma-and-client:
+        patterns:
+          - "prisma"
+          - "@prisma/*"
+        update-types:
+          - "major"
+          - "minor"
+          - "patch"
       npm-patch:
         patterns:
           - "*"
+        exclude-patterns:
+          - "react"
+          - "react-dom"
+          - "@types/react"
+          - "@types/react-dom"
+          - "prisma"
+          - "@prisma/*"
         update-types:
           - "patch"
       npm-minor:
@@ -32,6 +57,11 @@ updates:
           - "wrangler"
         update-types:
           - "minor"
+    ignore:
+      # The runtime major and its matching types move together after an explicit toolchain review.
+      - dependency-name: "@types/node"
+        update-types:
+          - "version-update:semver-major"
     cooldown:
       semver-major-days: 14
       semver-minor-days: 5
@@ -55,6 +85,11 @@ updates:
     directory: "/docker"
     schedule:
       interval: "weekly"
+    ignore:
+      # Docker's Node major is pinned to .node-version and updated as one deliberate change.
+      - dependency-name: "node"
+        update-types:
+          - "version-update:semver-major"
 
   # Images pinned in docker/*.compose*.yml files.
   - package-ecosystem: "docker-compose"

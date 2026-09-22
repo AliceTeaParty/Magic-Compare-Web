@@ -28,7 +28,9 @@ pnpm test:e2e:empty --project=internal-ios-webkit
 
 ## PR 浏览器矩阵
 
-`.github/workflows/browser-ui.yml` 是可复用工作流，每个 PR 和 main 更新调用同一套矩阵，也支持每周、版本 tag 和手动执行。每组分别测试 internal/public，并用另一份空数据库检查首次使用入口。
+`.github/workflows/ci.yml` 在每个 PR 和 main 更新运行，且可由其他工作流在同一提交调用；不使用路径过滤，避免必需的 `CI Gate` 因配置、补丁或文档改动被跳过。`CI Gate` 总结 Verify、Compose、浏览器矩阵、静态导出和视觉回归五项的实际结果，任一项失败或跳过都会阻断。
+
+`.github/workflows/browser-ui.yml` 是 CI 调用的可复用工作流，也支持每周和手动执行。每组分别测试 internal/public，并用另一份空数据库检查首次使用入口。版本 tag 或手动镜像检查会先调用同一套 CI；tag 在通过运行时 smoke 后，才将该 smoke 使用的 Docker 归档加载、打 tag 并推送 GHCR，发布阶段不会重新构建镜像。
 
 | 组                    | Runner       | 浏览器与设备配置                            |
 | --------------------- | ------------ | ------------------------------------------- |

@@ -3,57 +3,16 @@ name: CI
 run-name: CI • ${{ github.event_name }} • ${{ github.ref_name }}
 
 on:
+  workflow_call:
   pull_request:
     types:
       - opened
       - synchronize
       - reopened
       - ready_for_review
-    paths:
-      - "apps/**"
-      - "packages/**"
-      - "scripts/**"
-      - "tests/**"
-      - "docker/**"
-      - ".dockerignore"
-      - ".env.example"
-      - "DESIGN.md"
-      - ".node-version"
-      - ".prettierignore"
-      - ".prettierrc"
-      - "docker-compose.yml"
-      - "eslint.config.mjs"
-      - "package.json"
-      - "playwright*.config.ts"
-      - "pnpm-lock.yaml"
-      - "pnpm-workspace.yaml"
-      - "tsconfig*.json"
-      - "**/tsconfig*.json"
-      - ".github/workflows/**"
   push:
     branches:
       - main
-    paths:
-      - "apps/**"
-      - "packages/**"
-      - "scripts/**"
-      - "tests/**"
-      - "docker/**"
-      - ".dockerignore"
-      - ".env.example"
-      - "DESIGN.md"
-      - ".node-version"
-      - ".prettierignore"
-      - ".prettierrc"
-      - "docker-compose.yml"
-      - "eslint.config.mjs"
-      - "package.json"
-      - "playwright*.config.ts"
-      - "pnpm-lock.yaml"
-      - "pnpm-workspace.yaml"
-      - "tsconfig*.json"
-      - "**/tsconfig*.json"
-      - ".github/workflows/**"
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -67,7 +26,6 @@ defaults:
     shell: bash
 
 env:
-  NODE_VERSION: "24.13.1"
   CI_COMPOSE_ARGS: -f docker-compose.yml -f docker/ci.compose.override.yml
 
 jobs:
@@ -90,8 +48,11 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: ${{ env.NODE_VERSION }}
+          node-version-file: .node-version
           cache: pnpm
+
+      - name: Check toolchain declarations
+        run: node scripts/check-toolchain.mjs
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -130,7 +91,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: ${{ env.NODE_VERSION }}
+          node-version-file: .node-version
           cache: pnpm
 
       - name: Install dependencies
@@ -219,10 +180,10 @@ jobs:
           {
             echo "## CI Compose Smoke Summary"
             echo
-            echo "- Compose files: \`docker-compose.yml\` + \`docker/ci.compose.override.yml\`"
-            echo "- Object storage: RustFS CI sidecar on port 9000"
-            echo "- Readiness probe: \`http://127.0.0.1:3000\`"
-            echo "- Demo seed: enabled (\`MAGIC_COMPARE_HIDE_DEMO=false\` plus CI S3 env)"
+            printf '%s\n' '- Compose files: `docker-compose.yml` + `docker/ci.compose.override.yml`'
+            printf '%s\n' '- Object storage: RustFS CI sidecar on port 9000'
+            printf '%s\n' '- Readiness probe: `http://127.0.0.1:3000`'
+            printf '%s\n' '- Demo seed: enabled (`MAGIC_COMPARE_HIDE_DEMO=false` plus CI S3 env)'
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload compose logs
@@ -281,7 +242,7 @@ jobs:
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v6
         with:
-          node-version: ${{ env.NODE_VERSION }}
+          node-version-file: .node-version
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - name: Compare reviewed UI screenshots
@@ -295,3 +256,50 @@ jobs:
             output/playwright/playwright-report
             output/playwright/test-results
           retention-days: 7
+
+  ci-gate:
+    name: CI Gate
+    if: always()
+    needs:
+      - verify
+      - compose-smoke
+      - browser-ui
+      - static-ui
+      - visual-ui
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      VERIFY_RESULT: ${{ needs.verify.result }}
+      COMPOSE_SMOKE_RESULT: ${{ needs.compose-smoke.result }}
+      BROWSER_UI_RESULT: ${{ needs.browser-ui.result }}
+      STATIC_UI_RESULT: ${{ needs.static-ui.result }}
+      VISUAL_UI_RESULT: ${{ needs.visual-ui.result }}
+    steps:
+      - name: Summarize required jobs
+        run: |
+          set -euo pipefail
+          required_jobs=(
+            "Verify Workspace:$VERIFY_RESULT"
+            "Verify Compose Internal Site:$COMPOSE_SMOKE_RESULT"
+            "Browser UI:$BROWSER_UI_RESULT"
+            "Static Export UI:$STATIC_UI_RESULT"
+            "UI Visual Regression:$VISUAL_UI_RESULT"
+          )
+          {
+            echo "## CI Gate"
+            echo
+            echo "| Required job | Result |"
+            echo "| --- | --- |"
+            for required_job in "${required_jobs[@]}"; do
+              job_name="${required_job%%:*}"
+              job_result="${required_job#*:}"
+              printf '| %s | `%s` |\n' "$job_name" "$job_result"
+            done
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          for required_job in "${required_jobs[@]}"; do
+            if [[ "${required_job#*:}" != "success" ]]; then
+              echo "CI Gate blocked because ${required_job%%:*} reported ${required_job#*:}."
+              exit 1
+            fi
+          done
