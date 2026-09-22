@@ -2,14 +2,14 @@ import { ConflictError } from "@/lib/server/api/errors";
 
 export class PublicSiteOperationConflictError extends ConflictError {}
 
-let activePublicSiteOperation: "export" | "deploy" | null = null;
+let activePublicSiteOperation: "publish" | "export" | "deploy" | null = null;
 
 /**
- * Serializes export/deploy operations inside the process so concurrent button clicks cannot race on
- * the same build output directory or deployment command.
+ * Keeps manifest mutations and export/deploy operations from reading or replacing each other's
+ * inputs inside the single workstation process.
  */
 export async function withPublicSiteOperationLock<T>(
-  label: "export" | "deploy",
+  label: "publish" | "export" | "deploy",
   action: () => Promise<T>,
 ): Promise<T> {
   if (activePublicSiteOperation) {

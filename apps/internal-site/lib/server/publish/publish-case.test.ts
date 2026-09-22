@@ -9,7 +9,6 @@ const {
   assetUpdateMany,
   readPublishedManifest,
   writePublishedManifest,
-  resetPublishedGroup,
   assertLikelyPublicAssets,
   enrichPublishManifestWithPlaceholders,
 } = vi.hoisted(() => ({
@@ -20,7 +19,6 @@ const {
   assetUpdateMany: vi.fn(),
   readPublishedManifest: vi.fn(),
   writePublishedManifest: vi.fn(),
-  resetPublishedGroup: vi.fn(),
   assertLikelyPublicAssets: vi.fn(),
   enrichPublishManifestWithPlaceholders: vi.fn(),
 }));
@@ -43,7 +41,6 @@ vi.mock("@/lib/server/db/client", () => ({
 
 vi.mock("@/lib/server/storage/published-content", () => ({
   readPublishedManifest,
-  resetPublishedGroup,
   writePublishedManifest,
 }));
 
@@ -72,7 +69,6 @@ describe("publishCase", () => {
     assetUpdateMany.mockReset();
     readPublishedManifest.mockReset();
     writePublishedManifest.mockReset();
-    resetPublishedGroup.mockReset();
     assertLikelyPublicAssets.mockReset();
     enrichPublishManifestWithPlaceholders.mockReset();
     readPublishedManifest.mockResolvedValue(null);
@@ -146,7 +142,6 @@ describe("publishCase", () => {
 
     await publishCase("case-1");
 
-    expect(resetPublishedGroup).toHaveBeenCalledWith("2026--test-example");
     expect(assertLikelyPublicAssets).toHaveBeenCalledTimes(1);
     expect(assetUpdateMany).toHaveBeenCalledWith(
       expect.objectContaining({

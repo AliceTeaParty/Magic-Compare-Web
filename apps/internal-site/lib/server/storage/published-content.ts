@@ -1,20 +1,18 @@
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
+import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { parsePublishManifest, type PublishManifest } from "@magic-compare/content-schema";
 import { getPublishedRoot } from "@/lib/server/runtime-config";
+import { withPublicSiteOperationLock } from "@/lib/server/public-site/runtime/operation-lock";
 
 export function getPublishedGroupDirectory(publicSlug: string): string {
   return path.join(getPublishedRoot(), "groups", publicSlug);
 }
 
-export async function resetPublishedGroup(publicSlug: string): Promise<void> {
-  const directory = getPublishedGroupDirectory(publicSlug);
-  await rm(directory, { recursive: true, force: true });
-  await mkdir(directory, { recursive: true });
-}
-
 export async function deletePublishedGroup(publicSlug: string): Promise<void> {
-  await rm(getPublishedGroupDirectory(publicSlug), { recursive: true, force: true });
+  return withPublicSiteOperationLock("publish", async () => {
+    await rm(getPublishedGroupDirectory(publicSlug), { recursive: true, force: true });
+  });
 }
 
 /** Reads the previous snapshot only as an optimization cache; invalid legacy data is replaceable. */
@@ -32,6 +30,14 @@ export async function writePublishedManifest(
   manifest: PublishManifest,
 ): Promise<void> {
   const manifestPath = path.join(getPublishedGroupDirectory(publicSlug), "manifest.json");
-  await mkdir(path.dirname(manifestPath), { recursive: true });
-  await writeFile(manifestPath, JSON.stringify(manifest, null, 2), "utf8");
+  const directory = path.dirname(manifestPath);
+  const temporaryManifestPath = path.join(directory, `manifest.${randomUUID()}.tmp`);
+  await mkdir(directory, { recursive: true });
+
+  try {
+    await writeFile(temporaryManifestPath, JSON.stringify(manifest, null, 2), "utf8");
+    await rename(temporaryManifestPath, manifestPath);
+  } finally {
+    await rm(temporaryManifestPath, { force: true });
+  }
 }

@@ -6,7 +6,6 @@ import {
 } from "@/lib/server/storage/internal-asset-sanity";
 import {
   readPublishedManifest,
-  resetPublishedGroup,
   writePublishedManifest,
 } from "@/lib/server/storage/published-content";
 import { buildPublishManifest } from "./build-publish-manifest";
@@ -158,9 +157,6 @@ export async function publishCase(caseId: string) {
       );
     }
 
-    // Reset first so removed frames/assets disappear from the published bundle instead of lingering
-    // after subsequent publishes.
-    await resetPublishedGroup(publicSlug);
     await writePublishedManifest(publicSlug, enriched.manifest);
     results.push({ groupId: group.id, publicSlug });
   }
