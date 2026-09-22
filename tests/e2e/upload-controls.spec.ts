@@ -44,6 +44,8 @@ test("upload source, metadata, title mode, column editing and abandon controls",
   await page.mouse.move(last.x + last.width / 2, last.y + last.height / 2, { steps: 15 });
   await page.mouse.up();
   await expect(previews.first()).toHaveAttribute("aria-label", lastTitle!);
+  // dnd-kit keeps its capture-phase click listener for this exact cleanup window after a drop.
+  await page.waitForTimeout(50);
   // Narrow layouts show asset labels in previews; column editing belongs to the desktop header.
   if (!isMobile) {
     await page.getByRole("button", { name: "编辑 Src 列名" }).click();
