@@ -42,6 +42,8 @@ test("details and guide preserve stage geometry and close without trapping the p
   page,
   isMobile,
 }) => {
+  const stage = page.getByTestId("viewer-stage");
+  const before = (await stage.boundingBox())!;
   await page.getByRole("button", { name: "打开详情", exact: true }).click();
   if (isMobile) {
     await page.keyboard.press("Escape");
@@ -50,7 +52,8 @@ test("details and guide preserve stage geometry and close without trapping the p
     await page.getByRole("button", { name: "关闭详情", exact: true }).click();
   }
   await expect.poll(() => centerError(page)).toBeLessThanOrEqual(1);
-  const before = await page.getByTestId("viewer-stage").boundingBox();
+  // Centering also holds during the details animation; wait for the original width before testing the guide.
+  await expect.poll(async () => (await stage.boundingBox())?.width).toBeCloseTo(before.width, 0);
   await page.getByRole("button", { name: "查看引导", exact: true }).click();
   await page.keyboard.press("Escape");
   await expect(page.getByRole("button", { name: "查看引导", exact: true })).toHaveAttribute(
@@ -58,10 +61,7 @@ test("details and guide preserve stage geometry and close without trapping the p
     "false",
   );
   await expect.poll(() => centerError(page)).toBeLessThanOrEqual(1);
-  expect((await page.getByTestId("viewer-stage").boundingBox())?.width).toBeCloseTo(
-    before!.width,
-    0,
-  );
+  expect((await stage.boundingBox())?.width).toBeCloseTo(before.width, 0);
 });
 
 test("swipe moves in the visible direction and reset restores its midpoint", async ({
