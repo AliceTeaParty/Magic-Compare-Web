@@ -10,20 +10,31 @@
 | ------------------------------ | ------------------------------ |
 | Next.js / React / React DOM    | `16.3.5` / `19.2.8` / `19.2.8` |
 | Prisma / Prisma Client         | `7.10.0`                       |
-| Zod                            | `4.4.3`                        |
-| TypeScript / typescript-eslint | `6.0.3` / `8.66.0`             |
+| Zod                            | `4.6.5`                        |
+| TypeScript / typescript-eslint | `6.0.3` / `8.70.1`             |
 | Vitest                         | `4.1.11`                       |
 | Playwright                     | `1.62.1`                       |
-| ESLint / React Hooks plugin    | `10.8.0` / `7.1.1`             |
-| Prettier / tsx                 | `3.9.6` / `4.23.13`            |
+| ESLint / React Hooks plugin    | `10.11.0` / `7.1.1`            |
+| Prettier / tsx                 | `3.9.8` / `4.23.13`            |
 | Wrangler / Motion              | `4.119.0` / `12.43.0`          |
-| AWS S3 client / presigner      | `3.1104.0`                     |
+| AWS S3 client / presigner      | `3.1137.0`                     |
+| pinyin-pro                     | `3.29.4`                       |
+| CI Actions                     | checkout/setup-node/upload `7` |
+| pnpm Action / AWS CLI          | `6` / `2.36.46`                |
 
-最近一次已验证的批次更新了 Next.js `16.3.5`、Prisma `7.10.0`、Sharp `0.35.4`、tsx `4.23.13`、Vitest `4.1.11` 与 `@types/react-dom` `19.2.5`。TypeScript、Node 26 和 GitHub Actions major 仍保留为独立迁移项。
+最近一次已验证的批次更新了 Prisma `7.10.0`，并统一更新 npm 工具、AWS SDK、GitHub Actions 和 CI 使用的 AWS CLI。TypeScript 7 和 Node 26 仍保留为独立迁移项。
 
 本地、CI 与 Docker 统一使用 Node `24.13.x`，pnpm 固定为 `10.32.1`，`@types/node` 保持 Node 24 版本线。根目录的 `@types/node`、`@types/react`、`@types/react-dom` 固定到已验证版本，避免工具升级附带未验证的类型变化。下一代 TypeScript、Prisma 和 pnpm 属于后续独立迁移，不进入常规补丁更新。
 
 Next 开发缓存固定为 `.next-dev`，生产构建缓存为 `.next`。应用类型检查使用 `next typegen + tsc`；依赖升级验证时不需要为了类型检查停止开发服务器。
+
+### 2026-09-22 Dependabot 批次
+
+- PR #34、#36 的 Prisma `7.10.0` 已由本分支的完整迁移替代；PR #43、#46、#48 的兼容升级已合并到上述基线，旧锁文件不再复用。
+- PR #22、#24、#25、#26 的 Actions major 已按官方发行说明验证并更新所有 workflow 使用点。它们使用 Node 24 action runtime；GitHub-hosted runner 满足要求，pnpm 版本仍由根 `packageManager` 固定。
+- PR #35、#47 的 Node 26 类型和 Docker runtime 不进入本批次。项目的 engines、`.node-version`、Docker 和 `@types/node` 继续保持 Node 24；Dependabot 已忽略这两类 major 更新。
+
+版本依据见 [Prettier 3.9.8](https://github.com/prettier/prettier/releases/tag/3.9.8)、[ESLint 10.11.0](https://github.com/eslint/eslint/releases/tag/v10.11.0)、[typescript-eslint 8.70.1](https://github.com/typescript-eslint/typescript-eslint/releases/tag/v8.70.1)、[AWS SDK 3.1137.0](https://github.com/aws/aws-sdk-js-v3/releases/tag/v3.1137.0)、[Zod 4.6.5](https://github.com/colinhacks/zod/releases/tag/v4.6.5) 和 [pinyin-pro 3.29.4](https://github.com/zh-lx/pinyin-pro/releases/tag/3.29.4)。CI major 参考 [checkout 7](https://github.com/actions/checkout/releases/tag/v7.0.0)、[setup-node 7](https://github.com/actions/setup-node/releases/tag/v7.0.0)、[upload-artifact 7](https://github.com/actions/upload-artifact/releases/tag/v7.0.0) 与 [pnpm/action-setup 6](https://github.com/pnpm/action-setup/releases/tag/v6.0.0)；AWS CLI 补丁记录见[官方变更日志](https://github.com/aws/aws-cli/blob/v2/CHANGELOG.rst)。
 
 ## 拆分顺序
 

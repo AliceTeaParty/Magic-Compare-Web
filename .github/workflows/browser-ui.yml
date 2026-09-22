@@ -40,9 +40,9 @@ jobs:
             os: macos-15
             browser: webkit
     steps:
-      - uses: actions/checkout@v6
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v6
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
         with:
           node-version-file: .node-version
           cache: pnpm
@@ -74,7 +74,7 @@ jobs:
           JS
       - name: Upload report, screenshots and traces
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: browser-${{ matrix.suite }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
