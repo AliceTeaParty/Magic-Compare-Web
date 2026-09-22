@@ -91,6 +91,14 @@ Prisma `7.10.0` 的 CLI 仍固定依赖 `deepmerge-ts@7.1.5` 和 `mysql2@3.15.3`
 - 新 override 必须有公开修复版本，并通过 lint、测试、类型检查和两站构建。
 - 不用 major override 绕过 peer dependency 或迁移要求。
 
+## Playwright 目录输入补丁
+
+`patches/playwright-core@1.62.1.patch` 修正测试工具中目录 `input` 监听的安装顺序。1.62.1 的实现未等待监听安装完成便调用原生文件选择，事件先发生时，页面可正常收到文件，`setInputFiles` 却一直等待。桌面 WebKit 的 [CI trace](https://github.com/AliceTeaParty/Magic-Compare-Web/actions/runs/35707070215) 显示页面约 4.5 秒已完成配对，调用仍挂起到测试超时。
+
+独立原生页面自然运行 100/100 成功；对监听安装注入 100ms 延迟后，原版 10/10 超时且页面均收到完整文件。补丁先等待监听注册，再调用原生选择并等待输入事件，最后释放 handle；修正版重复验证通过。延迟注入证明了顺序缺陷，不把它描述成本机自然复现。实际桌面上传 E2E 继续验证真实文件选择与完整上传流程。
+
+补丁只影响 Playwright 测试依赖，保留原有异常处理和测试超时。升级 Playwright 时对照[上游实现](https://github.com/microsoft/playwright/blob/main/packages/playwright-core/src/server/dom.ts)，上游保证监听先注册后触发后移除此补丁，并复验桌面目录上传。
+
 ## 验证矩阵
 
 常规依赖升级至少运行：
