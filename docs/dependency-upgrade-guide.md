@@ -58,7 +58,7 @@ Next 开发缓存固定为 `.next-dev`，生产构建缓存为 `.next`。应用�
 
 迁移按 [Prisma 7 升级指南](https://www.prisma.io/docs/guides/upgrade-prisma-orm/v7) 和 [SQLite adapter 文档](https://www.prisma.io/docs/orm/v7/core-concepts/supported-databases/sqlite) 完成：
 
-- `prisma`、`@prisma/client` 和 `@prisma/adapter-better-sqlite3` 固定为同一稳定版本 `7.10.0`。Prisma CLI 是开发依赖，运行环境只安装 client、adapter 和 SQLite native addon。
+- `prisma`、`@prisma/client` 和 `@prisma/adapter-better-sqlite3` 固定为同一稳定版本 `7.10.0`。Prisma CLI 的直接声明是开发依赖；应用运行时使用 client、adapter 和 SQLite native addon。pnpm 仍可能通过 optional peer 把 CLI 传递包带入生产依赖图，镜像保留完整安装图，不按包名手工裁剪。
 - schema 使用 `prisma-client` generator，并将生成源码放在 `apps/internal-site/generated/prisma/`。该目录不提交，由 `postinstall` 和 `db:generate` 重建；应用和 E2E fixture 都通过明确生成路径导入。
 - datasource URL 位于 `apps/internal-site/prisma.config.ts`。CLI、`node:sqlite` 初始化器和运行时 adapter 共用 SQLite URL 解析规则，相对路径继续指向应用的 `prisma/` 目录。
 - adapter 固定使用 `timestampFormat: "unixepoch-ms"`，保持与 Prisma 6 原生 SQLite 驱动写入的整数毫秒日期兼容。状态与模式字段继续使用既有字符串存储，不引入数据库 enum。

@@ -58,4 +58,10 @@ GitHub 规则依据：[Workflow syntax — paths](https://docs.github.com/en/act
 - actionlint 语法检查通过。ShellCheck 的 SC2086 对应固定 Compose 参数的有意拆词，SC2016 对应 Markdown 反引号字面值；这两项没有真实错误，不为消除提示改变逻辑。
 - Prisma CLI 仍带来 deepmerge-ts/mysql2 的 3 项审计公告。当前 SQLite 业务调用链不加载这些 CLI/MySQL 路径，记录为不可达，没有追加未经验证的 major override。
 
-完整浏览器矩阵、fresh export、Docker 和远端 CI 结果在维护任务完成时另行记录。
+- fresh export：46 项通过、10 项按平台跳过，覆盖桌面 Chromium 与移动 WebKit 的静态原图、viewer 和交互。
+- Linux/amd64 Docker 构建与容器内 db:push、Prisma 查询通过。保留 pnpm 的完整生产依赖图，没有手工删除 CLI 传递包。
+- 完整本地浏览器首次回归：190 通过、22 按平台跳过；上传列名编辑超时已由 trace 定位为拖拽结束后 15ms 的合成点击，被 dnd-kit 有意保留 50ms 的 click 拦截器吞掉。测试等待该既定清理窗口；产品保护保持原样。远端 CI 与定向复验结果由维护 PR 记录。
+
+### 追加的方向键修复
+
+三变量 A/B 的上、下方向键原先都调用无方向参数的正向轮询函数，因此 ↑ 也走 Src→Rip→Flt。现在键盘层传入明确方向：↓ 正向、↑ 反向；点击和 Enter 保持正向。两变量仍在两张图之间切换。单元测试验证状态顺序，浏览器回归检查实际显示标签及 Src/Flt 往返，并以 fresh export 验证公开站行为。
