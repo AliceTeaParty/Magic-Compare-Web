@@ -34,7 +34,7 @@ export default defineConfig({
   projects: [
     {
       name: "visual-desktop",
-      testMatch: ["viewer.visual.spec.ts", "internal.visual.spec.ts"],
+      testMatch: ["viewer.visual.spec.ts", "internal.visual.spec.ts", "upload.visual.spec.ts"],
       use: { ...devices["Desktop Chrome"], viewport: { width: 1280, height: 800 } },
     },
     {

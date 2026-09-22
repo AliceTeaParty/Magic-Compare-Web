@@ -125,3 +125,13 @@ export async function touchDrag(
     await session.detach();
   }
 }
+
+/** Wait for shell hydration's restoration request before capturing or leaving an SSR page. */
+export async function openInternalPage(page: Page, url: string) {
+  const restored = page.waitForResponse(
+    (response) =>
+      response.url().endsWith("/api/ops/public-deploy") && response.request().method() === "GET",
+  );
+  await page.goto(url);
+  await (await restored).finished();
+}

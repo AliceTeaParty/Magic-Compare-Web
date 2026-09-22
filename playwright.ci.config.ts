@@ -20,11 +20,12 @@ export default defineConfig({
   ],
   projects: browsers.flatMap(({ name, device, channel }) =>
     ["internal", "public"].map((variant) => {
-      const source = config.projects!.find((project) => project.name === `${variant}-chromium`)!;
+      // Inherit the device-specific suite so mobile jobs exclude desktop folder uploads.
+      const sourceName = `${variant}-${devices[device].isMobile ? "mobile-" : ""}chromium`;
+      const source = config.projects!.find((project) => project.name === sourceName)!;
       return {
         ...source,
         name: `${variant}-${name}`,
-        // Every device exercises the site's complete suite, including responsive edit/upload UI.
         use: { ...source.use, ...devices[device], ...(channel ? { channel } : {}) },
       };
     }),

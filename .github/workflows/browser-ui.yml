@@ -52,7 +52,7 @@ jobs:
         run: pnpm exec playwright install --with-deps ${{ matrix.browser }}
       - name: Check internal and public behavior
         run: pnpm test:e2e:ci --project=internal-${{ matrix.suite }} --project=public-${{ matrix.suite }}
-      - name: Check empty catalog and upload intake
+      - name: Check empty-state behavior for this device
         if: ${{ !cancelled() && steps.browser_install.outcome == 'success' }}
         run: pnpm test:e2e:empty --project=internal-${{ matrix.suite }}
       - name: Summarize browser results

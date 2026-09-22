@@ -3,7 +3,6 @@ import { expect, test, expectPageFits } from "./support/browser-test";
 
 test("upload source, metadata, title mode, column editing and abandon controls", async ({
   page,
-  isMobile,
 }, info) => {
   await page.goto("/upload");
   await expect(page.getByRole("button", { name: "选择文件夹", exact: true })).toBeVisible();
@@ -46,18 +45,15 @@ test("upload source, metadata, title mode, column editing and abandon controls",
   await expect(previews.first()).toHaveAttribute("aria-label", lastTitle!);
   // dnd-kit keeps its capture-phase click listener for this exact cleanup window after a drop.
   await page.waitForTimeout(50);
-  // Narrow layouts show asset labels in previews; column editing belongs to the desktop header.
-  if (!isMobile) {
-    await page.getByRole("button", { name: "编辑 Src 列名" }).click();
-    const label = page.getByRole("textbox", { name: "编辑 Src 列名" });
-    await label.fill("Original");
-    await page.getByRole("button", { name: "取消编辑列名" }).click();
-    await expect(page.getByRole("button", { name: "编辑 Src 列名" })).toBeVisible();
-    await page.getByRole("button", { name: "编辑 Src 列名" }).click();
-    await label.fill("Original");
-    await page.getByRole("button", { name: "保存列名" }).click();
-    await expect(page.getByRole("button", { name: "编辑 Original 列名" })).toBeVisible();
-  }
+  await page.getByRole("button", { name: "编辑 Src 列名" }).click();
+  const label = page.getByRole("textbox", { name: "编辑 Src 列名" });
+  await label.fill("Original");
+  await page.getByRole("button", { name: "取消编辑列名" }).click();
+  await expect(page.getByRole("button", { name: "编辑 Src 列名" })).toBeVisible();
+  await page.getByRole("button", { name: "编辑 Src 列名" }).click();
+  await label.fill("Original");
+  await page.getByRole("button", { name: "保存列名" }).click();
+  await expect(page.getByRole("button", { name: "编辑 Original 列名" })).toBeVisible();
   await page.getByRole("button", { name: "热图", exact: true }).click();
   await expectPageFits(page);
   await page.route("**/api/ops/group-upload-complete", (route) =>

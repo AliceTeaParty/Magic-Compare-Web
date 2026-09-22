@@ -22,13 +22,12 @@ const viewerTests = [
   "navigation.spec.ts",
 ];
 const publicTests = ["public-site.spec.ts", ...viewerTests];
+// Folder upload is a desktop workflow; device emulation cannot validate a phone file picker.
+const desktopUploadTests = ["internal-site.spec.ts", "upload.spec.ts", "upload-controls.spec.ts"];
 const internalTests = [
-  "internal-site.spec.ts",
   "catalog.spec.ts",
   "workspace.spec.ts",
   "workspace-actions.spec.ts",
-  "upload.spec.ts",
-  "upload-controls.spec.ts",
   "deploy.spec.ts",
   ...viewerTests,
 ];
@@ -73,7 +72,7 @@ export default defineConfig({
     ]),
     {
       name: "internal-chromium",
-      testMatch: internalTests,
+      testMatch: [...internalTests, ...desktopUploadTests],
       metadata: { variant: "internal" },
       use: { ...devices["Desktop Chrome"], baseURL: "http://localhost:3100" },
     },
