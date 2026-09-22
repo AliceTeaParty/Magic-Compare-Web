@@ -267,23 +267,27 @@ export function GroupViewerWorkbench({
     setGuideOpen((currentOpen) => !currentOpen);
   }, []);
 
-  // A/B used to change only the before/after side, so Src/Rip/Flt groups never reached Flt from
-  // a stage click. Advance the selected comparison column together with the visible side instead.
-  const cycleCurrentAbAsset = useCallback(() => {
-    const nextSelection = getNextAbAssetSelection(
-      { comparisonAssetKey, side: abSide },
-      comparisonAssets,
-    );
+  // A/B column order is reversible: ArrowDown follows Src → Rip → Flt and ArrowUp reverses it.
+  // Click and Enter keep their established forward cycle by using the default direction.
+  const cycleCurrentAbAsset = useCallback(
+    (direction: 1 | -1 = 1) => {
+      const nextSelection = getNextAbAssetSelection(
+        { comparisonAssetKey, side: abSide },
+        comparisonAssets,
+        direction,
+      );
 
-    if (
-      nextSelection.comparisonAssetKey &&
-      nextSelection.comparisonAssetKey !== comparisonAssetKey
-    ) {
-      setComparisonAssetKey(nextSelection.comparisonAssetKey);
-    }
+      if (
+        nextSelection.comparisonAssetKey &&
+        nextSelection.comparisonAssetKey !== comparisonAssetKey
+      ) {
+        setComparisonAssetKey(nextSelection.comparisonAssetKey);
+      }
 
-    setAbSide(nextSelection.side);
-  }, [abSide, comparisonAssetKey, comparisonAssets, setAbSide, setComparisonAssetKey]);
+      setAbSide(nextSelection.side);
+    },
+    [abSide, comparisonAssetKey, comparisonAssets, setAbSide, setComparisonAssetKey],
+  );
 
   useViewerKeyboardShortcuts({
     abStageActive,

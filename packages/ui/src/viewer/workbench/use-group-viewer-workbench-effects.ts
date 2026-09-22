@@ -123,7 +123,7 @@ export function useViewerDevicePixelRatio(setDevicePixelRatio: (nextValue: numbe
  */
 export function useViewerKeyboardShortcuts(params: {
   abStageActive: boolean;
-  cycleAbAsset: () => void;
+  cycleAbAsset: (direction: 1 | -1) => void;
   mode: ViewerMode;
   onResetView: () => void;
   onToggleGuide: () => void;
@@ -203,7 +203,7 @@ export function useViewerKeyboardShortcuts(params: {
         abStageActiveRef.current
       ) {
         event.preventDefault();
-        cycleAbAssetRef.current();
+        cycleAbAssetRef.current(event.key === "ArrowDown" ? 1 : -1);
       }
 
       if (event.key.toLowerCase() === "i") {

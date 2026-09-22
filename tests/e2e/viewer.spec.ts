@@ -95,18 +95,35 @@ test("swipe moves in the visible direction and reset restores its midpoint", asy
     .toBe(50);
 });
 
-test("A/B cycles Src, Rip and Flt; zoom and reset keep the selected original", async ({ page }) => {
+test("A/B arrows cycle Src, Rip and Flt in opposite directions", async ({ page }) => {
   await page.getByRole("button", { name: "A / B", exact: true }).click();
   const stage = page.getByRole("button", { name: /A\/B inspect stage/ });
   await stage.click();
   await expect(stage).toHaveAttribute("aria-pressed", "true");
-  const seen = new Set<string>();
-  for (let index = 0; index < 4; index++) {
-    const label = await stage.getAttribute("aria-label");
-    seen.add(label?.match(/Showing (\w+)/)?.[1] ?? "");
-    await stage.press("Enter");
-  }
-  expect([...seen].sort()).toEqual(["Flt", "Rip", "Src"]);
+  await expect(stage).toHaveAttribute("aria-label", expect.stringContaining("Showing Rip"));
+
+  await page.keyboard.press("ArrowDown");
+  await expect(stage).toHaveAttribute("aria-label", expect.stringContaining("Showing Flt"));
+  await page.keyboard.press("ArrowDown");
+  await expect(stage).toHaveAttribute("aria-label", expect.stringContaining("Showing Src"));
+  await page.keyboard.press("ArrowDown");
+  await expect(stage).toHaveAttribute("aria-label", expect.stringContaining("Showing Rip"));
+
+  await page.keyboard.press("ArrowUp");
+  await expect(stage).toHaveAttribute("aria-label", expect.stringContaining("Showing Src"));
+  await page.keyboard.press("ArrowUp");
+  await expect(stage).toHaveAttribute("aria-label", expect.stringContaining("Showing Flt"));
+  await page.keyboard.press("ArrowUp");
+  await expect(stage).toHaveAttribute("aria-label", expect.stringContaining("Showing Rip"));
+
+  await stage.press("Enter");
+  await expect(stage).toHaveAttribute("aria-label", expect.stringContaining("Showing Flt"));
+  await stage.press("Enter");
+  await expect(stage).toHaveAttribute("aria-label", expect.stringContaining("Showing Src"));
+  await stage.press("Enter");
+  await expect(stage).toHaveAttribute("aria-label", expect.stringContaining("Showing Rip"));
+
+  // Reset remains available after arrow navigation and still exits expanded A/B inspection.
   await page.getByRole("button", { name: "放大 A/B 视图", exact: true }).click();
   await page.keyboard.press("r");
   await expect(stage).toHaveAttribute("aria-pressed", "false");
