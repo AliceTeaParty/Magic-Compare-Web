@@ -39,9 +39,6 @@ export default function createNextConfig(phase) {
       cpus: publicBuildCpuCount,
       staticGenerationMaxConcurrency: publicBuildCpuCount,
       optimizePackageImports: ["@mui/material", "@mui/icons-material"],
-      // Production deploys reuse this cache from a dedicated volume. The build process still exits
-      // after each run, so warm deploys consume disk without keeping CPU or memory resident.
-      turbopackFileSystemCacheForBuild: true,
     },
   };
 }

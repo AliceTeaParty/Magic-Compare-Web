@@ -2,10 +2,7 @@ import { ConflictError } from "@/lib/server/api/errors";
 
 export class PublicSiteOperationConflictError extends ConflictError {}
 
-let activePublicSiteOperation: {
-  label: "export" | "deploy";
-  promise: Promise<unknown>;
-} | null = null;
+let activePublicSiteOperation: "export" | "deploy" | null = null;
 
 /**
  * Serializes export/deploy operations inside the process so concurrent button clicks cannot race on
@@ -17,23 +14,15 @@ export async function withPublicSiteOperationLock<T>(
 ): Promise<T> {
   if (activePublicSiteOperation) {
     throw new PublicSiteOperationConflictError(
-      `Public site ${activePublicSiteOperation.label} is already running. Please wait for it to finish.`,
+      `Public site ${activePublicSiteOperation} is already running. Please wait for it to finish.`,
     );
   }
 
-  const promise = action();
-  activePublicSiteOperation = {
-    label,
-    promise,
-  };
-
+  activePublicSiteOperation = label;
   try {
-    return await promise;
+    return await action();
   } finally {
-    // Compare promises before clearing so a later operation cannot be unlocked by an earlier one
-    // finishing after the shared state has already been replaced.
-    if (activePublicSiteOperation?.promise === promise) {
-      activePublicSiteOperation = null;
-    }
+    // Overlapping calls are rejected above, so only this invocation can own and release the lock.
+    activePublicSiteOperation = null;
   }
 }

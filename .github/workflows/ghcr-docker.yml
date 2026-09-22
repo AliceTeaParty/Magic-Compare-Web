@@ -7,20 +7,6 @@ on:
   push:
     tags:
       - "v*"
-    paths:
-      - "apps/**"
-      - "packages/**"
-      - "scripts/**"
-      - "docker/**"
-      - ".dockerignore"
-      - ".env.example"
-      - "package.json"
-      - "pnpm-lock.yaml"
-      - "pnpm-workspace.yaml"
-      - "tsconfig*.json"
-      - "**/tsconfig*.json"
-      - "docker-compose.yml"
-      - ".github/workflows/ghcr-docker.yml"
 
 concurrency:
   group: ghcr-docker-${{ github.ref }}
