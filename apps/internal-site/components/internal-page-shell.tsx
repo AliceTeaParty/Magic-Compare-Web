@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { ArrowBack } from "@mui/icons-material";
 import { Box, Button, Stack, Typography } from "@mui/material";
+import { MAGIC_PAGE_HEADER } from "@magic-compare/ui";
 import Link from "next/link";
 
 interface InternalPageHeaderProps {
@@ -29,7 +30,7 @@ export function InternalPageHeader({
         gridTemplateColumns: "minmax(0, 1fr) auto",
         alignItems: "end",
         gap: { xs: 2, md: 3 },
-        minHeight: { xs: 120, md: 112 },
+        minHeight: MAGIC_PAGE_HEADER.minHeight,
         py: { xs: 2.5, md: 3 },
         borderBottom: "1px solid",
         borderColor: "divider",
@@ -58,11 +59,17 @@ export function InternalPageHeader({
           variant="h2"
           noWrap
           title={typeof title === "string" ? title : undefined}
+          sx={MAGIC_PAGE_HEADER.titleSx}
         >
           {title}
         </Typography>
         {subtitle ? (
-          <Typography component="div" variant="body2" color="text.secondary" sx={{ minWidth: 0 }}>
+          <Typography
+            component="div"
+            variant="body2"
+            color="text.secondary"
+            sx={{ minWidth: 0, ...MAGIC_PAGE_HEADER.subtitleSx }}
+          >
             {subtitle}
           </Typography>
         ) : null}

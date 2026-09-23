@@ -1,5 +1,3 @@
-import type { ViewerMode } from "@magic-compare/content-schema";
-
 export type WebUploadStage =
   "idle" | "scanned" | "generating" | "ready" | "uploading" | "paused" | "completed" | "failed";
 
@@ -54,7 +52,6 @@ export interface WebUploadGroupMetadata {
   slug: string;
   title: string;
   description: string;
-  defaultMode: ViewerMode;
   order: number;
   tags: string[];
 }

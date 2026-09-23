@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import type { GenerationProgress, PreflightedUploadFrame } from "./asset-generator";
-import { scanBrowserUploadFiles } from "./source-scanner";
+import { scanBrowserUploadFiles, type UploadPairingSuffixPreferences } from "./source-scanner";
 import type { BrowserUploadFile, WebUploadPlan } from "./web-upload-types";
 import {
   buildPlanView,
@@ -64,6 +64,8 @@ function filesFromInput(fileList: FileList): BrowserUploadFile[] {
 export function useWebUploadPlan() {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const planRef = useRef<WebUploadPlan | null>(null);
+  const scannedEntriesRef = useRef<BrowserUploadFile[] | null>(null);
+  const sourceRootNameRef = useRef<string | null>(null);
   const preflightFramesRef = useRef<PreflightedUploadFrame[] | null>(null);
   const generationAbortRef = useRef<AbortController | null>(null);
   const [planView, setPlanView] = useState<PlanView | null>(null);
@@ -71,6 +73,8 @@ export function useWebUploadPlan() {
   const [generationProgress, setGenerationProgress] = useState<GenerationProgress | null>(null);
   const [expandedFrameId, setExpandedFrameId] = useState<string | null>(null);
   const [isScanning, setIsScanning] = useState(false);
+  const [pairingSuffixPreferences, setPairingSuffixPreferencesState] =
+    useState<UploadPairingSuffixPreferences>({ before: "", after: "" });
   const { pushNotification } = useAppNotifications();
 
   useEffect(() => {
@@ -96,7 +100,9 @@ export function useWebUploadPlan() {
     sourceRootName: string,
     onPlanAccepted: (plan: WebUploadPlan) => void,
   ) {
-    const plan = scanBrowserUploadFiles(entries, sourceRootName);
+    const plan = scanBrowserUploadFiles(entries, sourceRootName, pairingSuffixPreferences);
+    scannedEntriesRef.current = entries;
+    sourceRootNameRef.current = sourceRootName;
     invalidatePreflight();
     planRef.current = plan;
     setExpandedFrameId(null);
@@ -110,6 +116,23 @@ export function useWebUploadPlan() {
       hasErrors ? "warning" : "success",
       { key: "web-upload-scan-result" },
     );
+  }
+
+  /** Re-scans the same local File references when an operator maps non-standard filename endings. */
+  function setPairingSuffixPreferences(nextPreferences: UploadPairingSuffixPreferences) {
+    setPairingSuffixPreferencesState(nextPreferences);
+    const entries = scannedEntriesRef.current;
+    const sourceRootName = sourceRootNameRef.current;
+    if (!entries || !sourceRootName) {
+      return;
+    }
+
+    const plan = scanBrowserUploadFiles(entries, sourceRootName, nextPreferences);
+    invalidatePreflight();
+    planRef.current = plan;
+    setExpandedFrameId(null);
+    setFrameTitleMode("inferred");
+    setPlanView(buildPlanView(plan));
   }
 
   async function chooseDirectory(locked: boolean, onPlanAccepted: (plan: WebUploadPlan) => void) {
@@ -217,6 +240,8 @@ export function useWebUploadPlan() {
     setPlanView(null);
     setExpandedFrameId(null);
     setFrameTitleMode("inferred");
+    scannedEntriesRef.current = null;
+    sourceRootNameRef.current = null;
   }
 
   return {
@@ -232,10 +257,12 @@ export function useWebUploadPlan() {
     isScanning,
     planRef,
     planView,
+    pairingSuffixPreferences,
     renamePairingColumn,
     reorderPairingRows,
     reportGenerationProgress: setGenerationProgress,
     resetPlan,
+    setPairingSuffixPreferences,
     setExpandedFrameId,
     sourceRootName: planRef.current?.sourceRootName ?? null,
   };

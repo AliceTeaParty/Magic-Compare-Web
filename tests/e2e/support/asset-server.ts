@@ -5,9 +5,15 @@ import { fixtureSvg } from "./viewer-fixture";
 export function startAssetServer() {
   const objects = new Map<string, { body: Buffer; contentType: string }>();
   createServer(async (request, response) => {
-    response.setHeader("Access-Control-Allow-Origin", "*");
-    response.setHeader("Access-Control-Allow-Methods", "GET, HEAD, PUT, POST, DELETE, OPTIONS");
-    response.setHeader("Access-Control-Allow-Headers", "*");
+    const origin = request.headers.origin;
+    // Native image loads omit Origin while browser API reads include it. Mirror S3's
+    // request-dependent CORS response instead of emitting access headers for every fixture request.
+    if (origin) {
+      response.setHeader("Access-Control-Allow-Origin", origin);
+      response.setHeader("Access-Control-Allow-Methods", "GET, HEAD, PUT, POST, DELETE, OPTIONS");
+      response.setHeader("Access-Control-Allow-Headers", "*");
+      response.setHeader("Vary", "Origin");
+    }
     if (request.method === "OPTIONS") {
       response.writeHead(204).end();
       return;
@@ -74,6 +80,8 @@ export function startAssetServer() {
       response.writeHead(404).end();
       return;
     }
+    // Public S3 originals are cacheable, so keep generated viewer fixtures cacheable as well.
+    if (fixture) response.setHeader("Cache-Control", "public, max-age=600");
     const range = /^bytes=(\d+)-(\d+)$/.exec(request.headers.range ?? "");
     const body = range ? object.body.subarray(Number(range[1]), Number(range[2]) + 1) : object.body;
     response.setHeader("Content-Type", object.contentType);

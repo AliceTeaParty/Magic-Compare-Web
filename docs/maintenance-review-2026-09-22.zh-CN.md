@@ -71,3 +71,19 @@ GitHub 规则依据：[Workflow syntax — paths](https://docs.github.com/en/act
 ### 保存警告后的多余刷新
 
 Firefox CI trace 发现：警告返回后额外触发 `router.refresh()`，紧接着 reload 会取消尚在进行的 RSC 请求，Next 随后回退到 document 导航，与 reload 相互中断。元数据响应已经包含已提交的值，因此删除只在 warning 时触发的刷新。保留原有删除、顺序和可见性操作所需的派生状态刷新。
+
+## 本轮前端审计对应的数据边界
+
+- S3 继续使用 `groups/<opaque-group-id>/<frame-number>/<revision-id>/oN.ext` 与 `tN.ext`。组名、文件名及自定义 Before/After 后缀不进入对象键；换素材创建新 revision，数据库提交后才删除旧版本，因此无需为自定义列名迁移对象结构。
+- SQLite 继续保存逻辑路径，公开域名由运行时配置解析。2026-09-22 本地只读检查覆盖 17 个 Case、26 个 Group、1382 个 Frame、4238 个 Asset：`integrity_check` 返回 `ok`，外键检查无结果，同图组重复 Frame 顺序及同组重复 active 上传任务均为 0。此结果仅代表本地审核数据。
+- 上传提交以条件更新抢占 Frame job，并在同一事务替换 Frame/Asset 和增加已完成计数。该路径中的重复 commit 不会重复增加计数，无需另建幂等表或存储层锁。
+- 图组可自定义默认模式已撤下。共享 `DEFAULT_VIEWER_MODE` 固定为 A/B，上传、导入、内部 Viewer 与公开 manifest 统一采用该值；已有数据库列及旧 manifest 字段保留为读取兼容，不做破坏性迁移。浏览器中用户主动选择的当前查看模式仍可记忆。
+- 原图、缩略图及旧预生成 Heatmap 数据保留。预生成 Heatmap 标记 Deprecated；当前实时分析是首选，未触发生产数据迁移或自动清理。
+
+### 2026-09-23 加载数据调整
+
+- `Asset.imagePlaceholderJson` 保存上传/导入时从缩略图生成的 8px WebP 和 Material 源色。SQLite 只新增可空列，不改素材路径；公开发布直接复用，Viewer 页面查询不执行 S3 读取。
+- 删除本轮临时引入的按需占位图 API、客户端请求 hook 和旧扫描加载图案。内部/公开 Viewer 都直接读取内嵌预览；生成失败保留中性底色，原图仍正常加载。
+- 旧数据先备份数据库，再显式运行 `DATABASE_URL=file:/绝对路径/数据库 pnpm --filter @magic-compare/internal-site exec tsx scripts/backfill-asset-placeholders.ts`。末尾可加图组 slug 限定范围；只补空字段，四并发读取缩略图，失败计数输出并保留后续重试机会，不触发发布。
+- 本地审核数据库先备份到忽略的 `output/backups/internal-site-before-placeholders-20260923.db`，再完成 4238/4238 个 Asset 的预览补录，失败 0；SQLite 完整性检查为 `ok`，外键检查无结果。该数据操作没有发布公开站。
+- 最新工作区 `pnpm check` 通过；完整内部/公开浏览器回归为 128 通过、31 项按平台跳过。静态公开站在隔离副本中重新导出，桌面 Chromium 与移动 WebKit 回归为 51 通过、13 项按平台跳过，覆盖 Heatmap 菜单居中、同行色阶及默认 A/B。Linux Docker 视觉回归 10/10 通过。

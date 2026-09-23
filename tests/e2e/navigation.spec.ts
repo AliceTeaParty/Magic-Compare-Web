@@ -1,5 +1,23 @@
 import { expect, test, openNavigation, viewerPath, expectPageFits } from "./support/browser-test";
 
+test("public shell keeps display controls in its footer instead of an empty navigation menu", async ({
+  page,
+}, info) => {
+  test.skip(
+    info.project.metadata.variant !== "public",
+    "Internal pages retain their working navigation.",
+  );
+
+  await page.goto(viewerPath(info.project.metadata.variant));
+  await expect(page.getByRole("button", { name: "打开导航", exact: true })).toHaveCount(0);
+
+  const footer = page.locator("footer");
+  await expect(footer.getByRole("button", { name: "选择主题色" })).toBeVisible();
+  await expect(footer.getByText(/^v\d/, { exact: false })).toBeVisible();
+  await expect(footer.getByText(/© .*All Rights Reserved\./)).toBeVisible();
+  await expectPageFits(page);
+});
+
 test("navigation, theme presets, custom color and dark mode survive reload", async ({
   page,
 }, info) => {

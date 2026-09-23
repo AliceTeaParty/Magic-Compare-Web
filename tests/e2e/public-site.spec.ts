@@ -8,11 +8,14 @@ test("public viewer exposes and loads both original stage images", async ({ page
   // this contract or make the browser test pass accidentally.
   const stageImageTags = initialHtml.match(/<img[^>]+data-viewer-stage-image[^>]*>/gi) ?? [];
   expect(stageImageTags).toHaveLength(2);
-  // Only the base original is high priority. The comparison original remains discoverable without
-  // competing for the first useful full-size image on constrained connections.
-  expect(stageImageTags.filter((tag) => /fetchpriority="high"/i.test(tag))).toHaveLength(1);
+  // The site starts in A/B with Rip visible. Src remains discoverable but does not compete
+  // with the visible original for the first useful full-size image on slow connections.
+  const highPriorityImages = stageImageTags.filter((tag) => /fetchpriority="high"/i.test(tag));
+  expect(highPriorityImages).toHaveLength(1);
+  expect(highPriorityImages[0]).toContain('alt="Rip image"');
   expect(stageImageTags.filter((tag) => /fetchpriority="low"/i.test(tag))).toHaveLength(1);
-  expect(initialHtml.match(/data-viewer-stage-placeholder/g)).toHaveLength(2);
+  // A/B paints one original at a time, so only its active image needs a mosaic preview.
+  expect(initialHtml.match(/data-viewer-stage-placeholder/g)).toHaveLength(1);
   expect(initialHtml).toContain('width="640"');
   expect(initialHtml).toContain('height="360"');
 

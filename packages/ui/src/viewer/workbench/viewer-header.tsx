@@ -3,6 +3,7 @@
 import { Box, Stack, Typography } from "@mui/material";
 import type { ViewerMode } from "@magic-compare/content-schema";
 import type { ViewerAsset } from "@magic-compare/compare-core/viewer-data";
+import { MAGIC_PAGE_HEADER } from "../../layout/magic-page-header";
 import { ViewerToolbar, ViewerUtilityControls } from "./viewer-toolbar";
 import type { ViewerInteractionStore } from "./viewer-interaction-store";
 
@@ -15,6 +16,7 @@ interface ViewerHeaderProps {
   comparisonAssets: ViewerAsset[];
   frameId: string | undefined;
   guideOpen: boolean;
+  heatmapPanelOpen: boolean;
   groupTitle: string;
   hideStageScrollControl: boolean;
   interactionStore: ViewerInteractionStore;
@@ -22,6 +24,7 @@ interface ViewerHeaderProps {
   onAbSideChange: (side: "before" | "after") => void;
   onComparisonAssetChange: (assetKey: string) => void;
   onOpenGuide: () => void;
+  onToggleHeatmapPanel: () => void;
   onModeChange: (mode: ViewerMode) => void;
   onScrollStageIntoView: () => void;
   onToggleSidebar: () => void;
@@ -41,6 +44,7 @@ export function ViewerHeader({
   comparisonAssets,
   frameId,
   guideOpen,
+  heatmapPanelOpen,
   groupTitle,
   hideStageScrollControl,
   interactionStore,
@@ -48,6 +52,7 @@ export function ViewerHeader({
   onAbSideChange,
   onComparisonAssetChange,
   onOpenGuide,
+  onToggleHeatmapPanel,
   onModeChange,
   onScrollStageIntoView,
   onToggleSidebar,
@@ -68,7 +73,7 @@ export function ViewerHeader({
         alignItems: { xs: "stretch", sm: "center" },
         justifyContent: "space-between",
         gap: { xs: 1, md: 2 },
-        minHeight: { md: 112 },
+        minHeight: MAGIC_PAGE_HEADER.minHeight,
         px: { xs: 1.5, md: 3 },
         // The desktop header shares the catalog/workspace divider coordinate. Two compact toolbar
         // rows fit inside this height in both viewers; public used to carry a taller legacy banner.
@@ -104,10 +109,10 @@ export function ViewerHeader({
           }}
         >
           <Typography
-            variant="h5"
+            variant="h4"
             noWrap
             sx={{
-              lineHeight: 1.18,
+              ...MAGIC_PAGE_HEADER.titleSx,
               // padding-bottom gives descenders (p, g, y...) room before overflow:hidden
               // clips them; noWrap relies on overflow:hidden for ellipsis truncation.
               paddingBottom: "0.18em",
@@ -123,9 +128,10 @@ export function ViewerHeader({
             {groupTitle}
           </Typography>
           <Typography
-            variant="body2"
+            variant="body1"
             noWrap
             sx={{
+              ...MAGIC_PAGE_HEADER.subtitleSx,
               color: "text.secondary",
               mt: "0.25em",
               pl: "0.08em",
@@ -146,6 +152,7 @@ export function ViewerHeader({
               the stage shortcut remains available in the desktop three-button group. */}
           <ViewerUtilityControls
             compact
+            detailsDisabled={mode === "heatmap"}
             guideOpen={guideOpen}
             hideStageScrollControl
             onOpenGuide={onOpenGuide}
@@ -164,12 +171,14 @@ export function ViewerHeader({
         comparisonAssets={comparisonAssets}
         frameId={frameId}
         guideOpen={guideOpen}
+        heatmapPanelOpen={heatmapPanelOpen}
         hideStageScrollControl={hideStageScrollControl}
         interactionStore={interactionStore}
         mode={mode}
         onAbSideChange={onAbSideChange}
         onComparisonAssetChange={onComparisonAssetChange}
         onOpenGuide={onOpenGuide}
+        onToggleHeatmapPanel={onToggleHeatmapPanel}
         onModeChange={onModeChange}
         onScrollStageIntoView={onScrollStageIntoView}
         onToggleSidebar={onToggleSidebar}

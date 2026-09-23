@@ -21,8 +21,10 @@ export const viewerTokens = {
     // Keep the compare stage on the same workbench layer as the title so the image surround does
     // not become a separate gray block in light or custom themes.
     surface: "var(--mui-palette-surface-container)",
-    activeShadow: "var(--mc-viewer-shadow, 0 18px 44px rgba(8, 15, 35, 0.28))",
-    measuredShadow: "var(--mc-viewer-shadow, 0 24px 52px rgba(8, 15, 35, 0.28))",
+    // The theme suppresses decorative surface shadows, but the image viewport still needs a
+    // measured edge when A/B zoom leaves part of its work surface exposed.
+    activeShadow: "0 8px 20px rgba(0, 0, 0, 0.18)",
+    measuredShadow: "0 0 0 1px var(--mui-palette-divider), 0 8px 20px rgba(0, 0, 0, 0.18)",
   },
   swipe: {
     dividerSurface: "var(--mui-palette-text-primary)",

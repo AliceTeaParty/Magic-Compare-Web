@@ -133,6 +133,7 @@ export function PairingTableHeader({
           md: desktopGridColumns,
         },
         gap: { xs: 0.75, md: 1 },
+        alignItems: "center",
         px: { xs: 0.75, md: 1.1 },
         py: 0.85,
         position: "sticky",

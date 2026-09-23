@@ -19,7 +19,14 @@ import {
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { findAsset, getComparisonTargetAssets } from "@magic-compare/compare-core/viewer-data";
-import { memo, useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
+import {
+  memo,
+  useEffect,
+  useRef,
+  useState,
+  type MouseEvent as ReactMouseEvent,
+  type ReactNode,
+} from "react";
 import type {
   ViewerAsset,
   ViewerDataset,
@@ -373,7 +380,9 @@ function ViewerSidebarContent({
               disappear from the metadata summary after a three-way upload. */}
           可用变量：{getAvailableVariableLabels(currentFrame).join(", ") || "无"}
         </Typography>
-        <Typography variant="body2">预生成热图：{heatmapAsset ? "可用" : "无"}</Typography>
+        <Typography variant="body2">
+          预生成 Heatmap（Deprecated）：{heatmapAsset ? "可用" : "无"}
+        </Typography>
       </Stack>
 
       {variant === "internal" && publishStatus ? (
@@ -449,6 +458,8 @@ function ViewerSidebarContent({
 }
 
 interface ViewerSidebarProps {
+  panelContent?: ReactNode;
+  panelLabel?: string;
   currentFrame: ViewerFrame | undefined;
   currentGroup: ViewerGroup;
   groups: ViewerDataset["siblingGroups"];
@@ -470,6 +481,8 @@ interface ViewerSidebarProps {
  * viewer state independent from the current responsive layout.
  */
 export const ViewerSidebar = memo(function ViewerSidebar({
+  panelContent,
+  panelLabel,
   currentFrame,
   currentGroup,
   groups,
@@ -499,6 +512,7 @@ export const ViewerSidebar = memo(function ViewerSidebar({
   };
   const mobileDrawerOpen = sidebarOpen && !showDesktopSidebar;
   useRootScrollLock(mobileDrawerOpen);
+  const content = panelContent ?? <ViewerSidebarContent {...contentProps} />;
 
   return (
     <>
@@ -512,6 +526,7 @@ export const ViewerSidebar = memo(function ViewerSidebar({
         >
           <Box
             component="aside"
+            aria-label={panelLabel}
             aria-hidden={!sidebarOpen}
             inert={!sidebarOpen}
             sx={{
@@ -526,15 +541,14 @@ export const ViewerSidebar = memo(function ViewerSidebar({
               backgroundColor: "surface.containerLow",
             }}
           >
-            <Box sx={{ width: 320 }}>
-              <ViewerSidebarContent {...contentProps} />
-            </Box>
+            <Box sx={{ width: 320, height: "100%" }}>{content}</Box>
           </Box>
         </Fade>
       ) : null}
 
       <Drawer
         anchor="right"
+        aria-label={panelLabel}
         open={mobileDrawerOpen}
         onClose={closeSidebar}
         transitionDuration={prefersReducedMotion ? 0 : 240}
@@ -556,7 +570,7 @@ export const ViewerSidebar = memo(function ViewerSidebar({
           },
         }}
       >
-        <ViewerSidebarContent {...contentProps} />
+        {content}
       </Drawer>
     </>
   );

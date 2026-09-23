@@ -83,7 +83,6 @@ function runner(
       slug: "comparison",
       title: "Comparison",
       description: "",
-      defaultMode: "before-after",
       order: 0,
       tags: [],
     },
@@ -265,7 +264,6 @@ describe("WebUploadRunner", () => {
         slug: "comparison",
         title: "Comparison",
         description: "",
-        defaultMode: "before-after",
         order: 0,
         tags: [],
       },
@@ -276,7 +274,11 @@ describe("WebUploadRunner", () => {
     await uploadRunner.start();
 
     expect(apiMocks.startGroupUpload).toHaveBeenCalledWith(
-      expect.objectContaining({ protocol: "stream-v2", frames: [sourceFrame] }),
+      expect.objectContaining({
+        protocol: "stream-v2",
+        frames: [sourceFrame],
+        group: expect.objectContaining({ defaultMode: "a-b" }),
+      }),
     );
     expect(generateFrame).toHaveBeenCalledOnce();
     expect(apiMocks.prepareGroupUploadFrame).toHaveBeenCalledWith(

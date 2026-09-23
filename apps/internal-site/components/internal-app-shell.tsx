@@ -38,7 +38,7 @@ import { PublicDeployTaskPanel } from "./public-deploy/public-deploy-task-panel"
 import { usePublicDeployJob } from "./public-deploy/use-public-deploy-job";
 
 const destinations = [
-  { href: "/", label: "项目", icon: <FolderCopyOutlined />, iconFeedback: "case" },
+  { href: "/", label: "项目", icon: <FolderCopyOutlined /> },
   {
     href: "/upload",
     label: "上传",
@@ -116,7 +116,7 @@ function NavigationContent({
               key={destination.href}
               href={destination.href}
               icon={destination.icon}
-              iconFeedback={destination.iconFeedback}
+              iconFeedback={"iconFeedback" in destination ? destination.iconFeedback : undefined}
               label={destination.label}
               selected={selected}
               onClick={onNavigate}

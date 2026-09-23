@@ -8,7 +8,7 @@ import {
 } from "./share-image-data";
 
 export const PUBLIC_SITE_NAME = "Magic Compare";
-export const PUBLIC_SITE_DESCRIPTION = "逐帧查看原图、成品与热图，检查图像处理前后的差异。";
+export const PUBLIC_SITE_DESCRIPTION = "逐帧查看原图、成品与Heatmap，检查图像处理前后的差异。";
 
 const MAX_PAGE_TITLE_LENGTH = 72;
 const MAX_DESCRIPTION_LENGTH = 160;

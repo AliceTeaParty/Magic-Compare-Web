@@ -1,16 +1,6 @@
 "use client";
 
-import {
-  Box,
-  Button,
-  Divider,
-  Drawer,
-  IconButton,
-  Stack,
-  Typography,
-  useMediaQuery,
-} from "@mui/material";
-import { useTheme } from "@mui/material/styles";
+import { Box, Button, Divider, Drawer, IconButton, Stack, Typography } from "@mui/material";
 import { Close } from "@mui/icons-material";
 import { useRootScrollLock } from "../../overlays/use-root-scroll-lock";
 import { viewerTokens } from "./viewer-tokens";
@@ -57,17 +47,13 @@ const guideSections = [
  * inspection workflow where users need immediate access to the image.
  */
 export function ViewerGuidePanel({ open, onClose, onComplete }: ViewerGuidePanelProps) {
-  const theme = useTheme();
-  const useBottomDrawer = useMediaQuery(theme.breakpoints.down("sm"), {
-    noSsr: true,
-  });
   useRootScrollLock(open);
 
   return (
     <Drawer
       aria-describedby="viewer-guide-description"
       aria-labelledby="viewer-guide-title"
-      anchor={useBottomDrawer ? "bottom" : "right"}
+      anchor="right"
       open={open}
       onClose={onClose}
       // Viewer owns the root scroll lock so Modal must not add body padding and squeeze the sheet.
@@ -77,15 +63,13 @@ export function ViewerGuidePanel({ open, onClose, onComplete }: ViewerGuidePanel
       slotProps={{
         paper: {
           sx: {
-            width: useBottomDrawer ? "100%" : 360,
+            width: "min(88vw, 360px)",
             maxWidth: "100%",
-            maxHeight: useBottomDrawer ? "78svh" : "100%",
-            borderTopLeftRadius: useBottomDrawer ? 16 : 0,
-            borderTopRightRadius: useBottomDrawer ? 16 : 0,
+            maxHeight: "100%",
             background: viewerTokens.guide.panelSurface,
             backgroundImage: "none",
-            borderLeft: useBottomDrawer ? 0 : "1px solid",
-            borderTop: useBottomDrawer ? "1px solid" : 0,
+            borderLeft: "1px solid",
+            borderTop: 0,
             borderColor: "divider",
           },
         },

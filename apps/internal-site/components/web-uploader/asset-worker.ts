@@ -171,7 +171,7 @@ async function bitmapToImageData(file: File) {
 
 async function buildHeatmap(before: File, after: File) {
   if (extensionForFile(before) === ".svg" || extensionForFile(after) === ".svg") {
-    throw new Error("浏览器 heatmap 生成暂不支持 SVG，请提供显式 heatmap 文件。");
+    throw new Error("浏览器 Heatmap 生成暂不支持 SVG，请提供显式 Heatmap 文件。");
   }
 
   const beforeData = await bitmapToImageData(before);
@@ -181,7 +181,7 @@ async function buildHeatmap(before: File, after: File) {
   const canvas = new OffscreenCanvas(diffused.width, diffused.height);
   const context = canvas.getContext("2d");
   if (!context) {
-    throw new Error("浏览器无法创建 heatmap 画布。");
+    throw new Error("浏览器无法创建 Heatmap 画布。");
   }
   context.putImageData(diffused, 0, 0);
   const blob = await canvas.convertToBlob({ type: "image/png" });

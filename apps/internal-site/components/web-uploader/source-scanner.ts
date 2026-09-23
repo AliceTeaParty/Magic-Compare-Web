@@ -7,6 +7,7 @@ import type {
   WebUploadPlan,
 } from "./web-upload-types";
 import { cjkKebabCase } from "@magic-compare/shared-utils";
+import { GROUP_TITLE_MAX_LENGTH } from "@magic-compare/content-schema";
 import { parseUploadFilenameStem } from "./filename-parser";
 import {
   getCommonHeatmapReferenceLabels,
@@ -100,6 +101,12 @@ interface NonFlatLayout {
   afterDirs: string[];
   heatmapDirs: string[];
   miscDirs: string[];
+}
+
+/** Lets an operator name non-standard filename endings before scanning a flat source directory. */
+export interface UploadPairingSuffixPreferences {
+  before: string;
+  after: string;
 }
 
 function extensionOf(path: string) {
@@ -256,8 +263,16 @@ function pathMatchesHints(path: string, hints: Set<string>) {
   return [...directoryTokens(basename(path))].some((token) => hints.has(token));
 }
 
-function matchKeyForName(name: string) {
-  const normalized = name.toLowerCase().replace(MATCH_KEY_SUFFIX_RE, "");
+function matchKeyForName(name: string, preferredSuffixes: string[] = []) {
+  const preferredPattern = preferredSuffixes
+    .map((suffix) => suffix.trim().replace(/^[-_.\s]+|[-_.\s]+$/g, ""))
+    .filter(Boolean)
+    .map((suffix) => suffix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+    .join("|");
+  const suffixPattern = preferredPattern
+    ? new RegExp(`(?:[_\\-. ]+(?:${MATCH_KEY_VARIANTS.join("|")}|${preferredPattern}))+$`, "i")
+    : MATCH_KEY_SUFFIX_RE;
+  const normalized = name.toLowerCase().replace(suffixPattern, "");
   return (
     normalized.replace(NON_ALNUM_RE, "-").replace(/^-+|-+$/g, "") ||
     name
@@ -265,6 +280,38 @@ function matchKeyForName(name: string) {
       .replace(NON_ALNUM_RE, "-")
       .replace(/^-+|-+$/g, "")
   );
+}
+
+function normalizePreferredSuffix(value: string) {
+  return value
+    .trim()
+    .replace(/^[-_.\s]+|[-_.\s]+$/g, "")
+    .toLowerCase();
+}
+
+/** Applies operator-provided filename role mappings after structural parsing has identified a frame. */
+function applyPairingSuffixPreferences(
+  candidates: SourceCandidate[],
+  preferences: UploadPairingSuffixPreferences,
+) {
+  const before = normalizePreferredSuffix(preferences.before);
+  const after = normalizePreferredSuffix(preferences.after);
+  const preferredSuffixes = [before, after].filter(Boolean);
+
+  if (preferredSuffixes.length === 0) {
+    return candidates;
+  }
+
+  return candidates.map((candidate) => {
+    const variant = candidate.variant.toLowerCase();
+    const preferredVariant = variant === before ? "before" : variant === after ? "after" : variant;
+    // The parser only strips known endings. A user-defined ending must also be removed from the
+    // matching key so `...-rip` and `...-output` describe one frame instead of two unrelated rows.
+    const frameKey = candidate.isStructured
+      ? candidate.frameKey
+      : `name:${matchKeyForName(stem(candidate.entry.relativePath), preferredSuffixes)}`;
+    return { ...candidate, variant: preferredVariant, frameKey };
+  });
 }
 
 function topLevelDirectory(relativePath: string) {
@@ -533,7 +580,7 @@ function buildFrameFromCandidates(
       code: "heatmap-count",
       severity: "error",
       path: heatmapCandidates[0].entry.relativePath,
-      message: `${candidates[0].title} 存在多个 heatmap 候选。`,
+      message: `${candidates[0].title} 存在多个 Heatmap 候选。`,
     };
   }
 
@@ -629,12 +676,21 @@ function assignCandidatesToBeforeKeys(
   return { grouped, unmatched };
 }
 
+/** Keep the suggested title within the same limit as editing and the upload API. */
+function suggestedGroupTitle(value: string) {
+  const title = titleCase(value) || "上传图组";
+  if (title.length <= GROUP_TITLE_MAX_LENGTH) return title;
+  const prefix = title.slice(0, GROUP_TITLE_MAX_LENGTH);
+  const lastSpace = prefix.lastIndexOf(" ");
+  return lastSpace >= GROUP_TITLE_MAX_LENGTH / 2 ? prefix.slice(0, lastSpace) : prefix.trimEnd();
+}
+
 function deriveGroupIdentity(sourceRootName: string, candidates: SourceCandidate[]) {
   const sourceSlug = cjkKebabCase(sourceRootName, "");
   if (sourceSlug && sourceSlug !== "uploaded-group") {
     return {
       slug: sourceSlug,
-      title: titleCase(sourceRootName) || "上传图组",
+      title: suggestedGroupTitle(sourceRootName),
     };
   }
 
@@ -654,10 +710,10 @@ function deriveGroupIdentity(sourceRootName: string, candidates: SourceCandidate
   if (slug.length < 3) {
     return {
       slug: cjkKebabCase(sourceRootName, "uploaded-group"),
-      title: titleCase(sourceRootName) || "上传图组",
+      title: suggestedGroupTitle(sourceRootName),
     };
   }
-  return { slug, title: titleCase(commonPrefix) || titleCase(sourceRootName) || "上传图组" };
+  return { slug, title: suggestedGroupTitle(commonPrefix) };
 }
 
 export function defaultHeatmapReferenceLabel(frames: WebUploadFramePlan[]) {
@@ -682,7 +738,7 @@ function heatmapReferenceIssues(frames: WebUploadFramePlan[]): WebUploadIssue[] 
       code: "heatmap-reference-missing",
       severity: "error",
       path: generatedHeatmapFrames[0].after.source.relativePath,
-      message: "需要自动生成 heatmap 的帧没有共同参考列，请统一比较列后再上传。",
+      message: "需要自动生成 Heatmap 的帧没有共同参考列，请统一比较列后再上传。",
     },
   ];
 }
@@ -720,10 +776,12 @@ function buildFlatPlan(
   sourceRootName: string,
   entries: BrowserUploadFile[],
   ignoredFiles: IgnoredUploadFile[],
+  preferences: UploadPairingSuffixPreferences,
 ): WebUploadPlan {
   const parsed = parseEntries(entries);
+  const candidates = applyPairingSuffixPreferences(parsed.candidates, preferences);
   const grouped = new Map<string, SourceCandidate[]>();
-  for (const candidate of parsed.candidates) {
+  for (const candidate of candidates) {
     const key = candidateFrameKey(candidate);
     grouped.set(key, [...(grouped.get(key) ?? []), candidate]);
   }
@@ -742,7 +800,7 @@ function buildFlatPlan(
     String(Math.max(0, ...orderedGroups.map(([, candidates]) => candidates[0]?.frameNumber ?? 0)))
       .length,
   );
-  const episodeWidth = structuredEpisodeWidth(parsed.candidates);
+  const episodeWidth = structuredEpisodeWidth(candidates);
   const frames: WebUploadFramePlan[] = [];
   const issues: WebUploadIssue[] = [];
   orderedGroups.forEach(([, candidates], index) => {
@@ -753,7 +811,7 @@ function buildFlatPlan(
       frames.push(frame);
     }
   });
-  const identity = deriveGroupIdentity(sourceRootName, parsed.candidates);
+  const identity = deriveGroupIdentity(sourceRootName, candidates);
 
   return {
     sourceRootName,
@@ -771,6 +829,7 @@ function buildNestedPlan(
   entries: BrowserUploadFile[],
   ignoredFiles: IgnoredUploadFile[],
   layout: NonFlatLayout,
+  preferences: UploadPairingSuffixPreferences,
 ): WebUploadPlan {
   const scopedEntries = (directory: string | null) =>
     directory ? entries.filter((entry) => topLevelDirectory(entry.relativePath) === directory) : [];
@@ -786,9 +845,19 @@ function buildNestedPlan(
   const miscParsedResults = layout.miscDirs.map((directory) =>
     parseEntries(scopedEntries(directory), basename(directory).toLowerCase() || "misc"),
   );
-  const afterParsed = afterParsedResults.flatMap((result) => result.candidates);
-  const heatmapParsed = heatmapParsedResults.flatMap((result) => result.candidates);
-  const miscParsed = miscParsedResults.flatMap((result) => result.candidates);
+  const beforeCandidates = applyPairingSuffixPreferences(beforeParsed.candidates, preferences);
+  const afterParsed = applyPairingSuffixPreferences(
+    afterParsedResults.flatMap((result) => result.candidates),
+    preferences,
+  );
+  const heatmapParsed = applyPairingSuffixPreferences(
+    heatmapParsedResults.flatMap((result) => result.candidates),
+    preferences,
+  );
+  const miscParsed = applyPairingSuffixPreferences(
+    miscParsedResults.flatMap((result) => result.candidates),
+    preferences,
+  );
   const ignored = [
     ...ignoredFiles,
     ...beforeParsed.ignored,
@@ -798,7 +867,7 @@ function buildNestedPlan(
   ];
   const issues: WebUploadIssue[] = [];
 
-  const beforeByKey = groupByMatchKey(beforeParsed.candidates);
+  const beforeByKey = groupByMatchKey(beforeCandidates);
   for (const [key, candidates] of beforeByKey) {
     if (candidates.length > 1) {
       issues.push({
@@ -826,7 +895,7 @@ function buildNestedPlan(
     4,
     String(Math.max(0, ...allBefore.map(([, candidate]) => candidate.frameNumber))).length,
   );
-  const episodeWidth = structuredEpisodeWidth(beforeParsed.candidates);
+  const episodeWidth = structuredEpisodeWidth(beforeCandidates);
   const frames: WebUploadFramePlan[] = [];
 
   for (const [order, [matchKey, before]] of allBefore.entries()) {
@@ -872,7 +941,7 @@ function buildNestedPlan(
     ignored.push({ path: candidate.entry.relativePath, reason: "unmatched-file" });
   }
 
-  const identity = deriveGroupIdentity(sourceRootName, beforeParsed.candidates);
+  const identity = deriveGroupIdentity(sourceRootName, beforeCandidates);
   return {
     sourceRootName,
     suggestedGroupSlug: identity.slug,
@@ -891,6 +960,7 @@ function buildNestedPlan(
 export function scanBrowserUploadFiles(
   entries: BrowserUploadFile[],
   sourceRootName = "uploaded-group",
+  preferences: UploadPairingSuffixPreferences = { before: "", after: "" },
 ): WebUploadPlan {
   const importableEntries: BrowserUploadFile[] = [];
   const ignoredFiles: IgnoredUploadFile[] = [];
@@ -906,8 +976,8 @@ export function scanBrowserUploadFiles(
   const normalizedEntries = stripSharedTopLevelDirectory(importableEntries);
   const layout = suggestNonFlatLayout(normalizedEntries);
   if (layout.beforeDir && layout.afterDirs.length > 0) {
-    return buildNestedPlan(sourceRootName, normalizedEntries, ignoredFiles, layout);
+    return buildNestedPlan(sourceRootName, normalizedEntries, ignoredFiles, layout, preferences);
   }
 
-  return buildFlatPlan(sourceRootName, normalizedEntries, ignoredFiles);
+  return buildFlatPlan(sourceRootName, normalizedEntries, ignoredFiles, preferences);
 }

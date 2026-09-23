@@ -164,6 +164,7 @@ const ViewerStageContent = memo(
     frameId,
     heatmapAsset,
     heatmapDisplay,
+    heatmapProcessing,
     interactionStore,
     mode,
     onCycleAbSide,
@@ -178,6 +179,7 @@ const ViewerStageContent = memo(
     frameId: string | undefined;
     heatmapAsset: ViewerAsset | undefined;
     heatmapDisplay?: "map" | "overlay" | "original";
+    heatmapProcessing: boolean;
     interactionStore: ViewerInteractionStore;
     mode: ViewerMode;
     onCycleAbSide: () => void;
@@ -254,6 +256,7 @@ const ViewerStageContent = memo(
             decoding="async"
             fetchPriority="high"
             prefersReducedMotion={prefersReducedMotion}
+            processing={heatmapProcessing}
           />
           {heatmapAsset && heatmapDisplay !== "original" && (
             <PositionedStageMedia
@@ -299,6 +302,7 @@ interface ViewerStageProps {
   frameId: string | undefined;
   heatmapAsset: ViewerAsset | undefined;
   heatmapDisplay?: "map" | "overlay" | "original";
+  heatmapProcessing: boolean;
   interactionStore: ViewerInteractionStore;
   mode: ViewerMode;
   onCycleAbSide: () => void;
@@ -320,6 +324,7 @@ export function ViewerStage({
   frameId,
   heatmapAsset,
   heatmapDisplay,
+  heatmapProcessing,
   interactionStore,
   mode,
   onCycleAbSide,
@@ -370,6 +375,9 @@ export function ViewerStage({
                 borderRadius: "inherit",
                 zIndex: mode === stageMode ? 1 : 0,
                 pointerEvents: mode === stageMode ? "auto" : "none",
+                // An outgoing image can still be loading during the fade. Keep its pixels but
+                // hide its feedback so the entering mode owns the only visible indicator.
+                "&[aria-hidden='true'] [data-viewer-stage-feedback]": { display: "none" },
               }}
             >
               <ViewerStageContent
@@ -384,6 +392,7 @@ export function ViewerStage({
                 frameId={frameId}
                 heatmapAsset={heatmapAsset}
                 heatmapDisplay={heatmapDisplay}
+                heatmapProcessing={heatmapProcessing}
                 interactionStore={interactionStore}
                 mode={stageMode}
                 onCycleAbSide={onCycleAbSide}

@@ -16,6 +16,7 @@ import {
 import {
   Box,
   Button,
+  Divider,
   IconButton,
   LinearProgress,
   ListItemIcon,
@@ -383,11 +384,13 @@ export function WebUploadWorkbench({ cases, initialCaseSlug }: WebUploadWorkbenc
     isScanning,
     planRef,
     planView,
+    pairingSuffixPreferences,
     renamePairingColumn,
     reorderPairingRows,
     reportGenerationProgress,
     resetPlan,
     setExpandedFrameId,
+    setPairingSuffixPreferences,
     sourceRootName,
   } = useWebUploadPlan();
   const { abandonUpload, pauseUpload, resetSession, snapshot, startOrResumeUpload } =
@@ -403,7 +406,6 @@ export function WebUploadWorkbench({ cases, initialCaseSlug }: WebUploadWorkbenc
     slug: "uploaded-group",
     title: "上传图组",
     description: "",
-    defaultMode: "before-after",
   });
 
   // Failed uploads can be resumed against the existing server job. Keep metadata locked there too
@@ -415,11 +417,6 @@ export function WebUploadWorkbench({ cases, initialCaseSlug }: WebUploadWorkbenc
     snapshot.stage === "paused" ||
     snapshot.stage === "failed";
   const selectedCaseExists = cases.some((item) => item.slug === selectedCaseSlug);
-  // Preserve the workspace that opened upload; a fixed catalog link discarded the operator's
-  // current Case context when they returned without uploading.
-  const returnCaseSlug =
-    initialCaseSlug && cases.some((item) => item.slug === initialCaseSlug) ? initialCaseSlug : null;
-  const returnHref = returnCaseSlug ? `/cases/${encodeURIComponent(returnCaseSlug)}` : "/";
   const hasBlockingIssues = Boolean(planView && planView.errorCount > 0);
   const canStart = Boolean(
     selectedCaseExists &&
@@ -472,15 +469,22 @@ export function WebUploadWorkbench({ cases, initialCaseSlug }: WebUploadWorkbenc
 
   return (
     <>
-      <Stack spacing={{ xs: 1.5, md: 2 }}>
+      <Box sx={{ display: { xs: "block", md: "none" }, py: 5 }}>
+        <Paper elevation={0} sx={{ ...webUploadPanelSx, maxWidth: 480, mx: "auto" }}>
+          <Stack spacing={0.75}>
+            <Typography component="h1" variant="h3">
+              上传工作台仅支持桌面浏览器
+            </Typography>
+            <Typography color="text.secondary">
+              请在电脑上选择文件夹、检查配对并开始上传。
+            </Typography>
+          </Stack>
+        </Paper>
+      </Box>
+
+      <Stack spacing={2} sx={{ display: { xs: "none", md: "flex" } }}>
         <InternalPageHeader
-          backHref={returnHref}
           title="上传对比"
-          subtitle={
-            sourceRootName && planView
-              ? `${sourceRootName} · ${planView.frames.length} Frame`
-              : "未选择素材"
-          }
           actions={
             <>
               {!planView ? (
@@ -571,70 +575,22 @@ export function WebUploadWorkbench({ cases, initialCaseSlug }: WebUploadWorkbenc
           {...({ webkitdirectory: "", directory: "" } as Record<string, string>)}
         />
 
-        <UploadFlowStrip
-          generationProgress={generationProgress}
-          overallProgress={overallProgress}
-          planView={planView}
-          snapshot={snapshot}
-          sourceRootName={sourceRootName}
-        />
-
         {!planView ? (
           <UploadIntakePanel
-            cases={cases}
             isScanning={isScanning}
-            selectedCaseSlug={selectedCaseSlug}
-            onCaseChange={setSelectedCaseSlug}
             onChooseDirectory={() => void chooseDirectory(isLocked, acceptPlan)}
           />
         ) : (
           <Box
             sx={{
               display: "grid",
-              gridTemplateColumns: { xs: "minmax(0, 1fr)", lg: "304px minmax(0, 1fr)" },
-              gap: { xs: 1.5, md: 2 },
+              // Match the Case workspace: inspection stays wide, supporting controls sit at right.
+              gridTemplateColumns: "minmax(0, 1fr) 336px",
+              gap: 2.5,
               alignItems: "start",
               minWidth: 0,
             }}
           >
-            <Stack
-              spacing={1.5}
-              sx={{
-                minWidth: 0,
-                position: { lg: "sticky" },
-                top: { lg: 16 },
-              }}
-            >
-              {showProgressPanel ? (
-                <Paper elevation={0} sx={webUploadPanelSx}>
-                  <Stack spacing={1.35}>
-                    <Typography component="h2" variant="h4">
-                      进度
-                    </Typography>
-                    <UploadDetails
-                      generationProgress={generationProgress}
-                      overallProgress={overallProgress}
-                      planView={planView}
-                      snapshot={snapshot}
-                    />
-                  </Stack>
-                </Paper>
-              ) : null}
-
-              <UploadConfigurationPanel
-                cases={cases}
-                groupMeta={groupMeta}
-                isLocked={isLocked}
-                selectedCaseSlug={selectedCaseSlug}
-                sourceRootName={sourceRootName ?? groupMeta.title}
-                onCaseChange={setSelectedCaseSlug}
-                onChooseDirectory={() => void chooseDirectory(isLocked, acceptPlan)}
-                onGroupMetaChange={(nextMeta) =>
-                  setGroupMeta({ ...nextMeta, slug: normalizeSlug(nextMeta.slug) })
-                }
-              />
-            </Stack>
-
             <PairingPreviewPanel
               plan={planRef.current}
               planView={planView}
@@ -656,6 +612,54 @@ export function WebUploadWorkbench({ cases, initialCaseSlug }: WebUploadWorkbenc
                 reorderPairingRows(activeFrameId, overFrameId, snapshot.stage === "scanned")
               }
             />
+            <Stack
+              spacing={1.5}
+              sx={{
+                minWidth: 0,
+                position: "sticky",
+                top: 16,
+              }}
+            >
+              {showProgressPanel ? (
+                <Paper elevation={0} sx={{ ...webUploadPanelSx, p: 0, overflow: "hidden" }}>
+                  {/* Progress uses the same header/body division as the source and pairing cards. */}
+                  <Typography component="h2" variant="h4" sx={{ px: 2.25, py: 1.75 }}>
+                    进度
+                  </Typography>
+                  <Divider />
+                  <Box sx={{ p: 2.25 }}>
+                    <UploadDetails
+                      generationProgress={generationProgress}
+                      overallProgress={overallProgress}
+                      planView={planView}
+                      snapshot={snapshot}
+                    />
+                  </Box>
+                </Paper>
+              ) : null}
+
+              <UploadConfigurationPanel
+                cases={cases}
+                groupMeta={groupMeta}
+                isLocked={isLocked}
+                selectedCaseSlug={selectedCaseSlug}
+                sourceRootName={sourceRootName ?? groupMeta.title}
+                onCaseChange={setSelectedCaseSlug}
+                onChooseDirectory={() => void chooseDirectory(isLocked, acceptPlan)}
+                onGroupMetaChange={(nextMeta) =>
+                  setGroupMeta({ ...nextMeta, slug: normalizeSlug(nextMeta.slug) })
+                }
+                onPairingSuffixPreferencesChange={setPairingSuffixPreferences}
+                pairingSuffixPreferences={pairingSuffixPreferences}
+              />
+              <UploadFlowStrip
+                generationProgress={generationProgress}
+                overallProgress={overallProgress}
+                planView={planView}
+                snapshot={snapshot}
+                sourceRootName={sourceRootName}
+              />
+            </Stack>
           </Box>
         )}
       </Stack>

@@ -1,16 +1,19 @@
 "use client";
 
+import { Close, ZoomInMap } from "@mui/icons-material";
 import {
   Box,
   Button,
+  IconButton,
   MenuItem,
   Stack,
   TextField,
   ToggleButton,
-  ToggleButtonGroup,
   Typography,
 } from "@mui/material";
 import type { HeatmapRegion } from "@magic-compare/compare-core/heatmap";
+import type { ReactNode } from "react";
+import { MagicSegmentedControl } from "../../controls/magic-segmented-control";
 import type { LiveHeatmapState } from "./use-live-heatmap";
 import type { ViewerInteractionStore } from "./viewer-interaction-store";
 import { HeatmapOpacityControls } from "./viewer-toolbar";
@@ -27,6 +30,8 @@ export function HeatmapInspectionPanel({
   onInspect,
   onRetry,
   onUseStored,
+  onClose,
+  comparisonControls,
   stored,
   interactionStore,
 }: {
@@ -38,6 +43,8 @@ export function HeatmapInspectionPanel({
   onInspect: (region: HeatmapRegion) => void;
   onRetry: () => void;
   onUseStored?: () => void;
+  onClose: () => void;
+  comparisonControls?: ReactNode;
   stored: boolean;
   interactionStore: ViewerInteractionStore;
 }) {
@@ -45,36 +52,78 @@ export function HeatmapInspectionPanel({
   return (
     <Stack
       component="section"
-      aria-label="热图分析"
-      spacing={1}
+      aria-label="Heatmap"
+      data-heatmap-analysis-panel=""
+      spacing={1.5}
       sx={{
-        px: { xs: 1.5, md: 2 },
-        py: 1.25,
-        borderBottom: "1px solid",
-        borderColor: "divider",
+        p: 2.25,
         minWidth: 0,
+        height: "100%",
+        overflowY: "auto",
+        backgroundColor: "surface.containerLow",
       }}
     >
-      <Stack direction="row" useFlexGap sx={{ gap: 1, flexWrap: "wrap", alignItems: "center" }}>
-        <ToggleButtonGroup
+      <Stack direction="row" sx={{ alignItems: "center", justifyContent: "space-between" }}>
+        <Stack spacing={0.15}>
+          <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
+            Heatmap
+          </Typography>
+        </Stack>
+        <IconButton aria-label="关闭 Heatmap" onClick={onClose} size="small">
+          <Close fontSize="small" />
+        </IconButton>
+      </Stack>
+      {/* The right drawer is modal on phones, so it repeats the target switcher where it remains
+          reachable instead of forcing a close-and-reopen loop before each Heatmap comparison. */}
+      {comparisonControls ? (
+        <Box
+          sx={{
+            display: { xs: "flex", sm: "none" },
+            minWidth: 0,
+            justifyContent: "center",
+            "& > .MuiStack-root": { ml: 0 },
+          }}
+        >
+          {comparisonControls}
+        </Box>
+      ) : null}
+      {/* The phone drawer needs full-width controls; desktop's wrapping row leaves uneven gaps. */}
+      <Stack
+        direction={{ xs: "column", sm: "row" }}
+        useFlexGap
+        sx={{
+          gap: { xs: 1.25, sm: 2 },
+          flexWrap: "wrap",
+          alignItems: { xs: "stretch", sm: "center" },
+        }}
+      >
+        <MagicSegmentedControl
           size="small"
           exclusive
           value={display}
-          aria-label="热图显示方式"
+          aria-label="Heatmap 显示方式"
           onChange={(_, value: HeatmapDisplay | null) => value && onDisplayChange(value)}
+          sx={{
+            width: { xs: "100%", sm: "auto" },
+            "& .MuiToggleButtonGroup-grouped": {
+              flex: { xs: "1 1 0", sm: "0 1 auto" },
+              minWidth: 0,
+              px: { xs: 0.75, sm: 1.25 },
+            },
+          }}
         >
-          <ToggleButton value="map">仅热图</ToggleButton>
+          <ToggleButton value="map">仅 Heatmap</ToggleButton>
           <ToggleButton value="overlay">叠加</ToggleButton>
           <ToggleButton value="original">原图</ToggleButton>
-        </ToggleButtonGroup>
+        </MagicSegmentedControl>
         {!stored && (
           <TextField
             select
             size="small"
-            label="灵敏度"
+            slotProps={{ select: { inputProps: { "aria-label": "Heatmap 灵敏度" } } }}
             value={gain}
             onChange={(event) => onGainChange(Number(event.target.value))}
-            sx={{ minWidth: 110 }}
+            sx={{ minWidth: 110, width: { xs: "100%", sm: "auto" } }}
           >
             <MenuItem value={0.5}>保守</MenuItem>
             <MenuItem value={1}>自动</MenuItem>
@@ -84,17 +133,20 @@ export function HeatmapInspectionPanel({
         )}
         {display === "overlay" && <HeatmapOpacityControls interactionStore={interactionStore} />}
       </Stack>
-      <Box role="status" aria-live="polite">
+      {/* The stage owns the shared visual indicator for image loading and analysis. */}
+      <Box
+        role="status"
+        aria-live="polite"
+        aria-label={state.status === "loading" && !stored ? "正在生成 Heatmap" : undefined}
+      >
         {stored ? (
           <Typography variant="body2">
-            预生成热图 · 使用上传时的算法与色阶。
+            预生成 Heatmap（Deprecated）
             <Button size="small" onClick={onRetry}>
               重新分析原图
             </Button>
           </Typography>
-        ) : state.status === "loading" ? (
-          <Typography variant="body2">正在分析两张原图… 当前显示对比原图。</Typography>
-        ) : state.status === "error" ? (
+        ) : state.status === "loading" && !summary ? null : state.status === "error" ? (
           <Stack spacing={0.5}>
             <Typography variant="body2" color="error">
               {state.error} 素材须允许跨域像素读取。
@@ -105,7 +157,7 @@ export function HeatmapInspectionPanel({
               </Button>
               {onUseStored && (
                 <Button size="small" onClick={onUseStored}>
-                  使用预生成热图
+                  使用预生成 Heatmap
                 </Button>
               )}
             </Stack>
@@ -113,47 +165,56 @@ export function HeatmapInspectionPanel({
         ) : (
           summary && (
             <Stack spacing={0.5}>
+              {/* Keep the scale and its label together at a glance, even in the narrow drawer. */}
               <Stack
                 direction="row"
-                useFlexGap
-                sx={{ gap: 1, alignItems: "center", flexWrap: "wrap" }}
+                spacing={1.25}
+                sx={{
+                  alignItems: "center",
+                  px: 1.5,
+                  py: 1.25,
+                  border: "1px solid",
+                  borderColor: "divider",
+                  borderRadius: 999,
+                  backgroundColor: "surface.containerHigh",
+                }}
               >
                 <Box
                   aria-hidden="true"
                   sx={{
-                    width: 100,
+                    flex: "1 1 0",
+                    minWidth: 48,
                     height: 8,
+                    borderRadius: 999,
                     background: "linear-gradient(90deg,#0c0e12,#2d2570,#ac2d71,#f56930,#fff5a0)",
                   }}
                 />
-                <Typography variant="caption">
-                  弱 → 强 · 色阶上限{" "}
-                  {(
-                    summary.noiseFloor +
-                    summary.autoCeiling / (state.renderedGain ?? gain)
-                  ).toFixed(1)}{" "}
-                  / 255
-                </Typography>
-                <Typography variant="caption">
-                  全图差异 RMS {summary.rms.toFixed(2)} / 255
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  sx={{ flexShrink: 0, whiteSpace: "nowrap", letterSpacing: "0.04em" }}
+                >
+                  弱 → 强
                 </Typography>
               </Stack>
-              {state.renderedGain !== gain && (
-                <Typography variant="caption">正在更新色阶…</Typography>
-              )}
-              <Typography variant="caption" color="text.secondary">
-                按当前帧展开细微差异，忽略 1 级以内波动。颜色表示变化强度，质量需核对原图。
-              </Typography>
               {summary.regions.length ? (
-                <Stack direction="row" useFlexGap sx={{ flexWrap: "wrap", gap: 0.5 }}>
+                <Stack spacing={0.75}>
                   {summary.regions.map((region, index) => (
                     <Button
                       key={index}
+                      variant="outlined"
                       size="small"
                       onClick={() => onInspect(region)}
                       aria-label={`检查区域 ${index + 1}`}
+                      startIcon={<ZoomInMap />}
+                      sx={{ justifyContent: "flex-start", minHeight: 40 }}
                     >
-                      区域 {index + 1} · {region.score.toFixed(1)}
+                      <Box component="span" sx={{ display: "grid", textAlign: "left" }}>
+                        <Box component="span">查看区域 {index + 1}</Box>
+                        <Typography component="span" variant="caption" color="text.secondary">
+                          局部 RMS {region.score.toFixed(1)} / 255
+                        </Typography>
+                      </Box>
                     </Button>
                   ))}
                 </Stack>
@@ -183,7 +244,17 @@ export function HeatmapRegionMarkers({
   onInspect: (region: HeatmapRegion) => void;
 }) {
   return (
-    <Box sx={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "hidden" }}>
+    <Box
+      sx={{
+        position: "absolute",
+        inset: 0,
+        // Stage mode layers carry z-index during their crossfade. Markers are an inspection
+        // affordance above those pixels, so the shared overlay must establish the higher layer.
+        zIndex: 3,
+        pointerEvents: "none",
+        overflow: "hidden",
+      }}
+    >
       {regions.map((region, index) => {
         const x = rotate ? 1 - region.y - region.height : region.x;
         const y = rotate ? region.x : region.y;
@@ -202,16 +273,19 @@ export function HeatmapRegionMarkers({
               // Keep the outline at the measured patch size; the panel provides larger targets.
               minWidth: 0,
               minHeight: 0,
-              p: 0,
-              border: "1px solid #fff",
-              boxShadow: "0 0 0 1px #111",
+              display: "grid",
+              placeItems: "start",
+              p: 0.25,
+              border: "2px solid #fff",
+              boxShadow: "0 0 0 1px rgba(0,0,0,0.86), 0 2px 8px rgba(0,0,0,0.52)",
               borderRadius: 0,
-              background: "transparent",
+              backgroundColor: "rgba(0,0,0,0.38)",
               color: "#fff",
               textShadow: "0 1px 2px #000",
               pointerEvents: "auto",
               cursor: "pointer",
               fontSize: 12,
+              fontWeight: 700,
             }}
           >
             {index + 1}

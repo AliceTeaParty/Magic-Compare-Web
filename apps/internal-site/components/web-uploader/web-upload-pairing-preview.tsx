@@ -25,9 +25,9 @@ import {
   Select,
   Stack,
   ToggleButton,
-  ToggleButtonGroup,
   Typography,
 } from "@mui/material";
+import { MagicSegmentedControl } from "@magic-compare/ui";
 import { FluentFolderEmoji } from "../fluent-emoji";
 import { PairingTableHeader } from "./web-upload-pairing-header";
 import { SortablePairingRow, type PairingPreviewUrls } from "./web-upload-pairing-row";
@@ -59,6 +59,10 @@ function frameForId(plan: WebUploadPlan | null, frameId: string | null) {
     return null;
   }
   return plan.frames.find((frame) => frameIdForFrame(frame) === frameId) ?? null;
+}
+
+function compactHeatmapReference(label: string) {
+  return label.length > 15 ? `${label.slice(0, 12)}...` : label;
 }
 
 /**
@@ -161,14 +165,21 @@ export function PairingPreviewPanel({
           borderColor: "divider",
         }}
       >
-        <Stack direction="row" spacing={1} sx={{ alignItems: "baseline", minWidth: 0 }}>
+        <Stack direction="row" spacing={0.7} sx={{ alignItems: "center", minWidth: 0 }}>
           <Typography component="h2" variant="h4">
             配对
           </Typography>
           {planView ? (
-            <Typography variant="body2" color="text.secondary" noWrap>
-              {planView.frames.length} Frame
-            </Typography>
+            <>
+              {hasBlockingIssues ? (
+                <WarningAmber aria-hidden="true" color="warning" sx={{ fontSize: 18 }} />
+              ) : (
+                <CheckCircle aria-hidden="true" color="success" sx={{ fontSize: 18 }} />
+              )}
+              <Typography variant="body2" color="text.secondary" noWrap>
+                {planView.frames.length} Frame
+              </Typography>
+            </>
           ) : null}
         </Stack>
         {planView ? (
@@ -183,7 +194,7 @@ export function PairingPreviewPanel({
             }}
           >
             {/* This explicit fallback exposes filename titles when structured inference is wrong. */}
-            <ToggleButtonGroup
+            <MagicSegmentedControl
               exclusive
               size="small"
               value={frameTitleMode}
@@ -214,12 +225,8 @@ export function PairingPreviewPanel({
               <ToggleButton value="filename" aria-label="文件名 Frame 标题">
                 文件名
               </ToggleButton>
-            </ToggleButtonGroup>
-            <FormControl
-              size="small"
-              variant="outlined"
-              sx={{ minWidth: 184, flex: "1 1 184px", maxWidth: 260 }}
-            >
+            </MagicSegmentedControl>
+            <FormControl size="small" variant="outlined" sx={{ width: 164, flex: "0 1 164px" }}>
               <Select
                 // Incomplete pairs have no valid reference option yet; avoid an out-of-range selection.
                 value={
@@ -227,11 +234,13 @@ export function PairingPreviewPanel({
                     ? planView.heatmapReferenceLabel
                     : ""
                 }
-                inputProps={{ "aria-label": "热图参考变量" }}
+                inputProps={{ "aria-label": "Heatmap 参考变量" }}
                 onChange={(event) => onHeatmapReferenceChange(event.target.value)}
                 disabled={!canReorder || planView.heatmapReferenceOptions.length <= 1}
                 displayEmpty
-                renderValue={(value) => (value ? `Heatmap: ${value}` : "Heatmap")}
+                renderValue={(value) =>
+                  value ? `Heatmap: ${compactHeatmapReference(value)}` : "Heatmap"
+                }
                 sx={{
                   height: webUploadSizes.compactControlHeight,
                   width: "100%",
@@ -239,10 +248,12 @@ export function PairingPreviewPanel({
                   borderRadius: webUploadRadii.control,
                   "& .MuiSelect-select": {
                     py: 0.45,
+                    pl: "30px !important",
                     pr: "30px !important",
                     overflow: "hidden",
                     textOverflow: "ellipsis",
                     whiteSpace: "nowrap",
+                    textAlign: "center",
                     fontSize: 13,
                   },
                 }}
@@ -254,27 +265,11 @@ export function PairingPreviewPanel({
                 ))}
               </Select>
             </FormControl>
-            <Box
-              sx={{
-                minHeight: webUploadSizes.compactControlHeight,
-                display: "flex",
-                alignItems: "center",
-                gap: 0.6,
-                px: 0.5,
-                color: hasBlockingIssues ? "warning.main" : "success.main",
-              }}
-            >
-              {hasBlockingIssues ? (
-                <WarningAmber aria-hidden="true" sx={{ fontSize: 19 }} />
-              ) : (
-                <CheckCircle aria-hidden="true" sx={{ fontSize: 19 }} />
-              )}
-              <Typography variant="body2" sx={{ color: "text.secondary", whiteSpace: "nowrap" }}>
-                {hasBlockingIssues
-                  ? `${planView.errorCount} 问题`
-                  : `${planView.healthyPairCount} 可用`}
+            {hasBlockingIssues ? (
+              <Typography variant="body2" color="warning.main" sx={{ whiteSpace: "nowrap" }}>
+                {planView.errorCount} 问题
               </Typography>
-            </Box>
+            ) : null}
           </Box>
         ) : null}
       </Box>

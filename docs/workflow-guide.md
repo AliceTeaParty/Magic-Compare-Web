@@ -344,7 +344,7 @@ Web 上传链路是：
 ## 站点品牌与版本信息
 
 - Next config 在构建时读取根 `package.json` 的 `version` 和当前 git 短 hash，注入为 `MAGIC_COMPARE_APP_VERSION` / `MAGIC_COMPARE_COMMIT_SHA`。
-- internal-site 与 public-site 都在导航底部显示 `v<version>`，commit hash 放在提示中；公开页脚不再重复版本。
+- internal-site 在导航底部显示 `v<version>`；public-site 将版本与主题控件放在页脚 copyright 前。commit hash 放在版本提示中。
 - `MAGIC_COMPARE_INTERNAL_LOGO_URL` / `MAGIC_COMPARE_INTERNAL_FAVICON_URL` 只影响内部站，`MAGIC_COMPARE_PUBLIC_LOGO_URL` / `MAGIC_COMPARE_PUBLIC_FAVICON_URL` 只影响公开站。
 - 品牌变量接受绝对 URL，或对应应用已经能够服务的 `/...` 路径；留空时使用内置 Logo 与 favicon。
 - 修改内部站品牌变量后需要重启 internal-site，使布局 metadata 与导航重新读取配置。

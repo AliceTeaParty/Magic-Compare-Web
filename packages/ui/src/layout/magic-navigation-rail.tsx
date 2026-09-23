@@ -58,11 +58,14 @@ export function MagicNavigationLogo({
  * to a heavier weight and tighter spacing than the internal title despite serving the same role.
  */
 export function MagicMobileNavigationBar({
+  alwaysVisible = false,
   logoUrl,
   onOpenNavigation,
 }: {
+  /** Public pages retain the brand bar after their empty navigation rail is removed. */
+  alwaysVisible?: boolean;
   logoUrl?: string | null;
-  onOpenNavigation: () => void;
+  onOpenNavigation?: () => void;
 }) {
   return (
     <AppBar
@@ -76,13 +79,15 @@ export function MagicMobileNavigationBar({
         borderColor: "divider",
         // An opaque shared surface keeps scrolling content from changing title and icon contrast.
         backgroundColor: "var(--mui-palette-surface-container)",
-        [MAGIC_NAV_RAIL_MEDIA_QUERY]: { display: "none" },
+        [MAGIC_NAV_RAIL_MEDIA_QUERY]: { display: alwaysVisible ? "block" : "none" },
       }}
     >
       <Toolbar disableGutters sx={{ minHeight: "56px !important", px: 1.5 }}>
-        <IconButton aria-label="打开导航" onClick={onOpenNavigation} sx={{ mr: 0.75 }}>
-          <Menu />
-        </IconButton>
+        {onOpenNavigation ? (
+          <IconButton aria-label="打开导航" onClick={onOpenNavigation} sx={{ mr: 0.75 }}>
+            <Menu />
+          </IconButton>
+        ) : null}
         <MagicNavigationLogo logoUrl={logoUrl} size={32} />
         <Typography variant="subtitle1" noWrap sx={{ ml: 1, flex: 1, minWidth: 0 }}>
           Magic Compare
@@ -107,10 +112,12 @@ export function MagicBuildVersionLabel({
   appVersion,
   commitHash,
   compact = false,
+  fullWidth = true,
 }: {
   appVersion?: string | null;
   commitHash?: string | null;
   compact?: boolean;
+  fullWidth?: boolean;
 }) {
   if (!appVersion) return null;
 
@@ -126,7 +133,7 @@ export function MagicBuildVersionLabel({
         component="div"
         variant="caption"
         sx={{
-          width: "100%",
+          width: fullWidth ? "100%" : "auto",
           px: compact ? 0 : 0.75,
           color: "text.disabled",
           fontVariantNumeric: "tabular-nums",

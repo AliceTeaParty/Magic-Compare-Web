@@ -6,7 +6,7 @@ import { Box, ListItemButton, ListItemIcon, ListItemText } from "@mui/material";
 import Link from "next/link";
 import { NAV_RAIL_MEDIA_QUERY } from "./internal-layout-constants";
 
-type NavigationIconFeedback = "case" | "workspace" | "upload" | "create";
+type NavigationIconFeedback = "workspace" | "upload" | "create";
 
 interface InternalNavigationItemProps {
   disabled?: boolean;
@@ -19,12 +19,6 @@ interface InternalNavigationItemProps {
   selected?: boolean;
   title?: string;
 }
-
-const caseFeedback = keyframes`
-  0% { transform: rotate(0deg) scaleY(1); }
-  45% { transform: rotate(-5deg) translateY(1px) scaleY(0.92); }
-  100% { transform: rotate(0deg) translateY(0) scaleY(1); }
-`;
 
 const workspaceFeedback = keyframes`
   0% { transform: rotate(-5deg) scale(0.88); clip-path: inset(18% 18% 18% 18%); }
@@ -43,7 +37,6 @@ const createFeedback = keyframes`
 `;
 
 const navigationFeedbackAnimations = {
-  case: `${caseFeedback} 260ms cubic-bezier(0.2, 0, 0, 1)`,
   workspace: `${workspaceFeedback} 240ms cubic-bezier(0, 0, 0, 1)`,
   upload: `${uploadFeedback} 260ms cubic-bezier(0.2, 0, 0, 1)`,
   create: `${createFeedback} 220ms cubic-bezier(0, 0, 0, 1)`,
@@ -112,7 +105,7 @@ export function InternalNavigationItem({
 }: InternalNavigationItemProps) {
   const [feedbackSequence, setFeedbackSequence] = useState(0);
 
-  /** Restarts only the icon's semantic feedback while leaving the rail indicator geometry fixed. */
+  /** Restarts semantic icon feedback while leaving the rail indicator geometry fixed. */
   function handleActivation() {
     if (iconFeedback) setFeedbackSequence((current) => current + 1);
     onClick?.();
