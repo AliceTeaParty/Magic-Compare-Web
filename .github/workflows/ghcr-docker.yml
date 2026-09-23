@@ -229,7 +229,7 @@ jobs:
             org.opencontainers.image.description=Magic Compare internal-site runtime image
 
       - name: Download verified runtime image
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: ghcr-runtime-image-${{ github.run_id }}-${{ github.run_attempt }}
           path: /tmp/magic-compare-runtime-image
