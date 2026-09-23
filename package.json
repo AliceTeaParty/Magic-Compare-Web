@@ -68,7 +68,7 @@
     }
   },
   "dependencies": {
-    "@types/node": "24.13.3",
+    "@types/node": "24.13.6",
     "@types/react": "19.2.18",
     "@types/react-dom": "19.2.5",
     "tsx": "^4.23.13",
