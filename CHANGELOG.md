@@ -6,6 +6,11 @@ Entries before that date are summarized at release level instead of being recons
 
 ## Unreleased
 
+### Fixed
+
+- Kept S3 image checks at upload and import entry points instead of blocking public manifest publication on legacy asset metadata; reused thumbnail reads for validation and mosaic preview generation.
+- Limited batch manifest refresh to published Cases and pruned stale public bundles only when their manifest identity is verifiable.
+
 ## v2.0.0-RC - 2026-09-23
 
 ### Added

@@ -6,20 +6,16 @@ const {
   caseUpdate,
   groupUpdate,
   groupFindFirst,
-  assetUpdateMany,
   readPublishedManifest,
   writePublishedManifest,
-  assertLikelyPublicAssets,
   enrichPublishManifestWithPlaceholders,
 } = vi.hoisted(() => ({
   caseFindUnique: vi.fn(),
   caseUpdate: vi.fn(),
   groupUpdate: vi.fn(),
   groupFindFirst: vi.fn(),
-  assetUpdateMany: vi.fn(),
   readPublishedManifest: vi.fn(),
   writePublishedManifest: vi.fn(),
-  assertLikelyPublicAssets: vi.fn(),
   enrichPublishManifestWithPlaceholders: vi.fn(),
 }));
 
@@ -33,9 +29,6 @@ vi.mock("@/lib/server/db/client", () => ({
       update: groupUpdate,
       findFirst: groupFindFirst,
     },
-    asset: {
-      updateMany: assetUpdateMany,
-    },
   },
 }));
 
@@ -46,11 +39,6 @@ vi.mock("@/lib/server/storage/published-content", () => ({
 
 vi.mock("./publish-image-placeholders", () => ({
   enrichPublishManifestWithPlaceholders,
-}));
-
-vi.mock("@/lib/server/storage/internal-asset-sanity", () => ({
-  assertLikelyPublicAssets,
-  isKeyCompareAssetKind: (kind: string) => ["before", "after", "heatmap"].includes(kind),
 }));
 
 vi.mock("@/lib/server/storage/internal-assets", () => ({
@@ -66,10 +54,8 @@ describe("publishCase", () => {
     caseUpdate.mockReset();
     groupUpdate.mockReset();
     groupFindFirst.mockReset();
-    assetUpdateMany.mockReset();
     readPublishedManifest.mockReset();
     writePublishedManifest.mockReset();
-    assertLikelyPublicAssets.mockReset();
     enrichPublishManifestWithPlaceholders.mockReset();
     readPublishedManifest.mockResolvedValue(null);
     enrichPublishManifestWithPlaceholders.mockImplementation(
@@ -80,7 +66,7 @@ describe("publishCase", () => {
     );
   });
 
-  it("writes manifest-only published bundles with public asset urls", async () => {
+  it("publishes legacy assets without blocking on storage revalidation", async () => {
     caseFindUnique.mockResolvedValue({
       id: "case-1",
       slug: "2026",
@@ -142,12 +128,6 @@ describe("publishCase", () => {
 
     await publishCase("case-1");
 
-    expect(assertLikelyPublicAssets).toHaveBeenCalledTimes(1);
-    expect(assetUpdateMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: expect.objectContaining({ id: { in: ["asset-before", "asset-after"] } }),
-      }),
-    );
     expect(writePublishedManifest).toHaveBeenCalledWith(
       "2026--test-example",
       expect.objectContaining({
@@ -184,138 +164,5 @@ describe("publishCase", () => {
         ]),
       }),
     );
-  });
-
-  it("fails before writing the manifest when public assets fail sanity check", async () => {
-    caseFindUnique.mockResolvedValue({
-      id: "case-1",
-      slug: "2026",
-      title: "2026",
-      subtitle: "",
-      summary: "summary",
-      tagsJson: "[]",
-      publishedAt: null,
-      groups: [
-        {
-          id: "group-1",
-          slug: "test-example",
-          storageRoot: "/groups/group-1",
-          publicSlug: "2026--test-example",
-          title: "Test Example",
-          description: "",
-          defaultMode: "before-after",
-          tagsJson: "[]",
-          isPublic: true,
-          order: 0,
-          frames: [
-            {
-              id: "frame-1",
-              title: "Frame 1",
-              caption: "",
-              order: 0,
-              isPublic: true,
-              assets: [
-                {
-                  id: "asset-before",
-                  kind: "before",
-                  label: "Before",
-                  imageUrl: "/internal-assets/2026/test-example/001/before.png",
-                  thumbUrl: "/internal-assets/2026/test-example/001/thumb-before.png",
-                  width: 1280,
-                  height: 720,
-                  note: "",
-                  isPublic: true,
-                  isPrimaryDisplay: true,
-                },
-                {
-                  id: "asset-after",
-                  kind: "after",
-                  label: "After",
-                  imageUrl: "/internal-assets/2026/test-example/001/after.png",
-                  thumbUrl: "/internal-assets/2026/test-example/001/thumb-after.png",
-                  width: 1280,
-                  height: 720,
-                  note: "",
-                  isPublic: true,
-                  isPrimaryDisplay: true,
-                },
-              ],
-            },
-          ],
-        },
-      ],
-    });
-    assertLikelyPublicAssets.mockRejectedValue(new Error("bad public asset"));
-
-    await expect(publishCase("case-1")).rejects.toThrow("bad public asset");
-    expect(writePublishedManifest).not.toHaveBeenCalled();
-  });
-
-  it("trusts previously validated immutable assets without reading storage again", async () => {
-    const storageValidatedAt = new Date("2026-08-05T08:00:00.000Z");
-    caseFindUnique.mockResolvedValue({
-      id: "case-1",
-      slug: "2026",
-      title: "2026",
-      subtitle: "",
-      summary: "summary",
-      tagsJson: "[]",
-      groups: [
-        {
-          id: "group-1",
-          slug: "test-example",
-          storageRoot: "/groups/group-1",
-          publicSlug: "2026--test-example",
-          title: "Test Example",
-          description: "",
-          defaultMode: "before-after",
-          tagsJson: "[]",
-          order: 0,
-          frames: [
-            {
-              id: "frame-1",
-              title: "Frame 1",
-              caption: "",
-              order: 0,
-              isPublic: true,
-              assets: [
-                {
-                  id: "asset-before",
-                  kind: "before",
-                  label: "Before",
-                  imageUrl: "/internal-assets/before.png",
-                  thumbUrl: "/internal-assets/thumb-before.png",
-                  width: 1280,
-                  height: 720,
-                  note: "",
-                  isPublic: true,
-                  isPrimaryDisplay: true,
-                  storageValidatedAt,
-                },
-                {
-                  id: "asset-after",
-                  kind: "after",
-                  label: "After",
-                  imageUrl: "/internal-assets/after.png",
-                  thumbUrl: "/internal-assets/thumb-after.png",
-                  width: 1280,
-                  height: 720,
-                  note: "",
-                  isPublic: true,
-                  isPrimaryDisplay: true,
-                  storageValidatedAt,
-                },
-              ],
-            },
-          ],
-        },
-      ],
-    });
-
-    await publishCase("case-1");
-
-    expect(assertLikelyPublicAssets).toHaveBeenCalledWith([]);
-    expect(assetUpdateMany).not.toHaveBeenCalled();
-    expect(writePublishedManifest).toHaveBeenCalledOnce();
   });
 });

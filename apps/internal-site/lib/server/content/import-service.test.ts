@@ -5,6 +5,7 @@ const {
   validateImportManifest,
   assertLikelyImportManifestAssets,
   generateAssetPlaceholderJson,
+  validateAndGenerateAssetPlaceholderJson,
   caseUpsert,
   caseUpdate,
   groupFindUnique,
@@ -15,6 +16,7 @@ const {
   validateImportManifest: vi.fn(),
   assertLikelyImportManifestAssets: vi.fn(),
   generateAssetPlaceholderJson: vi.fn(),
+  validateAndGenerateAssetPlaceholderJson: vi.fn(),
   caseUpsert: vi.fn(),
   caseUpdate: vi.fn(),
   groupFindUnique: vi.fn(),
@@ -34,6 +36,7 @@ vi.mock("@/lib/server/storage/internal-asset-sanity", () => ({
 
 vi.mock("@/lib/server/storage/asset-placeholders", () => ({
   generateAssetPlaceholderJson,
+  validateAndGenerateAssetPlaceholderJson,
 }));
 
 vi.mock("@/lib/server/db/client", () => ({
@@ -63,6 +66,7 @@ describe("applyImportManifest", () => {
     validateImportManifest.mockReset();
     assertLikelyImportManifestAssets.mockReset();
     generateAssetPlaceholderJson.mockReset();
+    validateAndGenerateAssetPlaceholderJson.mockReset();
     caseUpsert.mockReset();
     caseUpdate.mockReset();
     groupFindUnique.mockReset();
@@ -145,7 +149,7 @@ describe("applyImportManifest", () => {
     });
     assertLikelyImportManifestAssets.mockResolvedValue(undefined);
     const pending = new Map<string, (value: string) => void>();
-    generateAssetPlaceholderJson.mockImplementation(
+    validateAndGenerateAssetPlaceholderJson.mockImplementation(
       (thumbUrl: string) =>
         new Promise<string>((resolve) => {
           pending.set(thumbUrl, resolve);

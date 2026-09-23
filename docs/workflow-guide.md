@@ -394,7 +394,7 @@ Web 上传链路是：
 
 仓库不再提供独立的 `case-publish` API。内容写操作只在 Case 含公开 Group 时重新生成 manifest；Group 改为内部时会删除对应 published bundle，最后一个公开 Group 被移除后会同步清理 Case 发布状态。
 
-manifest 生成只查询公开 Group、Frame 和所需字段。新上传或 manifest 导入在对象检查成功后写入 `Asset.storageValidatedAt`；旧素材首次生成 manifest 时以 8 路并发检查未记录的原图和缩略图，后续信任 UUID 不可变路径，不再重复读取 R2。日志记录查询、校验和总耗时以及信任/新增校验数量。
+普通发布和内容同步按公开 Group 生成 manifest，并在发布成功后更新 Case 状态；批量刷新命令只纳入 `Case.status=published`、`Group.isPublic=true` 且含公开 Frame 的内容。新上传和 manifest 导入在对象检查成功后写入 `Asset.storageValidatedAt`；发布不读取该字段，也不会为旧素材再访问 S3。生成 manifest 时缩略图读取只用于可选马赛克预览，失败不会阻止有效原图发布。
 
 manifest 同步不会自动导出或部署公开站。
 

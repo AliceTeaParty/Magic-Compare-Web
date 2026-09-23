@@ -47,7 +47,7 @@ const helperMocks = vi.hoisted(() => ({
   buildFramePendingPrefix: vi.fn(),
   assertFrameCanPrepare: vi.fn(),
   assertFrameCanCommit: vi.fn(),
-  assertPreparedAssetsUploaded: vi.fn(),
+  validatePreparedAssetsAndGeneratePlaceholders: vi.fn(),
   deleteReplacedFramePrefixes: vi.fn(),
   requireActiveUploadJob: vi.fn(),
   countUncommittedFrameJobs: vi.fn(),
@@ -131,7 +131,8 @@ vi.mock("./upload-storage-operations", async () => {
     buildPresignedFiles: helperMocks.buildPresignedFiles,
     assertFrameCanPrepare: helperMocks.assertFrameCanPrepare,
     assertFrameCanCommit: helperMocks.assertFrameCanCommit,
-    assertPreparedAssetsUploaded: helperMocks.assertPreparedAssetsUploaded,
+    validatePreparedAssetsAndGeneratePlaceholders:
+      helperMocks.validatePreparedAssetsAndGeneratePlaceholders,
     deleteReplacedFramePrefixes: helperMocks.deleteReplacedFramePrefixes,
   };
 });
@@ -282,6 +283,7 @@ describe("upload-service", () => {
     });
 
     Object.values(helperMocks).forEach((mockFn) => mockFn.mockReset());
+    helperMocks.validatePreparedAssetsAndGeneratePlaceholders.mockResolvedValue([]);
     deleteInternalAssetPrefix.mockReset();
   });
 
@@ -786,7 +788,7 @@ describe("upload-service", () => {
         group: { id: "group-1", slug: "test-group", storageRoot: "/groups/group-1" },
       },
     });
-    helperMocks.assertPreparedAssetsUploaded.mockRejectedValue(
+    helperMocks.validatePreparedAssetsAndGeneratePlaceholders.mockRejectedValue(
       new StorageValidationError({
         logicalPath: "/groups/group-1/3/revision-1/o1.png",
         code: "SignatureDoesNotMatch",
