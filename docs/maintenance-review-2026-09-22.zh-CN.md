@@ -87,3 +87,9 @@ Firefox CI trace 发现：警告返回后额外触发 `router.refresh()`，紧�
 - 旧数据先备份数据库，再显式运行 `DATABASE_URL=file:/绝对路径/数据库 pnpm --filter @magic-compare/internal-site exec tsx scripts/backfill-asset-placeholders.ts`。末尾可加图组 slug 限定范围；只补空字段，四并发读取缩略图，失败计数输出并保留后续重试机会，不触发发布。
 - 本地审核数据库先备份到忽略的 `output/backups/internal-site-before-placeholders-20260923.db`，再完成 4238/4238 个 Asset 的预览补录，失败 0；SQLite 完整性检查为 `ok`，外键检查无结果。该数据操作没有发布公开站。
 - 最新工作区 `pnpm check` 通过；完整内部/公开浏览器回归为 128 通过、31 项按平台跳过。静态公开站在隔离副本中重新导出，桌面 Chromium 与移动 WebKit 回归为 51 通过、13 项按平台跳过，覆盖 Heatmap 菜单居中、同行色阶及默认 A/B。Linux Docker 视觉回归 10/10 通过。
+
+### RC 提交前复核
+
+- 上传页改为左侧配对、右侧 336px 设置栏，卡片边框、标题区和间距沿用项目设置；目录选定后只显示单行文件夹名。桌面明暗视觉用例 2/2 通过。
+- `pnpm check`、内部及公开站 `pnpm build` 通过。Heatmap 请求增加来源查询参数后，修正测试拦截路径，内部/公开站的桌面与移动端定向回归 42/42 通过。
+- 最后一次完整本地 E2E 在定位上述测试拦截问题时主动中止；修正后按本轮要求仅重跑相关用例。其余改动已有前述完整回归记录，提交后的远端 CI 继续执行完整矩阵。

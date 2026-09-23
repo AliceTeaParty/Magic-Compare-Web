@@ -217,7 +217,7 @@ compose 当前会做这些事：
 
 说明：
 
-- 基础 `docker-compose.yml` 默认拉取 GHCR `v2.0.0-alpha.4`；升级时用 `MAGIC_COMPARE_INTERNAL_SITE_IMAGE` 显式指定版本标签或 digest。发布流程只推送版本标签，没有 `latest` 标签。
+- 基础 `docker-compose.yml` 默认拉取 GHCR `v2.0.0-RC`；升级时用 `MAGIC_COMPARE_INTERNAL_SITE_IMAGE` 显式指定版本标签或 digest。发布流程只推送版本标签，没有 `latest` 标签。
 - `docker/dev.compose.override.yml` 会把 `internal-site` / `internal-site-init` 切换成本地 `build`
 - 开发环境和生产环境一样，通过 `.env` 提供实际 S3-compatible 存储配置
 - 数据目录现在统一通过 `.env` 控制；留空时走 Docker named volumes，填写宿主机路径时走 bind mount

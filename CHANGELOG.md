@@ -6,6 +6,33 @@ Entries before that date are summarized at release level instead of being recons
 
 ## Unreleased
 
+## v2.0.0-RC - 2026-09-23
+
+### Added
+
+- Stored compact thumbnail-derived mosaic previews with assets and published manifests. New uploads and imports populate them automatically; an explicit backfill command covers existing SQLite rows.
+- Added searchable upload project selection, editable Before/After suffix preferences, and a shared segmented control for multi-option choices.
+
+### Changed
+
+- Standardized new and imported groups on A/B as the default viewer mode. Legacy mode fields remain readable for compatibility, but no longer configure new groups.
+- Redesigned Heatmap inspection for desktop and mobile, kept its name untranslated, and reused the image loading feedback while analysis runs. Pre-generated Heatmaps are deprecated fallbacks.
+- Aligned internal and public viewer controls, loading mosaics, filmstrip thumbnails, menus, headers, details transitions, and footer layout.
+- Reworked the desktop upload page with the pairing area on the left and a 336px configuration column on the right, matching the Case settings card hierarchy. Mobile upload shows a desktop-only notice.
+- Migrated SQLite access to Prisma 7 and refreshed the dependency toolchain, documentation, and visual baselines.
+
+### Fixed
+
+- Made the Up arrow cycle A/B comparison variables in reverse order while Down continues forward.
+- Isolated Heatmap analysis requests from stale cross-origin image cache entries and unified loading feedback across modes.
+- Preserved manifests and local export output across interrupted writes, surfaced saved metadata when downstream synchronization fails, and removed redundant runtime guards.
+- Required full same-commit CI before GHCR publication and repaired Playwright and workflow coverage for release paths.
+
+### Migration notes
+
+- Initialize the nullable `Asset.imagePlaceholderJson` column before starting the new internal image. Back up the SQLite database, then run the documented placeholder backfill for existing rows; it does not publish or deploy content.
+- Re-export and deploy the static public site explicitly to include mosaic previews in published manifests. S3 object keys and historical Heatmap files do not need migration.
+
 ## v2.0.0-alpha.4 - 2026-09-14
 
 ### Added
