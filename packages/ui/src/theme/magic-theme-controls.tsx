@@ -82,7 +82,12 @@ export function MagicThemeControls({ compact = false }: { compact?: boolean }) {
       <Tooltip title="主题色" placement={compact ? "right" : "bottom"}>
         <span>
           {/* SSR renders the footer before hydration; disable clicks until the handler is attached. */}
-          <IconButton aria-label="选择主题色" disabled={!mounted} onClick={openPalette}>
+          <IconButton
+            {...themeControlPersistenceProps}
+            aria-label="选择主题色"
+            disabled={!mounted}
+            onClick={openPalette}
+          >
             <PaletteOutlined />
           </IconButton>
         </span>

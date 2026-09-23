@@ -55,9 +55,14 @@ test("Heatmap sensitivity menu and legend keep the shared alignment", async ({ p
 
   const legend = panel.getByText("弱 → 强", { exact: true }).locator("..");
   await expect(legend).toHaveCSS("border-style", "solid");
-  const bar = (await legend.locator("div").first().boundingBox())!;
-  const label = (await legend.getByText("弱 → 强", { exact: true }).boundingBox())!;
-  expect(Math.abs(bar.y + bar.height / 2 - label.y - label.height / 2)).toBeLessThan(3);
+  // The side panel animates into place; compare final geometry once that transition settles.
+  await expect
+    .poll(async () => {
+      const bar = (await legend.locator("div").first().boundingBox())!;
+      const label = (await legend.getByText("弱 → 强", { exact: true }).boundingBox())!;
+      return Math.abs(bar.y + bar.height / 2 - label.y - label.height / 2);
+    })
+    .toBeLessThan(3);
 
   await sensitivity.click();
   await expect(page.getByRole("option", { name: "自动", exact: true })).toHaveCSS(
