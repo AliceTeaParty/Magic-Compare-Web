@@ -80,9 +80,12 @@ export function MagicThemeControls({ compact = false }: { compact?: boolean }) {
     >
       {modeControl}
       <Tooltip title="主题色" placement={compact ? "right" : "bottom"}>
-        <IconButton aria-label="选择主题色" onClick={openPalette}>
-          <PaletteOutlined />
-        </IconButton>
+        <span>
+          {/* SSR renders the footer before hydration; disable clicks until the handler is attached. */}
+          <IconButton aria-label="选择主题色" disabled={!mounted} onClick={openPalette}>
+            <PaletteOutlined />
+          </IconButton>
+        </span>
       </Tooltip>
       <Popover
         open={Boolean(anchor)}

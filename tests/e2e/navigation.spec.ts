@@ -26,7 +26,7 @@ test("navigation, theme presets, custom color and dark mode survive reload", asy
   const palette = page.getByRole("button", { name: "选择主题色" }).filter({ visible: true });
   await palette.click();
   const presets = page.getByRole("button", { name: /^使用.+主题$/ });
-  // The portal can mount after the palette click; wait for all options before iterating.
+  // Wait for the opened menu before cycling choices.
   await expect.poll(() => presets.count()).toBeGreaterThan(1);
   const count = await presets.count();
   for (let index = 0; index < count; index++) {
