@@ -83,7 +83,7 @@ Playwright WebKit 使用带补丁的 WebKit，不是 Safari 应用；手机配�
 pnpm test:e2e:visual:docker --update-snapshots
 ```
 
-更新只在显式参数下回写 `tests/e2e/screenshots`。逐张检查正常/奇数尺寸、明/暗、桌面/手机图片，确认原图已加载、四角完整、分界线和把手合理后再提交。截图样式只排除 Next 开发调试浮标，保留全部产品界面。CI 不更新基准；浏览器升级需同步 Docker 镜像并重新审查截图。直接 `pnpm test:e2e:visual` 用于相同 Linux 环境，macOS 的渲染差异不应回写为 Linux 基准。
+更新只在显式参数下回写 `tests/e2e/screenshots`。逐张检查正常/奇数尺寸、明/暗、桌面/手机图片，确认原图已加载、四角完整、分界线和把手合理后再提交。截图样式只排除 Next 开发调试浮标，保留全部产品界面。CI 不更新基准；浏览器升级需同步 Docker 镜像并重新审查截图。直接 `pnpm test:e2e:visual` 用于相同 Linux 环境；配置会拒绝在 macOS 上直接更新基准，避免字体像素差异覆盖 Linux 截图。
 
 全页截图先等待页面壳恢复完成，再通过通知的关闭按钮清除临时提示，避免遮挡表单。保留默认光标样式，防止截图工具在 React hydration 前改写输入框的 style；截图时不聚焦输入框。
 
