@@ -161,7 +161,7 @@
       "slug": "test-group",
       "title": "Test Group",
       "description": "",
-      "defaultMode": "before-after",
+      "defaultMode": "a-b",
       "tags": [],
       "isPublic": false,
       "frames": []
@@ -179,6 +179,8 @@
 - 这是只读接口，供 internal-site 的 Group viewer 导航加载另一组 dataset，不修改数据库或发布状态。
 - `caseSlug` 和 `groupSlug` 必须为非空字符串；校验失败返回 `400`。
 - 找不到对应 group 时返回 `404` 和 `{ "error": "Group not found." }`。
+
+素材的微型 WebP 马赛克和源色随 dataset 内嵌。上传、导入时预生成并保存在 Asset 元数据；导入在改写数据库前以四并发处理缩略图。公开 manifest 复用同一数据；Viewer 不再发起独立的占位图请求。
 
 ### `POST /api/ops/group-update`
 
@@ -331,7 +333,7 @@
     "title": "Test Group",
     "description": "",
     "order": 0,
-    "defaultMode": "before-after",
+    "defaultMode": "a-b",
     "tags": []
   },
   "frames": [
@@ -393,7 +395,7 @@
 
 - `case.slug`、`group.slug`、`frame.order` 是恢复上传和定位目标的关键键。
 - `case.coverAssetLabel` 可以为空。
-- `group.defaultMode` 默认值是 `before-after`。
+- Viewer 统一预设为 `a-b`。`group.defaultMode` 仅为旧客户端与 manifest 保留，上传输入统一归一化为 `a-b`，不再提供自定义图组默认模式。
 - `frames[].assets` 当前最少需要两个 asset。
 - `forceRestart` 可选，默认 `false`。
 - 不带 `protocol` 时使用完整 frame 快照，兼容既有调用方。
@@ -471,7 +473,7 @@
 说明：
 
 - 如果 case 已存在，当前代码不会用上传端 metadata 覆盖 case 标题、摘要、标签；已有 case 仍以数据库为准。
-- 如果 group 已存在，title / description / order / defaultMode / tags 会按本次输入更新。
+- 如果 group 已存在，title / description / order / tags 会按本次输入更新；默认模式统一写为 `a-b`。
 - 同一 group 在输入哈希未变化、且存在活动 job 时会直接恢复现有 job。
 - 输入变化或显式传入 `forceRestart=true` 时，服务端会清空整个 group 当前数据并重建上传 job；输入哈希相同的活动 job 会直接恢复。
 - 如果目标 group 之前是公开状态，启动上传时会立刻降回 `isPublic=false`，并删除对应已发布 bundle，避免公开站点看到半替换内容。

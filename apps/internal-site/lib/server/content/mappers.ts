@@ -1,8 +1,9 @@
 import type { Asset } from "@/generated/prisma/client";
 import type { ViewerDataset } from "@magic-compare/compare-core/viewer-data";
-import type { CaseStatus, ViewerMode } from "@magic-compare/content-schema";
+import { DEFAULT_VIEWER_MODE, type CaseStatus } from "@magic-compare/content-schema";
 import { resolvePublishedGroupUrl } from "@/lib/server/public-site/url";
 import { resolvePublicInternalAssetUrl } from "@/lib/server/storage/internal-assets";
+import { readAssetPlaceholder } from "@/lib/server/storage/asset-placeholders";
 import type { CaseCatalogItem, CaseWorkspaceData } from "./types";
 
 type OrderedItem = { order: number };
@@ -76,18 +77,6 @@ function workspaceExtraAssetLabels(assets: Array<{ kind: string; label: string }
 }
 
 /**
- * Falls back to swipe mode because it is the safest viewer default when stored data contains an
- * outdated mode string.
- */
-export function asViewerMode(input: string): ViewerMode {
-  if (input === "a-b" || input === "heatmap" || input === "before-after") {
-    return input;
-  }
-
-  return "before-after";
-}
-
-/**
  * Falls back to draft so unexpected status values fail closed instead of making internal content
  * appear published in the UI.
  */
@@ -122,6 +111,8 @@ export function mapFrameAssets(assets: Asset[]) {
     height: asset.height,
     note: asset.note,
     isPrimaryDisplay: asset.isPrimaryDisplay,
+    // Inline metadata avoids a second request and the old graphic-to-mosaic loading transition.
+    placeholder: readAssetPlaceholder(asset.imagePlaceholderJson),
   }));
 }
 
@@ -229,7 +220,7 @@ export function mapCaseWorkspaceData(caseRow: {
       title: group.title,
       description: group.description,
       order: group.order,
-      defaultMode: asViewerMode(group.defaultMode),
+      defaultMode: DEFAULT_VIEWER_MODE,
       isPublic: group.isPublic,
       publicSlug: group.publicSlug,
       frameCount: group._count.frames,
@@ -298,7 +289,7 @@ export function buildViewerDataset(
       publicSlug: currentGroup.publicSlug,
       title: currentGroup.title,
       description: currentGroup.description,
-      defaultMode: asViewerMode(currentGroup.defaultMode),
+      defaultMode: DEFAULT_VIEWER_MODE,
       tags: parseTags(currentGroup.tagsJson),
       isPublic: currentGroup.isPublic,
       frames: sortByOrder(currentGroup.frames).map((frame) => ({

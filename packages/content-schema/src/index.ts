@@ -4,6 +4,12 @@ export const CASE_STATUSES = ["draft", "internal", "published", "archived"] as c
 
 export const VIEWER_MODES = ["before-after", "a-b", "heatmap"] as const;
 
+// Group-authored defaults are retired; both sites open new viewing sessions in the same mode.
+export const DEFAULT_VIEWER_MODE = "a-b" as const;
+
+export const GROUP_TITLE_MAX_LENGTH = 20;
+export const GROUP_DESCRIPTION_MAX_LENGTH = 40;
+
 export const ASSET_KINDS = ["before", "after", "heatmap", "crop", "misc"] as const;
 
 export const PUBLISH_SCHEMA_VERSION = 2;
@@ -93,7 +99,7 @@ const GroupImportSchema = z.object({
   title: z.string().min(1),
   description: z.string().default(""),
   order: z.number().int().nonnegative(),
-  defaultMode: ViewerModeSchema.default("before-after"),
+  defaultMode: ViewerModeSchema.default(DEFAULT_VIEWER_MODE),
   isPublic: z.boolean().default(false),
   tags: StringListSchema,
 });

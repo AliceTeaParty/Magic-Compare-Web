@@ -1,4 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
+import { DEFAULT_VIEWER_MODE } from "@magic-compare/content-schema";
 
 interface PreparedUploadFile {
   contentType: string;
@@ -90,7 +91,7 @@ async function verifyGroupUpload() {
       title: "Upload check",
       description: "",
       order: 0,
-      defaultMode: "before-after",
+      defaultMode: DEFAULT_VIEWER_MODE,
       tags: [],
     },
     frames: [frame],

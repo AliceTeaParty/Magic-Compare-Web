@@ -16,6 +16,7 @@ import {
 const STORAGE_OPERATION_CONCURRENCY = 6;
 
 export type PreparedUploadAsset = UploadAssetDescriptor & {
+  imagePlaceholderJson?: string | null;
   original: UploadAssetDescriptor["original"] & { logicalPath: string };
   thumbnail: UploadAssetDescriptor["thumbnail"] & { logicalPath: string };
 };

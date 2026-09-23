@@ -1,6 +1,6 @@
 import path from "node:path";
 import { existsSync } from "node:fs";
-import type { ImportManifest } from "@magic-compare/content-schema";
+import { DEFAULT_VIEWER_MODE, type ImportManifest } from "@magic-compare/content-schema";
 import { DEMO_CASE_SLUG, buildPublicGroupSlug } from "@magic-compare/shared-utils";
 import {
   resolveDefaultPublishedRoot,
@@ -53,7 +53,7 @@ const demoManifest: ImportManifest = {
         title: "Banding Check",
         description: "Two frames comparing gradient cleanup and edge retention.",
         order: 0,
-        defaultMode: "before-after",
+        defaultMode: DEFAULT_VIEWER_MODE,
         isPublic: true,
         tags: ["gradient", "grain"],
       },

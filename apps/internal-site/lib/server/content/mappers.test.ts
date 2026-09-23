@@ -1,5 +1,35 @@
 import { describe, expect, it } from "vitest";
-import { mapCaseWorkspaceData } from "./mappers";
+import { mapCaseWorkspaceData, mapFrameAssets } from "./mappers";
+
+describe("mapFrameAssets", () => {
+  it("inlines the persisted preview in the first Viewer payload", () => {
+    const [asset] = mapFrameAssets([
+      {
+        id: "asset-1",
+        frameId: "frame-1",
+        kind: "before",
+        label: "Before",
+        imageUrl: "/groups/group-1/original.webp",
+        thumbUrl: "/groups/group-1/thumb.webp",
+        width: 1920,
+        height: 1080,
+        note: "",
+        isPublic: true,
+        isPrimaryDisplay: true,
+        storageValidatedAt: null,
+        imagePlaceholderJson: JSON.stringify({
+          dataUrl: "data:image/webp;base64,UklGRg==",
+          sourceColor: "#AABBCC",
+        }),
+      },
+    ]);
+
+    expect(asset?.placeholder).toEqual({
+      dataUrl: "data:image/webp;base64,UklGRg==",
+      sourceColor: "#AABBCC",
+    });
+  });
+});
 
 describe("mapCaseWorkspaceData", () => {
   it("uses first-frame extra asset labels instead of default viewer mode tags", () => {
@@ -38,6 +68,7 @@ describe("mapCaseWorkspaceData", () => {
       ],
     });
 
+    expect(result.groups[0]?.defaultMode).toBe("a-b");
     expect(result.groups[0]?.extraAssetLabels).toEqual(["Rip", "Deband"]);
   });
 });

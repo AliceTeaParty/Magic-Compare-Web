@@ -1,6 +1,8 @@
 import { prisma } from "@/lib/server/db/client";
 import { BadRequestError, ConflictError, StorageValidationError } from "@/lib/server/api/errors";
 import { deleteInternalAssetPrefix } from "@/lib/server/storage/internal-assets";
+import { generateAssetPlaceholderJson } from "@/lib/server/storage/asset-placeholders";
+import { mapWithConcurrency } from "@/lib/server/concurrency/map-with-concurrency";
 import {
   type GroupUploadStartInput,
   GroupUploadCancelInputSchema,
@@ -328,6 +330,10 @@ export async function commitGroupUploadFrame(rawInput: unknown) {
     }
     throw error;
   }
+  // Decode thumbnails before the transaction; SQLite must never hold a write lock across S3 reads.
+  await mapWithConcurrency(preparedAssets, 4, async (asset) => {
+    asset.imagePlaceholderJson = await generateAssetPlaceholderJson(asset.thumbnail.logicalPath);
+  });
   const existingFrames = await prisma.frame.findMany({
     where: {
       groupId: job.group.id,
@@ -686,6 +692,7 @@ function buildCommittedFrameCreateInput(
         label: asset.label,
         imageUrl: asset.original.logicalPath,
         thumbUrl: asset.thumbnail.logicalPath,
+        imagePlaceholderJson: asset.imagePlaceholderJson,
         width: asset.width,
         height: asset.height,
         note: asset.note,

@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { posix as pathPosix } from "node:path";
-import type { ImportManifest } from "@magic-compare/content-schema";
+import { DEFAULT_VIEWER_MODE, type ImportManifest } from "@magic-compare/content-schema";
 import { validateImportManifest } from "@/lib/server/validators/import-manifest";
 import { prisma } from "@/lib/server/db/client";
 import {
@@ -9,6 +9,8 @@ import {
 } from "@/lib/server/storage/internal-asset-sanity";
 import { buildLogicalStoragePath } from "@/lib/server/storage/internal-assets";
 import { stringifyTags } from "./mappers";
+import { generateAssetPlaceholderJson } from "../storage/asset-placeholders";
+import { mapWithConcurrency } from "../concurrency/map-with-concurrency";
 
 function inferGroupStorageRoot(groupEntry: ImportManifest["groups"][number]): string {
   const firstAsset = groupEntry.frames[0]?.assets[0];
@@ -65,7 +67,7 @@ export async function upsertGroup(groupEntry: ImportManifest["groups"][number], 
         title: groupEntry.group.title,
         description: groupEntry.group.description,
         order: groupEntry.group.order,
-        defaultMode: groupEntry.group.defaultMode,
+        defaultMode: DEFAULT_VIEWER_MODE,
         isPublic: groupEntry.group.isPublic,
         tagsJson: stringifyTags(groupEntry.group.tags),
         storageRoot,
@@ -92,7 +94,7 @@ export async function upsertGroup(groupEntry: ImportManifest["groups"][number], 
       title: groupEntry.group.title,
       description: groupEntry.group.description,
       order: groupEntry.group.order,
-      defaultMode: groupEntry.group.defaultMode,
+      defaultMode: DEFAULT_VIEWER_MODE,
       isPublic: groupEntry.group.isPublic,
       tagsJson: stringifyTags(groupEntry.group.tags),
       storageRoot,
@@ -109,6 +111,18 @@ export async function upsertGroup(groupEntry: ImportManifest["groups"][number], 
 export async function applyImportManifest(rawManifest: unknown) {
   const manifest = validateImportManifest(rawManifest);
   await assertLikelyImportManifestAssets(manifest);
+
+  // Batch thumbnail reads before replacing rows: serial S3 round trips made large imports slow,
+  // and a failed optional preview should not prolong an already half-written group.
+  const assetEntries = manifest.groups.flatMap((group) =>
+    group.frames.flatMap((frame) => frame.assets),
+  );
+  const placeholderJson = await mapWithConcurrency(assetEntries, 4, (asset) =>
+    generateAssetPlaceholderJson(asset.thumbUrl),
+  );
+  const placeholdersByAsset = new Map(
+    assetEntries.map((asset, index) => [asset, placeholderJson[index]]),
+  );
 
   const caseRow = await prisma.case.upsert({
     where: {
@@ -160,6 +174,7 @@ export async function applyImportManifest(rawManifest: unknown) {
             label: assetEntry.label,
             imageUrl: assetEntry.imageUrl,
             thumbUrl: assetEntry.thumbUrl,
+            imagePlaceholderJson: placeholdersByAsset.get(assetEntry),
             width: assetEntry.width,
             height: assetEntry.height,
             note: assetEntry.note,

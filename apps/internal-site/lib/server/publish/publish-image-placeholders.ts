@@ -132,6 +132,9 @@ export async function enrichPublishManifestWithPlaceholders({
     currentAssets,
     PLACEHOLDER_CONCURRENCY,
     async (asset): Promise<PlaceholderGenerationOutcome> => {
+      if (asset.placeholder) {
+        return { assetId: asset.id, placeholder: asset.placeholder, status: "reused" };
+      }
       const previous = previousById.get(asset.id);
       if (previous?.thumbUrl === asset.thumbUrl && previous.placeholder) {
         return { assetId: asset.id, placeholder: previous.placeholder, status: "reused" };

@@ -108,6 +108,8 @@ describe("publish image placeholders", () => {
       id: asset.id,
       thumbUrl: `/groups/group-1/${asset.id}-thumb.png`,
     }));
+    // New uploads already carry their immutable preview; publishing must not fetch it again.
+    manifest.frames[0]!.assets[1]!.placeholder = reusable;
     const red = await createSolidImage(16, 9, { r: 255, g: 0, b: 0, alpha: 1 });
     let activeReads = 0;
     let maxActiveReads = 0;
@@ -129,7 +131,7 @@ describe("publish image placeholders", () => {
     });
 
     expect(maxActiveReads).toBeLessThanOrEqual(4);
-    expect(result.stats).toEqual({ generated: 5, reused: 1, failed: 1 });
+    expect(result.stats).toEqual({ generated: 4, reused: 2, failed: 1 });
     expect(result.manifest.frames[0]?.assets[0]?.placeholder).toEqual(reusable);
     expect(result.manifest.frames[0]?.assets[3]?.placeholder).toBeUndefined();
     expect(result.manifest.frames[0]?.assets[6]?.placeholder?.sourceColor).toBe("#FF0000");

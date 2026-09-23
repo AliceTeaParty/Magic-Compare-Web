@@ -1,6 +1,11 @@
 import { createHash } from "node:crypto";
 import { z } from "zod";
-import { AssetKindSchema, SlugSchema, ViewerModeSchema } from "@magic-compare/content-schema";
+import {
+  AssetKindSchema,
+  DEFAULT_VIEWER_MODE,
+  SlugSchema,
+  ViewerModeSchema,
+} from "@magic-compare/content-schema";
 
 const Sha256Schema = z.string().regex(/^[a-f0-9]{64}$/i);
 const ExtensionSchema = z.string().regex(/^\.[a-z0-9]+$/i);
@@ -62,7 +67,8 @@ const GroupUploadIdentitySchema = z.object({
     title: z.string().min(1),
     description: z.string().default(""),
     order: z.number().int().nonnegative(),
-    defaultMode: ViewerModeSchema.default("before-after"),
+    // Older upload clients may still send this field; its value no longer controls the group.
+    defaultMode: ViewerModeSchema.default(DEFAULT_VIEWER_MODE).transform(() => DEFAULT_VIEWER_MODE),
     tags: z.array(z.string().min(1)).default([]),
   }),
 });

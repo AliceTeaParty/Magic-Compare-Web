@@ -1,3 +1,4 @@
+import { DEFAULT_VIEWER_MODE } from "@magic-compare/content-schema";
 import type {
   AssetKind,
   AssetRecord,
@@ -210,7 +211,7 @@ export function createViewerDatasetFromPublishManifest(manifest: PublishManifest
       publicSlug: manifest.group.publicSlug,
       title: manifest.group.title,
       description: manifest.group.description,
-      defaultMode: manifest.group.defaultMode,
+      defaultMode: DEFAULT_VIEWER_MODE,
       tags: manifest.group.tags,
       isPublic: true,
       frames: orderByNumericOrder(manifest.frames).map((frame) => ({

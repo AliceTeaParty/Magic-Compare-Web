@@ -64,6 +64,7 @@ export async function publishCase(caseId: string) {
                   isPublic: true,
                   isPrimaryDisplay: true,
                   storageValidatedAt: true,
+                  imagePlaceholderJson: true,
                 },
               },
             },

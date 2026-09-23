@@ -171,6 +171,7 @@ describe("createViewerDatasetFromPublishManifest", () => {
     });
 
     expect(dataset.group.publicSlug).toBe("demo-case--banding-check");
+    expect(dataset.group.defaultMode).toBe("a-b");
     expect(dataset.publishStatus?.status).toBe("published");
     expect(dataset.group.frames).toHaveLength(1);
     expect(dataset.group.frames[0]?.assets[0]?.placeholder).toEqual({
