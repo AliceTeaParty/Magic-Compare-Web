@@ -1,0 +1,31 @@
+diff --git a/lib/coreBundle.js b/lib/coreBundle.js
+index d9041dd0f009072511a7d808dec83121ff29e127..93b929db7e745fc290a542668b9d04a77a03482b 100644
+--- a/lib/coreBundle.js
++++ b/lib/coreBundle.js
+@@ -20155,12 +20155,20 @@ var init_dom = __esm({
+         if (localPaths || localDirectory) {
+           const localPathsOrDirectory = localDirectory ? [localDirectory] : localPaths;
+           await progress2.race(Promise.all(localPathsOrDirectory.map((localPath) => import_fs14.default.promises.access(localPath, import_fs14.default.constants.F_OK))));
+-          const waitForInputEvent = localDirectory ? this.evaluate((node) => new Promise((fulfill) => {
+-            node.addEventListener("input", fulfill, { once: true });
+-          })).catch(() => {
+-          }) : Promise.resolve();
+-          await this._page.delegate.setInputFilePaths(progress2, retargeted, localPathsOrDirectory);
+-          await progress2.race(waitForInputEvent);
++          // Install the listener before native directory selection can emit its input event.
++          const inputEventState = localDirectory ? await progress2.race(this.evaluateHandle((node) => ({
++            promise: new Promise((fulfill) => {
++              node.addEventListener("input", () => fulfill(), { once: true });
++            })
++          })).catch(() => null)) : null;
++          try {
++            await this._page.delegate.setInputFilePaths(progress2, retargeted, localPathsOrDirectory);
++            if (inputEventState)
++              await progress2.race(inputEventState.evaluate((state) => state.promise).catch(() => {
++              }));
++          } finally {
++            inputEventState?.dispose();
++          }
+         } else {
+           await progress2.race(retargeted.evaluateInUtility(([injected, node, files]) => injected.setInputFiles(node, files), filePayloads));
+         }

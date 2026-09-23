@@ -3,6 +3,7 @@ import { mkdir, rm, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import path from "node:path";
 import { startAssetServer } from "./asset-server";
+import { createPrismaClient } from "../../../apps/internal-site/lib/server/db/create-client";
 import { parsePublishManifest } from "../../../packages/content-schema/src/index";
 import { createViewerFixture, fixtureSvg } from "./viewer-fixture";
 
@@ -70,9 +71,7 @@ async function main() {
         await writeFile(path.join(directory, "ignored.txt"), "Not an image");
     }
     await run(["--filter", "@magic-compare/internal-site", "db:push"]);
-    const require = createRequire(path.join(root, "apps/internal-site/package.json"));
-    const { PrismaClient } = require("@prisma/client");
-    const prisma = new PrismaClient();
+    const prisma = createPrismaClient(databaseUrl);
     try {
       if (process.env.MAGIC_COMPARE_E2E_FIXTURE !== "empty")
         await prisma.case.create({

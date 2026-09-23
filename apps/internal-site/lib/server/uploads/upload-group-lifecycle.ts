@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { DEFAULT_VIEWER_MODE } from "@magic-compare/content-schema";
 import {
   recomputeCaseCoverAsset,
   syncCasePublicationState,
@@ -126,7 +127,7 @@ export async function ensureCaseAndGroup(input: GroupUploadStartInput) {
         title: input.group.title,
         description: input.group.description,
         order: input.group.order,
-        defaultMode: input.group.defaultMode,
+        defaultMode: DEFAULT_VIEWER_MODE,
         isPublic: false,
         tagsJson: stringifyTags(input.group.tags),
         storageRoot,
@@ -142,7 +143,7 @@ export async function ensureCaseAndGroup(input: GroupUploadStartInput) {
       existingGroup.title !== input.group.title ||
       existingGroup.description !== input.group.description ||
       existingGroup.order !== input.group.order ||
-      existingGroup.defaultMode !== input.group.defaultMode ||
+      existingGroup.defaultMode !== DEFAULT_VIEWER_MODE ||
       existingGroup.tagsJson !== tagsJson)
   ) {
     return {
@@ -153,7 +154,7 @@ export async function ensureCaseAndGroup(input: GroupUploadStartInput) {
           title: input.group.title,
           description: input.group.description,
           order: input.group.order,
-          defaultMode: input.group.defaultMode,
+          defaultMode: DEFAULT_VIEWER_MODE,
           tagsJson,
           storageRoot,
         },

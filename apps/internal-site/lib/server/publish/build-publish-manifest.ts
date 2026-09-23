@@ -1,8 +1,10 @@
 import {
+  DEFAULT_VIEWER_MODE,
   PUBLISH_SCHEMA_VERSION,
   type PublishManifest,
 } from "@magic-compare/content-schema";
-import { asAssetKind, asViewerMode, parseTags } from "@/lib/server/content/mappers";
+import { asAssetKind, parseTags } from "@/lib/server/content/mappers";
+import { readAssetPlaceholder } from "@/lib/server/storage/asset-placeholders";
 import {
   internalAssetPublicGroupBaseUrl,
   resolvePublicInternalAssetUrl,
@@ -20,6 +22,7 @@ type PublishableAsset = {
   note: string;
   isPublic: boolean;
   isPrimaryDisplay: boolean;
+  imagePlaceholderJson?: string | null;
 };
 
 type PublishableFrame = {
@@ -86,16 +89,13 @@ function mapManifestAssets(assets: PublishableAsset[]): PublishManifestAsset[] {
     id: asset.id,
     kind: asAssetKind(asset.kind),
     label: asset.label,
-    imageUrl: assertPublicAssetDeliveryUrl(
-      resolvePublicInternalAssetUrl(asset.imageUrl),
-    ),
-    thumbUrl: assertPublicAssetDeliveryUrl(
-      resolvePublicInternalAssetUrl(asset.thumbUrl),
-    ),
+    imageUrl: assertPublicAssetDeliveryUrl(resolvePublicInternalAssetUrl(asset.imageUrl)),
+    thumbUrl: assertPublicAssetDeliveryUrl(resolvePublicInternalAssetUrl(asset.thumbUrl)),
     width: asset.width,
     height: asset.height,
     note: asset.note,
     isPrimaryDisplay: asset.isPrimaryDisplay,
+    placeholder: readAssetPlaceholder(asset.imagePlaceholderJson),
   }));
 }
 
@@ -121,9 +121,7 @@ export function buildPublishManifest(params: {
     schemaVersion: PUBLISH_SCHEMA_VERSION,
     publicSlug,
     generatedAt: publishedAt.toISOString(),
-    assetBasePath: assertPublicAssetDeliveryUrl(
-      internalAssetPublicGroupBaseUrl(group.storageRoot),
-    ),
+    assetBasePath: assertPublicAssetDeliveryUrl(internalAssetPublicGroupBaseUrl(group.storageRoot)),
     case: {
       slug: caseRow.slug,
       title: caseRow.title,
@@ -138,7 +136,7 @@ export function buildPublishManifest(params: {
       publicSlug,
       title: group.title,
       description: group.description,
-      defaultMode: asViewerMode(group.defaultMode),
+      defaultMode: DEFAULT_VIEWER_MODE,
       tags: parseTags(group.tagsJson),
     },
     frames: publicFrames.map((frame) => ({

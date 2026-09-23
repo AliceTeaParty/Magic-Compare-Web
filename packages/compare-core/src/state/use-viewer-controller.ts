@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { ViewerMode } from "@magic-compare/content-schema";
+import { DEFAULT_VIEWER_MODE, type ViewerMode } from "@magic-compare/content-schema";
 import {
   getComparisonAssetKey,
   type ViewerAsset,
@@ -47,7 +47,7 @@ export interface ViewerController {
 export function useViewerController(group: ViewerGroup): ViewerController {
   const frames = useMemo(() => getOrderedFrames(group), [group]);
   const [currentFrameId, setCurrentFrameId] = useState<string | undefined>(frames[0]?.id);
-  const [mode, setModeState] = useState<ViewerMode>(group.defaultMode);
+  const [mode, setModeState] = useState<ViewerMode>(DEFAULT_VIEWER_MODE);
   const [abSide, setAbSideState] = useState<"before" | "after">("after");
   const [comparisonAssetPreferenceKey, setComparisonAssetPreferenceKey] = useState<
     string | undefined
@@ -73,18 +73,16 @@ export function useViewerController(group: ViewerGroup): ViewerController {
       [comparisonAssetPreferenceKey, currentFrame],
     );
   const comparisonAssetKey = afterAsset ? getComparisonAssetKey(afterAsset) : undefined;
-  const resolvedMode = resolveViewerMode(mode, currentFrame, group.defaultMode);
+  const resolvedMode = resolveViewerMode(mode, currentFrame, DEFAULT_VIEWER_MODE);
   const framesRef = useRef(frames);
   const currentFrameRef = useRef(currentFrame);
   const currentFrameIndexRef = useRef(currentFrameIndex);
-  const defaultModeRef = useRef(group.defaultMode);
 
   // Event handlers need the latest frame and mode information without paying for new callback
   // identities every render, because the workbench now mounts long-lived DOM listeners around them.
   framesRef.current = frames;
   currentFrameRef.current = currentFrame;
   currentFrameIndexRef.current = currentFrameIndex;
-  defaultModeRef.current = group.defaultMode;
 
   // The saved mode is advisory only; it must be revalidated whenever the active frame changes
   // because not every frame exposes heatmap or A/B assets.
@@ -125,7 +123,7 @@ export function useViewerController(group: ViewerGroup): ViewerController {
    * some modes disappear on a per-frame basis and mode buttons must not churn callback identity.
    */
   const setMode = useCallback((nextMode: ViewerMode): void => {
-    setModeState(resolveViewerMode(nextMode, currentFrameRef.current, defaultModeRef.current));
+    setModeState(resolveViewerMode(nextMode, currentFrameRef.current, DEFAULT_VIEWER_MODE));
   }, []);
 
   /**

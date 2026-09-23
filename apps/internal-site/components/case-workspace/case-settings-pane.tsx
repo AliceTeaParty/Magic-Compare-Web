@@ -69,7 +69,7 @@ interface CaseSettingsPaneProps {
     title: string;
   };
   onMetadataSaved: (metadata: { title: string; summary: string; tags: string[] }) => void;
-  onNotify: (message: string, tone: AppNotificationTone) => void;
+  onNotify: (message: string, tone: AppNotificationTone, options?: { sticky?: boolean }) => void;
   onOpenChange: (open: boolean) => void;
   open: boolean;
 }
@@ -126,13 +126,17 @@ export function CaseSettingsPane({
           title: string;
           summary: string;
           tags: string[];
+          warnings?: string[];
         }>(
           "/api/ops/case-update",
           { caseSlug: data.slug, title, summary, tags },
           { fallbackMessage: "保存项目失败。" },
         );
         onMetadataSaved(result);
-        onNotify("项目设置已保存。", "success");
+        // Publication failure occurs after saving; keep the committed metadata visible.
+        if (result.warnings?.length) {
+          onNotify(result.warnings.join("\n"), "warning", { sticky: true });
+        } else onNotify("项目设置已保存。", "success");
         onOpenChange(false);
       } catch (error) {
         onNotify(error instanceof Error ? error.message : "保存项目失败。", "error");

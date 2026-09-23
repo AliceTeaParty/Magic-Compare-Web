@@ -87,4 +87,43 @@ describe("published manifest synchronization", () => {
     expect(mocks.publishCase).not.toHaveBeenCalled();
     expect(mocks.syncCasePublicationState).toHaveBeenCalledWith("case-1");
   });
+  it("reports publication failure after committing order without rejecting the saved mutation", async () => {
+    mocks.groupFindMany.mockResolvedValue([{ id: "group-1" }]);
+    mocks.groupCount.mockResolvedValue(1);
+    mocks.publishCase.mockRejectedValue(new Error("disk full"));
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const result = await reorderGroups("case-1", ["group-1"]);
+      expect(mocks.transaction).toHaveBeenCalledOnce();
+      expect(result.warnings).toEqual([expect.stringContaining("更改已保存")]);
+      expect(log).toHaveBeenCalledWith(expect.stringContaining("case-1"), expect.any(Error));
+    } finally {
+      log.mockRestore();
+    }
+  });
+  it("updates the last hidden group's case status even when bundle removal fails", async () => {
+    mocks.caseFindUnique.mockResolvedValue({
+      id: "case-1",
+      slug: "mono",
+      groups: [
+        {
+          id: "group-1",
+          slug: "comparison",
+          isPublic: true,
+          publicSlug: "mono--comparison",
+        },
+      ],
+    });
+    mocks.groupCount.mockResolvedValue(0);
+    mocks.deletePublishedGroup.mockRejectedValue(new Error("filesystem unavailable"));
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const result = await setGroupVisibility("mono", "comparison", false);
+      expect(result.isPublic).toBe(false);
+      expect(result.warnings).toHaveLength(1);
+      expect(mocks.syncCasePublicationState).toHaveBeenCalledWith("case-1");
+    } finally {
+      log.mockRestore();
+    }
+  });
 });

@@ -15,7 +15,13 @@ export interface LiveHeatmapState {
 
 /** Decode the originals without resizing; averaging images first would erase fine compression errors. */
 async function readOriginal(url: string, signal: AbortSignal) {
-  const response = await fetch(url, { signal });
+  const imageUrl = new URL(url, window.location.href);
+  // The image CDN can retain an older response without this origin's CORS header. Give pixel
+  // reads a stable origin-specific cache key while leaving ordinary image URLs untouched.
+  if (imageUrl.origin !== window.location.origin && /^https?:$/.test(imageUrl.protocol)) {
+    imageUrl.searchParams.set("heatmap-origin", window.location.origin);
+  }
+  const response = await fetch(imageUrl, { signal, cache: "reload" });
   if (!response.ok) throw new Error(`原图读取失败（${response.status}）。`);
   const objectUrl = URL.createObjectURL(await response.blob());
   const image = new Image();
@@ -25,7 +31,7 @@ async function readOriginal(url: string, signal: AbortSignal) {
     signal.throwIfAborted();
     // Bound peak memory on mobile while retaining native-pixel analysis for images through 4K.
     if (image.naturalWidth * image.naturalHeight > 12_000_000)
-      throw new Error("原图超过 1200 万像素，请使用预生成热图或裁切后分析。");
+      throw new Error("原图超过 1200 万像素，请使用预生成 Heatmap 或裁切后分析。");
     const canvas = document.createElement("canvas");
     canvas.width = image.naturalWidth;
     canvas.height = image.naturalHeight;
@@ -76,7 +82,7 @@ export function useLiveHeatmap(
         error:
           error instanceof Error
             ? error.message
-            : "无法分析原图，请检查素材跨域访问或使用预生成热图。",
+            : "无法分析原图，请检查素材跨域访问或使用预生成 Heatmap。",
       });
       abort.abort();
       worker?.terminate();
@@ -86,7 +92,7 @@ export function useLiveHeatmap(
     try {
       worker = new Worker(new URL("./heatmap-worker.ts", import.meta.url), { type: "module" });
       workerRef.current = worker;
-      worker.onerror = () => fail(new Error("热图计算不可用，请重试或使用预生成热图。"));
+      worker.onerror = () => fail(new Error("Heatmap 计算不可用，请重试或使用预生成 Heatmap。"));
       worker.onmessage = ({ data }: MessageEvent<HeatmapResponse>) => {
         if (abort.signal.aborted || data.id !== sequence.current) return;
         if ("error" in data) {
@@ -104,7 +110,7 @@ export function useLiveHeatmap(
           asset: {
             id: `live-heatmap-${data.id}`,
             kind: "heatmap",
-            label: "实时差异热图",
+            label: "实时差异 Heatmap",
             imageUrl: resultUrl,
             thumbUrl: resultUrl,
             width: data.summary.width,
@@ -145,9 +151,17 @@ export function useLiveHeatmap(
   }, [enabled, key, beforeUrl, afterUrl]);
 
   useEffect(() => {
-    if (!enabled) return;
-    workerRef.current?.postMessage({ id: ++sequence.current, gain } satisfies HeatmapRequest);
-  }, [enabled, gain]);
+    const worker = workerRef.current;
+    if (!enabled || !worker) return;
+    // Sensitivity re-renders reuse the same pending state and keep the last map visible while
+    // the worker updates it, so the shared stage indicator does not flash a different surface.
+    setState((current) =>
+      current.key === key && current.status === "ready"
+        ? { ...current, status: "loading" }
+        : current,
+    );
+    worker.postMessage({ id: ++sequence.current, gain } satisfies HeatmapRequest);
+  }, [enabled, gain, key]);
 
   return state.key === key ? state : { key, status: "loading" as const };
 }

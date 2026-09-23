@@ -2,6 +2,10 @@
 
 UI 改动以真实浏览器中的操作结果、盒模型和截图为验收依据。`pnpm check` 检查源码、类型和 Vitest；浏览器测试是独立 CI 门禁。
 
+Viewer 模式切换使用 220ms 画布交叠淡入淡出，退出画布在过渡期间保留已解码图像，完成后卸载；A/B 内部切换变量仍立即显示。详情栏与 Heatmap 分析栏用 240ms 布局过渡，详情开关保持原图节点。系统减少动态效果偏好会取消这些过渡。`viewer.spec.ts` 检查实际中间帧、退出层不可交互、连续反向切换、过渡完成后的卸载，以及详情栏展开和收起时的连续尺寸变化。
+
+原图加载直接显示数据中预置的像素占位图，旧扫描动画已移除；没有预览数据时保留中性底色，不切换另一种加载图案。等待超过 5 秒后显示“网络较慢”。原图解码完成后，占位图与提示一起退出。
+
 ## 日常入口
 
 ```bash
@@ -28,7 +32,9 @@ pnpm test:e2e:empty --project=internal-ios-webkit
 
 ## PR 浏览器矩阵
 
-`.github/workflows/browser-ui.yml` 是可复用工作流，每个 PR 和 main 更新调用同一套矩阵，也支持每周、版本 tag 和手动执行。每组分别测试 internal/public，并用另一份空数据库检查首次使用入口。
+`.github/workflows/ci.yml` 在每个 PR 和 main 更新运行，且可由其他工作流在同一提交调用；不使用路径过滤，避免必需的 `CI Gate` 因配置、补丁或文档改动被跳过。`CI Gate` 总结 Verify、Compose、浏览器矩阵、静态导出和视觉回归五项的实际结果，任一项失败或跳过都会阻断。
+
+`.github/workflows/browser-ui.yml` 是 CI 调用的可复用工作流，也支持每周和手动执行。每组分别测试 internal/public，并用另一份空数据库检查首次使用入口。版本 tag 或手动镜像检查会先调用同一套 CI；tag 在通过运行时 smoke 后，才将该 smoke 使用的 Docker 归档加载、打 tag 并推送 GHCR，发布阶段不会重新构建镜像。
 
 | 组                    | Runner       | 浏览器与设备配置                            |
 | --------------------- | ------------ | ------------------------------------------- |
@@ -38,7 +44,7 @@ pnpm test:e2e:empty --project=internal-ios-webkit
 | Android Chrome        | Ubuntu 24.04 | Chrome 正式稳定版，Pixel 7 视口与触摸模拟   |
 | iOS WebKit            | macOS 15     | Playwright WebKit，iPhone 13 视口与触摸模拟 |
 
-五组运行各自站点的完整功能用例，包括手机上的项目管理、上传和部署面板。`fail-fast: false` 保留其他浏览器结果；每组按需安装浏览器，缓存 pnpm，使用 `.node-version`，上传独立 HTML/JSON 报告、失败截图与 trace，保留 14 天。GitHub job summary 展示通过、失败、flaky 和跳过数量。静态导出和固定 Linux 图像基准是独立任务。
+各组按实际设备使用范围运行用例。目录上传只属于桌面工作流：上传入口、配对、生成、上传与恢复用例及截图仅在桌面项目运行；手机模拟不能证明手机文件选择器支持该流程，手机矩阵不运行上传用例。`fail-fast: false` 保留其他浏览器结果；每组按需安装浏览器，缓存 pnpm，使用 `.node-version`，上传独立 HTML/JSON 报告、失败截图与 trace，保留 14 天。GitHub job summary 展示通过、失败、flaky 和跳过数量。静态导出和固定 Linux 图像基准是独立任务。
 
 Playwright WebKit 使用带补丁的 WebKit，不是 Safari 应用；手机配置是设备模拟，不是 iOS/Android 真机。macOS WebKit 更接近 Safari 的平台行为，依据 [Playwright 浏览器说明](https://playwright.dev/docs/browsers#webkit)。Chrome 通道使用已安装的正式浏览器；CI 在临时 runner 安装，个人机器可直接使用已有 Chrome。
 
@@ -47,16 +53,16 @@ Playwright WebKit 使用带补丁的 WebKit，不是 Safari 应用；手机配�
 | 场景         | 验证内容                                                                                                                                           |
 | ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Viewer 布局  | 首次进入、横图/竖图/方图、横竖屏尺寸变化、侧栏及引导；舞台相对内容区中心偏差不超过 1 CSS px，无页面横向溢出；原图与舞台边界误差不超过 0.125 CSS px |
-| 对比操作     | 滑动方向与复位、A/B 的 Src/Rip/Flt 循环、缩放复位、热图透明度、模式偏好恢复                                                                        |
+| 对比操作     | 滑动方向与复位、A/B 的 ↓ Src→Rip→Flt 与 ↑ Src→Flt→Rip 循环、缩放复位、热图透明度、模式偏好恢复                                                     |
 | 胶卷         | 长列表虚拟窗口、键盘滚动到首尾、鼠标拖动、手机轻触、从缩略图/标题/间隙起手的触摸滚动、纵向页面滚动、取消后继续操作                                 |
 | 图片生命周期 | 原图 SSR 发现、解码完成、失败提示、换帧恢复、迟到请求不覆盖较新的选择                                                                              |
 | 工作台       | 创建项目、保存设置；图组 inline edit 取消、连续保存、行高稳定、失败回滚、重新编辑恢复                                                              |
 | 全局与列表   | 桌面导航、手机抽屉及断点切换；明暗、全部预设和自定义主题色恢复；项目搜索、标签搜索、状态筛选、排序和空结果                                         |
 | 项目管理     | 新建描述验证、失败保留草稿与取消；空项目列表、空工作区、项目删除确认、图组排序/删除、公开状态失败回滚与重新发布                                    |
-| 上传         | 真实目录输入、生成缩略图、上传及数据库提交、完成请求失败后继续且不重复 PUT、打开上传后的图组                                                       |
-| 上传控件     | 无项目入口、目标项目、无效配对和重新选择、Frame 标题模式、预览展开/折叠、拖动排序、桌面列名保存/取消、热图参考列、暂停和放弃                       |
+| 桌面上传     | 真实目录输入、生成缩略图、上传及数据库提交、完成请求失败后继续且不重复 PUT、打开上传后的图组                                                       |
+| 桌面上传控件 | 无项目入口、目标项目、无效配对和重新选择、Frame 标题模式、预览展开/折叠、拖动排序、桌面列名保存/取消、热图参考列、暂停和放弃                       |
 | 部署面板     | 恢复执行中任务、收起/重开、避免重复任务、失败重试、无需更新、完成链接和通知；任务 API 用模拟响应                                                   |
-| 视觉         | 桌面 Chromium 与手机 WebKit；明暗主题、珊瑚色，横图/奇数竖图舞台；项目列表、工作区、设置面板、上传入口与配对表全页截图                             |
+| 视觉         | 桌面 Chromium 与手机 WebKit；明暗主题、珊瑚色，横图/奇数竖图舞台；项目列表、工作区、设置面板，以及仅桌面的上传入口与配对表全页截图                 |
 | 静态产物     | 隔离副本运行实际 `public:export`，用静态服务器重新执行公开 viewer 测试                                                                             |
 
 连续触摸拖动用 Chromium CDP 注入，由浏览器参与原生滚动和 pointer cancellation。WebKit 项目覆盖真实 touch tap、布局、模式、截图；其中鼠标操作只证明对应交互逻辑，不能当作 iPhone 连续手势证据。不适用的设备用例明确 skip。发布前仍需在真实 iPhone 检查横向拖动、斜向起手、纵向页面滚动和动态地址栏。
@@ -65,7 +71,7 @@ Playwright WebKit 使用带补丁的 WebKit，不是 Safari 应用；手机配�
 
 浏览器用例自动检查未捕获异常与 hydration 错误。唯一排除项是 trace 已确认的 Next 开发工具在 WebKit 页面卸载时读取 `__nextjs_original-stack-frames` 的跨域错误，必须同时匹配开发工具调用栈、端点与错误内容；应用异常仍会失败。
 
-`test:e2e:empty` 使用空数据库启动同一个内部站，验证空项目列表和没有可选项目时的上传页面。其报告分别保存在 `empty-report`、`empty-test-results`、`empty-results.json`，不会覆盖常规测试证据。测试种子时间固定，保证项目卡片日期截图稳定。
+`test:e2e:empty` 使用空数据库启动同一个内部站，在各设备验证空项目列表，并仅在桌面验证没有可选项目时的上传页面。其报告分别保存在 `empty-report`、`empty-test-results`、`empty-results.json`，不会覆盖常规测试证据。测试种子时间固定，保证项目卡片日期截图稳定。
 
 上传使用进程内 HTTP 存储替身，应用 API、生成流程和 SQLite 都是真实实现；替身不验证 S3 签名。真实 S3 的签名、Range 和上传协议由既有 Compose/RustFS CI 检查负责，生产端点仍需部署后的单独验证。测试不会导入生产素材、发布生产 bundle 或触发部署。
 
@@ -77,7 +83,7 @@ Playwright WebKit 使用带补丁的 WebKit，不是 Safari 应用；手机配�
 pnpm test:e2e:visual:docker --update-snapshots
 ```
 
-更新只在显式参数下回写 `tests/e2e/screenshots`。逐张检查正常/奇数尺寸、明/暗、桌面/手机图片，确认原图已加载、四角完整、分界线和把手合理后再提交。截图样式只排除 Next 开发调试浮标，保留全部产品界面。CI 不更新基准；浏览器升级需同步 Docker 镜像并重新审查截图。直接 `pnpm test:e2e:visual` 用于相同 Linux 环境，macOS 的渲染差异不应回写为 Linux 基准。
+更新只在显式参数下回写 `tests/e2e/screenshots`。逐张检查正常/奇数尺寸、明/暗、桌面/手机图片，确认原图已加载、四角完整、分界线和把手合理后再提交。截图样式只排除 Next 开发调试浮标，保留全部产品界面。CI 不更新基准；浏览器升级需同步 Docker 镜像并重新审查截图。直接 `pnpm test:e2e:visual` 用于相同 Linux 环境；配置会拒绝在 macOS 上直接更新基准，避免字体像素差异覆盖 Linux 截图。
 
 全页截图先等待页面壳恢复完成，再通过通知的关闭按钮清除临时提示，避免遮挡表单。保留默认光标样式，防止截图工具在 React hydration 前改写输入框的 style；截图时不聚焦输入框。
 
@@ -98,15 +104,15 @@ pnpm test:e2e:visual:docker --update-snapshots
 
 新增页面、弹窗或操作时同步维护此表。复用的图标、排版和装饰组件由所在页面的视觉截图验证；状态计算与手势边界同时保留 Vitest 用例。
 
-| UI 入口/组件                                                                                                      | 功能用例                                                                                                                          | 视觉用例                     |
-| ----------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- | ---------------------------- |
-| 内部 `/`：Catalog、卡片、筛选/排序、新建弹窗                                                                      | `catalog.spec.ts`、`workspace.spec.ts`、`empty.spec.ts`                                                                           | `internal.visual.spec.ts`    |
-| 内部 `/cases/[caseSlug]`：工作区、设置、inline edit、排序、公开状态、删除弹窗                                     | `workspace.spec.ts`、`workspace-actions.spec.ts`                                                                                  | `internal.visual.spec.ts`    |
-| 内部 `/upload`：入口、配置、配对、预览、列编辑、进度、操作菜单                                                    | `upload-controls.spec.ts`、`upload.spec.ts`、`empty.spec.ts`                                                                      | `internal.visual.spec.ts`    |
-| 全局导航、主题、抽屉、断点切换、404                                                                               | `navigation.spec.ts`、`internal-site.spec.ts`                                                                                     | 两套 visual spec 的页面壳    |
-| 全局部署面板与通知                                                                                                | `deploy.spec.ts`；保存/上传错误用例也验证通知                                                                                     | 功能用例保留失败截图与 trace |
-| 内部 group viewer、公开 `/g/[publicSlug]`：三种模式、工具栏、缩放、采样提示、详情、引导、胶卷、图片 loading/error | `viewer.spec.ts`、`viewer-controls.spec.ts`、`heatmap.spec.ts`、`public-site.spec.ts`；内部详情切组见 `workspace-actions.spec.ts` | `viewer.visual.spec.ts`      |
-| 公开 `/` 与不存在的图组                                                                                           | `navigation.spec.ts`；静态导出复跑同一套公开用例                                                                                  | 功能用例保留失败截图与 trace |
+| UI 入口/组件                                                                                                      | 功能用例                                                                                                                          | 视觉用例                          |
+| ----------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- | --------------------------------- |
+| 内部 `/`：Catalog、卡片、筛选/排序、新建弹窗                                                                      | `catalog.spec.ts`、`workspace.spec.ts`、`empty.spec.ts`                                                                           | `internal.visual.spec.ts`         |
+| 内部 `/cases/[caseSlug]`：工作区、设置、inline edit、排序、公开状态、删除弹窗                                     | `workspace.spec.ts`、`workspace-actions.spec.ts`                                                                                  | `internal.visual.spec.ts`         |
+| 内部 `/upload`：入口、配置、配对、预览、列编辑、进度、操作菜单                                                    | `upload-controls.spec.ts`、`upload.spec.ts`、`upload-empty.spec.ts`（仅桌面）                                                     | `upload.visual.spec.ts`（仅桌面） |
+| 全局导航、主题、抽屉、断点切换、404                                                                               | `navigation.spec.ts`、`internal-site.spec.ts`                                                                                     | 两套 visual spec 的页面壳         |
+| 全局部署面板与通知                                                                                                | `deploy.spec.ts`；保存/上传错误用例也验证通知                                                                                     | 功能用例保留失败截图与 trace      |
+| 内部 group viewer、公开 `/g/[publicSlug]`：三种模式、工具栏、缩放、采样提示、详情、引导、胶卷、图片 loading/error | `viewer.spec.ts`、`viewer-controls.spec.ts`、`heatmap.spec.ts`、`public-site.spec.ts`；内部详情切组见 `workspace-actions.spec.ts` | `viewer.visual.spec.ts`           |
+| 公开 `/` 与不存在的图组                                                                                           | `navigation.spec.ts`；静态导出复跑同一套公开用例                                                                                  | 功能用例保留失败截图与 trace      |
 
 这张表记录 UI 入口的实际覆盖，不把访问过页面等同于所有状态组合均已验证。实机连续手势、系统原生文件/颜色选择器、外部部署服务和所有可能的数据组合仍有独立验收边界。
 

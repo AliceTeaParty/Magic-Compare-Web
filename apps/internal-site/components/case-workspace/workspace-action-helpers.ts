@@ -4,6 +4,17 @@ import type { CaseWorkspaceData } from "@/lib/server/repositories/content-reposi
 import { postJson } from "@/lib/client/internal-api";
 import type { AppNotificationTone } from "../notifications/use-app-notifications";
 
+export interface WorkspaceMutationResult {
+  warnings?: string[];
+}
+
+/** A successful commit with failed publication must keep the saved UI value and show the warning. */
+function showMutationWarnings(result: WorkspaceMutationResult, notifications: NotificationApi) {
+  if (!result.warnings?.length) return false;
+  notifications.pushNotification(result.warnings.join("\n"), "warning", { sticky: true });
+  return true;
+}
+
 type GroupItem = CaseWorkspaceData["groups"][number];
 
 export interface NotificationApi {
@@ -76,7 +87,7 @@ function runWorkspaceTransition(
  * Reuses one optimistic group-mutation flow for both visibility toggles and drag reorder so local
  * state replacement, rollback, refresh, and save-indicator cleanup cannot drift apart.
  */
-function runOptimisticGroupMutation<T>({
+function runOptimisticGroupMutation<T extends WorkspaceMutationResult>({
   fallbackErrorMessage,
   nextGroups,
   onSuccess,
@@ -97,7 +108,7 @@ function runOptimisticGroupMutation<T>({
   runWorkspaceTransition(context.startTransition, async () => {
     try {
       const result = await request();
-      onSuccess?.(result);
+      if (!showMutationWarnings(result, context.notifications)) onSuccess?.(result);
       context.refresh();
     } catch (error) {
       replaceWorkspaceGroups(context.groupsRef, context.setGroups, previousGroups);
@@ -169,7 +180,7 @@ export function toggleWorkspaceGroupVisibility(
     },
     previousGroups,
     request: async () =>
-      postJson("/api/ops/group-visibility", {
+      postJson<WorkspaceMutationResult>("/api/ops/group-visibility", {
         caseSlug: context.data.slug,
         groupSlug: targetGroup.slug,
         isPublic: nextVisibility,
@@ -195,16 +206,21 @@ export function updateWorkspaceCaseSummary(
 
   return (async () => {
     try {
-      const result = await postJson<{ summary?: string }>("/api/ops/case-update", {
-        caseSlug: context.data.slug,
-        summary: normalizedSummary,
-      });
-      const savedSummary =
-        result && typeof result.summary === "string" ? result.summary : normalizedSummary;
+      const result = await postJson<WorkspaceMutationResult & { summary: string }>(
+        "/api/ops/case-update",
+        {
+          caseSlug: context.data.slug,
+          summary: normalizedSummary,
+        },
+      );
+      const savedSummary = result.summary;
 
       context.summaryRef.current = savedSummary;
       context.setCaseSummary(savedSummary);
-      context.notifications.pushNotification("项目描述已保存。", "success");
+      // The response already carries the committed value, including when publication failed.
+      if (!showMutationWarnings(result, context.notifications)) {
+        context.notifications.pushNotification("项目描述已保存。", "success");
+      }
     } catch (error) {
       context.summaryRef.current = previousSummary;
       context.setCaseSummary(previousSummary);
@@ -248,18 +264,16 @@ export function updateWorkspaceGroupMetadata(
 
   return (async () => {
     try {
-      const result = await postJson<{ title?: string; description?: string }>(
-        "/api/ops/group-update",
-        {
-          caseSlug: context.data.slug,
-          groupSlug: targetGroup.slug,
-          title,
-          description,
-        },
-      );
-      const savedTitle = result && typeof result.title === "string" ? result.title : title;
-      const savedDescription =
-        result && typeof result.description === "string" ? result.description : description;
+      const result = await postJson<
+        WorkspaceMutationResult & { title: string; description: string }
+      >("/api/ops/group-update", {
+        caseSlug: context.data.slug,
+        groupSlug: targetGroup.slug,
+        title,
+        description,
+      });
+      const savedTitle = result.title;
+      const savedDescription = result.description;
       const savedGroups = context.groupsRef.current.map((group) =>
         group.id === targetGroup.id
           ? {
@@ -271,7 +285,10 @@ export function updateWorkspaceGroupMetadata(
       );
 
       replaceWorkspaceGroups(context.groupsRef, context.setGroups, savedGroups);
-      context.notifications.pushNotification("图组元数据已保存。", "success");
+      // Publication warnings do not require a route refresh after applying the saved metadata.
+      if (!showMutationWarnings(result, context.notifications)) {
+        context.notifications.pushNotification("图组元数据已保存。", "success");
+      }
     } catch (error) {
       replaceWorkspaceGroups(context.groupsRef, context.setGroups, previousGroups);
       pushWorkspaceError(context.notifications, error, "保存图组元数据失败。");
@@ -304,7 +321,7 @@ export function deleteWorkspaceGroup(
     },
     previousGroups,
     request: async () =>
-      postJson("/api/ops/group-delete", {
+      postJson<WorkspaceMutationResult>("/api/ops/group-delete", {
         caseSlug: context.data.slug,
         groupSlug: targetGroup.slug,
       }),
@@ -337,7 +354,7 @@ export function reorderWorkspaceGroups(
     nextGroups: reordered,
     previousGroups,
     request: async () =>
-      postJson("/api/ops/group-reorder", {
+      postJson<WorkspaceMutationResult>("/api/ops/group-reorder", {
         caseId: context.data.id,
         groupIds: reordered.map((group) => group.id),
       }),

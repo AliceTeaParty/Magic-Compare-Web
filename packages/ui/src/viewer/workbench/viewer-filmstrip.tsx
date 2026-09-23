@@ -1,8 +1,8 @@
 "use client";
 
-import { PhotoLibrary } from "@mui/icons-material";
+import { BrokenImageOutlined, PhotoLibrary } from "@mui/icons-material";
 import { Box, Button, Stack, Typography } from "@mui/material";
-import type { ViewerFrame } from "@magic-compare/compare-core/viewer-data";
+import type { ViewerAsset, ViewerFrame } from "@magic-compare/compare-core/viewer-data";
 import {
   memo,
   useCallback,
@@ -13,6 +13,7 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from "react";
 import { useFilmstripDrag } from "./use-filmstrip-drag";
+import { useStageImageLoadState } from "./use-stage-image-load-state";
 import {
   FILMSTRIP_CARD_WIDTH,
   FILMSTRIP_ITEM_STRIDE,
@@ -29,6 +30,85 @@ function resolveThumbnailAsset(frame: ViewerFrame) {
   );
 }
 
+/** Reveal only the decoded thumbnail, keeping its own inline preview visible while it loads. */
+function ThumbnailImage({
+  asset,
+  isActive,
+  prefersReducedMotion,
+}: {
+  asset: ViewerAsset;
+  isActive: boolean;
+  prefersReducedMotion: boolean;
+}) {
+  const imageUrl = asset.thumbUrl || asset.imageUrl;
+  const { hasError, imageRef, markErrored, markLoaded, showImage } =
+    useStageImageLoadState(imageUrl);
+  const transition = prefersReducedMotion ? "none" : "opacity 180ms ease-out";
+
+  return (
+    <>
+      {asset.placeholder ? (
+        <Box
+          component="img"
+          src={asset.placeholder.dataUrl}
+          alt=""
+          aria-hidden="true"
+          data-viewer-filmstrip-placeholder=""
+          sx={{
+            position: "absolute",
+            inset: 0,
+            width: "100%",
+            height: "100%",
+            objectFit: "cover",
+            imageRendering: "pixelated",
+            opacity: showImage || hasError ? 0 : 1,
+            transition,
+          }}
+        />
+      ) : null}
+      <Box
+        component="img"
+        key={imageUrl}
+        ref={imageRef}
+        src={imageUrl}
+        alt=""
+        draggable={false}
+        loading={isActive ? "eager" : "lazy"}
+        fetchPriority={isActive ? "high" : "auto"}
+        decoding="async"
+        onLoad={markLoaded}
+        onError={markErrored}
+        sx={{
+          position: "absolute",
+          inset: 0,
+          width: "100%",
+          height: "100%",
+          objectFit: "cover",
+          display: "block",
+          // A decoded thumbnail fades over its own preview instead of flashing an empty card.
+          opacity: showImage ? 1 : 0,
+          transition,
+          pointerEvents: "none",
+          userSelect: "none",
+          WebkitUserDrag: "none",
+        }}
+      />
+      {hasError ? (
+        <BrokenImageOutlined
+          aria-hidden="true"
+          sx={{
+            position: "absolute",
+            left: "50%",
+            top: "50%",
+            transform: "translate(-50%, -50%)",
+            color: "text.secondary",
+          }}
+        />
+      ) : null}
+    </>
+  );
+}
+
 /**
  * Keeps each thumbnail button focused on presentation so drag/scroll physics stay in the hook and
  * selection visuals stay local to the card.
@@ -36,11 +116,13 @@ function resolveThumbnailAsset(frame: ViewerFrame) {
 function ThumbnailButton({
   frame,
   isActive,
+  prefersReducedMotion,
   onFrameIntent,
   onSelectFrame,
 }: {
   frame: ViewerFrame;
   isActive: boolean;
+  prefersReducedMotion: boolean;
   onFrameIntent: (frame: ViewerFrame) => void;
   onSelectFrame: (frameId: string) => void;
 }) {
@@ -119,6 +201,7 @@ function ThumbnailButton({
     >
       <Box
         sx={{
+          position: "relative",
           borderRadius: 1,
           overflow: "hidden",
           backgroundColor: viewerTokens.filmstrip.thumbnailSurface,
@@ -126,23 +209,10 @@ function ThumbnailButton({
         }}
       >
         {thumbAsset ? (
-          <Box
-            component="img"
-            src={thumbAsset.thumbUrl || thumbAsset.imageUrl}
-            alt=""
-            draggable={false}
-            loading={isActive ? "eager" : "lazy"}
-            fetchPriority={isActive ? "high" : "auto"}
-            decoding="async"
-            sx={{
-              width: "100%",
-              height: "100%",
-              objectFit: "cover",
-              display: "block",
-              pointerEvents: "none",
-              userSelect: "none",
-              WebkitUserDrag: "none",
-            }}
+          <ThumbnailImage
+            asset={thumbAsset}
+            isActive={isActive}
+            prefersReducedMotion={prefersReducedMotion}
           />
         ) : (
           <Box
@@ -287,6 +357,9 @@ export const ViewerFilmstrip = memo(function ViewerFilmstrip({
         sx={{
           width: "100%",
           minWidth: 0,
+          // The last card border sat exactly on the scrollport clip edge at fractional zoom.
+          // One painted pixel below the row preserves its bottom stroke without changing drag math.
+          pb: "1px",
           overflowX: "auto",
           overflowY: "visible",
           overscrollBehaviorX: "contain",
@@ -338,6 +411,7 @@ export const ViewerFilmstrip = memo(function ViewerFilmstrip({
                 key={frame.id}
                 frame={frame}
                 isActive={frame.id === currentFrameId}
+                prefersReducedMotion={prefersReducedMotion}
                 onSelectFrame={handleFrameSelection}
                 onFrameIntent={onFrameIntent}
               />

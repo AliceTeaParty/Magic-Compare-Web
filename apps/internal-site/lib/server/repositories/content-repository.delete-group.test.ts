@@ -112,6 +112,37 @@ describe("deleteGroup", () => {
     expect(deletePublishedGroup).toHaveBeenCalledWith("2026--test-example");
     expect(syncCasePublicationState).toHaveBeenCalledWith("case-1");
   });
+  it("continues publication cleanup when S3 deletion fails after the database commit", async () => {
+    caseFindUnique.mockResolvedValue({
+      id: "case-1",
+      slug: "2026",
+      groups: [
+        {
+          id: "group-1",
+          slug: "comparison",
+          title: "Comparison",
+          publicSlug: "2026--comparison",
+          storageRoot: "/groups/group-1",
+        },
+      ],
+    });
+    deleteInternalAssetPrefix.mockRejectedValue(new Error("S3 unavailable"));
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const result = await deleteGroup("2026", "comparison");
+      expect(groupDelete).toHaveBeenCalledOnce();
+      expect(deletePublishedGroup).toHaveBeenCalledWith("2026--comparison");
+      expect(syncCasePublicationState).toHaveBeenCalledWith("case-1");
+      expect(result.removedPublishedBundle).toBe(true);
+      expect(result.warnings).toEqual([expect.stringContaining("素材清理失败")]);
+      expect(log).toHaveBeenCalledWith(
+        expect.stringContaining("/groups/group-1"),
+        expect.any(Error),
+      );
+    } finally {
+      log.mockRestore();
+    }
+  });
 });
 
 describe("deleteCase", () => {

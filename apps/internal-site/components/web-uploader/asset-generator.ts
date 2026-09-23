@@ -203,7 +203,7 @@ function selectedHeatmapSource(frame: WebUploadFramePlan, referenceLabel: string
   const asset = resolveFrameHeatmapReference(frame, referenceLabel);
   const selected = asset ? plannedAssets(frame).find((planned) => planned.asset === asset) : null;
   if (!selected) {
-    throw new Error(`${frame.title} 不存在 heatmap 参考列 ${referenceLabel}。`);
+    throw new Error(`${frame.title} 不存在 Heatmap 参考列 ${referenceLabel}。`);
   }
   return selected;
 }
@@ -294,7 +294,7 @@ export async function preflightUploadFrames(
       !frame.heatmap &&
       (before.extension === ".svg" || sources.get(reference!.slot)!.preflight.extension === ".svg")
     ) {
-      throw new Error(`${frame.title} 使用 SVG 时必须提供显式 heatmap。`);
+      throw new Error(`${frame.title} 使用 SVG 时必须提供显式 Heatmap。`);
     }
 
     return {
@@ -374,7 +374,7 @@ export async function generateUploadFrame(
       tick(`${frame.plan.title} ${asset.label}`);
 
       if (shouldGenerateHeatmap) {
-        if (!result.heatmap) throw new Error(`${frame.plan.title} 没有生成 heatmap。`);
+        if (!result.heatmap) throw new Error(`${frame.plan.title} 没有生成 Heatmap。`);
         assets.push({
           slot: frame.descriptor.generatedHeatmap!.slot,
           kind: "heatmap",

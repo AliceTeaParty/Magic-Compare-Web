@@ -3,6 +3,9 @@ import type { Metadata, Viewport } from "next";
 export const MAGIC_SITE_VIEWPORT: Viewport = {
   width: "device-width",
   initialScale: 1,
+  // Image inspection owns pinch zoom; page-level scaling would also enlarge the workbench controls.
+  maximumScale: 1,
+  userScalable: false,
   viewportFit: "cover",
 };
 

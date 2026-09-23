@@ -1,8 +1,9 @@
 import { randomUUID } from "node:crypto";
-import type {
-  PublicDeployJob,
-  PublicDeployStage,
-  StartPublicDeployJobResult,
+import {
+  PUBLIC_DEPLOY_STAGES,
+  type PublicDeployJob,
+  type PublicDeployStage,
+  type StartPublicDeployJobResult,
 } from "../../../public-deploy-job";
 import {
   getCfPagesBranch,
@@ -65,10 +66,6 @@ function resolvePublicSiteUrl(projectName: string): string | null {
   return configured || (projectName ? `https://${projectName}.pages.dev` : null);
 }
 
-function stageSequence(): PublicDeployStage[] {
-  return ["checking", "building", "preparing", "uploading"];
-}
-
 /** Finalizes timing for the previous stage before moving the persistent job to the next phase. */
 function moveToStage(job: PublicDeployJob, nextStage: PublicDeployStage): void {
   if (job.stage === nextStage) return;
@@ -78,7 +75,8 @@ function moveToStage(job: PublicDeployJob, nextStage: PublicDeployStage): void {
   job.stageDurationsMs[job.stage] =
     (job.stageDurationsMs[job.stage] ?? 0) + (now - state.stageStartedAtMs);
   job.stage = nextStage;
-  job.completedStageCount = Math.max(0, job.stageSequence.indexOf(nextStage));
+  // Running jobs and stage callbacks share this list; persisted jobs are never resumed here.
+  job.completedStageCount = PUBLIC_DEPLOY_STAGES.indexOf(nextStage);
   job.updatedAt = new Date(now).toISOString();
   job.uploadProgress = null;
   state.stageStartedAtMs = now;
@@ -181,7 +179,7 @@ export async function startPublicDeployJob(): Promise<StartPublicDeployJobResult
     id: randomUUID(),
     status: "running",
     stage: "checking",
-    stageSequence: stageSequence(),
+    stageSequence: [...PUBLIC_DEPLOY_STAGES],
     completedStageCount: 0,
     startedAt: now.toISOString(),
     updatedAt: now.toISOString(),

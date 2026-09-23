@@ -96,4 +96,29 @@ test.describe("group inline editing", () => {
     await page.reload();
     await expect(page.getByText("Recovered title", { exact: true })).toBeVisible();
   });
+  test("publication warning keeps the saved title visible and durable", async ({ page }) => {
+    await page.route(
+      "**/api/ops/group-update",
+      async (route) => {
+        const response = await route.fetch();
+        expect(response.ok()).toBe(true);
+        await route.fulfill({
+          response,
+          json: {
+            ...(await response.json()),
+            warnings: ["更改已保存，公开内容同步失败。"],
+          },
+        });
+      },
+      { times: 1 },
+    );
+    await page.getByRole("button", { name: "编辑图组", exact: true }).first().click();
+    await page.getByRole("textbox", { name: "图组标题", exact: true }).fill("Saved with warning");
+    await page.getByRole("button", { name: "保存图组元数据", exact: true }).click();
+    await expect(page.getByText("更改已保存，公开内容同步失败。", { exact: true })).toBeVisible();
+    await expect(page.getByText("Saved with warning", { exact: true })).toBeVisible();
+    await expect(page.getByText("图组元数据已保存。", { exact: true })).toHaveCount(0);
+    await page.reload();
+    await expect(page.getByText("Saved with warning", { exact: true })).toBeVisible();
+  });
 });

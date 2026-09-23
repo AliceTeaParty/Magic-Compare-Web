@@ -1,5 +1,41 @@
-import { describe, expect, it } from "vitest";
-import { mapCaseWorkspaceData } from "./mappers";
+import { describe, expect, it, vi } from "vitest";
+import { mapCaseWorkspaceData, mapFrameAssets } from "./mappers";
+
+// Viewer mapping needs a URL, not a configured S3 client; keep this unit test CI-independent.
+vi.mock("@/lib/server/storage/internal-assets", () => ({
+  resolvePublicInternalAssetUrl: (logicalPath: string) => `https://assets.test${logicalPath}`,
+}));
+
+describe("mapFrameAssets", () => {
+  it("inlines the persisted preview in the first Viewer payload", () => {
+    const [asset] = mapFrameAssets([
+      {
+        id: "asset-1",
+        frameId: "frame-1",
+        kind: "before",
+        label: "Before",
+        imageUrl: "/groups/group-1/original.webp",
+        thumbUrl: "/groups/group-1/thumb.webp",
+        width: 1920,
+        height: 1080,
+        note: "",
+        isPublic: true,
+        isPrimaryDisplay: true,
+        storageValidatedAt: null,
+        imagePlaceholderJson: JSON.stringify({
+          dataUrl: "data:image/webp;base64,UklGRg==",
+          sourceColor: "#AABBCC",
+        }),
+      },
+    ]);
+
+    expect(asset?.placeholder).toEqual({
+      dataUrl: "data:image/webp;base64,UklGRg==",
+      sourceColor: "#AABBCC",
+    });
+    expect(asset?.imageUrl).toBe("https://assets.test/groups/group-1/original.webp");
+  });
+});
 
 describe("mapCaseWorkspaceData", () => {
   it("uses first-frame extra asset labels instead of default viewer mode tags", () => {
@@ -38,6 +74,7 @@ describe("mapCaseWorkspaceData", () => {
       ],
     });
 
+    expect(result.groups[0]?.defaultMode).toBe("a-b");
     expect(result.groups[0]?.extraAssetLabels).toEqual(["Rip", "Deband"]);
   });
 });

@@ -80,6 +80,8 @@ test("same-frame source replacement isolates late decode and events without chan
   });
   await page.goto(viewerPath(info.project.metadata.variant));
   await waitForStage(page);
+  // New groups open in A/B; this case exercises same-frame replacement through slide's variants.
+  await page.getByRole("button", { name: "滑动", exact: true }).click();
   await page.getByRole("button", { name: "使用 Flt 作为对比变量", exact: true }).click();
   await expect
     .poll(() =>

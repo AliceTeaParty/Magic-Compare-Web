@@ -12,7 +12,12 @@ export default defineConfig({
   ],
   projects: config
     .projects!.filter((project) => project.metadata?.variant === "internal")
-    .map((project) => ({ ...project, testMatch: "empty.spec.ts" })),
+    .map((project) => ({
+      ...project,
+      testMatch: project.use?.isMobile
+        ? ["empty.spec.ts"]
+        : ["empty.spec.ts", "upload-empty.spec.ts"],
+    })),
   webServer: (Array.isArray(config.webServer) ? config.webServer : [])
     .filter((server) => !server.command.endsWith(" public"))
     .map((server) => ({ ...server, env: { ...server.env, MAGIC_COMPARE_E2E_FIXTURE: "empty" } })),

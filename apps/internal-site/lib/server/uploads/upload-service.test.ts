@@ -428,6 +428,9 @@ describe("upload-service", () => {
       ],
     });
 
+    expect(helperMocks.ensureCaseAndGroup).toHaveBeenCalledWith(
+      expect.objectContaining({ group: expect.objectContaining({ defaultMode: "a-b" }) }),
+    );
     expect(helperMocks.cancelExpiredActiveUploadJobs).toHaveBeenCalledWith("group-1");
     expect(helperMocks.cancelExpiredActiveUploadJobs.mock.invocationCallOrder[0]).toBeLessThan(
       helperMocks.findActiveUploadJobByGroup.mock.invocationCallOrder[0],

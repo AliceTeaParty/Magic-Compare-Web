@@ -2,6 +2,15 @@ import path from "node:path";
 import { defineConfig, devices } from "@playwright/test";
 import config from "./playwright.config";
 
+// macOS font rasterization changed checked-in pixels without changing the upload layout.
+// Baseline updates must run in the same pinned Linux browser image as CI.
+if (
+  process.platform !== "linux" &&
+  process.argv.some((arg) => arg.startsWith("--update-snapshots"))
+) {
+  throw new Error("Update visual baselines with pnpm test:e2e:visual:docker --update-snapshots.");
+}
+
 export default defineConfig({
   ...config,
   // Release labels are fixture data here; format changes still alter pixels, version bumps do not.
@@ -34,7 +43,7 @@ export default defineConfig({
   projects: [
     {
       name: "visual-desktop",
-      testMatch: ["viewer.visual.spec.ts", "internal.visual.spec.ts"],
+      testMatch: ["viewer.visual.spec.ts", "internal.visual.spec.ts", "upload.visual.spec.ts"],
       use: { ...devices["Desktop Chrome"], viewport: { width: 1280, height: 800 } },
     },
     {

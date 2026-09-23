@@ -4,6 +4,7 @@ import type {
   UploadFrameDescriptor,
   UploadStreamFrameDescriptor,
 } from "@/lib/server/uploads/contracts";
+import { DEFAULT_VIEWER_MODE } from "@magic-compare/content-schema";
 import {
   cancelGroupUpload,
   commitGroupUploadFrame,
@@ -211,7 +212,7 @@ function buildLegacyUploadPlan(options: LegacyUploadRunnerOptions) {
         title: options.groupInput.title,
         description: options.groupInput.description,
         order: options.groupInput.order,
-        defaultMode: options.groupInput.defaultMode,
+        defaultMode: DEFAULT_VIEWER_MODE,
         tags: options.groupInput.tags,
       },
       frames,
@@ -231,7 +232,7 @@ function buildStreamUploadPlan(options: StreamUploadRunnerOptions) {
         title: options.groupInput.title,
         description: options.groupInput.description,
         order: options.groupInput.order,
-        defaultMode: options.groupInput.defaultMode,
+        defaultMode: DEFAULT_VIEWER_MODE,
         tags: options.groupInput.tags,
       },
       frames: options.stream.frames,

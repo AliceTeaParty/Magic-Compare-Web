@@ -1,4 +1,4 @@
-import { Prisma } from "@prisma/client";
+import { Prisma } from "@/generated/prisma/client";
 import { NotFoundError } from "@/lib/server/api/errors";
 import {
   recomputeCaseCoverAsset,

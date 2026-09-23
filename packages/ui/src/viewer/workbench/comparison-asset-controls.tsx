@@ -1,13 +1,11 @@
 "use client";
 
 import { CompareArrows, ImageOutlined } from "@mui/icons-material";
-import { Box, Chip, Stack, ToggleButton, ToggleButtonGroup, Tooltip } from "@mui/material";
+import { Box, Chip, Stack, ToggleButton, Tooltip } from "@mui/material";
 import { getComparisonAssetKey } from "@magic-compare/compare-core";
 import type { ViewerAsset } from "@magic-compare/compare-core/viewer-data";
-import {
-  VIEWER_COMPACT_CONTROL_HEIGHT,
-  VIEWER_SEGMENTED_CONTROL_STYLES,
-} from "./viewer-control-styles";
+import { MagicSegmentedControl } from "../../controls/magic-segmented-control";
+import { VIEWER_COMPACT_CONTROL_HEIGHT } from "./viewer-control-styles";
 
 interface ComparisonAssetControlsProps {
   baselineAsset: ViewerAsset;
@@ -80,7 +78,7 @@ export function ComparisonAssetControls({
       />
 
       <Box sx={{ minWidth: 0, flex: "0 0 auto" }}>
-        <ToggleButtonGroup
+        <MagicSegmentedControl
           exclusive
           size="small"
           value={comparisonAssetKey}
@@ -88,9 +86,7 @@ export function ComparisonAssetControls({
           onChange={handleComparisonAssetChange}
           sx={{
             height: VIEWER_COMPACT_CONTROL_HEIGHT,
-            ...VIEWER_SEGMENTED_CONTROL_STYLES,
             "& .MuiToggleButtonGroup-grouped": {
-              ...VIEWER_SEGMENTED_CONTROL_STYLES["& .MuiToggleButtonGroup-grouped"],
               // One outer pill and flat equal segments match the Viewer mode control.
               minWidth: 72,
               maxWidth: 144,
@@ -116,7 +112,7 @@ export function ComparisonAssetControls({
               </ToggleButton>
             );
           })}
-        </ToggleButtonGroup>
+        </MagicSegmentedControl>
       </Box>
     </Stack>
   );

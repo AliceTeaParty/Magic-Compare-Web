@@ -78,6 +78,25 @@ describe("getNextAbAssetSelection", () => {
     expect(baseline).toEqual({ side: "before" });
   });
 
+  it("cycles backward from the baseline through every comparison target", () => {
+    const flt = getNextAbAssetSelection({ side: "before" }, comparisonAssets, -1);
+    const rip = getNextAbAssetSelection(flt, comparisonAssets, -1);
+    const baseline = getNextAbAssetSelection(rip, comparisonAssets, -1);
+
+    expect(flt).toEqual({ comparisonAssetKey: "misc:flt", side: "after" });
+    expect(rip).toEqual({ comparisonAssetKey: "after:rip", side: "after" });
+    expect(baseline).toEqual({ side: "before" });
+  });
+
+  it("keeps two-variable A/B cycling between the source and its comparison", () => {
+    const comparisonOnly = comparisonAssets.slice(0, 1);
+    const forward = getNextAbAssetSelection({ side: "before" }, comparisonOnly);
+    const reverse = getNextAbAssetSelection({ side: "before" }, comparisonOnly, -1);
+
+    expect(getNextAbAssetSelection(forward, comparisonOnly)).toEqual({ side: "before" });
+    expect(getNextAbAssetSelection(reverse, comparisonOnly, -1)).toEqual({ side: "before" });
+  });
+
   it("restores the first comparison target when the selected column disappeared", () => {
     expect(
       getNextAbAssetSelection(
@@ -152,6 +171,7 @@ describe("createViewerDatasetFromPublishManifest", () => {
     });
 
     expect(dataset.group.publicSlug).toBe("demo-case--banding-check");
+    expect(dataset.group.defaultMode).toBe("a-b");
     expect(dataset.publishStatus?.status).toBe("published");
     expect(dataset.group.frames).toHaveLength(1);
     expect(dataset.group.frames[0]?.assets[0]?.placeholder).toEqual({

@@ -1,6 +1,6 @@
 "use client";
 
-import { Box, Paper } from "@mui/material";
+import { Alert, Box, Paper, Snackbar } from "@mui/material";
 import {
   getComparisonAssetKey,
   getNextAbAssetSelection,
@@ -12,6 +12,7 @@ import { useViewerController } from "@magic-compare/compare-core/use-viewer-cont
 import type { ViewerDataset } from "@magic-compare/compare-core/viewer-data";
 import { useCallback, useEffect, useState } from "react";
 import { ViewerFilmstrip } from "./workbench/viewer-filmstrip";
+import { ComparisonAssetControls } from "./workbench/comparison-asset-controls";
 import { ViewerHeader } from "./workbench/viewer-header";
 import {
   useAbStageOutsideDismiss,
@@ -90,7 +91,7 @@ export function GroupViewerWorkbench({
     setSidebarOpen,
     sidebarOpen,
     stepFrame,
-    toggleSidebar,
+    toggleSidebar: toggleDetails,
   } = controller;
   const [devicePixelRatio, setDevicePixelRatio] = useState(1);
   const [guideOpen, setGuideOpen] = useState(false);
@@ -116,12 +117,26 @@ export function GroupViewerWorkbench({
   const activeAfterAsset = afterAsset;
   const [heatmapGain, setHeatmapGain] = useState(1);
   const [heatmapDisplay, setHeatmapDisplay] = useState<HeatmapDisplay>("map");
+  const [heatmapPanelOpen, setHeatmapPanelOpen] = useState(false);
+  const [detailsWarningOpen, setDetailsWarningOpen] = useState(false);
+
+  // Details and Heatmap analysis share the supporting pane; explain the unavailable action
+  // instead of silently toggling a hidden details state, including its keyboard shortcut.
+  const toggleSidebar = useCallback(() => {
+    if (mode === "heatmap") {
+      setDetailsWarningOpen(true);
+      return;
+    }
+    toggleDetails();
+  }, [mode, toggleDetails]);
   const [heatmapRetry, setHeatmapRetry] = useState(0);
   const [storedHeatmapKey, setStoredHeatmapKey] = useState<string | null>(null);
+  const [heatmapSurfaceMounted, setHeatmapSurfaceMounted] = useState(mode === "heatmap");
   const heatmapPairKey = `${beforeAsset?.imageUrl}\n${afterAsset?.imageUrl}`;
   const useStoredHeatmap = storedHeatmapKey === heatmapPairKey;
   const liveHeatmap = useLiveHeatmap(
-    mode === "heatmap" && !useStoredHeatmap,
+    // A reversed fade still owns the decoded heatmap; release its worker/blob only after exit.
+    (mode === "heatmap" || heatmapSurfaceMounted) && !useStoredHeatmap,
     beforeAsset,
     afterAsset,
     heatmapGain,
@@ -205,13 +220,6 @@ export function GroupViewerWorkbench({
     }
   }, [closeSidebar, mediaPreferencesReady, resolvedShowDesktopSidebar]);
 
-  // Leaving A/B mode should reset inspect state so returning to it starts from a predictable baseline.
-  useEffect(() => {
-    if (mode !== "a-b") {
-      interactionStore.resetAb(currentFrameId);
-    }
-  }, [currentFrameId, interactionStore, mode]);
-
   useViewerDevicePixelRatio(setDevicePixelRatio);
 
   useEffect(() => {
@@ -267,23 +275,27 @@ export function GroupViewerWorkbench({
     setGuideOpen((currentOpen) => !currentOpen);
   }, []);
 
-  // A/B used to change only the before/after side, so Src/Rip/Flt groups never reached Flt from
-  // a stage click. Advance the selected comparison column together with the visible side instead.
-  const cycleCurrentAbAsset = useCallback(() => {
-    const nextSelection = getNextAbAssetSelection(
-      { comparisonAssetKey, side: abSide },
-      comparisonAssets,
-    );
+  // A/B column order is reversible: ArrowDown follows Src → Rip → Flt and ArrowUp reverses it.
+  // Click and Enter keep their established forward cycle by using the default direction.
+  const cycleCurrentAbAsset = useCallback(
+    (direction: 1 | -1 = 1) => {
+      const nextSelection = getNextAbAssetSelection(
+        { comparisonAssetKey, side: abSide },
+        comparisonAssets,
+        direction,
+      );
 
-    if (
-      nextSelection.comparisonAssetKey &&
-      nextSelection.comparisonAssetKey !== comparisonAssetKey
-    ) {
-      setComparisonAssetKey(nextSelection.comparisonAssetKey);
-    }
+      if (
+        nextSelection.comparisonAssetKey &&
+        nextSelection.comparisonAssetKey !== comparisonAssetKey
+      ) {
+        setComparisonAssetKey(nextSelection.comparisonAssetKey);
+      }
 
-    setAbSide(nextSelection.side);
-  }, [abSide, comparisonAssetKey, comparisonAssets, setAbSide, setComparisonAssetKey]);
+      setAbSide(nextSelection.side);
+    },
+    [abSide, comparisonAssetKey, comparisonAssets, setAbSide, setComparisonAssetKey],
+  );
 
   useViewerKeyboardShortcuts({
     abStageActive,
@@ -303,6 +315,11 @@ export function GroupViewerWorkbench({
     stageRef: stageShell.stageRef,
   });
 
+  // Analysis is a supporting surface, not stage content. It opens from the Heatmap tool icon,
+  // keeping the image immediately inspectable when the mode itself changes.
+  const showingHeatmapPanel = mode === "heatmap" && heatmapPanelOpen;
+  const showingSupportingPane = showingHeatmapPanel || (mode !== "heatmap" && sidebarOpen);
+
   return (
     <Box
       sx={{
@@ -319,7 +336,14 @@ export function GroupViewerWorkbench({
           maxWidth: "100%",
           display: "grid",
           gridTemplateColumns:
-            sidebarOpen && resolvedShowDesktopSidebar ? "minmax(0, 1fr) 320px" : "minmax(0, 1fr)",
+            showingSupportingPane && resolvedShowDesktopSidebar
+              ? "minmax(0, 1fr) 320px"
+              : "minmax(0, 1fr) 0px",
+          // Keep both tracks so details can open and close continuously. The existing stage
+          // ResizeObserver follows the interpolated width without remounting or reloading images.
+          transition:
+            "grid-template-columns 240ms cubic-bezier(0.2, 0, 0, 1), background-color 250ms cubic-bezier(0.2, 0, 0, 1)",
+          "@media (prefers-reduced-motion: reduce)": { transition: "none" },
           gridTemplateRows: "auto minmax(0, auto)",
           // A min-height grid stretches auto tracks by default, which made the viewer header absorb
           // the unused viewport height and pushed the stage far below its controls.
@@ -340,6 +364,7 @@ export function GroupViewerWorkbench({
           comparisonAssets={comparisonAssets}
           frameId={currentFrameId}
           guideOpen={guideOpen}
+          heatmapPanelOpen={showingHeatmapPanel}
           groupTitle={dataset.group.title}
           hideStageScrollControl={resolvedHideStageScrollControl}
           interactionStore={interactionStore}
@@ -347,10 +372,11 @@ export function GroupViewerWorkbench({
           onAbSideChange={setAbSide}
           onComparisonAssetChange={setComparisonAssetKey}
           onOpenGuide={openViewerGuide}
+          onToggleHeatmapPanel={() => setHeatmapPanelOpen((open) => !open)}
           onModeChange={setMode}
           onScrollStageIntoView={stageShell.scrollStageIntoView}
           onToggleSidebar={toggleSidebar}
-          sidebarOpen={sidebarOpen}
+          sidebarOpen={mode !== "heatmap" && sidebarOpen}
         />
 
         <Box
@@ -361,25 +387,6 @@ export function GroupViewerWorkbench({
             flexDirection: "column",
           }}
         >
-          {mode === "heatmap" && (
-            <HeatmapInspectionPanel
-              state={liveHeatmap}
-              gain={heatmapGain}
-              onGainChange={setHeatmapGain}
-              display={heatmapDisplay}
-              onDisplayChange={setHeatmapDisplay}
-              interactionStore={interactionStore}
-              onInspect={inspectHeatmapRegion}
-              stored={useStoredHeatmap}
-              onRetry={() => {
-                setStoredHeatmapKey(null);
-                setHeatmapRetry((value) => value + 1);
-              }}
-              onUseStored={
-                matchingStoredHeatmap ? () => setStoredHeatmapKey(heatmapPairKey) : undefined
-              }
-            />
-          )}
           <Box data-testid="viewer-stage-area" sx={{ minWidth: 0, p: { xs: 1, md: 1.5 } }}>
             {/* Stack spacing reset the stage's auto margins, leaving fitted images left-aligned.
                 One stage needs no spacing wrapper; its containing block owns centering. */}
@@ -406,9 +413,11 @@ export function GroupViewerWorkbench({
                 frameId={currentFrameId}
                 heatmapAsset={displayedHeatmap}
                 heatmapDisplay={heatmapDisplay}
+                heatmapProcessing={!useStoredHeatmap && liveHeatmap.status === "loading"}
                 interactionStore={interactionStore}
                 mode={mode}
                 onCycleAbSide={cycleCurrentAbAsset}
+                onHeatmapPresenceChange={setHeatmapSurfaceMounted}
                 prefersReducedMotion={resolvedPrefersReducedMotion}
                 rotateStage={resolvedRotateStage}
                 stageRef={stageShell.stageRef}
@@ -476,8 +485,45 @@ export function GroupViewerWorkbench({
           heatmapAsset={heatmapAsset}
           publishStatus={dataset.publishStatus}
           showDesktopSidebar={resolvedShowDesktopSidebar}
-          sidebarOpen={sidebarOpen}
-          closeSidebar={closeSidebar}
+          sidebarOpen={showingSupportingPane}
+          panelLabel={showingHeatmapPanel ? "Heatmap" : undefined}
+          panelContent={
+            showingHeatmapPanel ? (
+              <HeatmapInspectionPanel
+                state={liveHeatmap}
+                gain={heatmapGain}
+                onGainChange={setHeatmapGain}
+                display={heatmapDisplay}
+                onDisplayChange={setHeatmapDisplay}
+                interactionStore={interactionStore}
+                onInspect={(region) => {
+                  setHeatmapPanelOpen(false);
+                  inspectHeatmapRegion(region);
+                }}
+                stored={useStoredHeatmap}
+                onClose={() => setHeatmapPanelOpen(false)}
+                comparisonControls={
+                  beforeAsset && activeComparisonAssetKey && comparisonAssets.length > 0 ? (
+                    <ComparisonAssetControls
+                      baselineAsset={beforeAsset}
+                      comparisonAssetKey={activeComparisonAssetKey}
+                      comparisonAssets={comparisonAssets}
+                      onComparisonAssetChange={setComparisonAssetKey}
+                    />
+                  ) : undefined
+                }
+                onRetry={() => {
+                  setStoredHeatmapKey(null);
+                  setHeatmapRetry((value) => value + 1);
+                }}
+                onUseStored={
+                  matchingStoredHeatmap ? () => setStoredHeatmapKey(heatmapPairKey) : undefined
+                }
+              />
+            ) : undefined
+          }
+          closeSidebar={showingHeatmapPanel ? () => setHeatmapPanelOpen(false) : closeSidebar}
+          prefersReducedMotion={resolvedPrefersReducedMotion}
           variant={variant}
           onGroupIntent={imagePreloader.preloadGroupHint}
           onGroupNavigate={onGroupNavigate}
@@ -489,6 +535,20 @@ export function GroupViewerWorkbench({
           onClose={() => setGuideOpen(false)}
           onComplete={completeViewerGuide}
         />
+        <Snackbar
+          open={detailsWarningOpen}
+          autoHideDuration={3200}
+          onClose={() => setDetailsWarningOpen(false)}
+          anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+        >
+          <Alert
+            severity="info"
+            onClose={() => setDetailsWarningOpen(false)}
+            sx={{ width: "100%" }}
+          >
+            Heatmap 模式暂时无法打开详情
+          </Alert>
+        </Snackbar>
       </Paper>
     </Box>
   );

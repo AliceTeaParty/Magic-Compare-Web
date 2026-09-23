@@ -3,15 +3,14 @@ import { expect, test, expectPageFits } from "./support/browser-test";
 
 test("upload source, metadata, title mode, column editing and abandon controls", async ({
   page,
-  isMobile,
 }, info) => {
   await page.goto("/upload");
   await expect(page.getByRole("button", { name: "选择文件夹", exact: true })).toBeVisible();
-  await page.getByRole("combobox", { name: "目标项目" }).click();
-  await page.getByRole("option", { name: /E2E Sample/ }).click();
   await page
     .locator('input[type="file"]')
     .setInputFiles(path.resolve("output/playwright/e2e/upload-multiple-source"));
+  await page.getByRole("combobox", { name: "目标项目" }).click();
+  await page.getByRole("option", { name: /E2E Sample/ }).click();
   await expect(page.getByRole("button", { name: "开始上传", exact: true })).toBeEnabled();
   await page
     .getByRole("textbox", { name: "Slug", exact: true })
@@ -22,9 +21,9 @@ test("upload source, metadata, title mode, column editing and abandon controls",
     "true",
   );
   await page.getByRole("button", { name: "自动 Frame 标题" }).click();
-  await page.getByRole("combobox", { name: "热图参考变量" }).click();
+  await page.getByRole("combobox", { name: "Heatmap 参考变量" }).click();
   await page.getByRole("option", { name: "Heatmap: Flt", exact: true }).click();
-  await expect(page.getByRole("combobox", { name: "热图参考变量" })).toHaveText("Heatmap: Flt");
+  await expect(page.getByRole("combobox", { name: "Heatmap 参考变量" })).toHaveText("Heatmap: Flt");
   const previews = page.getByRole("button", { name: /^预览 / });
   await previews.first().press("Enter");
   await expect(previews.first()).toHaveAttribute("aria-expanded", "true");
@@ -44,19 +43,17 @@ test("upload source, metadata, title mode, column editing and abandon controls",
   await page.mouse.move(last.x + last.width / 2, last.y + last.height / 2, { steps: 15 });
   await page.mouse.up();
   await expect(previews.first()).toHaveAttribute("aria-label", lastTitle!);
-  // Narrow layouts show asset labels in previews; column editing belongs to the desktop header.
-  if (!isMobile) {
-    await page.getByRole("button", { name: "编辑 Src 列名" }).click();
-    const label = page.getByRole("textbox", { name: "编辑 Src 列名" });
-    await label.fill("Original");
-    await page.getByRole("button", { name: "取消编辑列名" }).click();
-    await expect(page.getByRole("button", { name: "编辑 Src 列名" })).toBeVisible();
-    await page.getByRole("button", { name: "编辑 Src 列名" }).click();
-    await label.fill("Original");
-    await page.getByRole("button", { name: "保存列名" }).click();
-    await expect(page.getByRole("button", { name: "编辑 Original 列名" })).toBeVisible();
-  }
-  await page.getByRole("button", { name: "热图", exact: true }).click();
+  // dnd-kit keeps its capture-phase click listener for this exact cleanup window after a drop.
+  await page.waitForTimeout(50);
+  await page.getByRole("button", { name: "编辑 Src 列名" }).click();
+  const label = page.getByRole("textbox", { name: "编辑 Src 列名" });
+  await label.fill("Original");
+  await page.getByRole("button", { name: "取消编辑列名" }).click();
+  await expect(page.getByRole("button", { name: "编辑 Src 列名" })).toBeVisible();
+  await page.getByRole("button", { name: "编辑 Src 列名" }).click();
+  await label.fill("Original");
+  await page.getByRole("button", { name: "保存列名" }).click();
+  await expect(page.getByRole("button", { name: "编辑 Original 列名" })).toBeVisible();
   await expectPageFits(page);
   await page.route("**/api/ops/group-upload-complete", (route) =>
     route.fulfill({ status: 503, json: { error: "E2E stop before complete" } }),

@@ -117,7 +117,6 @@ export function useWebUploadSession() {
             slug: groupInput.slug,
             title: groupInput.title.trim() || "上传图组",
             description: groupInput.description.trim(),
-            defaultMode: groupInput.defaultMode,
             order: 0,
             tags: [],
           },

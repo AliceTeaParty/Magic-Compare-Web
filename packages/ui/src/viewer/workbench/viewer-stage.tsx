@@ -1,11 +1,19 @@
 "use client";
 
 import { PhotoLibrary } from "@mui/icons-material";
-import { Box, Stack, Typography } from "@mui/material";
+import { Box, Fade, Stack, Typography } from "@mui/material";
 import { getContainedMediaRect } from "@magic-compare/compare-core";
 import type { ViewerMode } from "@magic-compare/content-schema";
 import type { ViewerAsset } from "@magic-compare/compare-core/viewer-data";
-import { useEffect, useMemo, useRef, type ReactNode, type RefObject, useState } from "react";
+import {
+  memo,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  type ReactNode,
+  type RefObject,
+  useState,
+} from "react";
 import { ABCompareStage } from "./ab-compare-stage";
 import { PositionedStageMedia } from "./positioned-stage-media";
 import { SwipeCompareStage } from "./swipe-compare-stage";
@@ -62,7 +70,7 @@ export function getViewerDevicePixelRatio(): number {
 function useElementSize(targetRef: RefObject<HTMLElement | null>): StageSize {
   const [size, setSize] = useState<StageSize>({ width: 0, height: 0 });
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const target = targetRef.current;
     if (!target) {
       return;
@@ -147,137 +155,144 @@ function StagePresentationShell({
  * Chooses the active stage implementation and computes the contained media rect from the currently
  * visible asset so all compare modes share the same fitted geometry.
  */
-function ViewerStageContent({
-  abSide,
-  afterAsset,
-  beforeAsset,
-  devicePixelRatio,
-  frameId,
-  heatmapAsset,
-  heatmapDisplay,
-  interactionStore,
-  mode,
-  onCycleAbSide,
-  prefersReducedMotion,
-  rotateStage,
-}: {
-  abSide: "before" | "after";
-  afterAsset: ViewerAsset | undefined;
-  beforeAsset: ViewerAsset | undefined;
-  devicePixelRatio: number;
-  frameId: string | undefined;
-  heatmapAsset: ViewerAsset | undefined;
-  heatmapDisplay?: "map" | "overlay" | "original";
-  interactionStore: ViewerInteractionStore;
-  mode: ViewerMode;
-  onCycleAbSide: () => void;
-  prefersReducedMotion: boolean;
-  rotateStage: boolean;
-}) {
-  const overlayOpacity = useViewerOverlayOpacity(interactionStore);
-  const stageViewportRef = useRef<HTMLDivElement | null>(null);
-  const viewportSize = useElementSize(stageViewportRef);
-  const referenceAsset = afterAsset ?? beforeAsset;
-  const mediaRect = useMemo(() => {
-    if (!referenceAsset) {
-      return {
-        x: 0,
-        y: 0,
-        width: 0,
-        height: 0,
-      };
+const ViewerStageContent = memo(
+  function ViewerStageContent({
+    abSide,
+    afterAsset,
+    beforeAsset,
+    devicePixelRatio,
+    frameId,
+    heatmapAsset,
+    heatmapDisplay,
+    heatmapProcessing,
+    interactionStore,
+    mode,
+    onCycleAbSide,
+    prefersReducedMotion,
+    rotateStage,
+  }: {
+    active: boolean;
+    abSide: "before" | "after";
+    afterAsset: ViewerAsset | undefined;
+    beforeAsset: ViewerAsset | undefined;
+    devicePixelRatio: number;
+    frameId: string | undefined;
+    heatmapAsset: ViewerAsset | undefined;
+    heatmapDisplay?: "map" | "overlay" | "original";
+    heatmapProcessing: boolean;
+    interactionStore: ViewerInteractionStore;
+    mode: ViewerMode;
+    onCycleAbSide: () => void;
+    prefersReducedMotion: boolean;
+    rotateStage: boolean;
+  }) {
+    const overlayOpacity = useViewerOverlayOpacity(interactionStore);
+    const stageViewportRef = useRef<HTMLDivElement | null>(null);
+    const viewportSize = useElementSize(stageViewportRef);
+    const referenceAsset = afterAsset ?? beforeAsset;
+    const mediaRect = useMemo(() => {
+      if (!referenceAsset) {
+        return {
+          x: 0,
+          y: 0,
+          width: 0,
+          height: 0,
+        };
+      }
+
+      const mediaSize = rotateStage
+        ? { width: referenceAsset.height, height: referenceAsset.width }
+        : { width: referenceAsset.width, height: referenceAsset.height };
+
+      return getContainedMediaRect(viewportSize, mediaSize);
+    }, [referenceAsset, rotateStage, viewportSize]);
+
+    if (!beforeAsset || !afterAsset) {
+      return (
+        <Stack
+          spacing={1.5}
+          sx={{
+            alignItems: "center",
+          }}
+        >
+          <PhotoLibrary sx={{ color: "text.secondary" }} />
+          <Typography variant="body1">This frame is missing its before/after pair.</Typography>
+        </Stack>
+      );
     }
 
-    const mediaSize = rotateStage
-      ? { width: referenceAsset.height, height: referenceAsset.width }
-      : { width: referenceAsset.width, height: referenceAsset.height };
+    if (mode === "a-b") {
+      return (
+        <Box ref={stageViewportRef} sx={{ width: "100%", height: "100%", borderRadius: "inherit" }}>
+          <ABCompareStage
+            afterAsset={afterAsset}
+            beforeAsset={beforeAsset}
+            devicePixelRatio={devicePixelRatio}
+            frameId={frameId}
+            interactionStore={interactionStore}
+            mediaRect={mediaRect}
+            onCycleSide={onCycleAbSide}
+            prefersReducedMotion={prefersReducedMotion}
+            rotateStage={rotateStage}
+            side={abSide}
+            viewportSize={viewportSize}
+          />
+        </Box>
+      );
+    }
 
-    return getContainedMediaRect(viewportSize, mediaSize);
-  }, [referenceAsset, rotateStage, viewportSize]);
-
-  if (!beforeAsset || !afterAsset) {
-    return (
-      <Stack
-        spacing={1.5}
-        sx={{
-          alignItems: "center",
-        }}
-      >
-        <PhotoLibrary sx={{ color: "text.secondary" }} />
-        <Typography variant="body1">This frame is missing its before/after pair.</Typography>
-      </Stack>
-    );
-  }
-
-  if (mode === "a-b") {
-    return (
-      <Box ref={stageViewportRef} sx={{ width: "100%", height: "100%", borderRadius: "inherit" }}>
-        <ABCompareStage
-          afterAsset={afterAsset}
-          beforeAsset={beforeAsset}
-          devicePixelRatio={devicePixelRatio}
-          frameId={frameId}
-          interactionStore={interactionStore}
-          mediaRect={mediaRect}
-          onCycleSide={onCycleAbSide}
-          prefersReducedMotion={prefersReducedMotion}
-          rotateStage={rotateStage}
-          side={abSide}
-          viewportSize={viewportSize}
-        />
-      </Box>
-    );
-  }
-
-  if (mode === "heatmap") {
-    return (
-      <Box
-        ref={stageViewportRef}
-        sx={{ width: "100%", height: "100%", position: "relative", borderRadius: "inherit" }}
-      >
-        <PositionedStageMedia
-          asset={afterAsset}
-          alt={`${afterAsset.label} base`}
-          mediaRect={mediaRect}
-          rotateStage={rotateStage}
-          loading="eager"
-          decoding="async"
-          fetchPriority="high"
-          prefersReducedMotion={prefersReducedMotion}
-        />
-        {heatmapAsset && heatmapDisplay !== "original" && (
+    if (mode === "heatmap") {
+      return (
+        <Box
+          ref={stageViewportRef}
+          sx={{ width: "100%", height: "100%", position: "relative", borderRadius: "inherit" }}
+        >
           <PositionedStageMedia
-            asset={heatmapAsset}
-            alt={heatmapAsset.label}
+            asset={afterAsset}
+            alt={`${afterAsset.label} base`}
             mediaRect={mediaRect}
             rotateStage={rotateStage}
             loading="eager"
             decoding="async"
-            // The base image establishes useful pixels first; the overlay remains eager but low
-            // priority so a multi-megabyte heatmap cannot delay the initial inspection surface.
-            fetchPriority="low"
-            opacity={heatmapDisplay === "map" ? 1 : overlayOpacity / 100}
+            fetchPriority="high"
             prefersReducedMotion={prefersReducedMotion}
+            processing={heatmapProcessing}
           />
-        )}
+          {heatmapAsset && heatmapDisplay !== "original" && (
+            <PositionedStageMedia
+              asset={heatmapAsset}
+              alt={heatmapAsset.label}
+              mediaRect={mediaRect}
+              rotateStage={rotateStage}
+              loading="eager"
+              decoding="async"
+              // The base image establishes useful pixels first; the overlay remains eager but low
+              // priority so a multi-megabyte heatmap cannot delay the initial inspection surface.
+              fetchPriority="low"
+              opacity={heatmapDisplay === "map" ? 1 : overlayOpacity / 100}
+              prefersReducedMotion={prefersReducedMotion}
+            />
+          )}
+        </Box>
+      );
+    }
+
+    return (
+      <Box ref={stageViewportRef} sx={{ width: "100%", height: "100%", borderRadius: "inherit" }}>
+        <SwipeCompareStage
+          beforeAsset={beforeAsset}
+          afterAsset={afterAsset}
+          frameId={frameId}
+          interactionStore={interactionStore}
+          mediaRect={mediaRect}
+          rotateStage={rotateStage}
+          prefersReducedMotion={prefersReducedMotion}
+        />
       </Box>
     );
-  }
-
-  return (
-    <Box ref={stageViewportRef} sx={{ width: "100%", height: "100%", borderRadius: "inherit" }}>
-      <SwipeCompareStage
-        beforeAsset={beforeAsset}
-        afterAsset={afterAsset}
-        frameId={frameId}
-        interactionStore={interactionStore}
-        mediaRect={mediaRect}
-        rotateStage={rotateStage}
-        prefersReducedMotion={prefersReducedMotion}
-      />
-    </Box>
-  );
-}
+  },
+  (_previous, next) => !next.active,
+);
 
 interface ViewerStageProps {
   abSide: "before" | "after";
@@ -287,9 +302,11 @@ interface ViewerStageProps {
   frameId: string | undefined;
   heatmapAsset: ViewerAsset | undefined;
   heatmapDisplay?: "map" | "overlay" | "original";
+  heatmapProcessing: boolean;
   interactionStore: ViewerInteractionStore;
   mode: ViewerMode;
   onCycleAbSide: () => void;
+  onHeatmapPresenceChange: (mounted: boolean) => void;
   prefersReducedMotion: boolean;
   rotateStage: boolean;
   stageRef: RefObject<HTMLDivElement | null>;
@@ -307,9 +324,11 @@ export function ViewerStage({
   frameId,
   heatmapAsset,
   heatmapDisplay,
+  heatmapProcessing,
   interactionStore,
   mode,
   onCycleAbSide,
+  onHeatmapPresenceChange,
   prefersReducedMotion,
   rotateStage,
   stageRef,
@@ -328,23 +347,61 @@ export function ViewerStage({
       }}
     >
       <StagePresentationShell inspectActive={mode === "a-b" && abStageActive}>
-        <ViewerStageContent
-          // A frame change is a new image-loading session. Remounting the mode content prevents a
-          // late event from a previous frame from sharing the next frame's DOM image state.
-          key={`${frameId ?? "empty"}:${mode}`}
-          abSide={abSide}
-          afterAsset={afterAsset}
-          beforeAsset={beforeAsset}
-          devicePixelRatio={devicePixelRatio}
-          frameId={frameId}
-          heatmapAsset={heatmapAsset}
-          heatmapDisplay={heatmapDisplay}
-          interactionStore={interactionStore}
-          mode={mode}
-          onCycleAbSide={onCycleAbSide}
-          prefersReducedMotion={prefersReducedMotion}
-          rotateStage={rotateStage}
-        />
+        {/* Retain the decoded outgoing surface during the mode fade instead of replacing it with
+            a newly mounted loading frame. Inactive modes unload after exit; A/B side changes do
+            not enter this transition, so pixel comparisons remain immediate. */}
+        {(["before-after", "a-b", "heatmap"] as const).map((stageMode) => (
+          <Fade
+            key={stageMode}
+            in={mode === stageMode}
+            appear={false}
+            mountOnEnter
+            unmountOnExit
+            timeout={prefersReducedMotion ? 0 : 220}
+            easing="cubic-bezier(0.2, 0, 0, 1)"
+            onEnter={stageMode === "heatmap" ? () => onHeatmapPresenceChange(true) : undefined}
+            onExited={() => {
+              if (stageMode === "a-b") interactionStore.resetAb(frameId);
+              if (stageMode === "heatmap") onHeatmapPresenceChange(false);
+            }}
+          >
+            <Box
+              data-viewer-mode-layer={stageMode}
+              aria-hidden={mode !== stageMode}
+              inert={mode !== stageMode}
+              sx={{
+                position: "absolute",
+                inset: 0,
+                borderRadius: "inherit",
+                zIndex: mode === stageMode ? 1 : 0,
+                pointerEvents: mode === stageMode ? "auto" : "none",
+                // An outgoing image can still be loading during the fade. Keep its pixels but
+                // hide its feedback so the entering mode owns the only visible indicator.
+                "&[aria-hidden='true'] [data-viewer-stage-feedback]": { display: "none" },
+              }}
+            >
+              <ViewerStageContent
+                // Frame changes reset image nodes without canceling the mode's exit cleanup.
+                key={frameId ?? "empty"}
+                // Freeze outgoing props so decoded pixels remain stable until Fade releases them.
+                active={mode === stageMode}
+                abSide={abSide}
+                afterAsset={afterAsset}
+                beforeAsset={beforeAsset}
+                devicePixelRatio={devicePixelRatio}
+                frameId={frameId}
+                heatmapAsset={heatmapAsset}
+                heatmapDisplay={heatmapDisplay}
+                heatmapProcessing={heatmapProcessing}
+                interactionStore={interactionStore}
+                mode={stageMode}
+                onCycleAbSide={onCycleAbSide}
+                prefersReducedMotion={prefersReducedMotion}
+                rotateStage={rotateStage}
+              />
+            </Box>
+          </Fade>
+        ))}
       </StagePresentationShell>
     </Box>
   );

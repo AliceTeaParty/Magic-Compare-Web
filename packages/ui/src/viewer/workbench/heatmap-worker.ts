@@ -23,7 +23,7 @@ self.onmessage = async ({ data }: MessageEvent<HeatmapRequest>) => {
     const pixels = renderHeatmap(analysis, data.gain);
     const canvas = new OffscreenCanvas(pixels.width, pixels.height);
     const context = canvas.getContext("2d");
-    if (!context) throw new Error("无法创建热图画布。");
+    if (!context) throw new Error("无法创建 Heatmap 画布。");
     context.putImageData(pixels, 0, 0);
     const blob = await canvas.convertToBlob({ type: "image/png" });
     const { intensity: _intensity, ...summary } = analysis;
@@ -36,7 +36,7 @@ self.onmessage = async ({ data }: MessageEvent<HeatmapRequest>) => {
           ? error.message.includes("matching dimensions")
             ? "两张原图尺寸不一致，无法逐像素分析。"
             : error.message
-          : "热图分析失败。",
+          : "Heatmap 生成失败。",
     } satisfies HeatmapResponse);
   }
 };

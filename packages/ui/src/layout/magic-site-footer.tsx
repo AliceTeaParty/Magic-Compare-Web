@@ -1,16 +1,24 @@
+"use client";
+
 import { Box, Link as MuiLink, Stack, Typography } from "@mui/material";
+import { MagicThemeControls } from "../theme/magic-theme-controls";
+import { MagicBuildVersionLabel } from "./magic-navigation-rail";
 
 export interface MagicSiteFooterProps {
+  appVersion?: string | null;
   author: string;
+  commitHash?: string | null;
   joinUsLabel?: string | null;
   joinUsUrl?: string | null;
   yearEnd: number;
   yearStart: number;
 }
 
-/** Renders the public ownership and community links after build identity moved into navigation. */
+/** Keeps public display preferences and build identity beside the footer ownership line. */
 export function MagicSiteFooter({
+  appVersion,
   author,
+  commitHash,
   joinUsLabel,
   joinUsUrl,
   yearEnd,
@@ -50,21 +58,32 @@ export function MagicSiteFooter({
             textAlign: "center",
           }}
         >
-          <Typography
-            variant="body2"
-            sx={{
-              color: "text.secondary",
-              fontSize: "0.8rem",
-              fontWeight: 400,
-              letterSpacing: "0.01em",
-            }}
-          >
-            © {yearLabel} {author}. All Rights Reserved.
-          </Typography>
+          <MagicThemeControls />
+          <MagicBuildVersionLabel
+            appVersion={appVersion}
+            commitHash={commitHash}
+            fullWidth={false}
+          />
+          {/* Keep each separator with the content it introduces so mobile wrapping never leaves a dot behind. */}
+          <Stack direction="row" useFlexGap sx={{ alignItems: "center", columnGap: 0.8 }}>
+            <Typography aria-hidden="true" variant="body2" color="text.disabled">
+              ·
+            </Typography>
+            <Typography
+              variant="body2"
+              sx={{
+                color: "text.secondary",
+                fontSize: "0.8rem",
+                fontWeight: 400,
+                letterSpacing: "0.01em",
+                whiteSpace: "nowrap",
+              }}
+            >
+              © {yearLabel} {author}. All Rights Reserved.
+            </Typography>
+          </Stack>
           {joinUsUrl && joinUsLabel ? (
-            <>
-              {/* Version used to compete with footer ownership text. Navigation now owns build
-                  identity, leaving one quiet separator for the remaining optional link. */}
+            <Stack direction="row" useFlexGap sx={{ alignItems: "center", columnGap: 0.8 }}>
               <Typography aria-hidden="true" variant="body2" color="text.disabled">
                 ·
               </Typography>
@@ -92,7 +111,7 @@ export function MagicSiteFooter({
               >
                 {joinUsLabel}
               </MuiLink>
-            </>
+            </Stack>
           ) : null}
         </Stack>
       </Box>

@@ -94,9 +94,20 @@ export async function waitForStage(page: Page) {
       ),
     )
     .toBe(true);
+  // A/B keeps both decoded layers in the stage and hides one side by opacity. Its default no longer
+  // guarantees that DOM order matches the visible side, so wait for any decoded stage image.
   await expect
-    .poll(() => images.first().evaluate((image) => Number(getComputedStyle(image).opacity)))
-    .toBe(1);
+    .poll(() =>
+      images.evaluateAll((nodes) =>
+        nodes.some((node) => {
+          const image = node as HTMLImageElement;
+          return (
+            image.complete && image.naturalWidth > 0 && Number(getComputedStyle(node).opacity) === 1
+          );
+        }),
+      ),
+    )
+    .toBe(true);
 }
 
 /** Chromium protocol input lets the browser arbitrate scrolling, unlike dispatched DOM events. */
@@ -124,4 +135,14 @@ export async function touchDrag(
   } finally {
     await session.detach();
   }
+}
+
+/** Wait for shell hydration's restoration request before capturing or leaving an SSR page. */
+export async function openInternalPage(page: Page, url: string) {
+  const restored = page.waitForResponse(
+    (response) =>
+      response.url().endsWith("/api/ops/public-deploy") && response.request().method() === "GET",
+  );
+  await page.goto(url);
+  await (await restored).finished();
 }

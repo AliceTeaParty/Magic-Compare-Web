@@ -36,11 +36,11 @@ describe("PositionedStageMedia SSR", () => {
     expect(html).toContain('width="1920"');
     expect(html).toContain('height="1080"');
     expect(html).toContain('data-viewer-stage-image=""');
-    expect(html).toContain("Before · 加载中");
-    expect(html).toContain("网络较慢，继续加载");
+    expect(html).not.toContain("加载中");
+    expect(html).toContain("网络较慢");
   });
 
-  it("keeps the reduced-motion placeholder divider centered and still", () => {
+  it("does not replay the retired scanning graphic when preview data is absent", () => {
     const html = renderToStaticMarkup(
       <PositionedStageMedia
         asset={asset}
@@ -51,7 +51,7 @@ describe("PositionedStageMedia SSR", () => {
       />,
     );
 
-    expect(html).toContain("translateX(-50%)");
+    expect(html).not.toContain("magic-stage-loading-scan");
     expect(html).not.toContain("infinite alternate");
   });
 

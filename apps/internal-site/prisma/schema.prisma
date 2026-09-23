@@ -1,10 +1,10 @@
 generator client {
-  provider = "prisma-client-js"
+  provider = "prisma-client"
+  output   = "../generated/prisma"
 }
 
 datasource db {
   provider = "sqlite"
-  url      = env("DATABASE_URL")
 }
 
 model Case {
@@ -62,19 +62,20 @@ model Frame {
 }
 
 model Asset {
-  id                 String    @id @default(cuid())
-  frameId            String
-  kind               String
-  label              String
-  imageUrl           String
-  thumbUrl           String
-  width              Int
-  height             Int
-  note               String    @default("")
-  isPublic           Boolean   @default(true)
-  isPrimaryDisplay   Boolean   @default(false)
-  storageValidatedAt DateTime?
-  frame              Frame     @relation(fields: [frameId], references: [id], onDelete: Cascade)
+  id                   String    @id @default(cuid())
+  frameId              String
+  kind                 String
+  label                String
+  imageUrl             String
+  thumbUrl             String
+  width                Int
+  height               Int
+  note                 String    @default("")
+  isPublic             Boolean   @default(true)
+  isPrimaryDisplay     Boolean   @default(false)
+  storageValidatedAt   DateTime?
+  imagePlaceholderJson String?
+  frame                Frame     @relation(fields: [frameId], references: [id], onDelete: Cascade)
 
   @@index([frameId])
 }

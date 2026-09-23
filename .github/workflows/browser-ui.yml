@@ -5,9 +5,6 @@ on:
   workflow_dispatch:
   schedule:
     - cron: "23 2 * * 1"
-  push:
-    tags:
-      - "v*"
 
 permissions:
   contents: read
@@ -43,9 +40,9 @@ jobs:
             os: macos-15
             browser: webkit
     steps:
-      - uses: actions/checkout@v6
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v6
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
         with:
           node-version-file: .node-version
           cache: pnpm
@@ -55,7 +52,7 @@ jobs:
         run: pnpm exec playwright install --with-deps ${{ matrix.browser }}
       - name: Check internal and public behavior
         run: pnpm test:e2e:ci --project=internal-${{ matrix.suite }} --project=public-${{ matrix.suite }}
-      - name: Check empty catalog and upload intake
+      - name: Check empty-state behavior for this device
         if: ${{ !cancelled() && steps.browser_install.outcome == 'success' }}
         run: pnpm test:e2e:empty --project=internal-${{ matrix.suite }}
       - name: Summarize browser results
@@ -77,7 +74,7 @@ jobs:
           JS
       - name: Upload report, screenshots and traces
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: browser-${{ matrix.suite }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: |

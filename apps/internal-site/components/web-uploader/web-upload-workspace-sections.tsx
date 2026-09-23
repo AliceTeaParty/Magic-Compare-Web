@@ -11,23 +11,21 @@ import {
 } from "@mui/icons-material";
 import {
   Alert,
+  Autocomplete,
   Box,
   Button,
   Divider,
-  FormControl,
   IconButton,
-  InputLabel,
-  MenuItem,
   Paper,
-  Select,
   Stack,
   TextField,
-  ToggleButton,
-  ToggleButtonGroup,
   Tooltip,
   Typography,
 } from "@mui/material";
-import type { ViewerMode } from "@magic-compare/content-schema";
+import {
+  GROUP_DESCRIPTION_MAX_LENGTH,
+  GROUP_TITLE_MAX_LENGTH,
+} from "@magic-compare/content-schema";
 import type { CaseCatalogItem } from "@/lib/server/repositories/content-repository";
 import { CaseCreateButton } from "../case-create-button";
 import { FluentFolderEmoji } from "../fluent-emoji";
@@ -35,18 +33,81 @@ import type { GenerationProgress } from "./asset-generator";
 import {
   webUploadFieldSx,
   webUploadPanelSx,
-  webUploadRadii,
   webUploadSizes,
   webUploadSurfaces,
 } from "./web-upload-design";
 import type { UploadRunnerSnapshot } from "./web-upload-types";
 import type { PlanView } from "./web-upload-view-model";
+import type { UploadPairingSuffixPreferences } from "./source-scanner";
 
 export interface UploadGroupMeta {
   slug: string;
   title: string;
   description: string;
-  defaultMode: ViewerMode;
+}
+
+/** Keeps case selection searchable once an internal catalog has more entries than a short menu. */
+function TargetCaseField({
+  cases,
+  disabled = false,
+  onChange,
+  selectedCaseSlug,
+}: {
+  cases: CaseCatalogItem[];
+  disabled?: boolean;
+  onChange: (caseSlug: string) => void;
+  selectedCaseSlug: string;
+}) {
+  const selectedCase = cases.find((item) => item.slug === selectedCaseSlug) ?? null;
+
+  return (
+    <Autocomplete
+      autoHighlight
+      disabled={disabled}
+      getOptionLabel={(item) => item.title}
+      isOptionEqualToValue={(left, right) => left.slug === right.slug}
+      onChange={(_event, nextCase) => {
+        if (nextCase) onChange(nextCase.slug);
+      }}
+      options={cases}
+      renderInput={(params) => <TextField {...params} label="目标项目" size="small" />}
+      value={selectedCase}
+    />
+  );
+}
+
+/** Captures naming conventions before directory selection and preserves them for a later re-scan. */
+function PairingSuffixFields({
+  disabled = false,
+  onChange,
+  value,
+}: {
+  disabled?: boolean;
+  onChange: (nextValue: UploadPairingSuffixPreferences) => void;
+  value: UploadPairingSuffixPreferences;
+}) {
+  return (
+    <Stack direction="row" spacing={1}>
+      <TextField
+        disabled={disabled}
+        fullWidth
+        helperText="例：output"
+        label="Before - 后缀"
+        onChange={(event) => onChange({ ...value, before: event.target.value })}
+        size="small"
+        value={value.before}
+      />
+      <TextField
+        disabled={disabled}
+        fullWidth
+        helperText="例：rip"
+        label="After - 后缀"
+        onChange={(event) => onChange({ ...value, after: event.target.value })}
+        size="small"
+        value={value.after}
+      />
+    </Stack>
+  );
 }
 
 const FLOW_STEPS: Array<{ icon: ElementType; label: string }> = [
@@ -121,7 +182,7 @@ function getFlowState({
   };
 }
 
-/** Keeps the workflow visible as one continuous task band instead of four disconnected cards. */
+/** Keeps the workflow readable in the narrow supporting column without splitting it into separate cards. */
 export function UploadFlowStrip({
   generationProgress,
   overallProgress,
@@ -149,49 +210,46 @@ export function UploadFlowStrip({
       elevation={0}
       aria-label="上传进度"
       sx={{
+        ...webUploadPanelSx,
         position: "relative",
         overflow: "hidden",
-        px: { xs: 1.25, sm: 2.25 },
-        py: { xs: 1.35, sm: 1.6 },
-        borderRadius: webUploadRadii.panel,
-        backgroundColor: webUploadSurfaces.flow,
+        py: 1.7,
       }}
     >
-      <Box
-        aria-hidden="true"
-        sx={{
-          position: "absolute",
-          top: { xs: 30, sm: 32 },
-          left: { xs: "13%", sm: "12.5%" },
-          right: { xs: "13%", sm: "12.5%" },
-          height: 2,
-          overflow: "hidden",
-          backgroundColor: webUploadSurfaces.progressTrack,
-        }}
-      >
-        {/* Progress updates stay on the compositor so frequent upload ticks do not relayout the flow. */}
-        <Box
-          sx={{
-            width: "100%",
-            height: "100%",
-            backgroundColor: "primary.main",
-            transform: `scaleX(${flow.progress / 100})`,
-            transformOrigin: "left center",
-            transition: "transform 300ms cubic-bezier(0.2, 0, 0, 1)",
-            "@media (prefers-reduced-motion: reduce)": { transition: "none" },
-          }}
-        />
-      </Box>
-
       <Box
         role="list"
         sx={{
           position: "relative",
           display: "grid",
-          gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
-          gap: { xs: 0.5, sm: 1 },
+          gap: 0.9,
         }}
       >
+        <Box
+          aria-hidden="true"
+          sx={{
+            position: "absolute",
+            top: webUploadSizes.flowMarker / 2,
+            bottom: webUploadSizes.flowMarker / 2,
+            left: webUploadSizes.flowMarker / 2,
+            width: 2,
+            overflow: "hidden",
+            backgroundColor: webUploadSurfaces.progressTrack,
+          }}
+        >
+          {/* Progress updates stay on the compositor so frequent upload ticks do not relayout the flow. */}
+          <Box
+            sx={{
+              width: "100%",
+              height: "100%",
+              backgroundColor: "primary.main",
+              transform: `scaleY(${flow.progress / 100})`,
+              transformOrigin: "center top",
+              transition: "transform 300ms cubic-bezier(0.2, 0, 0, 1)",
+              "@media (prefers-reduced-motion: reduce)": { transition: "none" },
+            }}
+          />
+        </Box>
+
         {FLOW_STEPS.map((step, index) => {
           const Icon = step.icon;
           const completed = index < flow.activeIndex || snapshot.stage === "completed";
@@ -199,11 +257,16 @@ export function UploadFlowStrip({
           const failed = index === flow.failedIndex;
 
           return (
-            <Stack
+            <Box
               key={step.label}
               role="listitem"
-              spacing={0.45}
-              sx={{ alignItems: "center", minWidth: 0, textAlign: "center" }}
+              sx={{
+                display: "grid",
+                gridTemplateColumns: `${webUploadSizes.flowMarker}px minmax(0, 1fr) auto`,
+                alignItems: "center",
+                columnGap: 1,
+                minWidth: 0,
+              }}
             >
               <Box
                 sx={{
@@ -245,7 +308,7 @@ export function UploadFlowStrip({
               <Typography
                 variant="body2"
                 noWrap
-                sx={{ width: "100%", fontWeight: active ? 700 : 550 }}
+                sx={{ minWidth: 0, fontWeight: active ? 700 : 550 }}
               >
                 {step.label}
               </Typography>
@@ -254,15 +317,13 @@ export function UploadFlowStrip({
                 noWrap
                 title={flow.details[index]}
                 sx={{
-                  display: { xs: "none", sm: "block" },
-                  width: "100%",
                   color: "text.secondary",
                   fontVariantNumeric: "tabular-nums",
                 }}
               >
                 {flow.details[index]}
               </Typography>
-            </Stack>
+            </Box>
           );
         })}
       </Box>
@@ -270,102 +331,30 @@ export function UploadFlowStrip({
   );
 }
 
-/** Shows only the two decisions required before a directory exists: destination and source. */
+/** Source selection is the only initial decision; destination and pairing belong to the scanned plan. */
 export function UploadIntakePanel({
-  cases,
   isScanning,
-  onCaseChange,
   onChooseDirectory,
-  selectedCaseSlug,
 }: {
-  cases: CaseCatalogItem[];
   isScanning: boolean;
-  onCaseChange: (caseSlug: string) => void;
   onChooseDirectory: () => void;
-  selectedCaseSlug: string;
 }) {
   return (
     <Paper
       component="section"
       elevation={0}
-      sx={{
-        minHeight: { xs: 360, md: 420 },
-        display: "grid",
-        gridTemplateColumns: { xs: "1fr", md: "minmax(280px, 0.85fr) minmax(0, 1.15fr)" },
-        overflow: "hidden",
-        borderRadius: webUploadRadii.panel,
-        backgroundColor: webUploadSurfaces.panel,
-      }}
+      sx={{ ...webUploadPanelSx, minHeight: 360, display: "grid", placeItems: "center" }}
     >
-      <Stack
-        spacing={2}
-        sx={{
-          justifyContent: "center",
-          p: { xs: 2, sm: 3, lg: 4 },
-          borderBottom: { xs: "1px solid", md: 0 },
-          borderRight: { xs: 0, md: "1px solid" },
-          borderColor: "divider",
-        }}
-      >
-        <Stack spacing={0.5}>
-          <Typography component="h2" variant="h3">
-            上传到
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            {cases.find((item) => item.slug === selectedCaseSlug)?.title ?? "尚无项目"}
-          </Typography>
-        </Stack>
-
-        {cases.length === 0 ? (
-          <Stack spacing={1.25}>
-            <Alert severity="warning">上传前需要创建项目。</Alert>
-            <CaseCreateButton />
-          </Stack>
-        ) : (
-          <FormControl fullWidth size="small">
-            <InputLabel id="web-upload-intake-case-label">目标项目</InputLabel>
-            <Select
-              labelId="web-upload-intake-case-label"
-              label="目标项目"
-              value={selectedCaseSlug}
-              onChange={(event) => onCaseChange(event.target.value)}
-            >
-              {cases.map((item) => (
-                <MenuItem key={item.slug} value={item.slug}>
-                  {item.title}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-        )}
-      </Stack>
-
-      <Stack
-        spacing={1.5}
-        sx={{
-          alignItems: "center",
-          justifyContent: "center",
-          p: { xs: 3, sm: 4 },
-          textAlign: "center",
-          backgroundColor: webUploadSurfaces.intake,
-        }}
-      >
-        <FluentFolderEmoji size={88} />
-        <Stack spacing={0.35}>
-          <Typography component="h2" variant="h3">
-            素材目录
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            {isScanning ? "正在读取" : "未选择"}
-          </Typography>
-        </Stack>
+      <Stack spacing={2} sx={{ alignItems: "center", textAlign: "center", py: 5 }}>
+        <FluentFolderEmoji size={72} />
+        <Typography component="h2" variant="h3">
+          素材目录
+        </Typography>
         <Button
           variant="contained"
           startIcon={<FolderOpenRounded />}
           loading={isScanning}
-          disabled={cases.length === 0}
           onClick={onChooseDirectory}
-          sx={{ minWidth: 152 }}
         >
           选择文件夹
         </Button>
@@ -382,6 +371,8 @@ export function UploadConfigurationPanel({
   onCaseChange,
   onChooseDirectory,
   onGroupMetaChange,
+  onPairingSuffixPreferencesChange,
+  pairingSuffixPreferences,
   selectedCaseSlug,
   sourceRootName,
 }: {
@@ -391,125 +382,79 @@ export function UploadConfigurationPanel({
   onCaseChange: (caseSlug: string) => void;
   onChooseDirectory: () => void;
   onGroupMetaChange: (nextMeta: UploadGroupMeta) => void;
+  onPairingSuffixPreferencesChange: (nextValue: UploadPairingSuffixPreferences) => void;
+  pairingSuffixPreferences: UploadPairingSuffixPreferences;
   selectedCaseSlug: string;
   sourceRootName: string;
 }) {
   return (
-    <Paper elevation={0} sx={{ ...webUploadPanelSx, ...webUploadFieldSx }}>
-      <Stack spacing={2}>
-        <Box sx={{ display: "flex", alignItems: "center", gap: 1.1, minWidth: 0 }}>
-          <Box
-            sx={{
-              width: 40,
-              height: 40,
-              flex: "0 0 auto",
-              display: "grid",
-              placeItems: "center",
-              borderRadius: 999,
-              color: "secondary.contrastText",
-              backgroundColor: "secondary.main",
-            }}
-          >
-            <FolderOpenRounded sx={{ fontSize: 20 }} />
-          </Box>
-          <Box sx={{ minWidth: 0, flex: 1 }}>
-            <Typography variant="caption" color="text.secondary">
-              素材目录
-            </Typography>
-            <Typography variant="subtitle1" noWrap title={sourceRootName} sx={{ fontWeight: 700 }}>
-              {sourceRootName}
-            </Typography>
-          </Box>
-          <Tooltip title="重新选择文件夹">
-            <span>
-              <IconButton
-                aria-label="重新选择文件夹"
-                disabled={isLocked}
-                onClick={onChooseDirectory}
-              >
-                <FolderOpenRounded />
-              </IconButton>
-            </span>
-          </Tooltip>
-        </Box>
-
-        <Divider />
-
-        <Stack spacing={1.5}>
-          <Typography component="h2" variant="h4">
-            图组信息
+    <Paper
+      elevation={0}
+      sx={{ ...webUploadPanelSx, ...webUploadFieldSx, p: 0, overflow: "hidden" }}
+    >
+      {/* The source is the card identity; a fixed header separates it from editable upload metadata. */}
+      <Box sx={{ display: "flex", alignItems: "center", gap: 1, minWidth: 0, px: 2.25, py: 1.75 }}>
+        <FolderOpenRounded color="primary" sx={{ fontSize: 23, flexShrink: 0 }} />
+        <Box sx={{ minWidth: 0, flex: 1 }}>
+          <Typography component="h2" variant="h4" noWrap title={sourceRootName}>
+            {sourceRootName}
           </Typography>
-          <FormControl fullWidth size="small" disabled={isLocked}>
-            <InputLabel id="web-upload-config-case-label">目标项目</InputLabel>
-            <Select
-              labelId="web-upload-config-case-label"
-              label="目标项目"
-              value={selectedCaseSlug}
-              onChange={(event) => onCaseChange(event.target.value)}
-            >
-              {cases.map((item) => (
-                <MenuItem key={item.slug} value={item.slug}>
-                  {item.title}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-          <TextField
-            label="Slug"
-            size="small"
-            value={groupMeta.slug}
+        </Box>
+        <Tooltip title="重新选择文件夹">
+          <span>
+            <IconButton aria-label="重新选择文件夹" disabled={isLocked} onClick={onChooseDirectory}>
+              <FolderOpenRounded />
+            </IconButton>
+          </span>
+        </Tooltip>
+      </Box>
+      <Divider />
+      <Stack spacing={2.1} sx={{ p: 2.25 }}>
+        {cases.length ? (
+          <TargetCaseField
+            cases={cases}
             disabled={isLocked}
-            onChange={(event) => onGroupMetaChange({ ...groupMeta, slug: event.target.value })}
+            onChange={onCaseChange}
+            selectedCaseSlug={selectedCaseSlug}
           />
-          <TextField
-            label="标题"
-            size="small"
-            value={groupMeta.title}
-            disabled={isLocked}
-            onChange={(event) => onGroupMetaChange({ ...groupMeta, title: event.target.value })}
-          />
-          <TextField
-            label="描述"
-            size="small"
-            multiline
-            minRows={2}
-            value={groupMeta.description}
-            disabled={isLocked}
-            onChange={(event) =>
-              onGroupMetaChange({ ...groupMeta, description: event.target.value })
-            }
-          />
-
-          <Stack spacing={0.75}>
-            <Typography variant="body2" color="text.secondary">
-              默认模式
-            </Typography>
-            <ToggleButtonGroup
-              exclusive
-              fullWidth
-              size="small"
-              value={groupMeta.defaultMode}
-              disabled={isLocked}
-              aria-label="默认对比模式"
-              onChange={(_event, nextMode: ViewerMode | null) => {
-                if (nextMode) onGroupMetaChange({ ...groupMeta, defaultMode: nextMode });
-              }}
-              sx={{
-                height: webUploadSizes.controlHeight,
-                "& .MuiToggleButton-root": {
-                  minWidth: 0,
-                  px: 0.5,
-                  borderRadius: webUploadRadii.control,
-                  whiteSpace: "nowrap",
-                },
-              }}
-            >
-              <ToggleButton value="before-after">滑动</ToggleButton>
-              <ToggleButton value="a-b">A / B</ToggleButton>
-              <ToggleButton value="heatmap">热图</ToggleButton>
-            </ToggleButtonGroup>
+        ) : (
+          <Stack spacing={1}>
+            <Alert severity="warning">上传前需要创建项目。</Alert>
+            <CaseCreateButton />
           </Stack>
-        </Stack>
+        )}
+        <PairingSuffixFields
+          disabled={isLocked}
+          onChange={onPairingSuffixPreferencesChange}
+          value={pairingSuffixPreferences}
+        />
+        <TextField
+          label="Slug"
+          size="small"
+          value={groupMeta.slug}
+          disabled={isLocked}
+          onChange={(event) => onGroupMetaChange({ ...groupMeta, slug: event.target.value })}
+        />
+        <TextField
+          label="标题"
+          size="small"
+          value={groupMeta.title}
+          disabled={isLocked}
+          helperText={`${groupMeta.title.length}/${GROUP_TITLE_MAX_LENGTH}`}
+          slotProps={{ htmlInput: { maxLength: GROUP_TITLE_MAX_LENGTH } }}
+          onChange={(event) => onGroupMetaChange({ ...groupMeta, title: event.target.value })}
+        />
+        <TextField
+          label="描述"
+          size="small"
+          multiline
+          minRows={2}
+          value={groupMeta.description}
+          disabled={isLocked}
+          helperText={`${groupMeta.description.length}/${GROUP_DESCRIPTION_MAX_LENGTH}`}
+          slotProps={{ htmlInput: { maxLength: GROUP_DESCRIPTION_MAX_LENGTH } }}
+          onChange={(event) => onGroupMetaChange({ ...groupMeta, description: event.target.value })}
+        />
       </Stack>
     </Paper>
   );

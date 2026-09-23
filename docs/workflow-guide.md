@@ -217,7 +217,7 @@ compose 当前会做这些事：
 
 说明：
 
-- 基础 `docker-compose.yml` 默认通过 `MAGIC_COMPARE_INTERNAL_SITE_IMAGE` 拉取 GHCR 运行时镜像
+- 基础 `docker-compose.yml` 默认拉取 GHCR `v2.0.0-RC`；升级时用 `MAGIC_COMPARE_INTERNAL_SITE_IMAGE` 显式指定版本标签或 digest。发布流程只推送版本标签，没有 `latest` 标签。
 - `docker/dev.compose.override.yml` 会把 `internal-site` / `internal-site-init` 切换成本地 `build`
 - 开发环境和生产环境一样，通过 `.env` 提供实际 S3-compatible 存储配置
 - 数据目录现在统一通过 `.env` 控制；留空时走 Docker named volumes，填写宿主机路径时走 bind mount
@@ -344,7 +344,7 @@ Web 上传链路是：
 ## 站点品牌与版本信息
 
 - Next config 在构建时读取根 `package.json` 的 `version` 和当前 git 短 hash，注入为 `MAGIC_COMPARE_APP_VERSION` / `MAGIC_COMPARE_COMMIT_SHA`。
-- internal-site 与 public-site 都在导航底部显示 `v<version>`，commit hash 放在提示中；公开页脚不再重复版本。
+- internal-site 在导航底部显示 `v<version>`；public-site 将版本与主题控件放在页脚 copyright 前。commit hash 放在版本提示中。
 - `MAGIC_COMPARE_INTERNAL_LOGO_URL` / `MAGIC_COMPARE_INTERNAL_FAVICON_URL` 只影响内部站，`MAGIC_COMPARE_PUBLIC_LOGO_URL` / `MAGIC_COMPARE_PUBLIC_FAVICON_URL` 只影响公开站。
 - 品牌变量接受绝对 URL，或对应应用已经能够服务的 `/...` 路径；留空时使用内置 Logo 与 favicon。
 - 修改内部站品牌变量后需要重启 internal-site，使布局 metadata 与导航重新读取配置。
@@ -692,3 +692,17 @@ docker build --platform linux/amd64 -f docker/internal-site.Dockerfile -t magic-
 3. `public-site` 只负责静态消费已发布 bundle
 
 只要不把这三段重新揉成一团，就不容易回到之前那些 404、空导出、并发部署和 viewer 布局失控的问题里。
+
+### 公开导出失败后的恢复
+
+导出先完整复制到目标目录旁的 `<exportDir>.next`，再把当前目录移到 `<exportDir>.previous` 并提升新目录。复制失败保留当前目录，提升失败恢复上一份目录；若进程恰在两次 rename 之间退出，下次 export/deploy 会先恢复缺失的目标目录。只保留最近一份 previous，下一次成功替换时覆盖。
+
+这些旁路目录属于导出流程，应与目标位于同一文件系统。单实例服务共用 publish/export/deploy 进程内锁；运维 CLI 仍需顺序执行，不能与服务中的发布操作并发运行。
+
+部署跳过判断现在覆盖素材公开域名、对象前缀、分享图片脚本、默认图标、构建配置和补丁内容。更改这些输入后会重新导出；凭据不进入指纹。
+
+### 保存成功但公开内容同步失败
+
+元数据、顺序、可见性和删除操作在 SQLite 提交后，若公开文件或素材清理失败，API 返回已保存的数据及 `warnings`。工作区保留已提交的值并显示持续警告；真正的数据库写入失败仍会回滚界面。
+
+管理员可按[公开内容修复](reference/publication-repair.zh-CN.md)对指定 Case slug 重建 manifest、清理已隐藏或删除图组的残留 bundle，并更新封面与项目状态。对象存储清理失败的 storageRoot 记录在服务端日志中，需按该精确前缀处理；修复命令不扫描或删除桶内其他素材。

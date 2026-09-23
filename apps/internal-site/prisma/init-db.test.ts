@@ -55,6 +55,7 @@ describe("init-db", () => {
         name: string;
       }>;
       expect(assetColumns.some((column) => column.name === "storageValidatedAt")).toBe(true);
+      expect(assetColumns.some((column) => column.name === "imagePlaceholderJson")).toBe(true);
     } finally {
       database.close();
     }

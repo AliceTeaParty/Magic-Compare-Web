@@ -225,6 +225,7 @@ CREATE INDEX IF NOT EXISTS "FrameUploadJob_groupUploadJobId_status_idx"
 
   ensureColumns(database, "Asset", [
     { name: "storageValidatedAt", sql: `"storageValidatedAt" DATETIME` },
+    { name: "imagePlaceholderJson", sql: `"imagePlaceholderJson" TEXT` },
   ]);
 
   ensureColumns(database, "GroupUploadJob", [

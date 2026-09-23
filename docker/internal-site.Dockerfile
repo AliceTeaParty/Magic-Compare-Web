@@ -40,7 +40,6 @@ FROM base AS production-deps
 
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
 COPY apps/internal-site/package.json ./apps/internal-site/package.json
-COPY apps/internal-site/prisma/schema.prisma ./apps/internal-site/prisma/schema.prisma
 COPY apps/public-site/package.json ./apps/public-site/package.json
 COPY packages/compare-core/package.json ./packages/compare-core/package.json
 COPY packages/content-schema/package.json ./packages/content-schema/package.json
@@ -50,13 +49,12 @@ COPY patches ./patches
 RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
   pnpm fetch --prod --frozen-lockfile
 RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
-  pnpm install --prod --offline --frozen-lockfile
-# Generation already copied the platform query engine into .prisma/client. The CLI engines and
-# optional Playwright peer are build-only payloads and would otherwise add over 120MB to runtime.
+  pnpm install --prod --offline --frozen-lockfile --ignore-scripts
+# Root postinstall generates the client with the development-only Prisma CLI. The builder already
+# produced that source, so the runtime install only rebuilds the native packages it actually uses.
+RUN pnpm rebuild better-sqlite3 esbuild sharp workerd
+# The optional Playwright peer is build-only payload and needlessly enlarges the runtime.
 RUN rm -rf \
-  node_modules/.pnpm/prisma@* \
-  node_modules/.pnpm/@prisma+engines@* \
-  node_modules/.pnpm/@prisma+fetch-engine@* \
   node_modules/.pnpm/@playwright+test@* \
   node_modules/.pnpm/playwright@* \
   node_modules/.pnpm/playwright-core@*
@@ -73,6 +71,7 @@ ENV NODE_OPTIONS=--max-old-space-size=512
 COPY --from=production-deps /app/node_modules ./node_modules
 COPY --from=builder /app/apps ./apps
 COPY --from=builder /app/packages ./packages
+COPY --from=builder /app/patches ./patches
 COPY --from=builder /app/scripts/sync-published.ts ./scripts/sync-published.ts
 COPY --from=builder /app/scripts/write-public-route-aliases.ts ./scripts/write-public-route-aliases.ts
 COPY --from=builder /app/scripts/export-public.ts ./scripts/export-public.ts

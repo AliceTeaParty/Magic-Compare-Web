@@ -128,6 +128,9 @@ function buildInternalTheme(seedValue: string) {
             // Catalog routes scroll while short workspaces may not. Reserving the scrollbar gutter
             // prevents the shared header divider and right-aligned actions from shifting by 17px.
             scrollbarGutter: "stable",
+            // The page shell must not capture a two-finger gesture and compete with the Viewer’s
+            // own image canvas. Pan remains native so long catalogs and drawers keep scrolling.
+            touchAction: "pan-x pan-y",
             transition: "background-color 250ms cubic-bezier(0.2, 0, 0, 1)",
           },
           body: {
@@ -256,10 +259,108 @@ function buildInternalTheme(seedValue: string) {
       MuiPopover: {
         // Anchored menus and pickers must not alter the page scrollbar or shift the app shell.
         defaultProps: { disableScrollLock: true },
+        styleOverrides: {
+          paper: {
+            overflow: "hidden",
+            border: "1px solid var(--mui-palette-divider)",
+            borderRadius: 10,
+            backgroundColor: "var(--mui-palette-surface-containerHigh)",
+            boxShadow: "0 10px 24px rgb(0 0 0 / 18%)",
+          },
+        },
       },
       MuiMenu: {
         styleOverrides: {
-          paper: { borderRadius: 8, backgroundColor: "var(--mui-palette-surface-containerHigh)" },
+          paper: {
+            overflow: "hidden",
+            border: "1px solid var(--mui-palette-divider)",
+            borderRadius: 10,
+            backgroundColor: "var(--mui-palette-surface-containerHigh)",
+            // Menus sit above a working surface. A vertical, softened shadow makes that layer
+            // readable without turning every option into its own card.
+            boxShadow: "0 10px 24px rgb(0 0 0 / 18%)",
+          },
+          list: { padding: 4 },
+        },
+      },
+      MuiMenuItem: {
+        styleOverrides: {
+          root: {
+            minHeight: 40,
+            margin: "2px 0",
+            borderRadius: 6,
+            fontWeight: 550,
+            "&:hover": {
+              backgroundColor: "color-mix(in srgb, currentColor 7%, transparent)",
+            },
+            "&.Mui-selected": {
+              color: "var(--mui-palette-primary-onContainer)",
+              backgroundColor: "var(--mui-palette-primary-light)",
+            },
+            "&.Mui-selected:hover": {
+              backgroundColor:
+                "color-mix(in srgb, var(--mui-palette-primary-onContainer) 8%, var(--mui-palette-primary-light))",
+            },
+          },
+        },
+      },
+      MuiSelect: {
+        // Every selector uses the same centered trigger and popup. Keeping this at the theme
+        // boundary prevents mode-specific controls from drifting apart as new menus are added.
+        defaultProps: {
+          MenuProps: {
+            transitionDuration: 0,
+            slotProps: {
+              paper: {
+                sx: { "& .MuiMenuItem-root": { justifyContent: "center", textAlign: "center" } },
+              },
+            },
+          },
+        },
+        styleOverrides: {
+          select: {
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            textAlign: "center",
+            // Reserve equal space for the arrow on both sides of the value.
+            paddingLeft: "32px !important",
+            paddingRight: "32px !important",
+          },
+        },
+      },
+      MuiAutocomplete: {
+        styleOverrides: {
+          paper: {
+            overflow: "hidden",
+            border: "1px solid var(--mui-palette-divider)",
+            borderRadius: 10,
+            backgroundColor: "var(--mui-palette-surface-containerHigh)",
+            boxShadow: "0 10px 24px rgb(0 0 0 / 18%)",
+          },
+          listbox: {
+            padding: 4,
+            "& .MuiAutocomplete-option": {
+              // Searchable project lists use the same centered option layout as selects.
+              justifyContent: "center",
+              textAlign: "center",
+              minHeight: 40,
+              margin: "2px 0",
+              borderRadius: 6,
+              fontWeight: 550,
+              "&[aria-selected='true']": {
+                color: "var(--mui-palette-primary-onContainer)",
+                backgroundColor: "var(--mui-palette-primary-light)",
+              },
+              "&.Mui-focused": {
+                backgroundColor: "color-mix(in srgb, currentColor 7%, transparent)",
+              },
+              "&.Mui-focused[aria-selected='true']": {
+                backgroundColor:
+                  "color-mix(in srgb, var(--mui-palette-primary-onContainer) 8%, var(--mui-palette-primary-light))",
+              },
+            },
+          },
         },
       },
       MuiTooltip: {

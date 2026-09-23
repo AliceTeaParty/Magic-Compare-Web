@@ -1,26 +1,21 @@
 "use client";
 
 import { keyframes } from "@emotion/react";
-import { FitScreen, HelpOutlined, Opacity, ViewSidebar } from "@mui/icons-material";
 import {
-  Box,
-  IconButton,
-  Slider,
-  Stack,
-  ToggleButton,
-  ToggleButtonGroup,
-  Tooltip,
-  Typography,
-} from "@mui/material";
+  AnalyticsOutlined,
+  FitScreen,
+  HelpOutlined,
+  Opacity,
+  ViewSidebar,
+} from "@mui/icons-material";
+import { Box, IconButton, Slider, Stack, ToggleButton, Tooltip, Typography } from "@mui/material";
 import type { ViewerMode } from "@magic-compare/content-schema";
 import type { ViewerAsset } from "@magic-compare/compare-core/viewer-data";
 import { clampNumber } from "@magic-compare/shared-utils";
+import { MagicSegmentedControl } from "../../controls/magic-segmented-control";
 import { AbInspectControls } from "./ab-inspect-controls";
 import { ComparisonAssetControls } from "./comparison-asset-controls";
-import {
-  VIEWER_COMPACT_CONTROL_HEIGHT,
-  VIEWER_SEGMENTED_CONTROL_STYLES,
-} from "./viewer-control-styles";
+import { VIEWER_COMPACT_CONTROL_HEIGHT } from "./viewer-control-styles";
 import { type ViewerInteractionStore, useViewerOverlayOpacity } from "./viewer-interaction-store";
 
 const tripleControlWidth = 144;
@@ -39,8 +34,8 @@ const contextualControlsEnter = keyframes`
 // Site variants describe capabilities, not locale. The previous variant branches made the same
 // Chinese viewer switch to English labels after public export, so both surfaces share one copy set.
 const VIEWER_CONTROL_COPY = {
-  heatmap: "热图",
-  heatmapOpacity: "热图透明度",
+  heatmap: "Heatmap",
+  heatmapOpacity: "Heatmap 透明度",
   opacity: "透明度",
   swipe: "滑动",
   tools: "视图工具",
@@ -48,6 +43,7 @@ const VIEWER_CONTROL_COPY = {
 
 interface ViewerUtilityControlsProps {
   compact?: boolean;
+  detailsDisabled: boolean;
   guideOpen: boolean;
   hideStageScrollControl: boolean;
   onOpenGuide: () => void;
@@ -64,12 +60,14 @@ interface ViewerToolbarProps {
   comparisonAssets: ViewerAsset[];
   frameId: string | undefined;
   guideOpen: boolean;
+  heatmapPanelOpen: boolean;
   hideStageScrollControl: boolean;
   mode: ViewerMode;
   interactionStore: ViewerInteractionStore;
   onAbSideChange: (side: "before" | "after") => void;
   onComparisonAssetChange: (assetKey: string) => void;
   onOpenGuide: () => void;
+  onToggleHeatmapPanel: () => void;
   onModeChange: (mode: ViewerMode) => void;
   onScrollStageIntoView: () => void;
   onToggleSidebar: () => void;
@@ -89,7 +87,7 @@ export function HeatmapOpacityControls({
       sx={{
         // Heatmap uses the same fixed-height tonal surface as the Viewer segmented controls, so
         // switching modes changes content without introducing a visually unrelated bare slider.
-        width: "min(100%, 240px)",
+        width: { xs: "100%", sm: "min(100%, 240px)" },
         height: VIEWER_COMPACT_CONTROL_HEIGHT,
         minHeight: VIEWER_COMPACT_CONTROL_HEIGHT,
         alignItems: "center",
@@ -132,6 +130,7 @@ export function HeatmapOpacityControls({
 /** Renders one stable icon group that can move between the desktop toolbar and mobile title row. */
 export function ViewerUtilityControls({
   compact = false,
+  detailsDisabled,
   guideOpen,
   hideStageScrollControl,
   onOpenGuide,
@@ -182,10 +181,10 @@ export function ViewerUtilityControls({
     >
       {!stageControlHidden ? (
         <Box sx={{ width: "100%", height: "100%" }}>
-          <Tooltip title="滚动到对比主图">
+          <Tooltip title="滚动到对比图">
             <IconButton
               size="small"
-              aria-label="滚动到对比主图"
+              aria-label="滚动到对比图"
               onClick={onScrollStageIntoView}
               sx={utilityIconButtonSx}
             >
@@ -212,21 +211,33 @@ export function ViewerUtilityControls({
         </IconButton>
       </Tooltip>
 
-      <Tooltip title={sidebarOpen ? "关闭详情 (I)" : "打开详情 (I)"}>
-        <IconButton
-          size="small"
-          aria-label={sidebarOpen ? "关闭详情" : "打开详情"}
-          aria-pressed={sidebarOpen}
-          onClick={onToggleSidebar}
-          sx={{
-            ...utilityIconButtonSx,
-            borderLeft: "1px solid",
-            borderLeftColor: "divider",
-            "& .MuiSvgIcon-root": { fontSize: 18 },
-          }}
-        >
-          <ViewSidebar />
-        </IconButton>
+      <Tooltip
+        title={
+          detailsDisabled
+            ? "Heatmap 模式暂时无法打开详情"
+            : sidebarOpen
+              ? "关闭详情 (I)"
+              : "打开详情 (I)"
+        }
+      >
+        {/* A disabled button cannot receive hover events; the wrapper keeps the reason discoverable. */}
+        <Box component="span" sx={{ display: "block", width: "100%", height: "100%" }}>
+          <IconButton
+            size="small"
+            aria-label={sidebarOpen ? "关闭详情" : "打开详情"}
+            aria-pressed={sidebarOpen}
+            disabled={detailsDisabled}
+            onClick={onToggleSidebar}
+            sx={{
+              ...utilityIconButtonSx,
+              borderLeft: "1px solid",
+              borderLeftColor: "divider",
+              "& .MuiSvgIcon-root": { fontSize: 18 },
+            }}
+          >
+            <ViewSidebar />
+          </IconButton>
+        </Box>
       </Tooltip>
     </Stack>
   );
@@ -244,12 +255,14 @@ export function ViewerToolbar({
   comparisonAssets,
   frameId,
   guideOpen,
+  heatmapPanelOpen,
   hideStageScrollControl,
   mode,
   interactionStore,
   onAbSideChange,
   onComparisonAssetChange,
   onOpenGuide,
+  onToggleHeatmapPanel,
   onModeChange,
   onScrollStageIntoView,
   onToggleSidebar,
@@ -295,6 +308,7 @@ export function ViewerToolbar({
       >
         <Box sx={{ display: { xs: "none", sm: "block" }, flex: "0 0 auto" }}>
           <ViewerUtilityControls
+            detailsDisabled={mode === "heatmap"}
             guideOpen={guideOpen}
             hideStageScrollControl={hideStageScrollControl}
             onOpenGuide={onOpenGuide}
@@ -304,7 +318,7 @@ export function ViewerToolbar({
           />
         </Box>
 
-        <ToggleButtonGroup
+        <MagicSegmentedControl
           exclusive
           size="small"
           value={mode}
@@ -315,10 +329,8 @@ export function ViewerToolbar({
             display: "grid",
             gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
             gap: 0,
-            ...VIEWER_SEGMENTED_CONTROL_STYLES,
             alignItems: "stretch",
             "& .MuiToggleButtonGroup-grouped": {
-              ...VIEWER_SEGMENTED_CONTROL_STYLES["& .MuiToggleButtonGroup-grouped"],
               // Fixed segment widths keep the utility controls stationary when the selected mode
               // or translated label changes. Mobile segments share the available row so icon
               // utilities never get clipped against the Viewer shell.
@@ -339,7 +351,7 @@ export function ViewerToolbar({
           <ToggleButton value="heatmap" disabled={!canUseHeatmap}>
             {VIEWER_CONTROL_COPY.heatmap}
           </ToggleButton>
-        </ToggleButtonGroup>
+        </MagicSegmentedControl>
       </Stack>
 
       <Box
@@ -395,14 +407,39 @@ export function ViewerToolbar({
                 onComparisonAssetChange={onComparisonAssetChange}
               />
             ) : null
-          ) : beforeAsset && comparisonAssetKey && comparisonAssets.length > 0 ? (
-            <ComparisonAssetControls
-              baselineAsset={beforeAsset}
-              comparisonAssetKey={comparisonAssetKey}
-              comparisonAssets={comparisonAssets}
-              onComparisonAssetChange={onComparisonAssetChange}
-            />
-          ) : null}
+          ) : (
+            <Stack direction="row" spacing={0.75} sx={{ alignItems: "center", minWidth: 0 }}>
+              <Tooltip title={heatmapPanelOpen ? "关闭 Heatmap" : "打开 Heatmap"}>
+                <IconButton
+                  aria-label={heatmapPanelOpen ? "关闭 Heatmap" : "打开 Heatmap"}
+                  aria-pressed={heatmapPanelOpen}
+                  onClick={onToggleHeatmapPanel}
+                  sx={{
+                    width: VIEWER_COMPACT_CONTROL_HEIGHT,
+                    height: VIEWER_COMPACT_CONTROL_HEIGHT,
+                    border: "1px solid",
+                    borderColor: "divider",
+                    borderRadius: 999,
+                    backgroundColor: "surface.containerHigh",
+                    "&[aria-pressed='true']": {
+                      color: "primary.onContainer",
+                      backgroundColor: "primary.light",
+                    },
+                  }}
+                >
+                  <AnalyticsOutlined fontSize="small" />
+                </IconButton>
+              </Tooltip>
+              {beforeAsset && comparisonAssetKey && comparisonAssets.length > 0 ? (
+                <ComparisonAssetControls
+                  baselineAsset={beforeAsset}
+                  comparisonAssetKey={comparisonAssetKey}
+                  comparisonAssets={comparisonAssets}
+                  onComparisonAssetChange={onComparisonAssetChange}
+                />
+              ) : null}
+            </Stack>
+          )}
         </Box>
       </Box>
     </Stack>

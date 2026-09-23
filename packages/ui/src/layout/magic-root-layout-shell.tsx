@@ -60,9 +60,13 @@ export function MagicRootLayoutShell({
             />
             {profile === "public" ? (
               <MagicPublicAppShell
-                appVersion={buildIdentity.appVersion}
-                commitHash={buildIdentity.commitHash}
-                footer={<MagicSiteFooter {...footerConfig} />}
+                footer={
+                  <MagicSiteFooter
+                    {...footerConfig}
+                    appVersion={buildIdentity.appVersion}
+                    commitHash={buildIdentity.commitHash}
+                  />
+                }
                 logoUrl={navigationLogoUrl}
               >
                 {children}

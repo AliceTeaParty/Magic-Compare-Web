@@ -57,6 +57,7 @@ export function PositionedStageMedia({
   showFallback = true,
   animateOpacity = true,
   willChangeTransform = false,
+  processing = false,
 }: {
   asset: ViewerAsset;
   alt: string;
@@ -77,6 +78,7 @@ export function PositionedStageMedia({
   showFallback?: boolean;
   animateOpacity?: boolean;
   willChangeTransform?: boolean;
+  processing?: boolean;
 }) {
   const { hasError, imageRef, markErrored, markLoaded, showImage } = useStageImageLoadState(
     asset.imageUrl,
@@ -137,10 +139,10 @@ export function PositionedStageMedia({
             errorMessage={fallbackErrorMessage}
             errored={hasError}
             imageReady={showImage}
-            loadingLabel={asset.label}
             opacity={opacity}
             placeholder={asset.placeholder}
             prefersReducedMotion={prefersReducedMotion}
+            processing={processing}
           />
         ) : null}
         <Box

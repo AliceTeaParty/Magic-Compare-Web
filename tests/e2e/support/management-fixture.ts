@@ -26,7 +26,7 @@ export async function createDraftGroup(
   const response = await request.post("/api/ops/group-upload-start", {
     data: {
       case: { slug: caseSlug, title: caseSlug },
-      group: { slug, title: slug, order, defaultMode: "before-after" },
+      group: { slug, title: slug, order, defaultMode: "a-b" },
       frames: [
         {
           order: 0,

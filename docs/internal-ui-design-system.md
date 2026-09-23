@@ -13,9 +13,9 @@
 
 - 手机使用 top app bar 和 temporary drawer。
 - 中等宽度使用 80px navigation rail。
-- 页面标题统一使用固定高度的 `InternalPageHeader`。返回、标题和 actions 均有稳定布局槽，异步状态和按钮显隐不得推动相邻元素。
+- 页面标题统一使用 `MAGIC_PAGE_HEADER` 与固定高度的 `InternalPageHeader`。标题、描述和 actions 均有稳定布局槽，异步状态和按钮显隐不得推动相邻元素。
 - Case 目录、Case workspace、Upload 共用同一 app shell；viewer 在该 shell 的内容区内全宽显示。
-- 公开 Viewer 使用只读 app shell：导航仅保留 Logo、主题控制和版本，内容区继续使用相同的全宽 workbench、header、stage、filmstrip 和 details pane。
+- 公开 Viewer 不保留空 navigation rail 或菜单。保留 Magic Compare 品牌栏；明暗模式、主题色和版本放在 footer 的 copyright 前，内容区继续使用全宽 workbench、header、stage、filmstrip 和 details pane。
 - 两站导航 Logo 和 favicon 分别由 `MAGIC_COMPARE_INTERNAL_*` 与 `MAGIC_COMPARE_PUBLIC_*` URL 变量配置，空值使用仓库内置资源。
 
 ## 公开站边界
@@ -29,7 +29,9 @@
 
 - 页面命令使用 Material Symbols 对应的 MUI Icons；只有命令含义不明确时同时显示文字。
 - 空状态可以使用 Microsoft Fluent Emoji，不能用 Emoji 代替错误、成功、上传阶段等功能状态图标。
-- 模式切换使用 connected segmented control。编辑、保存、暂停等状态切换必须复用固定尺寸的控制槽。
+- 2 项及以上的互斥选择使用 `MagicSegmentedControl`，子项保持 MUI `ToggleButton`；不要在页面各自复制边框、选中态或对齐规则。编辑、保存、暂停等状态切换必须复用固定尺寸的控制槽。
+- 对比图检查区域保留细边界与基础阴影，A/B 图片缩放后露出的空白仍需看清组件范围。
+- Menu、Select 与 Autocomplete 的浮层统一使用容器色、清晰边界、纵向柔和阴影和 container/on-container 选中态。Select 的当前值及选项、Autocomplete 的选项由共享主题居中，弹出时不缩放文字；带动作图标的 Menu 保持动作布局。选项是同一份选择列表，不再逐项做成独立卡片。
 - 高频图标按钮和拖拽把手使用至少 40px 的命中区域；目录卡片等单一目的表面把整个表面作为导航目标。
 - 尚未适用的次级动作退出焦点和点击顺序；若它稍后出现会推动主动作，则保留不可见布局槽，并把主动作放在槽前。
 - 临时反馈只显示最新一条 Snackbar；需要用户处理的错误保留在页面内容流中。

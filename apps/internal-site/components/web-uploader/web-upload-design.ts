@@ -1,7 +1,7 @@
 import type { SxProps, Theme } from "@mui/material/styles";
 
 export const webUploadRadii = {
-  panel: 1.5,
+  panel: 2,
   control: 1,
   item: 1,
   thumbnail: 0.75,
@@ -24,9 +24,6 @@ export const webUploadSizes = {
 } as const;
 
 export const webUploadSurfaces = {
-  panel: "var(--mui-palette-surface-containerLow)",
-  flow: "var(--mui-palette-surface-container)",
-  intake: "var(--mui-palette-surface-containerLowest)",
   row: "var(--mui-palette-surface-container)",
   rowHover: "var(--mui-palette-surface-containerHigh)",
   rowSelected:
@@ -48,9 +45,12 @@ export const webUploadColors = {
 } as const;
 
 export const webUploadPanelSx = {
-  p: { xs: 1.7, md: 2 },
+  p: { xs: 1.7, md: 2.25 },
   borderRadius: webUploadRadii.panel,
-  backgroundColor: webUploadSurfaces.panel,
+  // Match the settings pane's outlined surface so adjacent upload cards read as one workbench.
+  border: "1px solid",
+  borderColor: "divider",
+  backgroundColor: "var(--mui-palette-surface-containerHigh)",
 } satisfies SxProps<Theme>;
 
 export const webUploadFieldSx = {

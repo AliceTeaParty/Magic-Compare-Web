@@ -20,6 +20,7 @@ test("comparison variables, image selector and nearest-neighbor preferences rema
     localStorage.setItem("magic_compare_viewer_guide_v1", "dismissed"),
   );
   await page.goto(viewerPath(info.project.metadata.variant));
+  await page.getByRole("button", { name: "滑动", exact: true }).click();
   await page.getByRole("button", { name: "使用 Flt 作为对比变量", exact: true }).click();
   await expect(
     page.getByRole("button", { name: "使用 Flt 作为对比变量", exact: true }),

@@ -7,6 +7,7 @@ import {
   CircularProgress,
   Divider,
   Drawer,
+  Fade,
   Link as MuiLink,
   List,
   ListItemButton,
@@ -18,7 +19,14 @@ import {
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { findAsset, getComparisonTargetAssets } from "@magic-compare/compare-core/viewer-data";
-import { memo, useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
+import {
+  memo,
+  useEffect,
+  useRef,
+  useState,
+  type MouseEvent as ReactMouseEvent,
+  type ReactNode,
+} from "react";
 import type {
   ViewerAsset,
   ViewerDataset,
@@ -39,11 +47,6 @@ const currentGroupIconEnter = keyframes`
   35% { transform: scale(0.84) rotate(-7deg); }
   70% { transform: scale(1.08) rotate(0); }
   100% { transform: scale(1) rotate(0); }
-`;
-
-const desktopSidebarEnter = keyframes`
-  from { opacity: 0; transform: translateX(6px); }
-  to { opacity: 1; transform: translateX(0); }
 `;
 
 /** Formats server timestamps only after hydration so the browser's locale and time zone win. */
@@ -377,7 +380,9 @@ function ViewerSidebarContent({
               disappear from the metadata summary after a three-way upload. */}
           可用变量：{getAvailableVariableLabels(currentFrame).join(", ") || "无"}
         </Typography>
-        <Typography variant="body2">预生成热图：{heatmapAsset ? "可用" : "无"}</Typography>
+        <Typography variant="body2">
+          预生成 Heatmap（Deprecated）：{heatmapAsset ? "可用" : "无"}
+        </Typography>
       </Stack>
 
       {variant === "internal" && publishStatus ? (
@@ -453,6 +458,8 @@ function ViewerSidebarContent({
 }
 
 interface ViewerSidebarProps {
+  panelContent?: ReactNode;
+  panelLabel?: string;
   currentFrame: ViewerFrame | undefined;
   currentGroup: ViewerGroup;
   groups: ViewerDataset["siblingGroups"];
@@ -464,6 +471,7 @@ interface ViewerSidebarProps {
   publishStatus: ViewerDataset["publishStatus"];
   showDesktopSidebar: boolean;
   sidebarOpen: boolean;
+  prefersReducedMotion: boolean;
   closeSidebar: () => void;
   variant: "public" | "internal";
 }
@@ -473,6 +481,8 @@ interface ViewerSidebarProps {
  * viewer state independent from the current responsive layout.
  */
 export const ViewerSidebar = memo(function ViewerSidebar({
+  panelContent,
+  panelLabel,
   currentFrame,
   currentGroup,
   groups,
@@ -484,6 +494,7 @@ export const ViewerSidebar = memo(function ViewerSidebar({
   publishStatus,
   showDesktopSidebar,
   sidebarOpen,
+  prefersReducedMotion,
   closeSidebar,
   variant,
 }: ViewerSidebarProps) {
@@ -501,31 +512,46 @@ export const ViewerSidebar = memo(function ViewerSidebar({
   };
   const mobileDrawerOpen = sidebarOpen && !showDesktopSidebar;
   useRootScrollLock(mobileDrawerOpen);
+  const content = panelContent ?? <ViewerSidebarContent {...contentProps} />;
 
   return (
     <>
-      {sidebarOpen && showDesktopSidebar ? (
-        <Box
-          component="aside"
-          sx={{
-            borderLeft: "1px solid",
-            borderColor: "divider",
-            // The sidebar only fades into its final grid column. A CSS entry animation keeps the
-            // visual cue while allowing closed metadata content and Motion runtime code to unload.
-            animation: `${desktopSidebarEnter} 180ms ease-out`,
-            "@media (prefers-reduced-motion: reduce)": { animation: "none" },
-            // Public details use the same supporting surface; variant only trims internal data.
-            backgroundColor: "surface.containerLow",
-          }}
+      {showDesktopSidebar ? (
+        <Fade
+          in={sidebarOpen}
+          appear={false}
+          mountOnEnter
+          unmountOnExit
+          timeout={prefersReducedMotion ? 0 : 240}
         >
-          <ViewerSidebarContent {...contentProps} />
-        </Box>
+          <Box
+            component="aside"
+            aria-label={panelLabel}
+            aria-hidden={!sidebarOpen}
+            inert={!sidebarOpen}
+            sx={{
+              // Preserve the closing pane until the grid finishes contracting. A fixed inner
+              // width prevents metadata from rewrapping on every animation frame.
+              gridColumn: 2,
+              gridRow: 2,
+              minWidth: 0,
+              overflow: "hidden",
+              borderLeft: "1px solid",
+              borderColor: "divider",
+              backgroundColor: "surface.containerLow",
+            }}
+          >
+            <Box sx={{ width: 320, height: "100%" }}>{content}</Box>
+          </Box>
+        </Fade>
       ) : null}
 
       <Drawer
         anchor="right"
+        aria-label={panelLabel}
         open={mobileDrawerOpen}
         onClose={closeSidebar}
+        transitionDuration={prefersReducedMotion ? 0 : 240}
         // Viewer owns the root scroll lock so Modal must not add body padding and squeeze the sheet.
         // Closed mobile details duplicated the full metadata tree beside the desktop pane. Let MUI
         // unmount it while retaining the shell's explicit root-scroll handling.
@@ -544,7 +570,7 @@ export const ViewerSidebar = memo(function ViewerSidebar({
           },
         }}
       >
-        <ViewerSidebarContent {...contentProps} />
+        {content}
       </Drawer>
     </>
   );

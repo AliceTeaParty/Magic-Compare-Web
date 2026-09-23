@@ -30,6 +30,19 @@ describe("scanBrowserUploadFiles", () => {
     expect(plan.issues).toEqual([]);
   });
 
+  it("keeps an inferred folder title within the upload title limit", () => {
+    const plan = scanBrowserUploadFiles(
+      [
+        image("upload-multiple-source/frame-001_src.png"),
+        image("upload-multiple-source/frame-001_rip.png"),
+      ],
+      "upload-multiple-source",
+    );
+
+    expect(plan.suggestedGroupTitle).toBe("Upload Multiple");
+    expect(plan.suggestedGroupTitle.length).toBeLessThanOrEqual(20);
+  });
+
   it("pairs flat files across supported filename separators", () => {
     const plan = scanBrowserUploadFiles(
       [
@@ -420,6 +433,30 @@ describe("scanBrowserUploadFiles", () => {
     expect(plan.frames.map((frame) => frame.title)).toEqual(["8-28973", "9-39089"]);
     expect(plan.frames.map((frame) => frame.before.label)).toEqual(["Src", "Src"]);
     expect(plan.frames.map((frame) => frame.after.label)).toEqual(["Rip", "Rip"]);
+    expect(plan.issues).toEqual([]);
+  });
+
+  it("uses operator-selected filename endings when a flat directory has no src or after files", () => {
+    const plan = scanBrowserUploadFiles(
+      [
+        image("24_TAKOPI_00002.gen.vpy-25124-rip.png"),
+        image("24_TAKOPI_00002.gen.vpy-25124-output.png"),
+        image("24_TAKOPI_00002.gen.vpy-27368-rip.png"),
+        image("24_TAKOPI_00002.gen.vpy-27368-output.png"),
+      ],
+      "用所选项目新建的文件夹",
+      { before: "rip", after: "output" },
+    );
+
+    expect(plan.frames).toHaveLength(2);
+    expect(plan.frames.map((frame) => frame.before.source.relativePath)).toEqual([
+      "24_TAKOPI_00002.gen.vpy-25124-rip.png",
+      "24_TAKOPI_00002.gen.vpy-27368-rip.png",
+    ]);
+    expect(plan.frames.map((frame) => frame.after.source.relativePath)).toEqual([
+      "24_TAKOPI_00002.gen.vpy-25124-output.png",
+      "24_TAKOPI_00002.gen.vpy-27368-output.png",
+    ]);
     expect(plan.issues).toEqual([]);
   });
 

@@ -3,8 +3,14 @@ import type { CaseWorkspaceData } from "@/lib/server/repositories/content-reposi
 
 type GroupItem = CaseWorkspaceData["groups"][number];
 
-export const GROUP_TITLE_MAX_LENGTH = 20;
-export const GROUP_DESCRIPTION_MAX_LENGTH = 40;
+import {
+  GROUP_TITLE_MAX_LENGTH,
+  GROUP_DESCRIPTION_MAX_LENGTH,
+} from "@magic-compare/content-schema";
+export {
+  GROUP_TITLE_MAX_LENGTH,
+  GROUP_DESCRIPTION_MAX_LENGTH,
+} from "@magic-compare/content-schema";
 
 function isOverLimit(value: string, maxLength: number) {
   return value.length > maxLength;

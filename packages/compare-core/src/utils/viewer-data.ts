@@ -1,3 +1,4 @@
+import { DEFAULT_VIEWER_MODE } from "@magic-compare/content-schema";
 import type {
   AssetKind,
   AssetRecord,
@@ -125,6 +126,7 @@ export interface AbAssetSelection {
 export function getNextAbAssetSelection(
   current: AbAssetSelection,
   comparisonAssets: ViewerAsset[],
+  direction: 1 | -1 = 1,
 ): AbAssetSelection {
   if (comparisonAssets.length === 0) {
     return { side: "before" };
@@ -132,7 +134,9 @@ export function getNextAbAssetSelection(
 
   if (current.side === "before") {
     return {
-      comparisonAssetKey: getComparisonAssetKey(comparisonAssets[0]),
+      comparisonAssetKey: getComparisonAssetKey(
+        comparisonAssets[direction === 1 ? 0 : comparisonAssets.length - 1],
+      ),
       side: "after",
     };
   }
@@ -140,11 +144,11 @@ export function getNextAbAssetSelection(
   const currentIndex = comparisonAssets.findIndex(
     (asset) => getComparisonAssetKey(asset) === current.comparisonAssetKey,
   );
-  const nextIndex = currentIndex + 1;
+  const nextIndex = currentIndex + direction;
 
-  if (currentIndex === -1 || nextIndex < comparisonAssets.length) {
+  if (nextIndex >= 0 && nextIndex < comparisonAssets.length) {
     return {
-      comparisonAssetKey: getComparisonAssetKey(comparisonAssets[Math.max(0, nextIndex)]),
+      comparisonAssetKey: getComparisonAssetKey(comparisonAssets[nextIndex]),
       side: "after",
     };
   }
@@ -207,7 +211,7 @@ export function createViewerDatasetFromPublishManifest(manifest: PublishManifest
       publicSlug: manifest.group.publicSlug,
       title: manifest.group.title,
       description: manifest.group.description,
-      defaultMode: manifest.group.defaultMode,
+      defaultMode: DEFAULT_VIEWER_MODE,
       tags: manifest.group.tags,
       isPublic: true,
       frames: orderByNumericOrder(manifest.frames).map((frame) => ({

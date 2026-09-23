@@ -27,7 +27,8 @@ test("catalog search, status, sort and empty search recover without leaving the 
   await search.fill("e2e-sample");
   await expectPageFits(page);
   await page.locator('a[href="/cases/e2e-sample"]').first().click();
-  await expect(page).toHaveURL(/\/cases\/e2e-sample$/);
+  // The first workspace visit compiles its Next dev route; wait for navigation, not a 5s UI assertion.
+  await page.waitForURL(/\/cases\/e2e-sample$/);
 });
 
 test("create dialog validates description, retains failed drafts and resets on cancel", async ({

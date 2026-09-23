@@ -17,10 +17,10 @@ import {
   Paper,
   Stack,
   ToggleButton,
-  ToggleButtonGroup,
   Tooltip,
   Typography,
 } from "@mui/material";
+import { MagicSegmentedControl } from "@magic-compare/ui";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import Link from "next/link";
@@ -74,28 +74,7 @@ export function SortableGroupRow({
     minHeight: visibilityButtonHeight,
     px: "10px",
     py: 0,
-    border: "0 !important",
-    boxShadow: "none",
-    color: "text.secondary",
     fontSize: "0.8125rem",
-    backgroundColor: "transparent",
-    "&:hover": { backgroundColor: "action.hover" },
-    "&.Mui-selected": {
-      color: "primary.onContainer",
-      backgroundColor: "primary.light",
-    },
-    "&.Mui-selected:hover": {
-      backgroundColor: "color-mix(in srgb, currentColor 8%, var(--mui-palette-primary-light))",
-    },
-    "&.Mui-disabled": {
-      color: "text.secondary",
-      opacity: 0.6,
-    },
-    "&.Mui-selected.Mui-disabled": {
-      color: "primary.onContainer",
-      backgroundColor: "primary.light",
-      opacity: 1,
-    },
   };
   const {
     cancelMetadataEdit,
@@ -367,27 +346,14 @@ export function SortableGroupRow({
           >
             {/* These controls act on one group only, so they stay visually grouped here instead
                     of competing with workspace-level actions in the page header. */}
-            <ToggleButtonGroup
+            <MagicSegmentedControl
               exclusive
               size="small"
               onPointerDown={stopPointerPropagation}
               onClick={stopClickPropagation}
               sx={{
-                alignItems: "center",
-                gap: 0,
                 minHeight: compactControlHeight,
-                overflow: "hidden",
-                borderRadius: 999,
-                backgroundColor: "var(--mui-palette-surface-containerHigh)",
-                "& .MuiToggleButtonGroup-grouped": {
-                  m: 0,
-                  border: 0,
-                  borderRadius: 999,
-                  "&:not(:first-of-type)": {
-                    borderLeft: 0,
-                    ml: 0,
-                  },
-                },
+                "& .MuiToggleButtonGroup-grouped": { minHeight: compactControlHeight },
               }}
               value={group.isPublic ? "public" : "internal"}
               onChange={handleVisibilityChange}
@@ -408,7 +374,7 @@ export function SortableGroupRow({
                 <Public sx={{ mr: 0.55, fontSize: 14.5 }} />
                 公开
               </ToggleButton>
-            </ToggleButtonGroup>
+            </MagicSegmentedControl>
             <Box
               sx={{
                 display: "inline-flex",
