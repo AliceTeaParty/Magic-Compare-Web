@@ -1,5 +1,10 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { mapCaseWorkspaceData, mapFrameAssets } from "./mappers";
+
+// Viewer mapping needs a URL, not a configured S3 client; keep this unit test CI-independent.
+vi.mock("@/lib/server/storage/internal-assets", () => ({
+  resolvePublicInternalAssetUrl: (logicalPath: string) => `https://assets.test${logicalPath}`,
+}));
 
 describe("mapFrameAssets", () => {
   it("inlines the persisted preview in the first Viewer payload", () => {
@@ -28,6 +33,7 @@ describe("mapFrameAssets", () => {
       dataUrl: "data:image/webp;base64,UklGRg==",
       sourceColor: "#AABBCC",
     });
+    expect(asset?.imageUrl).toBe("https://assets.test/groups/group-1/original.webp");
   });
 });
 
