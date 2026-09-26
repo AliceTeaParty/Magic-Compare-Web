@@ -1,5 +1,40 @@
 import { expect, test, openNavigation, expectPageFits } from "./support/browser-test";
 
+test("catalog select icons stay left while labels stay centered across widths", async ({
+  page,
+}) => {
+  await page.goto("/");
+  for (const width of [1440, 390, 320]) {
+    await page.setViewportSize({ width, height: 844 });
+    for (const name of ["筛选项目状态", "项目排序"]) {
+      const { offset, iconInset, iconGap, controlWidth } = await page
+        .getByRole("combobox", { name })
+        .evaluate((select) => {
+          const root = select.closest(".MuiFilledInput-root");
+          const content = select.querySelector("[data-catalog-select-value]");
+          const icon = root?.querySelector(".MuiSvgIcon-root:not(.MuiSelect-icon)");
+          if (!root || !content || !icon)
+            return { offset: Infinity, iconInset: Infinity, iconGap: -Infinity, controlWidth: 0 };
+          const control = root.getBoundingClientRect();
+          const value = content.getBoundingClientRect();
+          const leadingIcon = icon.getBoundingClientRect();
+          return {
+            offset: Math.abs(value.x + value.width / 2 - control.x - control.width / 2),
+            iconInset: leadingIcon.x - control.x,
+            iconGap: value.left - leadingIcon.right,
+            controlWidth: control.width,
+          };
+        });
+      expect(offset, `${name} at ${width}px`).toBeLessThanOrEqual(1);
+      expect(iconInset, `${name} at ${width}px`).toBeGreaterThanOrEqual(12);
+      expect(iconInset, `${name} at ${width}px`).toBeLessThanOrEqual(18);
+      expect(iconGap, `${name} at ${width}px`).toBeGreaterThanOrEqual(4);
+      if (width === 320) expect(controlWidth, `${name} at ${width}px`).toBeGreaterThan(200);
+    }
+    await expectPageFits(page);
+  }
+});
+
 test("catalog search, status, sort and empty search recover without leaving the page", async ({
   page,
 }) => {
