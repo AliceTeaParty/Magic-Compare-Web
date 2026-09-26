@@ -1,7 +1,15 @@
 "use client";
 
 import { keyframes } from "@emotion/react";
-import { CheckCircleOutlineRounded, CheckRounded, CollectionsOutlined } from "@mui/icons-material";
+import {
+  ArchiveOutlined,
+  CheckRounded,
+  CollectionsOutlined,
+  EditNoteOutlined,
+  LockOutlineRounded,
+  OpenInNewRounded,
+  PublicOutlined,
+} from "@mui/icons-material";
 import {
   Box,
   CircularProgress,
@@ -40,6 +48,13 @@ const internalStatusLabels = {
   draft: "草稿",
   internal: "内部",
   published: "公开",
+} as const;
+
+const internalStatusIcons = {
+  archived: ArchiveOutlined,
+  draft: EditNoteOutlined,
+  internal: LockOutlineRounded,
+  published: PublicOutlined,
 } as const;
 
 const currentGroupIconEnter = keyframes`
@@ -309,7 +324,16 @@ function ViewerSidebarContent({
   publishStatus: ViewerDataset["publishStatus"];
   variant: "public" | "internal";
 }) {
-  const localizedPublishDate = useLocalizedPublishDate(publishStatus?.publishedAt);
+  // A group can retain its former public slug after visibility is disabled. Present publication
+  // controls and the date only while this particular group is currently published.
+  const isGroupPublished = currentGroup.isPublic && publishStatus?.status === "published";
+  const displayedStatus = currentGroup.isPublic
+    ? (publishStatus?.status ?? "internal")
+    : "internal";
+  const StatusIcon = internalStatusIcons[displayedStatus];
+  const localizedPublishDate = useLocalizedPublishDate(
+    isGroupPublished ? publishStatus?.publishedAt : null,
+  );
 
   return (
     <Stack spacing={2} sx={{ p: 2.25 }}>
@@ -389,57 +413,75 @@ function ViewerSidebarContent({
         <>
           <Divider />
           <Stack spacing={0.75}>
-            <Typography
-              variant="body2"
-              sx={{
-                color: "text.secondary",
-              }}
-            >
-              发布状态
-            </Typography>
             <Stack
               direction="row"
-              sx={{
-                alignSelf: "flex-start",
-                minHeight: 32,
-                px: 1.25,
-                alignItems: "center",
-                gap: 0.65,
-                borderRadius: 999,
-                color: "text.secondary",
-                backgroundColor: "surface.containerHigh",
-              }}
+              sx={{ alignItems: "center", justifyContent: "space-between", gap: 1 }}
             >
-              {publishStatus.status === "published" ? (
-                <CheckCircleOutlineRounded
-                  aria-hidden="true"
-                  sx={{ color: "success.main", fontSize: 18 }}
-                />
-              ) : null}
-              <Typography variant="caption" sx={{ fontWeight: 650 }}>
-                {internalStatusLabels[publishStatus.status]}
+              <Typography variant="body2" sx={{ color: "text.secondary" }}>
+                发布状态
               </Typography>
+              {/* Status is metadata, so an icon and label avoid a second button-shaped surface. */}
+              <Stack direction="row" sx={{ alignItems: "center", gap: 0.5, minHeight: 32 }}>
+                <StatusIcon
+                  aria-hidden="true"
+                  sx={{ fontSize: 18, color: isGroupPublished ? "success.main" : "text.secondary" }}
+                />
+                <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                  {internalStatusLabels[displayedStatus]}
+                </Typography>
+              </Stack>
             </Stack>
-            {publishStatus.publicUrl && publishStatus.publicSlug ? (
+            {isGroupPublished && publishStatus.publicUrl && publishStatus.publicSlug ? (
               <MuiLink
                 href={publishStatus.publicUrl}
                 target="_blank"
                 rel="noreferrer"
                 aria-label={`打开公开 Slug ${publishStatus.publicSlug}`}
-                underline="hover"
+                underline="none"
                 variant="body2"
-                sx={{ alignSelf: "flex-start", fontWeight: 550, overflowWrap: "anywhere" }}
+                sx={{
+                  alignSelf: "flex-start",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 0.75,
+                  maxWidth: "100%",
+                  minHeight: 44,
+                  px: 1.25,
+                  py: 0.75,
+                  borderRadius: 1,
+                  color: "text.primary",
+                  backgroundColor: "surface.containerHigh",
+                  fontWeight: 550,
+                  "&:hover": {
+                    backgroundColor: "surface.containerHighest",
+                    textDecoration: "none",
+                  },
+                  "&:focus-visible": {
+                    outline: "2px solid",
+                    outlineColor: "primary.main",
+                    outlineOffset: 2,
+                  },
+                }}
               >
-                公开 Slug：{publishStatus.publicSlug}
+                <Box component="span" sx={{ minWidth: 0, overflowWrap: "anywhere" }}>
+                  公开 Slug：{publishStatus.publicSlug}
+                </Box>
+                <OpenInNewRounded aria-hidden="true" sx={{ fontSize: 18, flexShrink: 0 }} />
               </MuiLink>
             ) : (
-              <Typography variant="body2" sx={{ color: "text.secondary" }}>
-                公开 Slug：首次发布后生成
+              <Typography
+                variant="body2"
+                sx={{ color: "text.secondary", overflowWrap: "anywhere" }}
+              >
+                公开 Slug：
+                {publishStatus.publicSlug
+                  ? `${publishStatus.publicSlug}（${isGroupPublished ? "公开站地址未配置" : "当前图组未公开"}）`
+                  : "首次发布后生成"}
               </Typography>
             )}
             <Typography
               component="time"
-              dateTime={publishStatus.publishedAt ?? undefined}
+              dateTime={isGroupPublished ? (publishStatus.publishedAt ?? undefined) : undefined}
               variant="body2"
               sx={{
                 minHeight: "1.5em",
