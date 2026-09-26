@@ -6,6 +6,12 @@ Entries before that date are summarized at release level instead of being recons
 
 ## Unreleased
 
+## v2.0.1 - 2026-09-27
+
+### Fixed
+
+- Updated reviewed catalog screenshots for the centered filter and sort labels, allowing the release CI visual gate to validate the intended desktop and mobile layout.
+
 ## v2.0.0 - 2026-09-27
 
 ### Changed
