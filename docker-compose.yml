@@ -1,5 +1,5 @@
 x-internal-site-common: &internal-site-common
-  image: ${MAGIC_COMPARE_INTERNAL_SITE_IMAGE:-ghcr.io/aliceteaparty/magic-compare-web:v2.0.0-RC}
+  image: ${MAGIC_COMPARE_INTERNAL_SITE_IMAGE:-ghcr.io/aliceteaparty/magic-compare-web:v2.0.0}
   init: true
   environment: &internal-site-environment
     MALLOC_ARENA_MAX: ${MALLOC_ARENA_MAX:-2}
