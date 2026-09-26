@@ -140,10 +140,8 @@ export async function enrichPublishManifestWithPlaceholders({
         return { assetId: asset.id, placeholder: previous.placeholder, status: "reused" };
       }
 
-      const source = sourceById.get(asset.id);
-      if (!source) {
-        return { assetId: asset.id, placeholder: null, status: "failed" };
-      }
+      // Impossible for this caller: manifest assets are selected from the same complete group asset set.
+      const source = sourceById.get(asset.id)!;
 
       try {
         const bytes = await readThumbnail(source.thumbUrl, THUMBNAIL_BYTE_LIMIT);

@@ -2,6 +2,7 @@ import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { ImageResponse } from "next/og";
 import React from "react";
+import sharp from "sharp";
 import type { PublishManifest } from "@magic-compare/content-schema";
 import {
   buildPublicShareImageData,
@@ -11,6 +12,7 @@ import {
 
 const FONT_CACHE_DIRECTORY = path.join(process.cwd(), ".next", "cache", "share-image-fonts");
 const FONT_DOWNLOAD_TIMEOUT_MS = 60_000;
+const SHARE_IMAGE_ASSET_TIMEOUT_MS = 30_000;
 const FONT_SOURCES = {
   ibmPlexRegular: {
     fileName: "IBMPlexSans-Regular.ttf",
@@ -94,6 +96,25 @@ async function loadShareImageFonts(): Promise<ShareImageFont[]> {
   return shareImageFontsPromise;
 }
 
+/** Downsizes source assets before next/og embeds them in SVG, keeping Sharp below its XML input limit. */
+async function loadShareImageAsset(imageUrl: string): Promise<string> {
+  const response = await fetch(imageUrl, {
+    signal: AbortSignal.timeout(SHARE_IMAGE_ASSET_TIMEOUT_MS),
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to download share image asset: HTTP ${response.status}`);
+  }
+
+  const image = Buffer.from(await response.arrayBuffer());
+  const thumbnail = await sharp(image)
+    .resize({ width: 1200, height: 900, fit: "inside", withoutEnlargement: true })
+    .flatten({ background: "#151a14" })
+    .jpeg({ quality: 80, mozjpeg: true })
+    .toBuffer();
+
+  return `data:image/jpeg;base64,${thumbnail.toString("base64")}`;
+}
+
 function ComparisonPanel({ imageUrl, label }: { imageUrl: string; label: string }) {
   return (
     <div
@@ -162,7 +183,11 @@ function ComparisonPanel({ imageUrl, label }: { imageUrl: string; label: string 
 /** Renders the fixed 1200x630 card used by Open Graph and Twitter metadata. */
 export async function renderPublicShareImage(manifest: PublishManifest): Promise<ImageResponse> {
   const data = buildPublicShareImageData(manifest);
-  const fonts = await loadShareImageFonts();
+  const [fonts, leftImageUrl, rightImageUrl] = await Promise.all([
+    loadShareImageFonts(),
+    loadShareImageAsset(data.leftAsset.imageUrl),
+    loadShareImageAsset(data.rightAsset.imageUrl),
+  ]);
 
   return new ImageResponse(
     <div
@@ -179,7 +204,7 @@ export async function renderPublicShareImage(manifest: PublishManifest): Promise
       }}
     >
       <div style={{ display: "flex", width: 1200, height: 450, background: "#151a14" }}>
-        <ComparisonPanel imageUrl={data.leftAsset.imageUrl} label={data.leftAsset.label} />
+        <ComparisonPanel imageUrl={leftImageUrl} label={data.leftAsset.label} />
         <div
           style={{
             position: "absolute",
@@ -190,7 +215,7 @@ export async function renderPublicShareImage(manifest: PublishManifest): Promise
             background: "rgba(255, 255, 255, 0.72)",
           }}
         />
-        <ComparisonPanel imageUrl={data.rightAsset.imageUrl} label={data.rightAsset.label} />
+        <ComparisonPanel imageUrl={rightImageUrl} label={data.rightAsset.label} />
       </div>
       <div
         style={{

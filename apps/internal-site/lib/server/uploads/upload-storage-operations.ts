@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { ConflictError } from "@/lib/server/api/errors";
 import { mapWithConcurrency } from "@/lib/server/concurrency/map-with-concurrency";
 import { assertLikelyImageAssetUrl } from "@/lib/server/storage/internal-asset-sanity";
+import { validateAndGenerateAssetPlaceholderJson } from "@/lib/server/storage/asset-placeholders";
 import {
   createPresignedInternalAssetUpload,
   deleteInternalAssetPrefix,
@@ -98,17 +99,21 @@ export function assertFrameCanCommit(
   }
 }
 
-/** Verifies every uploaded object before database rows point to the new revision. */
-export async function assertPreparedAssetsUploaded(
+/** Verifies uploaded objects while reusing thumbnail bytes for the optional preview. */
+export async function validatePreparedAssetsAndGeneratePlaceholders(
   preparedAssets: PreparedUploadAsset[],
-): Promise<void> {
-  const logicalPaths = preparedAssets.flatMap((asset) => [
-    asset.original.logicalPath,
-    asset.thumbnail.logicalPath,
+): Promise<Array<string | null>> {
+  const placeholders = new Array<string | null>(preparedAssets.length).fill(null);
+  const tasks = preparedAssets.flatMap((asset, index) => [
+    () => assertLikelyImageAssetUrl(asset.original.logicalPath),
+    async () => {
+      placeholders[index] = await validateAndGenerateAssetPlaceholderJson(
+        asset.thumbnail.logicalPath,
+      );
+    },
   ]);
-  await mapWithConcurrency(logicalPaths, STORAGE_OPERATION_CONCURRENCY, (logicalPath) =>
-    assertLikelyImageAssetUrl(logicalPath),
-  );
+  await mapWithConcurrency(tasks, STORAGE_OPERATION_CONCURRENCY, (task) => task());
+  return placeholders;
 }
 
 /** Deletes superseded prefixes only after the replacement frame has committed. */

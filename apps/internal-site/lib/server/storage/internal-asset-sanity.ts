@@ -4,12 +4,6 @@ import { StorageValidationError } from "@/lib/server/api/errors";
 import { mapWithConcurrency } from "@/lib/server/concurrency/map-with-concurrency";
 import { readInternalAssetPrefix } from "./internal-assets";
 
-type PublicAssetLike = {
-  kind: string;
-  imageUrl: string;
-  thumbUrl: string;
-};
-
 const decoder = new TextDecoder("utf-8");
 const KEY_ASSET_KINDS = new Set(["before", "after", "heatmap"]);
 const STORAGE_VALIDATION_CONCURRENCY = 8;
@@ -60,7 +54,7 @@ function storageFailureDetail(assetUrl: string, error: unknown) {
  * Keep server-side validation cheap because uploader already did the expensive decode step; this
  * layer only needs to catch obviously wrong or masqueraded objects before import/publish proceeds.
  */
-function assertLikelyImageBytes(assetUrl: string, bytes: Uint8Array): void {
+export function assertLikelyImageBytes(assetUrl: string, bytes: Uint8Array): void {
   const extension = extname(assetUrl).toLowerCase();
 
   if (extension === ".png" && hasPrefix(bytes, [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])) {
@@ -105,8 +99,8 @@ export async function assertLikelyImageAssetUrl(assetUrl: string): Promise<void>
 }
 
 /**
- * Import should only validate the key compare assets so the server stays lightweight and does not
- * turn every misc/crop object into a second full validation pass.
+ * Import validates key originals here; key thumbnails are validated alongside their preview read
+ * so each thumbnail only needs one normal storage request.
  */
 export async function assertLikelyImportManifestAssets(manifest: ImportManifest): Promise<void> {
   const tasks: Array<() => Promise<void>> = [];
@@ -116,25 +110,9 @@ export async function assertLikelyImportManifestAssets(manifest: ImportManifest)
         if (!isKeyCompareAssetKind(assetEntry.kind)) {
           continue;
         }
-        tasks.push(
-          () => assertLikelyImageAssetUrl(assetEntry.imageUrl),
-          () => assertLikelyImageAssetUrl(assetEntry.thumbUrl),
-        );
+        tasks.push(() => assertLikelyImageAssetUrl(assetEntry.imageUrl));
       }
     }
   }
-  await mapWithConcurrency(tasks, STORAGE_VALIDATION_CONCURRENCY, (task) => task());
-}
-
-/** Validates a publish batch as one bounded queue rather than waiting for every frame in series. */
-export async function assertLikelyPublicAssets(assets: PublicAssetLike[]): Promise<void> {
-  const tasks = assets.flatMap((asset) =>
-    isKeyCompareAssetKind(asset.kind)
-      ? [
-          () => assertLikelyImageAssetUrl(asset.imageUrl),
-          () => assertLikelyImageAssetUrl(asset.thumbUrl),
-        ]
-      : [],
-  );
   await mapWithConcurrency(tasks, STORAGE_VALIDATION_CONCURRENCY, (task) => task());
 }

@@ -100,6 +100,11 @@ test("group visibility failure rolls back and recovery persists", async ({ page,
   await expect(
     page.getByRole("button", { name: "删除项目", exact: true }).filter({ visible: true }),
   ).toBeDisabled();
+  await page.goto("/cases/e2e-sample/groups/viewer");
+  await page.getByRole("button", { name: "打开详情", exact: true }).click();
+  // Hiding a group retains its former slug in storage; the viewer must not offer a dead public link.
+  await expect(page.getByText(/当前图组未公开/)).toBeVisible();
+  await expect(page.getByRole("link", { name: /打开公开 Slug/ })).toHaveCount(0);
 });
 
 test("group drag saves order, delete cancels and recovers after failure", async ({

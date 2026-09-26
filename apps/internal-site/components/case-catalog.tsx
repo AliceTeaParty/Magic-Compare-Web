@@ -22,10 +22,34 @@ import { FluentFolderEmoji } from "./fluent-emoji";
 type StatusFilter = "all" | CaseStatus;
 type SortOrder = "updated-desc" | "updated-asc" | "title";
 
+const statusLabels: Record<StatusFilter, string> = {
+  all: "全部状态",
+  draft: "草稿",
+  internal: "内部",
+  published: "已发布",
+  archived: "已归档",
+};
+
+const sortLabels: Record<SortOrder, string> = {
+  "updated-desc": "最近更新",
+  "updated-asc": "最早更新",
+  title: "标题",
+};
+
+const selectLeadingIconSx = {
+  position: "absolute",
+  left: 16,
+  top: "50%",
+  transform: "translateY(-50%)",
+  fontSize: 18,
+  pointerEvents: "none",
+} as const;
+
 const controlSx = {
   // Status and sort previously repeated their labels in the outline notch. The filled M3 surface
   // keeps the icon and selected value readable without spending a second line on control chrome.
   "& .MuiFilledInput-root": {
+    position: "relative",
     minHeight: 52,
     borderRadius: "26px",
     overflow: "hidden",
@@ -35,6 +59,10 @@ const controlSx = {
     "&::before, &::after": { display: "none" },
   },
   "& .MuiFilledInput-input": { py: 1.5 },
+  // FilledInput reserves 12px for any start adornment, even an absolutely positioned icon.
+  "& .MuiSelect-root.MuiFilledInput-adornedStart": { pl: 0 },
+  // Keep the label centered while the icon remains at the leading edge.
+  "& .MuiSelect-select": { justifyContent: "center" },
 } as const;
 
 /** Filters the server snapshot locally so catalog controls respond without route-level loading. */
@@ -71,6 +99,8 @@ export function CaseCatalog({ items }: { items: CaseCatalogItem[] }) {
             xs: "repeat(2, minmax(0, 1fr))",
             sm: "minmax(240px, 1fr) 152px 168px",
           },
+          // Two compact selects leave no arrow clearance on the narrowest phones.
+          "@media (max-width: 360px)": { gridTemplateColumns: "minmax(0, 1fr)" },
           gap: 1,
           alignItems: "center",
         }}
@@ -99,7 +129,12 @@ export function CaseCatalog({ items }: { items: CaseCatalogItem[] }) {
             <Select
               value={status}
               disableUnderline
-              startAdornment={<FilterListOutlined sx={{ mr: 1, fontSize: 20 }} />}
+              startAdornment={<FilterListOutlined aria-hidden="true" sx={selectLeadingIconSx} />}
+              renderValue={(value) => (
+                <Box component="span" data-catalog-select-value sx={{ whiteSpace: "nowrap" }}>
+                  {statusLabels[value as StatusFilter]}
+                </Box>
+              )}
               inputProps={{ "aria-label": "筛选项目状态" }}
               onChange={(event) => setStatus(event.target.value as StatusFilter)}
             >
@@ -116,7 +151,12 @@ export function CaseCatalog({ items }: { items: CaseCatalogItem[] }) {
             <Select
               value={sortOrder}
               disableUnderline
-              startAdornment={<Sort sx={{ mr: 1, fontSize: 20 }} />}
+              startAdornment={<Sort aria-hidden="true" sx={selectLeadingIconSx} />}
+              renderValue={(value) => (
+                <Box component="span" data-catalog-select-value sx={{ whiteSpace: "nowrap" }}>
+                  {sortLabels[value as SortOrder]}
+                </Box>
+              )}
               inputProps={{ "aria-label": "项目排序" }}
               onChange={(event) => setSortOrder(event.target.value as SortOrder)}
             >

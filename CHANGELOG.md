@@ -6,6 +6,27 @@ Entries before that date are summarized at release level instead of being recons
 
 ## Unreleased
 
+## v2.0.1 - 2026-09-27
+
+### Fixed
+
+- Updated reviewed catalog screenshots for the centered filter and sort labels, allowing the release CI visual gate to validate the intended desktop and mobile layout.
+
+## v2.0.0 - 2026-09-27
+
+### Changed
+
+- Centered catalog filter and sort labels while keeping their icons at the leading edge, including narrow phone layouts.
+- Presented group visibility as an icon and label, and styled the public Slug link as an accessible action that accommodates long Slugs.
+- Removed redundant theme palette explanation from its popover.
+
+### Fixed
+
+- Kept S3 image checks at upload and import entry points instead of blocking public manifest publication on legacy asset metadata; reused thumbnail reads for validation and mosaic preview generation.
+- Limited batch manifest refresh to published Cases and pruned stale public bundles only when their manifest identity is verifiable.
+- Resized oversized public share image inputs before rendering so SVG parsing stays within resource limits.
+- Hid stale public links and publication dates when an individual group is no longer public.
+
 ## v2.0.0-RC - 2026-09-23
 
 ### Added

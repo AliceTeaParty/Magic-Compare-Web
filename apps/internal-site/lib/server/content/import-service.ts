@@ -9,7 +9,10 @@ import {
 } from "@/lib/server/storage/internal-asset-sanity";
 import { buildLogicalStoragePath } from "@/lib/server/storage/internal-assets";
 import { stringifyTags } from "./mappers";
-import { generateAssetPlaceholderJson } from "../storage/asset-placeholders";
+import {
+  generateAssetPlaceholderJson,
+  validateAndGenerateAssetPlaceholderJson,
+} from "../storage/asset-placeholders";
 import { mapWithConcurrency } from "../concurrency/map-with-concurrency";
 
 function inferGroupStorageRoot(groupEntry: ImportManifest["groups"][number]): string {
@@ -118,7 +121,9 @@ export async function applyImportManifest(rawManifest: unknown) {
     group.frames.flatMap((frame) => frame.assets),
   );
   const placeholderJson = await mapWithConcurrency(assetEntries, 4, (asset) =>
-    generateAssetPlaceholderJson(asset.thumbUrl),
+    isKeyCompareAssetKind(asset.kind)
+      ? validateAndGenerateAssetPlaceholderJson(asset.thumbUrl)
+      : generateAssetPlaceholderJson(asset.thumbUrl),
   );
   const placeholdersByAsset = new Map(
     assetEntries.map((asset, index) => [asset, placeholderJson[index]]),

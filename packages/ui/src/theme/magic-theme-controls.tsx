@@ -171,9 +171,6 @@ export function MagicThemeControls({ compact = false }: { compact?: boolean }) {
               </Box>
             </Tooltip>
           </Stack>
-          <Typography variant="caption" color="text.secondary">
-            颜色会生成完整的主色、辅助色和表面色阶。
-          </Typography>
         </Stack>
       </Popover>
     </Stack>

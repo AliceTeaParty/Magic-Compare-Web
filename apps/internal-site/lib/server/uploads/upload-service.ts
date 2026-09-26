@@ -1,8 +1,6 @@
 import { prisma } from "@/lib/server/db/client";
 import { BadRequestError, ConflictError, StorageValidationError } from "@/lib/server/api/errors";
 import { deleteInternalAssetPrefix } from "@/lib/server/storage/internal-assets";
-import { generateAssetPlaceholderJson } from "@/lib/server/storage/asset-placeholders";
-import { mapWithConcurrency } from "@/lib/server/concurrency/map-with-concurrency";
 import {
   type GroupUploadStartInput,
   GroupUploadCancelInputSchema,
@@ -40,12 +38,12 @@ import {
 import {
   assertFrameCanCommit,
   assertFrameCanPrepare,
-  assertPreparedAssetsUploaded,
   buildFramePendingPrefix,
   buildPreparedUploadAssets,
   buildPresignedFiles,
   deleteReplacedFramePrefixes,
   type PreparedUploadAsset,
+  validatePreparedAssetsAndGeneratePlaceholders,
 } from "./upload-storage-operations";
 
 /**
@@ -317,8 +315,9 @@ export async function commitGroupUploadFrame(rawInput: unknown) {
   }
 
   const { frameSnapshot, job, pendingPrefix, preparedAssets } = loadPreparedFrameCommit(frameJob);
+  let placeholderJson: Array<string | null>;
   try {
-    await assertPreparedAssetsUploaded(preparedAssets);
+    placeholderJson = await validatePreparedAssetsAndGeneratePlaceholders(preparedAssets);
   } catch (error) {
     if (error instanceof StorageValidationError) {
       throw new StorageValidationError({
@@ -330,9 +329,8 @@ export async function commitGroupUploadFrame(rawInput: unknown) {
     }
     throw error;
   }
-  // Decode thumbnails before the transaction; SQLite must never hold a write lock across S3 reads.
-  await mapWithConcurrency(preparedAssets, 4, async (asset) => {
-    asset.imagePlaceholderJson = await generateAssetPlaceholderJson(asset.thumbnail.logicalPath);
+  preparedAssets.forEach((asset, index) => {
+    asset.imagePlaceholderJson = placeholderJson[index] ?? null;
   });
   const existingFrames = await prisma.frame.findMany({
     where: {
